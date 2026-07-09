@@ -1,0 +1,93 @@
+# CEC Hub
+
+The staff home screen for Concord Eyecare. One local web app with big tiles:
+How-To Guides (SOPs) · Referral Letters · Google Reviews · Orders & Collections · Stock Orders.
+
+Built for everyone at the front desk — big text, big buttons, plain words, nothing scary.
+
+## What it is (and isn't)
+
+- A **local Flask app** on `http://localhost:5680`. No internet accounts, no logins.
+- **No patient data, ever.** Optomate stays the system of record — the Hub is the procedures-and-buttons layer on top.
+- The only thing the Hub ever *writes* outside its own folder is renaming a stock
+  proposal CSV to `*.approved.csv` when someone presses Approve (plus its own `hub.log`).
+- The "Who's using this?" picker in the corner is optional — it just puts a name on
+  the Hub's own log lines (e.g. who approved a stock order). It's a cookie, not an account.
+
+## Setting it up on a machine
+
+1. Install Python from python.org (tick "Add to PATH") if it isn't already there.
+2. Copy this whole `CEC-Hub` folder onto the machine (anywhere is fine).
+   *Deployment is folder-copy for now; a git repo comes later.*
+3. Double-click **INSTALL.bat** once.
+4. Double-click **START.bat** — the browser opens the Hub by itself.
+   Keep the black window open while the Hub is in use.
+5. Optional: right-click START.bat → Send to → Desktop (create shortcut), and
+   rename the shortcut "CEC Hub".
+
+### Connecting the other systems on this machine
+
+Open `config\integrations.json` in Notepad and check the paths:
+
+| Section | Points at | Used by |
+|---|---|---|
+| `review_bot` | the review bot's `sent_log.json`, `review_bot.log`, `config.json` | Reviews page |
+| `optomate_agent` | the agent's `logs\orders-digest.log`, `logs\uncollected-ready.txt`, `inventory\proposals\` | Orders + Stock pages |
+| `scorecard_drop` | the folder Karen saves the Friday scorecard photo into | referenced by the scorecard guide |
+
+If a path doesn't exist on this machine, the matching page simply says
+"not connected" — nothing breaks. The defaults assume the Optomate agent at
+`C:\CEC\CEC-Optomate-Agent` (practice server) and the review bot at its
+current location on Mark's machine; adjust per machine.
+
+Other config files: `config\tiles.json` (the home-screen tiles) and
+`config\staff.json` (names in the picker). All three are plain JSON read fresh
+on every page load — edit, save, refresh the browser. No restart needed.
+
+## Adding or editing a How-To Guide (SOP)
+
+Drop a markdown file in `sops\` following the conventions in **`sops\README.md`**
+(frontmatter, numbered steps, `> IF condition: action` decision boxes,
+`[MARK: ...]` for anything unconfirmed). The Hub picks it up on the next page
+load. Any Claude session can do this — point it at `sops\README.md`.
+
+## The Stock approve button — what it actually does
+
+Pressing "Approved — mark for entry" renames the proposal file from
+`name.csv` to `name.approved.csv` in the agent's proposals folder and logs who
+pressed it. **That's all.** The actual entry into Optomate stays a
+supervised/CLI step run by Mark/Claude. Nothing is ordered automatically.
+
+## For developers / future Claude sessions
+
+```
+app.py                  Flask app (port 5680) — routes only, no business logic
+hub\sop_parser.py       SOP markdown -> structured blocks (the renderer contract)
+hub\integrations.py     read-only views of the other systems, all graceful
+config\*.json           tiles, integration paths, staff names
+sops\                   the guides + README.md (authoring contract) + images\
+static\                 index.html / style.css / app.js — no build step
+tests\                  mocked pytest suite (no network, no real integration paths)
+```
+
+Run the tests from the `CEC-Hub` folder:
+
+```
+python -m pytest tests -q
+```
+
+Environment overrides (used by the tests, handy for odd setups):
+`CEC_HUB_INTEGRATIONS` (path to an integrations.json) and
+`CEC_HUB_SOPS_DIR` (path to a sops folder).
+
+Style rules baked into `static\style.css`: minimum 18px body text (19px used),
+1.6 line height, CEC greens (`#438F73` accents, `#0f2b21` headings, `#e8f2ee`
+background, `#2e6a52` for button/link fills so white text passes WCAG AA),
+Urbanist/Work Sans with system fallbacks, touch targets ≥48px.
+
+## If something goes wrong
+
+- Page says "not connected" — normal on machines that don't run that system.
+- Browser can't reach the Hub — the black window probably got closed.
+  Double-click START.bat again.
+- Anything else: close the black window, START.bat again. Still stuck? Ask Mark.

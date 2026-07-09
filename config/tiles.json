@@ -1,0 +1,41 @@
+{
+  "_readme": "Home-screen tiles. Edit names/descriptions freely — the app reads this file fresh on every page load. 'link' starting with #/ opens a Hub page; a full http link opens in a new tab (external: true).",
+  "tiles": [
+    {
+      "id": "sops",
+      "icon": "📋",
+      "name": "How-To Guides",
+      "description": "Step-by-step instructions for everyday jobs (SOPs)",
+      "link": "#/sops"
+    },
+    {
+      "id": "referrals",
+      "icon": "✉️",
+      "name": "Referral Letters",
+      "description": "Write GP reports and specialist letters",
+      "link": "http://localhost:5678",
+      "external": true
+    },
+    {
+      "id": "reviews",
+      "icon": "⭐",
+      "name": "Google Reviews",
+      "description": "How many review invitations went out this week",
+      "link": "#/reviews"
+    },
+    {
+      "id": "orders",
+      "icon": "📦",
+      "name": "Orders & Collections",
+      "description": "Recent orders digest and jobs ready to collect",
+      "link": "#/orders"
+    },
+    {
+      "id": "stock",
+      "icon": "🧾",
+      "name": "Stock Orders",
+      "description": "Check suggested stock orders and approve them",
+      "link": "#/stock"
+    }
+  ]
+}

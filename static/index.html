@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CEC Hub — Concord Eyecare</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@600;700;800&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="#/">
+            <span class="brand-badge">CEC</span>
+            <span class="brand-text">Staff Hub <span class="brand-sub">Concord Eyecare</span></span>
+        </a>
+        <div class="who">
+            <label for="staff-picker">Who's using this?</label>
+            <select id="staff-picker" aria-label="Pick your name">
+                <option value="">— pick your name —</option>
+            </select>
+        </div>
+    </header>
+
+    <main id="view" aria-live="polite">
+        <div class="loading-panel">Opening the Hub…</div>
+    </main>
+
+    <footer class="hub-footer">
+        CEC Hub runs only on this computer · no patient information is stored here · stuck? ask Mark
+    </footer>
+
+    <script src="/app.js"></script>
+</body>
+</html>

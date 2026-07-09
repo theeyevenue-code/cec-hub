@@ -1,0 +1,515 @@
+/* CEC Hub — big text, big buttons, CEC greens, nothing scary. */
+
+:root {
+    --green: #438F73;        /* CEC primary — accents, borders, icons   */
+    --green-deep: #2e6a52;   /* darker green — buttons & links (AA text) */
+    --green-dark: #24543f;   /* hover                                     */
+    --ink: #0f2b21;          /* headings                                  */
+    --body: #22332c;         /* body text                                 */
+    --muted: #46604f;        /* secondary text (AA on white)              */
+    --mint: #e8f2ee;         /* page background                           */
+    --mint-soft: #f3f9f6;    /* row hover / done steps                    */
+    --paper: #ffffff;
+    --line: #cfe0d8;
+    --amber-bg: #fff6df;
+    --amber-line: #d9b23a;
+    --amber-ink: #5d4a00;
+    --info-bg: #eaf3fb;
+    --info-line: #9dc0dd;
+    --info-ink: #163a57;
+    --danger-ink: #a02c20;
+    --danger-bg: #fdecea;
+    --radius: 16px;
+    --shadow: 0 2px 10px rgba(15, 43, 33, 0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+    font-family: 'Work Sans', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+    font-size: 19px;
+    line-height: 1.6;
+    color: var(--body);
+    background: var(--mint);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+h1, h2, h3, .brand, .tile-name, .stat-number {
+    font-family: 'Urbanist', 'Work Sans', 'Segoe UI', system-ui, sans-serif;
+    color: var(--ink);
+}
+
+main {
+    width: 100%;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 28px 22px 60px;
+    flex: 1;
+}
+
+/* --- Top bar --------------------------------------------------------- */
+
+.topbar {
+    background: var(--ink);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 22px;
+    flex-wrap: wrap;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: #fff;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.brand-badge {
+    background: var(--green);
+    color: #fff;
+    border-radius: 10px;
+    padding: 4px 10px;
+    font-size: 20px;
+    letter-spacing: 1px;
+}
+
+.brand-text { color: #fff; }
+.brand-sub { font-weight: 500; font-size: 15px; opacity: 0.85; display: block; line-height: 1.1; }
+
+.who { display: flex; align-items: center; gap: 10px; }
+.who label { font-size: 16px; color: #d7e8e0; }
+
+.who select {
+    font-size: 18px;
+    font-family: inherit;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 2px solid var(--green);
+    background: #fff;
+    color: var(--ink);
+    min-height: 48px;
+    cursor: pointer;
+}
+
+/* --- Shared bits ------------------------------------------------------ */
+
+.loading-panel, .error-panel, .empty-panel {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 34px 28px;
+    font-size: 21px;
+    text-align: center;
+    color: var(--muted);
+    box-shadow: var(--shadow);
+}
+
+.error-panel { color: var(--danger-ink); background: var(--danger-bg); border-color: #e5b6b0; }
+
+.page-title { font-size: 34px; font-weight: 800; margin-bottom: 6px; }
+.page-sub { font-size: 19px; color: var(--muted); margin-bottom: 22px; }
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-family: inherit;
+    font-size: 20px;
+    font-weight: 700;
+    min-height: 58px;
+    padding: 12px 26px;
+    border-radius: 14px;
+    border: 2px solid var(--green-deep);
+    background: var(--green-deep);
+    color: #fff;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s ease;
+}
+.btn:hover { background: var(--green-dark); border-color: var(--green-dark); }
+.btn:focus-visible { outline: 4px solid #9fd0bc; outline-offset: 2px; }
+
+.btn-quiet {
+    background: var(--paper);
+    color: var(--green-deep);
+}
+.btn-quiet:hover { background: var(--mint-soft); color: var(--green-dark); }
+
+.btn-back { margin-bottom: 18px; }
+
+.chip {
+    display: inline-block;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: var(--mint);
+    color: var(--ink);
+    border: 1px solid var(--line);
+}
+.chip-on  { background: #dff0e8; border-color: var(--green); color: #1d5741; }
+.chip-off { background: #eee; border-color: #bbb; color: #444; }
+.chip-amber { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber-ink); }
+
+.card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 26px 28px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+}
+.card h2 { font-size: 24px; margin-bottom: 12px; }
+
+/* --- Home tiles ------------------------------------------------------- */
+
+.greeting { font-size: 26px; font-weight: 700; color: var(--ink); margin-bottom: 20px; }
+
+.tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.tile {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--paper);
+    border: 2px solid var(--line);
+    border-radius: var(--radius);
+    padding: 26px 24px;
+    min-height: 180px;
+    text-decoration: none;
+    color: var(--body);
+    box-shadow: var(--shadow);
+    transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.tile:hover, .tile:focus-visible { border-color: var(--green); transform: translateY(-2px); }
+.tile:focus-visible { outline: 4px solid #9fd0bc; outline-offset: 2px; }
+
+.tile-icon { font-size: 46px; line-height: 1; }
+.tile-name { font-size: 26px; font-weight: 800; }
+.tile-desc { font-size: 18px; color: var(--muted); }
+.tile-external { font-size: 15px; color: var(--green-deep); font-weight: 600; margin-top: auto; }
+
+/* --- SOP list --------------------------------------------------------- */
+
+.sops-layout { display: flex; gap: 24px; align-items: flex-start; }
+
+.cat-sidebar {
+    flex: 0 0 230px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: sticky;
+    top: 20px;
+}
+
+.cat-btn {
+    font-family: inherit;
+    font-size: 19px;
+    font-weight: 600;
+    text-align: left;
+    padding: 14px 18px;
+    min-height: 56px;
+    border-radius: 12px;
+    border: 2px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+}
+.cat-btn:hover { border-color: var(--green); }
+.cat-btn.active { background: var(--green-deep); border-color: var(--green-deep); color: #fff; }
+
+.sops-main { flex: 1; min-width: 0; }
+
+.search-box {
+    width: 100%;
+    font-family: inherit;
+    font-size: 21px;
+    padding: 16px 20px;
+    min-height: 62px;
+    border: 2px solid var(--line);
+    border-radius: 14px;
+    margin-bottom: 20px;
+    background: var(--paper);
+    color: var(--body);
+}
+.search-box:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 4px #cde8dd; }
+
+.sop-card {
+    display: block;
+    background: var(--paper);
+    border: 2px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 14px;
+    text-decoration: none;
+    color: var(--body);
+    box-shadow: var(--shadow);
+}
+.sop-card:hover, .sop-card:focus-visible { border-color: var(--green); }
+.sop-card-title { font-size: 24px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.sop-card-summary { font-size: 18px; color: var(--muted); }
+.sop-card-meta { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* --- SOP detail ------------------------------------------------------- */
+
+.sop-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.sop-title { font-size: 36px; font-weight: 800; line-height: 1.25; margin-bottom: 10px; }
+.sop-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+
+.tick-hint { font-size: 16px; color: var(--muted); margin-bottom: 18px; }
+
+.sop-blocks h2 { font-size: 26px; margin: 26px 0 14px; }
+.sop-blocks p { margin-bottom: 16px; font-size: 20px; }
+.sop-blocks ul { margin: 0 0 18px 8px; list-style: none; }
+.sop-blocks ul li {
+    font-size: 20px;
+    padding: 10px 14px 10px 38px;
+    position: relative;
+}
+.sop-blocks ul li::before {
+    content: "•";
+    color: var(--green);
+    font-size: 30px;
+    position: absolute;
+    left: 10px;
+    top: 2px;
+}
+.sop-blocks img {
+    max-width: 100%;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    margin: 6px 0 18px;
+    display: block;
+}
+.sop-blocks code {
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 17px;
+    background: var(--mint);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 2px 8px;
+    word-break: break-all;
+}
+
+.step {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    background: var(--paper);
+    border: 2px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+}
+.step:hover { border-color: var(--green); }
+
+.step-tick {
+    flex: 0 0 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 3px solid var(--green);
+    background: var(--paper);
+    color: transparent;
+    font-size: 22px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 2px;
+}
+
+.step-number { font-weight: 800; color: var(--green-deep); font-size: 21px; margin-right: 4px; }
+.step-text { font-size: 21px; }
+
+.step.done { background: var(--mint-soft); border-color: var(--green); }
+.step.done .step-tick { background: var(--green); color: #fff; }
+.step.done .step-text { color: var(--muted); }
+
+.sop-btn {  /* links inside SOPs become big buttons */
+    display: inline-flex;
+    align-items: center;
+    min-height: 54px;
+    padding: 10px 24px;
+    margin: 6px 6px 6px 0;
+    border-radius: 12px;
+    background: var(--green-deep);
+    color: #fff !important;
+    font-weight: 700;
+    font-size: 19px;
+    text-decoration: none;
+}
+.sop-btn:hover { background: var(--green-dark); }
+.sop-btn::after { content: " ↗"; font-size: 16px; }
+
+.branch {
+    background: var(--amber-bg);
+    border: 2px solid var(--amber-line);
+    border-radius: 14px;
+    padding: 18px 22px;
+    margin: 6px 0 16px;
+}
+.branch-label {
+    display: inline-block;
+    background: var(--amber-ink);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    border-radius: 999px;
+    padding: 3px 12px;
+    margin-bottom: 10px;
+}
+.branch-q { font-size: 21px; font-weight: 700; color: var(--amber-ink); margin-bottom: 12px; }
+.branch-row { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 8px; font-size: 20px; }
+.branch-yesno {
+    flex: 0 0 auto;
+    font-weight: 800;
+    border-radius: 8px;
+    padding: 2px 12px;
+    font-size: 17px;
+    margin-top: 3px;
+}
+.branch-yes { background: #dff0e8; color: #1d5741; border: 1px solid var(--green); }
+.branch-no  { background: #fff; color: var(--amber-ink); border: 1px solid var(--amber-line); }
+
+.note-box {
+    background: var(--info-bg);
+    border: 2px solid var(--info-line);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin: 6px 0 16px;
+    font-size: 19px;
+    color: var(--info-ink);
+}
+.note-box::before { content: "Good to know: "; font-weight: 700; }
+
+.mark-flag {
+    display: inline-block;
+    background: var(--amber-bg);
+    border: 2px dashed var(--amber-line);
+    color: var(--amber-ink);
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 17px;
+    font-weight: 600;
+    margin: 2px 0;
+}
+
+/* --- Status pages (reviews / orders) ---------------------------------- */
+
+.stat-card { text-align: center; padding: 38px 28px; }
+.stat-number { font-size: 76px; font-weight: 800; line-height: 1.1; color: var(--green-deep); }
+.stat-label { font-size: 22px; color: var(--ink); font-weight: 600; }
+.stat-foot { margin-top: 14px; font-size: 17px; color: var(--muted); }
+
+.log-text {
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 16px;
+    line-height: 1.55;
+    background: #f6faf8;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 480px;
+    overflow: auto;
+}
+
+.updated-line { font-size: 16px; color: var(--muted); margin-bottom: 10px; }
+
+/* --- Stock ------------------------------------------------------------ */
+
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+
+.stock-table { border-collapse: collapse; width: 100%; font-size: 18px; }
+.stock-table th {
+    background: var(--mint);
+    color: var(--ink);
+    text-align: left;
+    padding: 12px 14px;
+    border-bottom: 2px solid var(--line);
+    white-space: nowrap;
+}
+.stock-table td { padding: 11px 14px; border-bottom: 1px solid var(--line); }
+.stock-table tr:last-child td { border-bottom: none; }
+
+.stock-actions { margin-top: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+.approved-banner {
+    background: #dff0e8;
+    border: 2px solid var(--green);
+    color: #1d5741;
+    border-radius: 12px;
+    padding: 14px 20px;
+    font-size: 20px;
+    font-weight: 700;
+    margin-top: 16px;
+}
+
+.confirm-strip {
+    background: var(--amber-bg);
+    border: 2px solid var(--amber-line);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-top: 14px;
+}
+.confirm-strip p { font-size: 19px; color: var(--amber-ink); margin-bottom: 12px; }
+
+.status-msg { margin-top: 12px; font-size: 19px; }
+.status-msg.ok { color: #1d5741; font-weight: 700; }
+.status-msg.error { color: var(--danger-ink); font-weight: 700; }
+
+/* --- Footer ------------------------------------------------------------ */
+
+.hub-footer {
+    text-align: center;
+    font-size: 15px;
+    color: var(--muted);
+    padding: 18px 20px 26px;
+}
+
+/* --- Small screens ------------------------------------------------------ */
+
+@media (max-width: 760px) {
+    .sops-layout { flex-direction: column; }
+    .cat-sidebar { position: static; flex-direction: row; flex-wrap: wrap; flex-basis: auto; }
+    .cat-btn { flex: 1 1 auto; text-align: center; }
+    .page-title { font-size: 28px; }
+    .sop-title { font-size: 29px; }
+    .stat-number { font-size: 58px; }
+}
+
+/* --- Print: the SOP becomes a clean paper checklist --------------------- */
+
+@media print {
+    body { background: #fff; font-size: 13pt; color: #000; }
+    .topbar, .hub-footer, .btn, .who, .tick-hint, .search-box { display: none !important; }
+    main { max-width: none; padding: 0; }
+    .step { border: 1.5pt solid #444; box-shadow: none; break-inside: avoid; cursor: default; }
+    .step-tick { border-color: #444; background: #fff !important; color: transparent !important; }
+    .step.done { background: #fff; }
+    .step.done .step-text { color: #000; }
+    .branch { border: 1.5pt solid #8a6d1a; background: #fff; break-inside: avoid; }
+    .note-box { border: 1.5pt solid #446; background: #fff; }
+    .sop-btn { background: none; color: #000 !important; padding: 0; min-height: 0; font-weight: 700; text-decoration: underline; }
+    .sop-btn::after { content: " (" attr(href) ")"; font-size: 10pt; }
+    .mark-flag { border: 1pt dashed #8a6d1a; background: #fff; }
+}

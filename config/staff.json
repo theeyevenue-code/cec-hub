@@ -1,0 +1,4 @@
+{
+  "_readme": "Names for the optional 'Who's using this?' picker in the top corner. Picking a name only adds it to the Hub's own log lines (e.g. who approved a stock order). No accounts, no passwords.",
+  "staff": ["Angie", "Karen", "Mark", "Nikki", "Vivian"]
+}
