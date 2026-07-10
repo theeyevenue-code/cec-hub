@@ -78,6 +78,13 @@ def _range(value):
     return min(nums), max(nums)
 
 
+def _blank(value):
+    """'70', '75mm' or a supplier list like '65/70/75' -> the largest
+    diameter offered (that's what decides whether a frame can be cut)."""
+    nums = [float(n) for n in NUM_RE.findall(str(value or ""))]
+    return max(nums) if nums else None
+
+
 def _fmt_power(v):
     return f"{v:+.2f}"
 
@@ -100,9 +107,10 @@ def _lens_type(raw, blank_mm):
 def parse_csv_text(text: str, source: str):
     """CSV text -> (lenses, errors). Never raises.
 
-    A row needs a lens name and a sphere range (sph_min+sph_max, or a
-    single sph_range column like '+4.00 to -4.00'); everything else is
-    optional. cyl_max / combined_max are stored as magnitudes.
+    A row only NEEDS a lens name. Sphere range (sph_min+sph_max, or one
+    sph_range column like '+4.00 to -4.00'), cyl, blank size and price are
+    all optional — missing limits surface as warnings when matching, never
+    as guesses. cyl_max / combined_max are stored as magnitudes.
     """
     lenses, errors = [], []
     try:
@@ -135,20 +143,23 @@ def parse_csv_text(text: str, source: str):
             errors.append(f"{source} row {rownum}: no lens name.")
             continue
 
+        # Sphere range is optional — supplier PRICE lists usually don't
+        # carry it (the availability guide does). A rangeless lens still
+        # matches, with a "check the guide" warning.
         sph_min, sph_max = _num(cells.get("sph_min")), _num(cells.get("sph_max"))
-        if sph_min is None or sph_max is None:
+        if sph_min is None and sph_max is None:
             rng = _range(cells.get("sph_range"))
             if rng:
                 sph_min, sph_max = rng
-        if sph_min is None or sph_max is None:
-            errors.append(f"{source} row {rownum} ({name}): sphere range "
-                          "missing — needs sph_min and sph_max (or one "
-                          "sph_range column).")
+        if (sph_min is None) != (sph_max is None):
+            errors.append(f"{source} row {rownum} ({name}): only half a "
+                          "sphere range — give both sph_min and sph_max, "
+                          "or neither.")
             continue
-        if sph_min > sph_max:
+        if sph_min is not None and sph_min > sph_max:
             sph_min, sph_max = sph_max, sph_min
 
-        blank_mm = _num(cells.get("blank_mm"))
+        blank_mm = _blank(cells.get("blank_mm"))
         cyl_max = _num(cells.get("cyl_max"))
         combined_max = _num(cells.get("combined_max"))
         lenses.append({
@@ -221,7 +232,10 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
     for lens in lenses:
         reasons, warnings = [], []
 
-        if not (lens["sph_min"] <= sph <= lens["sph_max"]):
+        if lens["sph_min"] is None:
+            warnings.append("power range isn't in the file — check the "
+                            "supplier guide before ordering")
+        elif not (lens["sph_min"] <= sph <= lens["sph_max"]):
             reasons.append(
                 f"sphere {_fmt_power(sph)} is outside its range "
                 f"({_fmt_power(lens['sph_min'])} to {_fmt_power(lens['sph_max'])})")
@@ -296,6 +310,9 @@ def _verdict(options, best):
                 line += (f" That saves ${saving:.2f} a lens compared with "
                          f"grinding ({_label(priced_grind)} at "
                          f"${priced_grind['price']:.2f}).")
+        if best["warnings"]:
+            line += (" Check its amber notes first — not all of its limits "
+                     "are in the file.")
         return line
     priced_stock = next((o for o in options
                          if o["type"] == "stock" and o["price"] is not None), None)

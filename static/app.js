@@ -460,7 +460,7 @@ function lensRowHTML(l, extraCellHTML) {
         <td>${l.index != null ? esc(l.index) : "—"}</td>
         <td><span class="chip ${l.type === "stock" ? "chip-on" : ""}">${l.type === "stock" ? "Stock" : "Grind"}</span></td>
         <td>${l.blank_mm != null ? esc(fmtMM(l.blank_mm)) : (l.type === "grind" ? "made to size" : "—")}</td>
-        <td>${esc(fmtPower(l.sph_min))} to ${esc(fmtPower(l.sph_max))}</td>
+        <td>${l.sph_min != null ? `${esc(fmtPower(l.sph_min))} to ${esc(fmtPower(l.sph_max))}` : "not in file"}</td>
         <td>${l.cyl_max != null ? "to −" + Number(l.cyl_max).toFixed(2) : "—"}</td>
         <td>${l.price != null ? esc(fmtMoney(l.price)) : "no price yet"}
             ${l.dearer_by > 0 ? `<div class="cell-sub">+${esc(fmtMoney(l.dearer_by))} vs best</div>` : ""}</td>
@@ -483,10 +483,13 @@ function lensCatalogHTML(cat) {
         <div class="sop-card-meta" style="margin:0 0 14px">${files}</div>
         ${errors.length ? `<div class="confirm-strip"><p>Some rows couldn't be read:</p>
             ${errors.map((e) => `<div class="warn-note">⚠ ${esc(e)}</div>`).join("")}</div>` : ""}
-        <div class="table-scroll"><table class="stock-table">
-            <thead>${LENS_TABLE_HEAD}</thead>
-            <tbody>${(cat.lenses || []).map((l) => lensRowHTML(l)).join("")}</tbody>
-        </table></div></div>`;
+        <details class="miss-details">
+            <summary>See everything that's loaded (${(cat.lenses || []).length} lens/coating lines)</summary>
+            <div class="table-scroll"><table class="stock-table">
+                <thead>${LENS_TABLE_HEAD}</thead>
+                <tbody>${(cat.lenses || []).map((l) => lensRowHTML(l)).join("")}</tbody>
+            </table></div>
+        </details></div>`;
 }
 
 async function renderLenses() {
@@ -579,14 +582,24 @@ async function renderLenses() {
             (data.min_blank != null ? `, needing a blank of at least ${esc(fmtMM(data.min_blank))}` : "");
         const options = data.options || [];
         const misses = data.misses || [];
+        const SHOW = 15;
+        const shown = options.slice(0, SHOW);
+        const rest = options.slice(SHOW);
         resultsEl.innerHTML = `
             <div class="updated-line" style="margin-top:18px">${rxLine}</div>
             <div class="${options.length && options[0].best ? "approved-banner" : "empty-panel"}"
                  style="margin-bottom:16px">${esc(data.verdict)}</div>
-            ${options.length ? `<div class="table-scroll"><table class="stock-table">
+            ${shown.length ? `<div class="table-scroll"><table class="stock-table">
                 <thead>${LENS_TABLE_HEAD}</thead>
-                <tbody>${options.map((l) => lensRowHTML(l)).join("")}</tbody>
+                <tbody>${shown.map((l) => lensRowHTML(l)).join("")}</tbody>
             </table></div>` : ""}
+            ${rest.length ? `<details class="miss-details">
+                <summary>Show the other ${rest.length} dearer options</summary>
+                <div class="table-scroll"><table class="stock-table">
+                    <thead>${LENS_TABLE_HEAD}</thead>
+                    <tbody>${rest.map((l) => lensRowHTML(l)).join("")}</tbody>
+                </table></div>
+            </details>` : ""}
             ${misses.length ? `<details class="miss-details">
                 <summary>Why the other ${misses.length} lens${misses.length === 1 ? " doesn't" : "es don't"} fit</summary>
                 ${misses.map((m) => `<div class="miss-item">

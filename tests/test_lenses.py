@@ -54,13 +54,27 @@ def test_parse_type_guessed_grind_without_blank():
 def test_parse_collects_row_errors_and_keeps_good_rows():
     text = ("lens,sph_min,sph_max,price\n"
             "Good Lens,-2.00,+2.00,10.00\n"
-            "No Range Lens,,,12.00\n"
+            "Half Range Lens,-2.00,,12.00\n"
             ",-1.00,+1.00,9.00\n")
     parsed, errors = lenses.parse_csv_text(text, "x.csv")
     assert len(parsed) == 1 and parsed[0]["name"] == "Good Lens"
     assert len(errors) == 2
-    assert "sphere range" in errors[0]
+    assert "half a sphere range" in errors[0]
     assert "no lens name" in errors[1]
+
+
+def test_parse_allows_missing_sphere_range():
+    # Price lists usually don't state ranges — the row still loads.
+    text = "lens,type,blank_mm,price\nStock Only Price,stock,70,12.00\n"
+    parsed, errors = lenses.parse_csv_text(text, "x.csv")
+    assert errors == []
+    assert parsed[0]["sph_min"] is None and parsed[0]["sph_max"] is None
+
+
+def test_parse_blank_diameter_list_uses_largest():
+    text = "lens,type,blank_mm,sph_min,sph_max\nMulti Blank,stock,65/70/75,-4,+4\n"
+    parsed, _ = lenses.parse_csv_text(text, "x.csv")
+    assert parsed[0]["blank_mm"] == 75
 
 
 def test_parse_rejects_file_without_name_column():
@@ -151,6 +165,17 @@ def test_find_warns_when_limits_missing_instead_of_assuming():
                for w in by_name["No Cyl Info"]["warnings"])
     assert any("blank size isn't in the file" in w
                for w in by_name["No Blank Info"]["warnings"])
+
+
+def test_find_rangeless_lens_matches_with_warning():
+    rows = ("lens,type,blank_mm,price\n"
+            "No Range Stock,stock,70,5.00\n")
+    parsed, _ = lenses.parse_csv_text(rows, "x.csv")
+    result = lenses.find_options(parsed, sph=-7.0)
+    assert len(result["options"]) == 1
+    assert any("power range isn't in the file" in w
+               for w in result["options"][0]["warnings"])
+    assert "amber notes" in result["verdict"]
 
 
 def test_find_combined_power_limit():
