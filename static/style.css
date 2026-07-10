@@ -527,6 +527,12 @@ main {
 .best-row td { background: #dff0e8; }
 
 .cell-sub { font-size: 15px; color: var(--muted); }
+.code-sub {
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 14px;
+    color: var(--green-deep);
+    letter-spacing: 0.3px;
+}
 .warn-note { font-size: 16px; color: var(--amber-ink); }
 
 .miss-details { margin-top: 16px; }

@@ -45,6 +45,14 @@ def test_parse_header_aliases_units_and_range_column():
     assert lens["type"] == "stock"        # guessed: it has a blank size
 
 
+def test_parse_product_code_aliases():
+    text = ("lens,lenstype,sph_min,sph_max\n"
+            "Nulux,S-NULUX,-4.00,+4.00\n")
+    parsed, errors = lenses.parse_csv_text(text, "x.csv")
+    assert errors == []
+    assert parsed[0]["code"] == "S-NULUX"
+
+
 def test_parse_type_guessed_grind_without_blank():
     text = "lens,sph_min,sph_max\nSV Lab,-10.00,+8.00\n"
     parsed, _ = lenses.parse_csv_text(text, "x.csv")

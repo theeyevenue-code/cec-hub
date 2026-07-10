@@ -33,6 +33,7 @@ aliases work — e.g. `diameter` for `blank_mm`, `cost` for `price`).
 |---|---|---|
 | `brand` | no | e.g. `Hoya` |
 | `lens` (or `name`) | **yes** | e.g. `Nulux 1.50`, `Stellify 1.55` |
+| `code` | no | the supplier's order code / lens type, e.g. `S-NULUX`, `HLSY-1.50-70` — shown on results and searchable |
 | `index` | no | refractive index, e.g. `1.50`, `1.55`, `1.60`, `1.67` |
 | `type` | no | `stock` or `grind`. If blank: has a blank size → stock, no blank size → grind |
 | `design` | no | free text, e.g. `Single vision` — shown, not matched on |

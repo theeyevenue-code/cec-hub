@@ -274,7 +274,8 @@ for line in SRC.read_text(encoding="utf-8").splitlines():
     parts = re.split(r"\s{2,}", s)
     if len(parts) < 5 or not INDEX_RE.match(parts[1]) or not DIAM_RE.match(parts[2]):
         continue
-    name, index, diamtr, values = parts[0], parts[1], parts[2], parts[4:]
+    name, index, diamtr, code, values = (parts[0], parts[1], parts[2],
+                                         parts[3], parts[4:])
     if len(values) > len(coats):
         raise SystemExit(f"Too many price cells for '{name}': {values}")
 
@@ -289,9 +290,9 @@ for line in SRC.read_text(encoding="utf-8").splitlines():
             continue
         bands, extra = bands_for(name, coat, mode)
         common = {
-            "brand": "Hoya", "lens": name, "index": index, "type": mode,
-            "design": "Single vision", "price": val.lstrip("$"),
-            "coating": coat,
+            "brand": "Hoya", "lens": name, "code": code, "index": index,
+            "type": mode, "design": "Single vision",
+            "price": val.lstrip("$"), "coating": coat,
         }
         if bands is None:
             rows_out.append({**common, "blank_mm": diamtr,
@@ -313,7 +314,7 @@ for line in SRC.read_text(encoding="utf-8").splitlines():
 OUT.parent.mkdir(exist_ok=True)
 with OUT.open("w", encoding="utf-8", newline="") as f:
     writer = csv.DictWriter(f, fieldnames=[
-        "brand", "lens", "index", "type", "design", "blank_mm",
+        "brand", "lens", "code", "index", "type", "design", "blank_mm",
         "sph_min", "sph_max", "cyl_max", "combined_max",
         "price", "coating", "notes"])
     writer.writeheader()

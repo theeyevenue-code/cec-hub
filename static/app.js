@@ -454,6 +454,7 @@ function lensRowHTML(l, extraCellHTML) {
     return `<tr class="${l.best ? "best-row" : ""}">
         <td><strong>${esc((l.brand + " " + l.name).trim())}</strong>
             ${l.best ? `<span class="badge-best">★ Best value</span>` : ""}
+            ${l.code ? `<div class="cell-sub code-sub">${esc(l.code)}</div>` : ""}
             ${l.coating ? `<div class="cell-sub">${esc(l.coating)}</div>` : ""}
             ${l.notes ? `<div class="cell-sub">${esc(l.notes)}</div>` : ""}
             ${warnings}</td>
@@ -473,14 +474,20 @@ const LENS_TABLE_HEAD = `<tr><th>Lens</th><th>Index</th><th>Type</th>
 
 function lensCatalogHTML(cat) {
     if (cat.message) {
-        return `<div class="card"><h2>📚 What's loaded</h2>
+        return `<div class="card"><h2>📚 Look up a lens</h2>
             <div class="empty-panel">${esc(cat.message)}</div></div>`;
     }
     const files = (cat.files || []).map((f) => `
         <span class="chip">${esc(f.filename)} · ${esc(f.count)} lens${f.count === 1 ? "" : "es"}</span>`).join(" ");
     const errors = (cat.files || []).flatMap((f) => f.errors || []);
-    return `<div class="card"><h2>📚 What's loaded</h2>
-        <div class="sop-card-meta" style="margin:0 0 14px">${files}</div>
+    return `<div class="card"><h2>📚 Look up a lens</h2>
+        <p>Type any part of a lens name, order code, index or coating — the details
+        (range, blank sizes, price) come straight from the loaded price files.</p>
+        <input class="search-box" id="lens-lookup" type="search" autocomplete="off"
+            placeholder="e.g. stellify · S-NULUX · 1.67 · full control"
+            aria-label="Look up a lens">
+        <div id="lens-lookup-results"></div>
+        <div class="sop-card-meta" style="margin:14px 0 0">${files}</div>
         ${errors.length ? `<div class="confirm-strip"><p>Some rows couldn't be read:</p>
             ${errors.map((e) => `<div class="warn-note">⚠ ${esc(e)}</div>`).join("")}</div>` : ""}
         <details class="miss-details">
@@ -490,6 +497,43 @@ function lensCatalogHTML(cat) {
                 <tbody>${(cat.lenses || []).map((l) => lensRowHTML(l)).join("")}</tbody>
             </table></div>
         </details></div>`;
+}
+
+const LOOKUP_LIMIT = 40;
+
+function wireLensLookup(cat) {
+    const box = document.getElementById("lens-lookup");
+    const out = document.getElementById("lens-lookup-results");
+    if (!box || !out) return;
+    const lenses = (cat.lenses || []).map((l) => ({
+        lens: l,
+        hay: [l.brand, l.name, l.code, l.coating, l.index, l.design,
+              l.type, l.notes].join(" ").toLowerCase(),
+    }));
+    let timer = null;
+    box.addEventListener("input", () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            const words = box.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+            if (!words.length) { out.innerHTML = ""; return; }
+            const hits = lenses.filter((x) => words.every((w) => x.hay.includes(w)))
+                               .map((x) => x.lens);
+            if (!hits.length) {
+                out.innerHTML = `<div class="empty-panel">Nothing loaded matches
+                    “${esc(box.value.trim())}”. Check the spelling, or it may be a
+                    lens we don't have a price file for yet.</div>`;
+                return;
+            }
+            out.innerHTML = `
+                <div class="updated-line" style="margin-top:12px">${hits.length} matching
+                    line${hits.length === 1 ? "" : "s"}${hits.length > LOOKUP_LIMIT
+                    ? ` — showing the first ${LOOKUP_LIMIT}` : ""}</div>
+                <div class="table-scroll"><table class="stock-table">
+                    <thead>${LENS_TABLE_HEAD}</thead>
+                    <tbody>${hits.slice(0, LOOKUP_LIMIT).map((l) => lensRowHTML(l)).join("")}</tbody>
+                </table></div>`;
+        }, 150);
+    });
 }
 
 async function renderLenses() {
@@ -554,6 +598,8 @@ async function renderLenses() {
             </div>
             <div class="status-msg" id="lf-upmsg"></div>
         </div>`;
+
+    wireLensLookup(cat);
 
     const sphEl = document.getElementById("lf-sph");
     const cylEl = document.getElementById("lf-cyl");
@@ -659,6 +705,7 @@ async function renderLenses() {
                     : "");
             const fresh = await getJSON("/api/lenses");
             document.getElementById("lens-catalog").innerHTML = lensCatalogHTML(fresh);
+            wireLensLookup(fresh);
         } catch (err) {
             msg.className = "status-msg error";
             msg.textContent = err.message;

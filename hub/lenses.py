@@ -27,6 +27,8 @@ MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 HEADER_ALIASES = {
     "brand": "brand", "supplier": "brand", "manufacturer": "brand",
     "lens": "name", "name": "name", "lens_name": "name", "product": "name",
+    "code": "code", "product_code": "code", "lens_type": "code",
+    "lenstype": "code", "barcode": "code", "order_code": "code",
     "index": "index", "material_index": "index", "refractive_index": "index",
     "type": "type", "form": "type", "stock_or_grind": "type",
     "design": "design", "vision_type": "design",
@@ -165,6 +167,7 @@ def parse_csv_text(text: str, source: str):
         lenses.append({
             "brand": cells.get("brand", ""),
             "name": name,
+            "code": cells.get("code", ""),
             "index": _num(cells.get("index")),
             "type": _lens_type(cells.get("type"), blank_mm),
             "design": cells.get("design", ""),
