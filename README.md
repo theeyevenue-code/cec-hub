@@ -62,6 +62,13 @@ uploaded from the page or dropped into the folder. The column layout — and
 how to turn a supplier's PDF guide into a CSV with a Claude session — is in
 **`lenses\README.md`**. No patient data: powers only, nothing is stored.
 
+On machines that can see the Optomate agent, the page also shows **Recent
+lens jobs**: spectacle orders the agent extracts to `logs\lens-jobs.jsonl`
+(order numbers and Rx/frame numbers only), each re-checked against the
+price files — in range? blank big enough? marked Grind when a stock lens
+would do? The same check is callable at `POST /api/lenses/check` for any
+future helper. It's a second pair of eyes only — it never changes an order.
+
 ## The Stock approve button — what it actually does
 
 Pressing "Approved — mark for entry" renames the proposal file from

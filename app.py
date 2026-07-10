@@ -181,6 +181,60 @@ def lenses_find():
     return jsonify(result)
 
 
+@app.route("/api/lenses/check", methods=["POST"])
+def lenses_check():
+    """Order-screen check: both eyes' Rx (+ blank size or frame numbers,
+    + optionally what was chosen) -> plain-words verdict. This is the
+    contract the Optomate agent and any future helper call."""
+    data = request.get_json(silent=True) or {}
+    right, left = data.get("right") or {}, data.get("left") or {}
+    if lenses.parse_number((right or {}).get("sph")) is None and \
+            lenses.parse_number((left or {}).get("sph")) is None:
+        return jsonify({"error": "Send at least one eye with a sphere, "
+                                 "e.g. {\"right\": {\"sph\": -2.75}}."}), 400
+    min_blank = lenses.parse_number(data.get("min_blank"))
+    if min_blank is None:
+        min_blank = lenses.min_blank_from_frame(data.get("frame") or {})
+    if min_blank is not None and not 40 <= min_blank <= 90:
+        min_blank = None
+
+    catalog = lenses.load_catalog(LENSES_DIR)
+    result = lenses.check_job(catalog["lenses"], right, left, min_blank,
+                              data.get("chosen") or {})
+    result["catalog_message"] = catalog["message"]
+    return jsonify(result)
+
+
+@app.route("/api/lenses/jobs")
+def lenses_jobs():
+    """Recent Optomate spectacle jobs (from the agent's lens-jobs.jsonl),
+    each checked against the loaded price files."""
+    data = integrations.lens_jobs(_integrations())
+    if not data["connected"]:
+        return jsonify(data)
+    catalog = lenses.load_catalog(LENSES_DIR)
+    jobs = []
+    for job in data["jobs"]:
+        min_blank = lenses.parse_number(job.get("min_blank"))
+        if min_blank is None:
+            min_blank = lenses.min_blank_from_frame(job.get("frame") or {})
+        check = lenses.check_job(
+            catalog["lenses"], job.get("right") or {}, job.get("left") or {},
+            min_blank,
+            {"code": job.get("code"), "type": job.get("stk_grd")},
+        )
+        jobs.append({
+            "job": str(job.get("job") or ""),
+            "entered": str(job.get("entered") or ""),
+            "supplier": str(job.get("supplier") or ""),
+            "code": str(job.get("code") or ""),
+            "stk_grd": str(job.get("stk_grd") or ""),
+            "check": check,
+        })
+    return jsonify({"connected": True, "updated": data["updated"],
+                    "jobs": jobs, "catalog_message": catalog["message"]})
+
+
 @app.route("/api/lenses/upload", methods=["POST"])
 def lenses_upload():
     file = request.files.get("file")

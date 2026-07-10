@@ -499,6 +499,53 @@ function lensCatalogHTML(cat) {
         </details></div>`;
 }
 
+const JOB_STATUS_CHIP = {
+    stock: `<span class="chip chip-on">✅ Stock covers it</span>`,
+    grind: `<span class="chip">🛠 Grind job</span>`,
+    check: `<span class="chip chip-amber">⚠ Worth a look</span>`,
+    none: `<span class="chip chip-amber">⚠ Outside the loaded ranges</span>`,
+    no_rx: `<span class="chip chip-off">No Rx on the job</span>`,
+};
+
+async function renderLensJobs() {
+    const holder = document.getElementById("lens-jobs");
+    if (!holder) return;
+    let data;
+    try {
+        data = await getJSON("/api/lenses/jobs");
+    } catch (e) {
+        return; // the panel is optional — never break the page over it
+    }
+    if (!data.connected || !(data.jobs || []).length) return;
+
+    holder.innerHTML = `<div class="card">
+        <h2>🗒️ Recent lens jobs from Optomate</h2>
+        <p class="updated-line">Each job entered in Optomate, checked against the loaded
+            price files.${data.updated ? ` Last updated ${esc(data.updated)}.` : ""}
+            Nothing is changed or sent — this is a second pair of eyes only.</p>
+        ${data.jobs.map((j) => {
+            const c = j.check || {};
+            const eyes = ["right", "left"].filter((s) => (c.eyes || {})[s])
+                .map((s) => `${s === "right" ? "R" : "L"} ${esc(c.eyes[s].rx)}`)
+                .join(" · ");
+            const chosenNotes = ((c.chosen || {}).notes || []).map((n) =>
+                `<div class="warn-note">⚠ ${esc(n)}</div>`).join("");
+            return `<div class="job-row">
+                <div class="job-head">
+                    <strong>Job ${esc(j.job || "?")}</strong>
+                    ${JOB_STATUS_CHIP[c.status] || ""}
+                    ${j.supplier ? `<span class="chip">${esc(j.supplier)}</span>` : ""}
+                    ${j.code ? `<span class="chip">${esc(j.code)}</span>` : ""}
+                    ${j.entered ? `<span class="updated-line" style="margin:0">${esc(j.entered)}</span>` : ""}
+                </div>
+                ${eyes ? `<div class="job-rx">${eyes}${c.min_blank ? ` · blank ≥ ${esc(c.min_blank)}mm` : ""}</div>` : ""}
+                <div class="job-verdict">${esc(c.headline || "")}</div>
+                ${chosenNotes}
+            </div>`;
+        }).join("")}
+    </div>`;
+}
+
 const LOOKUP_LIMIT = 40;
 
 function wireLensLookup(cat) {
@@ -580,6 +627,8 @@ async function renderLenses() {
             <div id="lens-results"></div>
         </div>
 
+        <div id="lens-jobs"></div>
+
         <div id="lens-catalog">${lensCatalogHTML(cat)}</div>
 
         <div class="card">
@@ -600,6 +649,7 @@ async function renderLenses() {
         </div>`;
 
     wireLensLookup(cat);
+    renderLensJobs();  // fills #lens-jobs only when the agent file exists
 
     const sphEl = document.getElementById("lf-sph");
     const cylEl = document.getElementById("lf-cyl");
@@ -668,7 +718,7 @@ async function renderLenses() {
         const a = parseFloat(aEl.value), dbl = parseFloat(dblEl.value),
               pd = parseFloat(pdEl.value);
         if (!(a > 0) || !(dbl >= 0) || !(pd > 0)) { suggestEl.innerHTML = ""; return; }
-        const size = Math.ceil(a + Math.max(a + dbl - pd, 0) + 2);
+        const size = Math.ceil((a + 2) + Math.max(a + dbl - pd, 0) + 2);
         suggestEl.innerHTML = `<span>Suggested: <strong>${esc(size)}mm</strong></span>
             <button class="btn btn-quiet" id="lf-usesize" type="button">Use it</button>`;
         document.getElementById("lf-usesize").addEventListener("click", () => {

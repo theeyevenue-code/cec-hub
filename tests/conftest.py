@@ -153,6 +153,35 @@ def hub_client_lenses(tmp_path, monkeypatch):
 
 
 @pytest.fixture
+def hub_client_lens_jobs(tmp_path, monkeypatch):
+    """Test client with a tmp lens catalogue AND an agent lens-jobs file."""
+    lenses_dir = tmp_path / "lenses"
+    lenses_dir.mkdir()
+    (lenses_dir / "hoya.csv").write_text(SAMPLE_LENSES_CSV, encoding="utf-8")
+
+    jobs_path = tmp_path / "agent-logs" / "lens-jobs.jsonl"
+    jobs_path.parent.mkdir(parents=True)
+    jobs_path.write_text(
+        '{"job": "31655", "entered": "2026-07-10 14:32", "supplier": "Eye CU",'
+        ' "code": "SE15HC", "stk_grd": "Grd",'
+        ' "right": {"sph": -3.0, "cyl": -1.0}, "left": {"sph": -2.75},'
+        ' "frame": {"a": 52, "dbl": 18, "pd": 62}}\n'
+        '{"job": "31656", "entered": "2026-07-10 15:01", "supplier": "Hoya",'
+        ' "stk_grd": "Stk", "right": {"sph": -9.0}, "left": {"sph": -9.25}}\n',
+        encoding="utf-8",
+    )
+    cfg = _write_integrations(tmp_path, {
+        "optomate_agent": {"lens_jobs": str(jobs_path)},
+    })
+    monkeypatch.setenv("CEC_HUB_LENSES_DIR", str(lenses_dir))
+    monkeypatch.setenv("CEC_HUB_INTEGRATIONS", str(cfg))
+    monkeypatch.delenv("CEC_HUB_SOPS_DIR", raising=False)
+    app_module = _reload_app()
+    with app_module.app.test_client() as client:
+        yield client
+
+
+@pytest.fixture
 def hub_client_custom_sops(tmp_path, monkeypatch):
     """Test client pointed at a tmp SOP folder (for image serving etc.)."""
     sops = tmp_path / "sops"

@@ -17,6 +17,7 @@ cheapest — including when a dearer-index STOCK lens beats a 1.50 GRIND.
 
 import csv
 import io
+import math
 import re
 from pathlib import Path
 
@@ -325,6 +326,151 @@ def _verdict(options, best):
                 f"({_label(priced_stock)} at ${priced_stock['price']:.2f}).")
     return (f"No stock lens covers this job — it needs a grind: "
             f"{_label(best)} at ${best['price']:.2f} a lens.")
+
+
+def min_blank_from_frame(frame: dict):
+    """Frame measurements -> smallest blank the job needs (mm), or None.
+
+    Same rule as the page helper: ED (or eye size + 2 if no ED) plus the
+    total decentration (frame PD - patient PD) plus 2mm spare. A monocular
+    PD (under 40 — Optomate stores per-eye PDs) is doubled first.
+    """
+    frame = frame or {}
+    a = _num(frame.get("a") or frame.get("eye") or frame.get("size"))
+    dbl = _num(frame.get("dbl") or frame.get("bridge"))
+    pd = _num(frame.get("pd"))
+    ed = _num(frame.get("ed") or frame.get("depth"))
+    if not a or a <= 0 or dbl is None or dbl < 0 or not pd or pd <= 0:
+        return None
+    if pd < 40:
+        pd *= 2
+    return math.ceil((ed if ed and ed > 0 else a + 2)
+                     + max(a + dbl - pd, 0) + 2)
+
+
+def _product_key(option: dict):
+    return (option["brand"], option["name"], option["code"],
+            option["coating"], option["type"])
+
+
+def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
+              min_blank: float | None = None, chosen: dict | None = None) -> dict:
+    """The order-screen question: for this pair of eyes (and blank size),
+    which products cover the WHOLE job, what's the cheapest, and does the
+    stock/grind call that was made look right.
+
+    right/left: {"sph": -0.75, "cyl": -1.00} (either may be omitted for a
+    single-lens job). chosen (optional): {"code": ..., "type": "Stk"/"Grd"}
+    — what was actually put on the order.
+    """
+    eyes = {}
+    for label, rx in (("right", right), ("left", left)):
+        sph = _num((rx or {}).get("sph"))
+        if sph is not None:
+            cyl = _num((rx or {}).get("cyl")) or 0.0
+            eyes[label] = find_options(lenses, sph, cyl, min_blank)
+    if not eyes:
+        return {"status": "no_rx", "headline":
+                "No Rx on this job yet — nothing to check.",
+                "eyes": {}, "options": [], "best": None, "chosen": None,
+                "min_blank": min_blank}
+
+    # A product covers the job when EVERY eye matches one of its rows.
+    covering = None
+    details, warnings = {}, {}
+    for result in eyes.values():
+        keys = set()
+        for option in result["options"]:
+            key = _product_key(option)
+            keys.add(key)
+            details.setdefault(key, option)
+            warnings.setdefault(key, []).extend(option.get("warnings") or [])
+        covering = keys if covering is None else covering & keys
+
+    per_lens = len(eyes)
+    products = []
+    for key in covering:
+        o = details[key]
+        seen = list(dict.fromkeys(warnings[key]))
+        products.append({
+            "brand": o["brand"], "name": o["name"], "code": o["code"],
+            "coating": o["coating"], "type": o["type"], "index": o["index"],
+            "price": o["price"],
+            "price_job": round(o["price"] * per_lens, 2)
+                         if o["price"] is not None else None,
+            "warnings": seen,
+        })
+    products.sort(key=lambda p: (p["price"] is None, p["price"] or 0,
+                                 p["index"] or 0))
+    best = next((p for p in products if p["price"] is not None), None)
+    best_stock = next((p for p in products
+                       if p["type"] == "stock" and p["price"] is not None), None)
+    best_grind = next((p for p in products
+                       if p["type"] == "grind" and p["price"] is not None), None)
+
+    unit = "a pair" if per_lens == 2 else "a lens"
+    if not products:
+        status = "none"
+        headline = ("Nothing in the loaded price files covers this Rx — "
+                    "check it by hand against the supplier guide.")
+    elif best_stock:
+        status = "stock"
+        headline = (f"Stock job — {_label(best_stock)} "
+                    f"({best_stock['coating']}) at "
+                    f"${best_stock['price_job']:.2f} {unit}.")
+        if best_grind:
+            saving = best_grind["price_job"] - best_stock["price_job"]
+            if saving > 0:
+                headline += (f" That's ${saving:.2f} {unit} under the "
+                             "cheapest grind.")
+        if best_stock["warnings"]:
+            headline += " Check its amber notes first."
+    else:
+        status = "grind"
+        headline = (f"Grind job — no stock lens covers this Rx. Cheapest: "
+                    f"{_label(best)} ({best['coating']}) at "
+                    f"${best['price_job']:.2f} {unit}." if best else
+                    "Grind job — no stock lens covers this Rx, and the "
+                    "grind options have no price loaded.")
+
+    chosen_out = None
+    if chosen and (chosen.get("code") or chosen.get("type")):
+        notes = []
+        raw_type = str(chosen.get("type") or "").strip().lower()
+        chosen_type = ("stock" if raw_type in ("stk", "stock") else
+                       "grind" if raw_type in ("grd", "grind") else "")
+        code = str(chosen.get("code") or "").strip()
+        code_known = bool(code) and code.lower() in {
+            (l["code"] or "").lower() for l in lenses if l["code"]}
+        if code and not code_known:
+            notes.append(f"code {code} isn't in the loaded price files — "
+                         "the chosen lens itself wasn't range-checked")
+        mismatch = False
+        if chosen_type == "grind" and best_stock:
+            notes.append(f"marked Grind, but a stock lens covers this Rx: "
+                         f"{_label(best_stock)} at "
+                         f"${best_stock['price_job']:.2f} {unit}")
+            mismatch = True
+        if chosen_type == "stock" and status in ("grind", "none"):
+            notes.append("marked Stock, but no stock lens in the loaded "
+                         "files covers this Rx — double-check")
+            mismatch = True
+        chosen_out = {"code": code, "type": chosen_type,
+                      "code_known": code_known, "notes": notes}
+        if mismatch:
+            status = "check"
+
+    return {
+        "status": status,
+        "headline": headline,
+        "min_blank": min_blank,
+        "eyes": {label: {"rx": result["rx"]["display"],
+                         "fits": len(result["options"])}
+                 for label, result in eyes.items()},
+        "options": products[:10],
+        "best": best,
+        "chosen": chosen_out,
+    }
 
 
 def safe_csv_name(name: str) -> str:

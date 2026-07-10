@@ -197,6 +197,59 @@ def test_find_combined_power_limit():
     assert any("combined" in r for r in too_much["misses"][0]["reasons"])
 
 
+# --- Whole-job check (both eyes) ---------------------------------------------
+
+def test_min_blank_from_frame():
+    # ED default (52+2) + (52+18-62)=8 decentration + 2 spare = 64.
+    assert lenses.min_blank_from_frame({"a": 52, "dbl": 18, "pd": 62}) == 64
+    # Monocular PDs (Optomate stores per-eye) get doubled: 31*2=62.
+    assert lenses.min_blank_from_frame({"a": 52, "dbl": 18, "pd": 31}) == 64
+    # ED wins over eye-size guess when given.
+    assert lenses.min_blank_from_frame({"a": 52, "dbl": 18, "pd": 62,
+                                        "ed": 56}) == 66
+    assert lenses.min_blank_from_frame({"a": 52}) is None
+    assert lenses.min_blank_from_frame({}) is None
+
+
+def test_check_job_worse_eye_decides():
+    # Right eye -3.00 fits Nulux 1.50, left eye -5.00 doesn't — the pair
+    # must land on a product covering BOTH.
+    result = lenses.check_job(_sample(), right={"sph": -3.0},
+                              left={"sph": -5.0})
+    assert result["status"] == "stock"
+    assert result["best"]["name"] == "Stellify 1.50"
+    assert result["best"]["price_job"] == 42.00          # per pair
+    assert "a pair" in result["headline"]
+
+
+def test_check_job_single_eye_prices_per_lens():
+    result = lenses.check_job(_sample(), right={"sph": -3.0})
+    assert result["best"]["price_job"] == result["best"]["price"]
+    assert "a lens" in result["headline"]
+
+
+def test_check_job_grind_only_and_stock_mismatch_flag():
+    result = lenses.check_job(_sample(), right={"sph": -9.0},
+                              chosen={"type": "Stk"})
+    assert result["status"] == "check"                   # said Stock, isn't
+    assert any("marked Stock" in n for n in result["chosen"]["notes"])
+
+
+def test_check_job_flags_grind_when_stock_possible():
+    result = lenses.check_job(_sample(), right={"sph": -3.0},
+                              chosen={"type": "Grd", "code": "MADE-UP-1"})
+    assert result["status"] == "check"
+    notes = result["chosen"]["notes"]
+    assert any("marked Grind, but a stock lens covers" in n for n in notes)
+    assert any("isn't in the loaded price files" in n for n in notes)
+    assert result["chosen"]["code_known"] is False
+
+
+def test_check_job_without_rx():
+    result = lenses.check_job(_sample())
+    assert result["status"] == "no_rx"
+
+
 # --- Endpoints -----------------------------------------------------------------
 
 def test_api_catalog(hub_client_lenses):
@@ -285,3 +338,46 @@ def test_api_upload_needs_a_file(hub_client_lenses):
     res = client.post("/api/lenses/upload", data={},
                       content_type="multipart/form-data")
     assert res.status_code == 400
+
+
+def test_api_check_endpoint(hub_client_lenses):
+    client, _ = hub_client_lenses
+    res = client.post("/api/lenses/check", json={
+        "right": {"sph": -3.0, "cyl": -1.0}, "left": {"sph": -5.0},
+        "frame": {"a": 52, "dbl": 18, "pd": 62},
+        "chosen": {"type": "Grd"},
+    })
+    data = res.get_json()
+    assert res.status_code == 200
+    assert data["status"] == "check"
+    assert data["min_blank"] == 64
+    assert data["best"]["type"] == "stock"
+    assert data["eyes"]["right"]["rx"] == "-3.00 / -1.00"
+
+
+def test_api_check_requires_an_eye(hub_client_lenses):
+    client, _ = hub_client_lenses
+    res = client.post("/api/lenses/check", json={"frame": {"a": 52}})
+    assert res.status_code == 400
+
+
+def test_api_jobs_disconnected(hub_client_lenses):
+    client, _ = hub_client_lenses
+    data = client.get("/api/lenses/jobs").get_json()
+    assert data["connected"] is False
+
+
+def test_api_jobs_checked_against_catalogue(hub_client_lens_jobs):
+    data = hub_client_lens_jobs.get("/api/lenses/jobs").get_json()
+    assert data["connected"] is True
+    jobs = {j["job"]: j for j in data["jobs"]}
+    assert list(jobs) == ["31656", "31655"]      # newest first
+    # 31655: -3.00/-1.00 and -2.75, marked Grd, but stock covers both eyes.
+    check = jobs["31655"]["check"]
+    assert check["status"] == "check"
+    assert check["min_blank"] == 64
+    assert any("marked Grind" in n for n in check["chosen"]["notes"])
+    # 31656: -9.00/-9.25 marked Stk — only the grind lens covers it.
+    check = jobs["31656"]["check"]
+    assert check["status"] == "check"
+    assert any("marked Stock" in n for n in check["chosen"]["notes"])

@@ -535,6 +535,13 @@ main {
 }
 .warn-note { font-size: 16px; color: var(--amber-ink); }
 
+.job-row { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.job-row:last-child { border-bottom: none; padding-bottom: 0; }
+.job-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.job-head strong { font-size: 20px; color: var(--ink); }
+.job-rx { font-size: 18px; color: var(--muted); margin-top: 4px; }
+.job-verdict { font-size: 19px; margin-top: 4px; }
+
 .miss-details { margin-top: 16px; }
 .miss-details summary {
     cursor: pointer;
