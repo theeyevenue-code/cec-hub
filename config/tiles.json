@@ -36,6 +36,13 @@
       "name": "Stock Orders",
       "description": "Check suggested stock orders and approve them",
       "link": "#/stock"
+    },
+    {
+      "id": "lenses",
+      "icon": "👓",
+      "name": "Lens Finder",
+      "description": "Which lenses can make an Rx — cheapest option first",
+      "link": "#/lenses"
     }
   ]
 }

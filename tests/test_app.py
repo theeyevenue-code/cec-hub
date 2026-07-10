@@ -15,7 +15,8 @@ class TestHomeAndConfig:
     def test_tiles_come_from_config(self, hub_client):
         data = hub_client.get("/api/tiles").get_json()
         ids = [t["id"] for t in data["tiles"]]
-        assert ids == ["sops", "referrals", "reviews", "orders", "stock"]
+        assert ids == ["sops", "referrals", "reviews", "orders", "stock",
+                       "lenses"]
 
     def test_referral_tile_links_to_the_referral_app(self, hub_client):
         data = hub_client.get("/api/tiles").get_json()

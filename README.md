@@ -1,7 +1,7 @@
 # CEC Hub
 
 The staff home screen for Concord Eyecare. One local web app with big tiles:
-How-To Guides (SOPs) · Referral Letters · Google Reviews · Orders & Collections · Stock Orders.
+How-To Guides (SOPs) · Referral Letters · Google Reviews · Orders & Collections · Stock Orders · Lens Finder.
 
 Built for everyone at the front desk — big text, big buttons, plain words, nothing scary.
 
@@ -10,7 +10,8 @@ Built for everyone at the front desk — big text, big buttons, plain words, not
 - A **local Flask app** on `http://localhost:5680`. No internet accounts, no logins.
 - **No patient data, ever.** Optomate stays the system of record — the Hub is the procedures-and-buttons layer on top.
 - The only thing the Hub ever *writes* outside its own folder is renaming a stock
-  proposal CSV to `*.approved.csv` when someone presses Approve (plus its own `hub.log`).
+  proposal CSV to `*.approved.csv` when someone presses Approve (plus its own `hub.log`
+  and the lens price CSVs saved into its own `lenses\` folder).
 - The "Who's using this?" picker in the corner is optional — it just puts a name on
   the Hub's own log lines (e.g. who approved a stock order). It's a cookie, not an account.
 
@@ -51,6 +52,16 @@ Drop a markdown file in `sops\` following the conventions in **`sops\README.md`*
 `[MARK: ...]` for anything unconfirmed). The Hub picks it up on the next page
 load. Any Claude session can do this — point it at `sops\README.md`.
 
+## The Lens Finder
+
+Type an Rx (one eye at a time, optional cyl and minimum blank size) and the
+Hub lists every lens in the catalogue that can make the job, cheapest first —
+including when a dearer-index **stock** lens beats a 1.50 **grind** on price.
+The catalogue is plain CSV files in `lenses\` (one per supplier price guide),
+uploaded from the page or dropped into the folder. The column layout — and
+how to turn a supplier's PDF guide into a CSV with a Claude session — is in
+**`lenses\README.md`**. No patient data: powers only, nothing is stored.
+
 ## The Stock approve button — what it actually does
 
 Pressing "Approved — mark for entry" renames the proposal file from
@@ -64,8 +75,10 @@ supervised/CLI step run by Mark/Claude. Nothing is ordered automatically.
 app.py                  Flask app (port 5680) — routes only, no business logic
 hub\sop_parser.py       SOP markdown -> structured blocks (the renderer contract)
 hub\integrations.py     read-only views of the other systems, all graceful
+hub\lenses.py           lens catalogue CSVs -> best-option finder (stock vs grind)
 config\*.json           tiles, integration paths, staff names
 sops\                   the guides + README.md (authoring contract) + images\
+lenses\                 lens price CSVs + README.md (column contract) + _template.csv
 static\                 index.html / style.css / app.js — no build step
 tests\                  mocked pytest suite (no network, no real integration paths)
 ```
@@ -77,8 +90,9 @@ python -m pytest tests -q
 ```
 
 Environment overrides (used by the tests, handy for odd setups):
-`CEC_HUB_INTEGRATIONS` (path to an integrations.json) and
-`CEC_HUB_SOPS_DIR` (path to a sops folder).
+`CEC_HUB_INTEGRATIONS` (path to an integrations.json),
+`CEC_HUB_SOPS_DIR` (path to a sops folder) and
+`CEC_HUB_LENSES_DIR` (path to a lens CSV folder).
 
 Style rules baked into `static\style.css`: minimum 18px body text (19px used),
 1.6 line height, CEC greens (`#438F73` accents, `#0f2b21` headings, `#e8f2ee`
