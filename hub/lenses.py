@@ -21,7 +21,7 @@ import math
 import re
 from pathlib import Path
 
-MAX_ROWS_PER_FILE = 2000
+MAX_ROWS_PER_FILE = 5000
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 
 # Loose header matching: lowercase, spaces/dashes -> underscore, then alias.
@@ -31,7 +31,9 @@ HEADER_ALIASES = {
     "code": "code", "product_code": "code", "lens_type": "code",
     "lenstype": "code", "barcode": "code", "order_code": "code",
     "index": "index", "material_index": "index", "refractive_index": "index",
-    "type": "type", "form": "type", "stock_or_grind": "type",
+    "type": "type", "stock_or_grind": "type", "stock_grind": "type",
+    "category": "category", "lens_category": "category", "vision": "category",
+    "form": "form", "spherical_aspherical": "form", "spheric_aspheric": "form",
     "design": "design", "vision_type": "design",
     "blank_mm": "blank_mm", "blank": "blank_mm", "blank_size": "blank_mm",
     "diameter": "blank_mm", "dia": "blank_mm", "size": "blank_mm",
@@ -169,8 +171,10 @@ def parse_csv_text(text: str, source: str):
             "brand": cells.get("brand", ""),
             "name": name,
             "code": cells.get("code", ""),
+            "category": cells.get("category", ""),
             "index": _num(cells.get("index")),
             "type": _lens_type(cells.get("type"), blank_mm),
+            "form": cells.get("form", ""),
             "design": cells.get("design", ""),
             "blank_mm": blank_mm,
             "sph_min": sph_min,
@@ -217,6 +221,16 @@ def load_catalog(lenses_dir: Path) -> dict:
         "No lens files loaded yet. Upload a supplier price CSV below, "
         "or ask Mark to set one up.")
     return {"lenses": lenses, "files": files, "message": message}
+
+
+def sv_only(lenses: list) -> list:
+    """Just the single-vision lenses — what the cost engine matches on.
+    Progressives/bifocals/occupationals are browse-only (made to order,
+    chosen by add power, and Hoyalog rejects out-of-range jobs anyway).
+    A file with no category column (other suppliers) is treated as all SV."""
+    return [l for l in lenses
+            if str(l.get("category", "")).strip().lower()
+            in ("", "single vision", "sv")]
 
 
 def find_options(lenses: list, sph: float, cyl: float = 0.0,

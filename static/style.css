@@ -533,7 +533,33 @@ main {
     color: var(--green-deep);
     letter-spacing: 0.3px;
 }
+.design-sub { font-size: 15px; color: var(--green-deep); font-weight: 600; }
 .warn-note { font-size: 16px; color: var(--amber-ink); }
+
+/* --- Lens library filters --- */
+.lens-filters { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.lens-select {
+    font-family: inherit;
+    font-size: 18px;
+    padding: 12px 14px;
+    min-height: 54px;
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    background: var(--paper);
+    color: var(--body);
+    cursor: pointer;
+    flex: 1 1 180px;
+}
+.lens-select:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 4px #cde8dd; }
+.lens-guide-note {
+    background: var(--mint-soft);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 17px;
+    color: var(--ink);
+    margin-bottom: 16px;
+}
 
 .job-row { padding: 14px 0; border-bottom: 1px solid var(--line); }
 .job-row:last-child { border-bottom: none; padding-bottom: 0; }

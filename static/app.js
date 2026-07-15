@@ -451,9 +451,12 @@ function fmtMM(v) { return parseFloat(v) + "mm"; }
 function lensRowHTML(l, extraCellHTML) {
     const warnings = (l.warnings || []).map((w) =>
         `<div class="warn-note">⚠ ${esc(w)}</div>`).join("");
+    const meta = [(l.category && l.category !== "Single vision") ? l.category : "",
+                  l.form].filter(Boolean).join(" · ");
     return `<tr class="${l.best ? "best-row" : ""}">
         <td><strong>${esc((l.brand + " " + l.name).trim())}</strong>
             ${l.best ? `<span class="badge-best">★ Best value</span>` : ""}
+            ${meta ? `<div class="cell-sub design-sub">${esc(meta)}</div>` : ""}
             ${l.code ? `<div class="cell-sub code-sub">${esc(l.code)}</div>` : ""}
             ${l.coating ? `<div class="cell-sub">${esc(l.coating)}</div>` : ""}
             ${l.notes ? `<div class="cell-sub">${esc(l.notes)}</div>` : ""}
@@ -474,29 +477,33 @@ const LENS_TABLE_HEAD = `<tr><th>Lens</th><th>Index</th><th>Type</th>
 
 function lensCatalogHTML(cat) {
     if (cat.message) {
-        return `<div class="card"><h2>📚 Look up a lens</h2>
+        return `<div class="card"><h2>📚 Lens library</h2>
             <div class="empty-panel">${esc(cat.message)}</div></div>`;
     }
     const files = (cat.files || []).map((f) => `
         <span class="chip">${esc(f.filename)} · ${esc(f.count)} lens${f.count === 1 ? "" : "es"}</span>`).join(" ");
     const errors = (cat.files || []).flatMap((f) => f.errors || []);
-    return `<div class="card"><h2>📚 Look up a lens</h2>
-        <p>Type any part of a lens name, order code, index or coating — the details
-        (range, blank sizes, price) come straight from the loaded price files.</p>
+    return `<div class="card"><h2>📚 Lens library</h2>
+        <p>Browse the whole range — narrow by type, index, design and coating, the way you'd
+        pick a lens — or just type a name or code. Every detail comes from the price files.</p>
+        <div class="lens-filters">
+            <select id="lf-cat" class="lens-select" aria-label="Lens type"></select>
+            <select id="lf-index" class="lens-select" aria-label="Index"></select>
+            <select id="lf-form" class="lens-select" aria-label="Design (spheric / aspheric)"></select>
+            <select id="lf-coat" class="lens-select" aria-label="Coating"></select>
+        </div>
         <input class="search-box" id="lens-lookup" type="search" autocomplete="off"
-            placeholder="e.g. stellify · S-NULUX · 1.67 · full control"
-            aria-label="Look up a lens">
+            placeholder="…or type a name / code (e.g. stellify · S-NULUX · myself)"
+            aria-label="Search lenses">
+        <div class="lens-guide-note">
+            💡 <strong>Aspheric (Nulux)</strong> — our go-to for plus powers &amp; higher Rx
+            (flatter, thinner). <strong>Spherical (Hilux)</strong> — better on curved /
+            high-base frames, e.g. wrap sunnies.</div>
         <div id="lens-lookup-results"></div>
         <div class="sop-card-meta" style="margin:14px 0 0">${files}</div>
         ${errors.length ? `<div class="confirm-strip"><p>Some rows couldn't be read:</p>
             ${errors.map((e) => `<div class="warn-note">⚠ ${esc(e)}</div>`).join("")}</div>` : ""}
-        <details class="miss-details">
-            <summary>See everything that's loaded (${(cat.lenses || []).length} lens/coating lines)</summary>
-            <div class="table-scroll"><table class="stock-table">
-                <thead>${LENS_TABLE_HEAD}</thead>
-                <tbody>${(cat.lenses || []).map((l) => lensRowHTML(l)).join("")}</tbody>
-            </table></div>
-        </details></div>`;
+    </div>`;
 }
 
 const JOB_STATUS_CHIP = {
@@ -546,40 +553,75 @@ async function renderLensJobs() {
     </div>`;
 }
 
-const LOOKUP_LIMIT = 40;
+const LOOKUP_LIMIT = 60;
+const CAT_ORDER = ["Single vision", "Progressive", "Occupational", "Bifocal"];
 
 function wireLensLookup(cat) {
     const box = document.getElementById("lens-lookup");
     const out = document.getElementById("lens-lookup-results");
-    if (!box || !out) return;
-    const lenses = (cat.lenses || []).map((l) => ({
+    const catEl = document.getElementById("lf-cat");
+    const idxEl = document.getElementById("lf-index");
+    const formEl = document.getElementById("lf-form");
+    const coatEl = document.getElementById("lf-coat");
+    if (!box || !out || !catEl) return;
+
+    const rows = (cat.lenses || []).map((l) => ({
         lens: l,
-        hay: [l.brand, l.name, l.code, l.coating, l.index, l.design,
-              l.type, l.notes].join(" ").toLowerCase(),
+        hay: [l.brand, l.name, l.code, l.coating, l.index, l.category,
+              l.form, l.notes].join(" ").toLowerCase(),
     }));
+
+    function fill(el, allLabel, values) {
+        el.innerHTML = `<option value="">${esc(allLabel)}</option>` +
+            values.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+    }
+    fill(catEl, "All lens types",
+         CAT_ORDER.filter((c) => rows.some((r) => r.lens.category === c)));
+    fill(idxEl, "Any index",
+         [...new Set(rows.map((r) => r.lens.index).filter((v) => v != null))]
+             .sort((a, b) => a - b).map(String));
+    fill(formEl, "Spheric & aspheric",
+         [...new Set(rows.map((r) => r.lens.form).filter(Boolean))].sort());
+    fill(coatEl, "Any coating",
+         [...new Set(rows.map((r) => r.lens.coating).filter(Boolean))].sort());
+
+    function apply() {
+        const cCat = catEl.value, cIdx = idxEl.value,
+              cForm = formEl.value, cCoat = coatEl.value;
+        const words = box.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        if (!(cCat || cIdx || cForm || cCoat || words.length)) {
+            out.innerHTML = `<div class="empty-panel">Pick a type, index or coating above,
+                or start typing a lens name or code.</div>`;
+            return;
+        }
+        const hits = rows.filter((r) => {
+            const l = r.lens;
+            if (cCat && l.category !== cCat) return false;
+            if (cIdx && String(l.index) !== cIdx) return false;
+            if (cForm && l.form !== cForm) return false;
+            if (cCoat && l.coating !== cCoat) return false;
+            return words.every((w) => r.hay.includes(w));
+        }).map((r) => r.lens);
+        if (!hits.length) {
+            out.innerHTML = `<div class="empty-panel">Nothing loaded matches those filters.
+                Try widening them, or it may be a lens we don't have a price file for yet.</div>`;
+            return;
+        }
+        out.innerHTML = `
+            <div class="updated-line" style="margin-top:12px">${hits.length} matching
+                line${hits.length === 1 ? "" : "s"}${hits.length > LOOKUP_LIMIT
+                ? ` — showing the first ${LOOKUP_LIMIT}` : ""}</div>
+            <div class="table-scroll"><table class="stock-table">
+                <thead>${LENS_TABLE_HEAD}</thead>
+                <tbody>${hits.slice(0, LOOKUP_LIMIT).map((l) => lensRowHTML(l)).join("")}</tbody>
+            </table></div>`;
+    }
+    [catEl, idxEl, formEl, coatEl].forEach((el) =>
+        el.addEventListener("change", apply));
     let timer = null;
     box.addEventListener("input", () => {
         clearTimeout(timer);
-        timer = setTimeout(() => {
-            const words = box.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-            if (!words.length) { out.innerHTML = ""; return; }
-            const hits = lenses.filter((x) => words.every((w) => x.hay.includes(w)))
-                               .map((x) => x.lens);
-            if (!hits.length) {
-                out.innerHTML = `<div class="empty-panel">Nothing loaded matches
-                    “${esc(box.value.trim())}”. Check the spelling, or it may be a
-                    lens we don't have a price file for yet.</div>`;
-                return;
-            }
-            out.innerHTML = `
-                <div class="updated-line" style="margin-top:12px">${hits.length} matching
-                    line${hits.length === 1 ? "" : "s"}${hits.length > LOOKUP_LIMIT
-                    ? ` — showing the first ${LOOKUP_LIMIT}` : ""}</div>
-                <div class="table-scroll"><table class="stock-table">
-                    <thead>${LENS_TABLE_HEAD}</thead>
-                    <tbody>${hits.slice(0, LOOKUP_LIMIT).map((l) => lensRowHTML(l)).join("")}</tbody>
-                </table></div>`;
-        }, 150);
+        timer = setTimeout(apply, 150);
     });
 }
 

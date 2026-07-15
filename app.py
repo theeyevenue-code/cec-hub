@@ -186,7 +186,8 @@ def lenses_find():
                                  "e.g. 68 (or leave it empty)."}), 400
 
     catalog = lenses.load_catalog(LENSES_DIR)
-    result = lenses.find_options(catalog["lenses"], sph, cyl or 0.0, min_blank)
+    result = lenses.find_options(lenses.sv_only(catalog["lenses"]), sph,
+                                 cyl or 0.0, min_blank)
     result["catalog_message"] = catalog["message"]
     return jsonify(result)
 
@@ -209,8 +210,8 @@ def lenses_check():
         min_blank = None
 
     catalog = lenses.load_catalog(LENSES_DIR)
-    result = lenses.check_job(catalog["lenses"], right, left, min_blank,
-                              data.get("chosen") or {})
+    result = lenses.check_job(lenses.sv_only(catalog["lenses"]), right, left,
+                              min_blank, data.get("chosen") or {})
     result["catalog_message"] = catalog["message"]
     return jsonify(result)
 
@@ -229,7 +230,8 @@ def lenses_jobs():
         if min_blank is None:
             min_blank = lenses.min_blank_from_frame(job.get("frame") or {})
         check = lenses.check_job(
-            catalog["lenses"], job.get("right") or {}, job.get("left") or {},
+            lenses.sv_only(catalog["lenses"]),
+            job.get("right") or {}, job.get("left") or {},
             min_blank,
             {"code": job.get("code"), "type": job.get("stk_grd")},
         )

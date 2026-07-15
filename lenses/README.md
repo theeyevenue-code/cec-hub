@@ -34,9 +34,11 @@ aliases work — e.g. `diameter` for `blank_mm`, `cost` for `price`).
 | `brand` | no | e.g. `Hoya` |
 | `lens` (or `name`) | **yes** | e.g. `Nulux 1.50`, `Stellify 1.55` |
 | `code` | no | the supplier's order code / lens type, e.g. `S-NULUX`, `HLSY-1.50-70` — shown on results and searchable |
+| `category` | no | `Single vision`, `Progressive`, `Bifocal` or `Occupational` — the top browse filter. **Only `Single vision` rows go through the "best lens for a job" cost engine**; the rest are browse/price/search reference. Blank counts as Single vision |
 | `index` | no | refractive index, e.g. `1.50`, `1.55`, `1.60`, `1.67` |
+| `form` | no | `Spherical`, `Aspheric` or `Freeform` — the spheric/aspheric browse filter (Hilux = Spherical, Nulux = Aspheric, progressives = Freeform) |
 | `type` | no | `stock` or `grind`. If blank: has a blank size → stock, no blank size → grind |
-| `design` | no | free text, e.g. `Single vision` — shown, not matched on |
+| `design` | no | free text — shown, not matched on (optional; `category`/`form` replaced it) |
 | `blank_mm` | no | blank diameter, e.g. `65` — a supplier list like `65/70/75` is fine (the biggest is used for fit checks; leave blank for grind — made to size) |
 | `sph_min` / `sph_max` | no | sphere range, signed: `-4.00` and `+4.00`. Price lists often don't state it — leave blank and the Finder flags "range not in file" instead of guessing |
 | `sph_range` | *alt* | *instead of the two above*: one cell like `+4.00 to -4.00` |

@@ -38,6 +38,60 @@ COATS_STOCK_ASP = ["Super Hard", "Hi-Vision ViewProtect",
                    "Diamond Finish UV Control", "Full Control"]
 COATS_STELLIFY = ["Super Hard", "Hi-Vision ViewProtect", "ViewProtect BlueControl"]
 
+# --- Multifocal / bifocal / occupational (reference "bible") -----------------
+# These carry a price + design, NOT availability ranges: progressives are
+# made-to-order and Hoyalog rejects out-of-range jobs at ordering, so the
+# Finder's cost engine only uses Single vision (see hub/lenses sv_only()).
+# The 8-column MF layout is identical to the SV grind header, so it reuses
+# COATS_GRIND; the shorter layouts are per-section.
+COATS_MF8 = COATS_GRIND
+COATS_BIFOCAL = ["Super Hard", "Hi-Vision ViewProtect", "Hard Diamond Finish",
+                 "ViewProtect BlueControl", "Diamond Finish BlueControl"]
+COATS_DYNSYNC = ["Super Hard", "Hi-Vision ViewProtect", "Hard Diamond Finish",
+                 "Diamond Finish BlueControl", "Hard Mirror"]
+COATS_ENROUTE = ["EnRoute Glare Filter"]
+COATS_MIYO = ["MiyoSmart STX", "MiyoSmart STX Full Control"]
+
+# Big section banners, in file order (all appear BEFORE "SINGLE VISION -
+# GRIND"): (trigger substring, category, default coating layout).
+MF_BANNERS = [
+    ("HOYALUX ID PROGRESSIVES", "Progressive", COATS_MF8),
+    ("HOYALUX DYNAMIC PROGRESSIVES", "Progressive", COATS_MF8),
+    ("EARLY PRESBYOPE", "Progressive", COATS_MF8),
+    ("VOCATIONAL RANGE", "Occupational", COATS_MF8),
+    ("DIGITAL EYE STRAIN", "Occupational", COATS_MF8),
+    ("SPECIAL LENSES", "Single vision", COATS_MF8),   # mixed; sub-headers refine
+    ("SERVICE RANGE", "Bifocal", COATS_BIFOCAL),
+]
+# Sub-section headers that override the current category/layout. category
+# "SKIP" (glass, polarised MF) drops rows until the next banner/sub-header —
+# those pricelist blocks have sparse/odd columns and are left for later.
+MF_SUBSECTIONS = [
+    ("ANTI-FATIGUE", "Occupational", COATS_DYNSYNC),
+    ("ENROUTE PROGRESSIVE", "Progressive", COATS_ENROUTE),
+    ("ENROUTE SINGLE VISION", "Single vision", COATS_ENROUTE),
+    ("SPORTIVE PROGRESSIVE", "Progressive", COATS_MF8),
+    ("SPORTIVE SINGLE VISION", "Single vision", COATS_MF8),
+    ("MIYOSMART", "Single vision", COATS_MIYO),
+    ("BIFOCAL", "Bifocal", COATS_BIFOCAL),
+    ("GLASS", "SKIP", None),        # glass range — niche, skip for now
+    ("POLARISED", "SKIP", None),    # polarised MF — sparse columns, skip
+]
+CORRIDOR_RE = re.compile(r"(\d+(?:/\d+)*\s*mm Corridors?)")
+
+
+def form_of(category: str, name: str) -> str:
+    """Spheric/aspheric axis. Hilux = spherical, Nulux = aspheric (from the
+    guide spec tables); progressives/occupationals are freeform."""
+    if category == "Bifocal":
+        return "Spherical"
+    if category in ("Progressive", "Occupational"):
+        return "Freeform"
+    if "Nulux" in name or "MiyoSmart" in name or "EnRoute" in name:
+        return "Aspheric"
+    return "Spherical"
+
+
 INDEX_RE = re.compile(r"^\d\.\d{2}$")
 DIAM_RE = re.compile(r"^\d{2}(?:/\d{2})*(?:mm)?$")
 PRICE_RE = re.compile(r"^\$\d+(?:\.\d{2})?$")
@@ -249,37 +303,18 @@ def fmt(v):
 
 
 rows_out = []
-mode = None          # None | "grind" | "stock"
+category = None      # MF phase: current category / "SKIP" / None
 coats = None
+mode = ""            # SV phase: "grind"/"stock"; "" while in MF phase
+sv_phase = False
+corridor = ""
 
-for line in SRC.read_text(encoding="utf-8").splitlines():
-    s = line.strip()
-    if "SINGLE VISION - GRIND" in s:
-        mode, coats = "grind", COATS_GRIND
-        continue
-    if "SINGLE VISION - STOCK" in s:
-        mode, coats = "stock", COATS_STOCK_SPH
-        continue
-    if mode == "stock" and s.startswith("ASPHERIC DESIGN"):
-        coats = COATS_STOCK_ASP
-        continue
-    if mode == "stock" and "STELLIFY SINGLE VISION" in s:
-        coats = COATS_STELLIFY
-        continue
-    if "SUNDRY OPTIONS" in s:
-        break
-    if mode is None or not s or s.startswith("*"):
-        continue
 
-    parts = re.split(r"\s{2,}", s)
-    if len(parts) < 5 or not INDEX_RE.match(parts[1]) or not DIAM_RE.match(parts[2]):
-        continue
-    name, index, diamtr, code, values = (parts[0], parts[1], parts[2],
-                                         parts[3], parts[4:])
-    if len(values) > len(coats):
-        raise SystemExit(f"Too many price cells for '{name}': {values}")
-
+def emit(name, index, diamtr, code, values, category, coats, mode, corridor):
+    """Append one CSV row per priced coating column for a pricelist row."""
     base_notes = []
+    if corridor:
+        base_notes.append(corridor)
     if "Sensity" in name:
         base_notes.append("Sensity photochromic")
     if "Polarised" in name:
@@ -288,14 +323,18 @@ for line in SRC.read_text(encoding="utf-8").splitlines():
     for coat, val in zip(coats, values):
         if not PRICE_RE.match(val):
             continue
-        bands, extra = bands_for(name, coat, mode)
         common = {
-            "brand": "Hoya", "lens": name, "code": code, "index": index,
-            "type": mode, "design": "Single vision",
+            "brand": "Hoya", "lens": name, "code": code, "category": category,
+            "index": index, "form": form_of(category, name),
             "price": val.lstrip("$"), "coating": coat,
         }
+        # Availability ranges exist only for core Single vision (the cost
+        # engine). Everything else is a rangeless reference row.
+        bands, extra = bands_for(name, coat, mode) if category == "Single vision" \
+            and mode in ("grind", "stock") else (None, None)
         if bands is None:
-            rows_out.append({**common, "blank_mm": diamtr,
+            rows_out.append({**common, "type": mode or "grind",
+                             "blank_mm": diamtr,
                              "sph_min": "", "sph_max": "",
                              "cyl_max": "", "combined_max": "",
                              "notes": "; ".join(
@@ -303,7 +342,8 @@ for line in SRC.read_text(encoding="utf-8").splitlines():
                                  + ([extra] if extra else []))})
             continue
         for blank, smin, smax, cyl, comb, page in bands:
-            rows_out.append({**common, "blank_mm": f"{blank:g}",
+            rows_out.append({**common, "type": mode,
+                             "blank_mm": f"{blank:g}",
                              "sph_min": fmt(smin), "sph_max": fmt(smax),
                              "cyl_max": f"-{cyl:.2f}" if cyl else "0",
                              "combined_max": f"{comb:.2f}" if comb else "",
@@ -311,16 +351,64 @@ for line in SRC.read_text(encoding="utf-8").splitlines():
                                  base_notes + [f"guide {page}"]
                                  + ([extra] if extra else []))})
 
+
+for line in SRC.read_text(encoding="utf-8").splitlines():
+    s = line.strip()
+    parts = re.split(r"\s{2,}", s)
+    is_row = (len(parts) >= 5 and INDEX_RE.match(parts[1])
+              and DIAM_RE.match(parts[2]))
+
+    if not is_row:
+        # Section/phase switches live on non-data lines ONLY, so a real lens
+        # row whose code contains a trigger word (e.g. the MIYOSMART code)
+        # is parsed as data below, never mistaken for a header.
+        if "SINGLE VISION - GRIND" in s:
+            sv_phase, mode, coats, category, corridor = True, "grind", COATS_GRIND, "Single vision", ""
+        elif "SINGLE VISION - STOCK" in s:
+            sv_phase, mode, coats, category = True, "stock", COATS_STOCK_SPH, "Single vision"
+        elif "SUNDRY OPTIONS" in s:
+            break
+        elif sv_phase and mode == "stock" and s.startswith("ASPHERIC DESIGN"):
+            coats = COATS_STOCK_ASP
+        elif sv_phase and mode == "stock" and "STELLIFY SINGLE VISION" in s:
+            coats = COATS_STELLIFY
+        elif not sv_phase:
+            hit = next((b for b in MF_BANNERS if b[0] in s), None) \
+                or next((b for b in MF_SUBSECTIONS if b[0] in s), None)
+            if hit:
+                _, category, coats = hit
+                m = CORRIDOR_RE.search(s)
+                corridor = m.group(1).replace("  ", " ") if m else ""
+            else:
+                m = CORRIDOR_RE.search(s)   # design sub-header with a corridor
+                if m:
+                    corridor = m.group(1).replace("  ", " ")
+        continue
+
+    if coats is None or category in (None, "SKIP"):
+        continue
+    name, index, diamtr, code, values = (parts[0], parts[1], parts[2],
+                                         parts[3], parts[4:])
+    if len(values) > len(coats):
+        if sv_phase:      # SV layout is verified — a mismatch means a bug
+            raise SystemExit(f"Too many price cells for '{name}': {values}")
+        continue          # MF layout noise — skip the row rather than misalign
+    emit(name, index, diamtr, code, values, category, coats, mode, corridor)
+
+
 OUT.parent.mkdir(exist_ok=True)
 with OUT.open("w", encoding="utf-8", newline="") as f:
     writer = csv.DictWriter(f, fieldnames=[
-        "brand", "lens", "code", "index", "type", "design", "blank_mm",
-        "sph_min", "sph_max", "cyl_max", "combined_max",
+        "brand", "lens", "code", "category", "index", "form", "type",
+        "blank_mm", "sph_min", "sph_max", "cyl_max", "combined_max",
         "price", "coating", "notes"])
     writer.writeheader()
     writer.writerows(rows_out)
 
-stock = sum(1 for r in rows_out if r["type"] == "stock")
+by_cat = {}
+for r in rows_out:
+    by_cat[r["category"]] = by_cat.get(r["category"], 0) + 1
 ranged = sum(1 for r in rows_out if r["sph_min"])
-print(f"{len(rows_out)} rows ({stock} stock, {len(rows_out) - stock} grind, "
-      f"{ranged} with ranges) -> {OUT}")
+print(f"{len(rows_out)} rows -> {OUT}")
+print("  by category:", ", ".join(f"{k} {v}" for k, v in sorted(by_cat.items())))
+print(f"  {ranged} rows carry availability ranges (Single vision only)")

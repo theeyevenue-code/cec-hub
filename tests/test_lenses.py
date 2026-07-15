@@ -53,6 +53,28 @@ def test_parse_product_code_aliases():
     assert parsed[0]["code"] == "S-NULUX"
 
 
+def test_parse_category_and_form():
+    # 'form' must be its own column (spheric/aspheric), NOT an alias of type.
+    text = ("lens,category,form,index,type,price\n"
+            "MySelf,Progressive,Freeform,1.50,grind,89.10\n"
+            "Nulux,Single vision,Aspheric,1.50,stock,9.90\n")
+    parsed, errors = lenses.parse_csv_text(text, "x.csv")
+    assert errors == []
+    assert parsed[0]["category"] == "Progressive"
+    assert parsed[0]["type"] == "grind" and parsed[0]["form"] == "Freeform"
+    assert parsed[1]["category"] == "Single vision" and parsed[1]["form"] == "Aspheric"
+
+
+def test_sv_only_excludes_multifocals():
+    text = ("lens,category,index,type,sph_min,sph_max,price\n"
+            "SV Lens,Single vision,1.50,stock,-6,+6,10\n"
+            "Prog Lens,Progressive,1.50,grind,,,50\n"
+            "Untagged,,1.50,stock,-4,+4,12\n")
+    parsed, _ = lenses.parse_csv_text(text, "x.csv")
+    names = {l["name"] for l in lenses.sv_only(parsed)}
+    assert names == {"SV Lens", "Untagged"}   # untagged files treated as all SV
+
+
 def test_parse_type_guessed_grind_without_blank():
     text = "lens,sph_min,sph_max\nSV Lab,-10.00,+8.00\n"
     parsed, _ = lenses.parse_csv_text(text, "x.csv")
