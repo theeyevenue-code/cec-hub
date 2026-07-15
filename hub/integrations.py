@@ -144,6 +144,38 @@ def orders_digest(cfg: dict) -> dict:
     }
 
 
+# --- Lens jobs (spectacle orders extracted by the agent) ----------------------
+
+MAX_LENS_JOBS = 50
+
+
+def lens_jobs(cfg: dict) -> dict:
+    """Recent spectacle lens jobs written by the Optomate agent
+    (lens-jobs.jsonl, one JSON object per line). Job numbers, Rx values and
+    frame measurements only — the agent never includes patient details."""
+    agent = cfg.get("optomate_agent", {}) or {}
+    path_str = agent.get("lens_jobs", "")
+    raw = _read_text(path_str)
+    if raw is None:
+        return {"connected": False, "jobs": [], "message": NOT_CONNECTED}
+
+    jobs = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(record, dict):
+            jobs.append(record)
+    jobs = jobs[-MAX_LENS_JOBS:]
+    jobs.reverse()  # newest (last written) first
+    return {"connected": True, "jobs": jobs,
+            "updated": _mtime_display(path_str), "message": ""}
+
+
 # --- Stock proposals ---------------------------------------------------------
 
 def _parse_csv(path: Path) -> dict:

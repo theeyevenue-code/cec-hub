@@ -477,6 +477,83 @@ main {
 .status-msg.ok { color: #1d5741; font-weight: 700; }
 .status-msg.error { color: var(--danger-ink); font-weight: 700; }
 
+/* --- Lens Finder -------------------------------------------------------- */
+
+.lens-form { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 17px; font-weight: 600; color: var(--ink); max-width: 260px; }
+.field input {
+    font-family: inherit;
+    font-size: 21px;
+    padding: 12px 14px;
+    min-height: 56px;
+    width: 190px;
+    max-width: 100%;
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    background: var(--paper);
+    color: var(--body);
+}
+.field input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 4px #cde8dd; }
+.field input[type="file"] { padding: 10px; font-size: 17px; width: 320px; }
+
+.blank-helper { margin-top: 18px; }
+.blank-helper summary {
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--green-deep);
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+}
+.helper-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; margin-top: 8px; }
+.helper-row .field input { width: 130px; }
+.helper-out { display: flex; gap: 12px; align-items: center; font-size: 20px; min-height: 56px; }
+.helper-note { font-size: 16px; color: var(--muted); margin-top: 10px; }
+
+.badge-best {
+    display: inline-block;
+    background: var(--green-deep);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 3px 12px;
+    margin-left: 8px;
+    white-space: nowrap;
+}
+.best-row td { background: #dff0e8; }
+
+.cell-sub { font-size: 15px; color: var(--muted); }
+.code-sub {
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 14px;
+    color: var(--green-deep);
+    letter-spacing: 0.3px;
+}
+.warn-note { font-size: 16px; color: var(--amber-ink); }
+
+.job-row { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.job-row:last-child { border-bottom: none; padding-bottom: 0; }
+.job-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.job-head strong { font-size: 20px; color: var(--ink); }
+.job-rx { font-size: 18px; color: var(--muted); margin-top: 4px; }
+.job-verdict { font-size: 19px; margin-top: 4px; }
+
+.miss-details { margin-top: 16px; }
+.miss-details summary {
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--muted);
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+}
+.miss-item { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 18px; }
+.miss-item:last-child { border-bottom: none; }
+
 /* --- Footer ------------------------------------------------------------ */
 
 .hub-footer {

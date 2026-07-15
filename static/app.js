@@ -64,6 +64,7 @@ const routes = [
     { re: /^#\/reviews$/, fn: renderReviews },
     { re: /^#\/orders$/, fn: renderOrders },
     { re: /^#\/stock$/, fn: renderStock },
+    { re: /^#\/lenses$/, fn: renderLenses },
 ];
 
 function route() {
@@ -438,6 +439,329 @@ async function renderStock() {
                 }
             });
         });
+    });
+}
+
+/* --- Lens Finder ------------------------------------------------------------------- */
+
+function fmtPower(v) { return (v >= 0 ? "+" : "") + Number(v).toFixed(2); }
+function fmtMoney(v) { return "$" + Number(v).toFixed(2); }
+function fmtMM(v) { return parseFloat(v) + "mm"; }
+
+function lensRowHTML(l, extraCellHTML) {
+    const warnings = (l.warnings || []).map((w) =>
+        `<div class="warn-note">⚠ ${esc(w)}</div>`).join("");
+    return `<tr class="${l.best ? "best-row" : ""}">
+        <td><strong>${esc((l.brand + " " + l.name).trim())}</strong>
+            ${l.best ? `<span class="badge-best">★ Best value</span>` : ""}
+            ${l.code ? `<div class="cell-sub code-sub">${esc(l.code)}</div>` : ""}
+            ${l.coating ? `<div class="cell-sub">${esc(l.coating)}</div>` : ""}
+            ${l.notes ? `<div class="cell-sub">${esc(l.notes)}</div>` : ""}
+            ${warnings}</td>
+        <td>${l.index != null ? esc(l.index) : "—"}</td>
+        <td><span class="chip ${l.type === "stock" ? "chip-on" : ""}">${l.type === "stock" ? "Stock" : "Grind"}</span></td>
+        <td>${l.blank_mm != null ? esc(fmtMM(l.blank_mm)) : (l.type === "grind" ? "made to size" : "—")}</td>
+        <td>${l.sph_min != null ? `${esc(fmtPower(l.sph_min))} to ${esc(fmtPower(l.sph_max))}` : "not in file"}</td>
+        <td>${l.cyl_max != null ? "to −" + Number(l.cyl_max).toFixed(2) : "—"}</td>
+        <td>${l.price != null ? esc(fmtMoney(l.price)) : "no price yet"}
+            ${l.dearer_by > 0 ? `<div class="cell-sub">+${esc(fmtMoney(l.dearer_by))} vs best</div>` : ""}</td>
+        ${extraCellHTML || ""}
+    </tr>`;
+}
+
+const LENS_TABLE_HEAD = `<tr><th>Lens</th><th>Index</th><th>Type</th>
+    <th>Blank</th><th>Sphere</th><th>Cyl</th><th>Price / lens</th></tr>`;
+
+function lensCatalogHTML(cat) {
+    if (cat.message) {
+        return `<div class="card"><h2>📚 Look up a lens</h2>
+            <div class="empty-panel">${esc(cat.message)}</div></div>`;
+    }
+    const files = (cat.files || []).map((f) => `
+        <span class="chip">${esc(f.filename)} · ${esc(f.count)} lens${f.count === 1 ? "" : "es"}</span>`).join(" ");
+    const errors = (cat.files || []).flatMap((f) => f.errors || []);
+    return `<div class="card"><h2>📚 Look up a lens</h2>
+        <p>Type any part of a lens name, order code, index or coating — the details
+        (range, blank sizes, price) come straight from the loaded price files.</p>
+        <input class="search-box" id="lens-lookup" type="search" autocomplete="off"
+            placeholder="e.g. stellify · S-NULUX · 1.67 · full control"
+            aria-label="Look up a lens">
+        <div id="lens-lookup-results"></div>
+        <div class="sop-card-meta" style="margin:14px 0 0">${files}</div>
+        ${errors.length ? `<div class="confirm-strip"><p>Some rows couldn't be read:</p>
+            ${errors.map((e) => `<div class="warn-note">⚠ ${esc(e)}</div>`).join("")}</div>` : ""}
+        <details class="miss-details">
+            <summary>See everything that's loaded (${(cat.lenses || []).length} lens/coating lines)</summary>
+            <div class="table-scroll"><table class="stock-table">
+                <thead>${LENS_TABLE_HEAD}</thead>
+                <tbody>${(cat.lenses || []).map((l) => lensRowHTML(l)).join("")}</tbody>
+            </table></div>
+        </details></div>`;
+}
+
+const JOB_STATUS_CHIP = {
+    stock: `<span class="chip chip-on">✅ Stock covers it</span>`,
+    grind: `<span class="chip">🛠 Grind job</span>`,
+    check: `<span class="chip chip-amber">⚠ Worth a look</span>`,
+    none: `<span class="chip chip-amber">⚠ Outside the loaded ranges</span>`,
+    no_rx: `<span class="chip chip-off">No Rx on the job</span>`,
+};
+
+async function renderLensJobs() {
+    const holder = document.getElementById("lens-jobs");
+    if (!holder) return;
+    let data;
+    try {
+        data = await getJSON("/api/lenses/jobs");
+    } catch (e) {
+        return; // the panel is optional — never break the page over it
+    }
+    if (!data.connected || !(data.jobs || []).length) return;
+
+    holder.innerHTML = `<div class="card">
+        <h2>🗒️ Recent lens jobs from Optomate</h2>
+        <p class="updated-line">Each job entered in Optomate, checked against the loaded
+            price files.${data.updated ? ` Last updated ${esc(data.updated)}.` : ""}
+            Nothing is changed or sent — this is a second pair of eyes only.</p>
+        ${data.jobs.map((j) => {
+            const c = j.check || {};
+            const eyes = ["right", "left"].filter((s) => (c.eyes || {})[s])
+                .map((s) => `${s === "right" ? "R" : "L"} ${esc(c.eyes[s].rx)}`)
+                .join(" · ");
+            const chosenNotes = ((c.chosen || {}).notes || []).map((n) =>
+                `<div class="warn-note">⚠ ${esc(n)}</div>`).join("");
+            return `<div class="job-row">
+                <div class="job-head">
+                    <strong>Job ${esc(j.job || "?")}</strong>
+                    ${JOB_STATUS_CHIP[c.status] || ""}
+                    ${j.supplier ? `<span class="chip">${esc(j.supplier)}</span>` : ""}
+                    ${j.code ? `<span class="chip">${esc(j.code)}</span>` : ""}
+                    ${j.entered ? `<span class="updated-line" style="margin:0">${esc(j.entered)}</span>` : ""}
+                </div>
+                ${eyes ? `<div class="job-rx">${eyes}${c.min_blank ? ` · blank ≥ ${esc(c.min_blank)}mm` : ""}</div>` : ""}
+                <div class="job-verdict">${esc(c.headline || "")}</div>
+                ${chosenNotes}
+            </div>`;
+        }).join("")}
+    </div>`;
+}
+
+const LOOKUP_LIMIT = 40;
+
+function wireLensLookup(cat) {
+    const box = document.getElementById("lens-lookup");
+    const out = document.getElementById("lens-lookup-results");
+    if (!box || !out) return;
+    const lenses = (cat.lenses || []).map((l) => ({
+        lens: l,
+        hay: [l.brand, l.name, l.code, l.coating, l.index, l.design,
+              l.type, l.notes].join(" ").toLowerCase(),
+    }));
+    let timer = null;
+    box.addEventListener("input", () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            const words = box.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+            if (!words.length) { out.innerHTML = ""; return; }
+            const hits = lenses.filter((x) => words.every((w) => x.hay.includes(w)))
+                               .map((x) => x.lens);
+            if (!hits.length) {
+                out.innerHTML = `<div class="empty-panel">Nothing loaded matches
+                    “${esc(box.value.trim())}”. Check the spelling, or it may be a
+                    lens we don't have a price file for yet.</div>`;
+                return;
+            }
+            out.innerHTML = `
+                <div class="updated-line" style="margin-top:12px">${hits.length} matching
+                    line${hits.length === 1 ? "" : "s"}${hits.length > LOOKUP_LIMIT
+                    ? ` — showing the first ${LOOKUP_LIMIT}` : ""}</div>
+                <div class="table-scroll"><table class="stock-table">
+                    <thead>${LENS_TABLE_HEAD}</thead>
+                    <tbody>${hits.slice(0, LOOKUP_LIMIT).map((l) => lensRowHTML(l)).join("")}</tbody>
+                </table></div>`;
+        }, 150);
+    });
+}
+
+async function renderLenses() {
+    view.innerHTML = `<div class="loading-panel">Getting the lens catalogue…</div>`;
+    let cat;
+    try {
+        cat = await getJSON("/api/lenses");
+    } catch (e) {
+        view.innerHTML = errorPanel(e.message);
+        return;
+    }
+
+    view.innerHTML = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Lens Finder</h1>
+        <p class="page-sub">Type the Rx (one eye at a time) and see every lens that can make the
+        job — cheapest first. A dearer-index stock lens often beats a grind on price.</p>
+
+        <div class="card">
+            <h2>🔍 Find the best lens for a job</h2>
+            <div class="lens-form">
+                <div class="field"><label for="lf-sph">Sphere</label>
+                    <input id="lf-sph" inputmode="text" placeholder="-2.75" autocomplete="off"></div>
+                <div class="field"><label for="lf-cyl">Cyl (optional)</label>
+                    <input id="lf-cyl" inputmode="text" placeholder="-1.25" autocomplete="off"></div>
+                <div class="field"><label for="lf-blank">Smallest blank that fits the frame (optional)</label>
+                    <input id="lf-blank" inputmode="numeric" placeholder="e.g. 68" autocomplete="off"></div>
+                <button class="btn" id="lf-go">Find lenses</button>
+            </div>
+            <details class="blank-helper">
+                <summary>Not sure what blank size the frame needs?</summary>
+                <div class="helper-row">
+                    <div class="field"><label for="lf-a">Frame eye size (A)</label>
+                        <input id="lf-a" inputmode="numeric" placeholder="52"></div>
+                    <div class="field"><label for="lf-dbl">Bridge (DBL)</label>
+                        <input id="lf-dbl" inputmode="numeric" placeholder="18"></div>
+                    <div class="field"><label for="lf-pd">Patient PD</label>
+                        <input id="lf-pd" inputmode="numeric" placeholder="62"></div>
+                    <div class="helper-out" id="lf-suggest"></div>
+                </div>
+                <p class="helper-note">Rough rule: eye size + (frame PD − patient PD) + a few mm
+                spare. Big decentration or a wide ED frame needs more — when in doubt, size up.</p>
+            </details>
+            <div id="lens-results"></div>
+        </div>
+
+        <div id="lens-jobs"></div>
+
+        <div id="lens-catalog">${lensCatalogHTML(cat)}</div>
+
+        <div class="card">
+            <h2>⬆️ Add or update a price list</h2>
+            <p>Upload a supplier price CSV (e.g. the Hoya guide turned into a
+            spreadsheet). Uploading a file with the same name <strong>replaces</strong> the old
+            one — that's how new pricing goes in. The column layout is described in the
+            <code>lenses\\README.md</code> file — give a Claude session the supplier's PDF guide
+            and point it at that file to make the CSV.</p>
+            <div class="lens-form">
+                <div class="field"><label for="lf-upname">Supplier / file name (optional)</label>
+                    <input id="lf-upname" placeholder="hoya" autocomplete="off"></div>
+                <div class="field"><label for="lf-upfile">CSV file</label>
+                    <input id="lf-upfile" type="file" accept=".csv,text/csv"></div>
+                <button class="btn" id="lf-upload">Upload it</button>
+            </div>
+            <div class="status-msg" id="lf-upmsg"></div>
+        </div>`;
+
+    wireLensLookup(cat);
+    renderLensJobs();  // fills #lens-jobs only when the agent file exists
+
+    const sphEl = document.getElementById("lf-sph");
+    const cylEl = document.getElementById("lf-cyl");
+    const blankEl = document.getElementById("lf-blank");
+    const resultsEl = document.getElementById("lens-results");
+
+    async function runFind() {
+        const params = new URLSearchParams();
+        params.set("sph", sphEl.value.trim());
+        if (cylEl.value.trim()) params.set("cyl", cylEl.value.trim());
+        if (blankEl.value.trim()) params.set("blank", blankEl.value.trim());
+        resultsEl.innerHTML = `<div class="loading-panel">Checking the catalogue…</div>`;
+        let data;
+        try {
+            data = await getJSON("/api/lenses/find?" + params.toString());
+        } catch (e) {
+            resultsEl.innerHTML = errorPanel(e.message);
+            return;
+        }
+        if (data.catalog_message) {
+            resultsEl.innerHTML = `<div class="empty-panel">${esc(data.catalog_message)}</div>`;
+            return;
+        }
+        const rxLine = `Checked for <strong>${esc(data.rx.display)}</strong>` +
+            (data.rx.transposed ? ` <span class="chip chip-amber">plus cyl — transposed to minus form first</span>` : "") +
+            (data.min_blank != null ? `, needing a blank of at least ${esc(fmtMM(data.min_blank))}` : "");
+        const options = data.options || [];
+        const misses = data.misses || [];
+        const SHOW = 15;
+        const shown = options.slice(0, SHOW);
+        const rest = options.slice(SHOW);
+        resultsEl.innerHTML = `
+            <div class="updated-line" style="margin-top:18px">${rxLine}</div>
+            <div class="${options.length && options[0].best ? "approved-banner" : "empty-panel"}"
+                 style="margin-bottom:16px">${esc(data.verdict)}</div>
+            ${shown.length ? `<div class="table-scroll"><table class="stock-table">
+                <thead>${LENS_TABLE_HEAD}</thead>
+                <tbody>${shown.map((l) => lensRowHTML(l)).join("")}</tbody>
+            </table></div>` : ""}
+            ${rest.length ? `<details class="miss-details">
+                <summary>Show the other ${rest.length} dearer options</summary>
+                <div class="table-scroll"><table class="stock-table">
+                    <thead>${LENS_TABLE_HEAD}</thead>
+                    <tbody>${rest.map((l) => lensRowHTML(l)).join("")}</tbody>
+                </table></div>
+            </details>` : ""}
+            ${misses.length ? `<details class="miss-details">
+                <summary>Why the other ${misses.length} lens${misses.length === 1 ? " doesn't" : "es don't"} fit</summary>
+                ${misses.map((m) => `<div class="miss-item">
+                    <strong>${esc((m.brand + " " + m.name).trim())}</strong> —
+                    ${esc(m.reasons.join("; "))}</div>`).join("")}
+            </details>` : ""}`;
+    }
+
+    document.getElementById("lf-go").addEventListener("click", runFind);
+    [sphEl, cylEl, blankEl].forEach((el) => el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") runFind();
+    }));
+
+    // Blank-size helper: eye size + total decentration + 2mm spare.
+    const aEl = document.getElementById("lf-a");
+    const dblEl = document.getElementById("lf-dbl");
+    const pdEl = document.getElementById("lf-pd");
+    const suggestEl = document.getElementById("lf-suggest");
+    function suggest() {
+        const a = parseFloat(aEl.value), dbl = parseFloat(dblEl.value),
+              pd = parseFloat(pdEl.value);
+        if (!(a > 0) || !(dbl >= 0) || !(pd > 0)) { suggestEl.innerHTML = ""; return; }
+        const size = Math.ceil((a + 2) + Math.max(a + dbl - pd, 0) + 2);
+        suggestEl.innerHTML = `<span>Suggested: <strong>${esc(size)}mm</strong></span>
+            <button class="btn btn-quiet" id="lf-usesize" type="button">Use it</button>`;
+        document.getElementById("lf-usesize").addEventListener("click", () => {
+            blankEl.value = size;
+        });
+    }
+    [aEl, dblEl, pdEl].forEach((el) => el.addEventListener("input", suggest));
+
+    // Upload a price list CSV.
+    const upBtn = document.getElementById("lf-upload");
+    upBtn.addEventListener("click", async () => {
+        const msg = document.getElementById("lf-upmsg");
+        const file = document.getElementById("lf-upfile").files[0];
+        if (!file) {
+            msg.className = "status-msg error";
+            msg.textContent = "Pick a CSV file first.";
+            return;
+        }
+        const fd = new FormData();
+        fd.append("file", file);
+        const name = document.getElementById("lf-upname").value.trim();
+        if (name) fd.append("name", name);
+        upBtn.disabled = true;
+        msg.className = "status-msg";
+        msg.textContent = "Uploading…";
+        try {
+            const res = await fetch("/api/lenses/upload", { method: "POST", body: fd });
+            const out = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(out.error || "Something went wrong.");
+            msg.className = "status-msg ok";
+            msg.textContent = out.message +
+                ((out.row_errors || []).length
+                    ? ` (${out.row_errors.length} row${out.row_errors.length === 1 ? "" : "s"} couldn't be read — details in the loaded list below.)`
+                    : "");
+            const fresh = await getJSON("/api/lenses");
+            document.getElementById("lens-catalog").innerHTML = lensCatalogHTML(fresh);
+            wireLensLookup(fresh);
+        } catch (err) {
+            msg.className = "status-msg error";
+            msg.textContent = err.message;
+        } finally {
+            upBtn.disabled = false;
+        }
     });
 }
 

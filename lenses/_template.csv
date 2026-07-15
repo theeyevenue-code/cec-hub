@@ -1,0 +1,6 @@
+brand,lens,code,index,type,design,blank_mm,sph_min,sph_max,cyl_max,combined_max,price,coating,notes
+Hoya,EXAMPLE Nulux 1.50,S-NULUX,1.50,stock,Single vision,70,-4.00,+4.00,-2.00,,18.50,Hi-Vision LongLife,EXAMPLE ROW — replace with the real guide
+Hoya,EXAMPLE Stellify 1.55,HLSY-1.55,1.55,stock,Single vision,65,+0.25,+4.00,-2.00,,24.00,,EXAMPLE — 65mm blank in plus powers
+Hoya,EXAMPLE Stellify 1.50,HLSY-1.50-70,1.50,stock,Single vision,75,-6.00,+4.00,-2.00,,21.00,,EXAMPLE — 75mm blank
+Hoya,EXAMPLE Nulux 1.60,S-NULUX-EYAS,1.60,stock,Single vision,70,-8.00,+6.00,-2.00,,32.00,,EXAMPLE
+Hoya,EXAMPLE SV Grind 1.50,RX-EXAMPLE,1.50,grind,Single vision,,-10.00,+8.00,-4.00,,45.00,,EXAMPLE — surfaced to any size

@@ -8,7 +8,8 @@
   "optomate_agent": {
     "orders_digest_log": "C:\\CEC\\CEC-Optomate-Agent\\logs\\orders-digest.log",
     "uncollected_ready": "C:\\CEC\\CEC-Optomate-Agent\\logs\\uncollected-ready.txt",
-    "proposals_dir": "C:\\CEC\\CEC-Optomate-Agent\\inventory\\proposals"
+    "proposals_dir": "C:\\CEC\\CEC-Optomate-Agent\\inventory\\proposals",
+    "lens_jobs": "C:\\CEC\\CEC-Optomate-Agent\\logs\\lens-jobs.jsonl"
   },
   "scorecard_drop": "C:\\Claude\\Claude Code\\Claude Second Brain\\scorecard-drop"
 }
