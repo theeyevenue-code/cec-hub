@@ -273,4 +273,6 @@ def lenses_upload():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5680, debug=False)
+    # 0.0.0.0 = reachable from other practice PCs (http://<this-machine>:5680).
+    # Set CEC_HUB_HOST=127.0.0.1 in the environment to go back to this-machine-only.
+    app.run(host=os.environ.get("CEC_HUB_HOST", "0.0.0.0"), port=5680, debug=False)

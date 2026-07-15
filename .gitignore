@@ -3,3 +3,10 @@ __pycache__/
 .pytest_cache/
 hub.log
 .env
+
+# Per-machine config — every machine keeps its own copy, made from the
+# *.example.json templates. Never committed: paths (and the referral-tool
+# link token) differ per machine and would overwrite each other on pull.
+config/integrations.json
+config/tiles.json
+config/staff.json
