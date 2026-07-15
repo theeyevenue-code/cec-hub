@@ -47,6 +47,18 @@ def _load_json(path: Path, fallback):
         return fallback
 
 
+def _config_json(filename: str, fallback):
+    """Per-machine config if it exists, else the committed *.example.json
+    template. config/*.json is per-machine and git-ignored (paths and the
+    referral link token differ per machine), so a fresh clone — and the
+    tests — fall back to the shipped example instead of showing nothing."""
+    real = CONFIG_DIR / filename
+    if real.is_file():
+        return _load_json(real, fallback)
+    stem, _, ext = filename.rpartition(".")
+    return _load_json(CONFIG_DIR / f"{stem}.example.{ext}", fallback)
+
+
 def _integrations() -> dict:
     # Read fresh on every request so path edits apply without a restart.
     return integrations.load_integrations(INTEGRATIONS_PATH)
@@ -75,14 +87,12 @@ def sop_image(filename):
 
 @app.route("/api/tiles")
 def tiles():
-    data = _load_json(CONFIG_DIR / "tiles.json", {"tiles": []})
-    return jsonify(data)
+    return jsonify(_config_json("tiles.json", {"tiles": []}))
 
 
 @app.route("/api/staff")
 def staff():
-    data = _load_json(CONFIG_DIR / "staff.json", {"staff": []})
-    return jsonify(data)
+    return jsonify(_config_json("staff.json", {"staff": []}))
 
 
 # --- SOPs ----------------------------------------------------------------
