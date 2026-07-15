@@ -59,6 +59,21 @@ def _config_json(filename: str, fallback):
     return _load_json(CONFIG_DIR / f"{stem}.example.{ext}", fallback)
 
 
+def merge_tiles(real, example):
+    """This machine's tiles, plus any tile in the shipped template that this
+    machine doesn't have yet (matched by id). So a new tile (e.g. the Lens
+    Finder) rolls out on a git pull without hand-editing every machine's
+    config, while each machine keeps its own tile order and custom links."""
+    if not isinstance(real, dict) or "tiles" not in real:
+        return example
+    tiles = list(real.get("tiles", []))
+    have = {t.get("id") for t in tiles if isinstance(t, dict)}
+    for t in (example or {}).get("tiles", []):
+        if isinstance(t, dict) and t.get("id") not in have:
+            tiles.append(t)
+    return {**real, "tiles": tiles}
+
+
 def _integrations() -> dict:
     # Read fresh on every request so path edits apply without a restart.
     return integrations.load_integrations(INTEGRATIONS_PATH)
@@ -87,7 +102,9 @@ def sop_image(filename):
 
 @app.route("/api/tiles")
 def tiles():
-    return jsonify(_config_json("tiles.json", {"tiles": []}))
+    real = _load_json(CONFIG_DIR / "tiles.json", None)
+    example = _load_json(CONFIG_DIR / "tiles.example.json", {"tiles": []})
+    return jsonify(merge_tiles(real, example))
 
 
 @app.route("/api/staff")

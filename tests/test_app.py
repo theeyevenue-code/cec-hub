@@ -24,6 +24,25 @@ class TestHomeAndConfig:
         assert referrals["link"] == "http://localhost:5678"
         assert referrals["external"] is True
 
+    def test_merge_tiles_appends_new_template_tiles(self):
+        import app
+        # A machine whose per-machine tiles.json predates the Lens Finder.
+        real = {"tiles": [{"id": "sops"},
+                          {"id": "referrals", "link": "http://custom:5555"}]}
+        example = {"tiles": [{"id": "sops"}, {"id": "referrals"},
+                             {"id": "lenses", "name": "Lens Finder"}]}
+        merged = app.merge_tiles(real, example)
+        ids = [t["id"] for t in merged["tiles"]]
+        assert ids == ["sops", "referrals", "lenses"]   # new tile appended
+        # the machine's own order and custom referral link are preserved
+        assert next(t for t in merged["tiles"]
+                    if t["id"] == "referrals")["link"] == "http://custom:5555"
+
+    def test_merge_tiles_no_machine_file_uses_template(self):
+        import app
+        example = {"tiles": [{"id": "lenses"}]}
+        assert app.merge_tiles(None, example) == example
+
     def test_staff_names_for_the_picker(self, hub_client):
         data = hub_client.get("/api/staff").get_json()
         assert "Angie" in data["staff"]
