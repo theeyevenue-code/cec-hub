@@ -10,3 +10,4 @@ hub.log
 config/integrations.json
 config/tiles.json
 config/staff.json
+config/lens_filter.json

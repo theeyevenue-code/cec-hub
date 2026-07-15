@@ -226,6 +226,46 @@ def load_catalog(lenses_dir: Path) -> dict:
     return {"lenses": lenses, "files": files, "message": message}
 
 
+def apply_lens_filter(catalog: dict, cfg: dict | None) -> dict:
+    """Narrow the catalogue to what THIS machine actually dispenses.
+
+    cfg["keep_only"] maps a lens category (e.g. "Progressive") to the ranges
+    that machine uses; within that category only lenses whose brand+name
+    contains one of those snippets (case-insensitive) survive. Categories not
+    named are left whole, so an empty/absent config changes nothing.
+
+    This runs after load_catalog, so the shared price files stay complete —
+    a git pull that refreshes the price list never fights a machine's own
+    choices, which live in the git-ignored config/lens_filter.json.
+    """
+    keep_only = (cfg or {}).get("keep_only") or {}
+    rules = {str(cat).strip().lower():
+             [str(p).strip().lower() for p in pats if str(p).strip()]
+             for cat, pats in keep_only.items() if pats}
+    if not rules:
+        return catalog
+
+    kept = []
+    for l in catalog.get("lenses", []):
+        pats = rules.get(str(l.get("category", "")).strip().lower())
+        if pats is None:
+            kept.append(l)
+            continue
+        label = f"{l.get('brand', '')} {l.get('name', '')}".lower()
+        if any(p in label for p in pats):
+            kept.append(l)
+
+    # Re-count each file from what survived, so the library's "x lenses"
+    # chip matches what's actually shown.
+    counts = {}
+    for l in kept:
+        src = l.get("source", "")
+        counts[src] = counts.get(src, 0) + 1
+    files = [{**f, "count": counts.get(f.get("filename", ""), 0)}
+             for f in catalog.get("files", [])]
+    return {**catalog, "lenses": kept, "files": files}
+
+
 def sv_only(lenses: list) -> list:
     """Just the single-vision lenses — what the cost engine matches on.
     Progressives/bifocals/occupationals are browse-only (made to order,

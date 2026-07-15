@@ -403,3 +403,45 @@ def test_api_jobs_checked_against_catalogue(hub_client_lens_jobs):
     check = jobs["31656"]["check"]
     assert check["status"] == "check"
     assert any("marked Stock" in n for n in check["chosen"]["notes"])
+
+
+# --- Per-machine declutter filter (apply_lens_filter) ------------------------
+
+def _catalogue(*rows):
+    """A tiny catalogue dict from (brand, name, category) triples."""
+    items = [{"brand": b, "name": n, "category": c, "source": "hoya.csv"}
+             for b, n, c in rows]
+    return {"lenses": items, "message": "",
+            "files": [{"filename": "hoya.csv", "count": len(items),
+                       "errors": []}]}
+
+
+def test_filter_keeps_only_named_ranges_within_that_category():
+    cat = _catalogue(
+        ("Hoya", "Hoyalux Dynamic Prime Eyas", "Progressive"),
+        ("Hoya", "Hoyalux Dynamic Premium Eyas", "Progressive"),
+        ("Hoya", "Hoyalux iD LifeStyle 4 Phoenix", "Progressive"),
+        ("Hoya", "Hoyalux iD LifeStyle Balansis", "Progressive"),
+        ("Hoya", "Hoyalux iD MySelf Profile", "Progressive"),
+        ("Hoya", "Hoyalux iD MySelf Eynoa", "Progressive"),
+        ("Hoya", "Nulux 1.50", "Single vision"),
+    )
+    out = lenses.apply_lens_filter(cat, {"keep_only": {
+        "Progressive": ["Dynamic Prime", "iD LifeStyle 4", "iD MySelf Profile"]}})
+    names = {l["name"] for l in out["lenses"]}
+    # Loose match keeps the range's variants, but 'Prime' != 'Premium',
+    # 'LifeStyle 4' != 'Balansis', and 'MySelf Profile' != plain 'MySelf'.
+    assert names == {
+        "Hoyalux Dynamic Prime Eyas",
+        "Hoyalux iD LifeStyle 4 Phoenix",
+        "Hoyalux iD MySelf Profile",
+        "Nulux 1.50",  # a category not in keep_only — left whole
+    }
+    # the library's per-file count reflects what survived
+    assert out["files"][0]["count"] == 4
+
+
+def test_filter_empty_or_absent_config_is_a_no_op():
+    cat = _catalogue(("Hoya", "Hoyalux Dynamic Premium", "Progressive"))
+    for cfg in ({}, {"keep_only": {}}, None):
+        assert lenses.apply_lens_filter(cat, cfg)["lenses"] == cat["lenses"]

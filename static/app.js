@@ -490,7 +490,6 @@ function lensCatalogHTML(cat) {
         <div class="lens-filters">
             <select id="lf-cat" class="lens-select" aria-label="Lens type"></select>
             <select id="lf-index" class="lens-select" aria-label="Index"></select>
-            <select id="lf-form" class="lens-select" aria-label="Design (spheric / aspheric)"></select>
             <select id="lf-coat" class="lens-select" aria-label="Coating"></select>
         </div>
         <input class="search-box" id="lens-lookup" type="search" autocomplete="off"
@@ -562,7 +561,6 @@ function wireLensLookup(cat) {
     const out = document.getElementById("lens-lookup-results");
     const catEl = document.getElementById("lf-cat");
     const idxEl = document.getElementById("lf-index");
-    const formEl = document.getElementById("lf-form");
     const coatEl = document.getElementById("lf-coat");
     if (!box || !out || !catEl) return;
 
@@ -581,16 +579,13 @@ function wireLensLookup(cat) {
     fill(idxEl, "Any index",
          [...new Set(rows.map((r) => r.lens.index).filter((v) => v != null))]
              .sort((a, b) => a - b).map(String));
-    fill(formEl, "Spheric & aspheric",
-         [...new Set(rows.map((r) => r.lens.form).filter(Boolean))].sort());
     fill(coatEl, "Any coating",
          [...new Set(rows.map((r) => r.lens.coating).filter(Boolean))].sort());
 
     function apply() {
-        const cCat = catEl.value, cIdx = idxEl.value,
-              cForm = formEl.value, cCoat = coatEl.value;
+        const cCat = catEl.value, cIdx = idxEl.value, cCoat = coatEl.value;
         const words = box.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-        if (!(cCat || cIdx || cForm || cCoat || words.length)) {
+        if (!(cCat || cIdx || cCoat || words.length)) {
             out.innerHTML = `<div class="empty-panel">Pick a type, index or coating above,
                 or start typing a lens name or code.</div>`;
             return;
@@ -599,7 +594,6 @@ function wireLensLookup(cat) {
             const l = r.lens;
             if (cCat && l.category !== cCat) return false;
             if (cIdx && String(l.index) !== cIdx) return false;
-            if (cForm && l.form !== cForm) return false;
             if (cCoat && l.coating !== cCoat) return false;
             return words.every((w) => r.hay.includes(w));
         }).map((r) => r.lens);
@@ -617,7 +611,7 @@ function wireLensLookup(cat) {
                 <tbody>${hits.slice(0, LOOKUP_LIMIT).map((l) => lensRowHTML(l)).join("")}</tbody>
             </table></div>`;
     }
-    [catEl, idxEl, formEl, coatEl].forEach((el) =>
+    [catEl, idxEl, coatEl].forEach((el) =>
         el.addEventListener("change", apply));
     let timer = null;
     box.addEventListener("input", () => {

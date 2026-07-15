@@ -85,6 +85,16 @@ def _staff_name() -> str:
     return name[:60] if name else "someone (no name picked)"
 
 
+def _catalog() -> dict:
+    """The lens catalogue, narrowed to what this machine dispenses.
+
+    Read fresh on every request (like the price files themselves), so an edit
+    to config/lens_filter.json takes effect on the next page load. The filter
+    config is per-machine and git-ignored — see config/lens_filter.example.json."""
+    catalog = lenses.load_catalog(LENSES_DIR)
+    return lenses.apply_lens_filter(catalog, _config_json("lens_filter.json", {}))
+
+
 # --- Pages -------------------------------------------------------------------
 
 @app.route("/")
@@ -176,7 +186,7 @@ def stock_approve():
 
 @app.route("/api/lenses")
 def lenses_catalog():
-    return jsonify(lenses.load_catalog(LENSES_DIR))
+    return jsonify(_catalog())
 
 
 @app.route("/api/lenses/find")
@@ -202,7 +212,7 @@ def lenses_find():
         return jsonify({"error": "Blank size should be in millimetres, "
                                  "e.g. 68 (or leave it empty)."}), 400
 
-    catalog = lenses.load_catalog(LENSES_DIR)
+    catalog = _catalog()
     result = lenses.find_options(lenses.sv_only(catalog["lenses"]), sph,
                                  cyl or 0.0, min_blank)
     result["catalog_message"] = catalog["message"]
@@ -226,7 +236,7 @@ def lenses_check():
     if min_blank is not None and not 40 <= min_blank <= 90:
         min_blank = None
 
-    catalog = lenses.load_catalog(LENSES_DIR)
+    catalog = _catalog()
     result = lenses.check_job(lenses.sv_only(catalog["lenses"]), right, left,
                               min_blank, data.get("chosen") or {})
     result["catalog_message"] = catalog["message"]
@@ -240,7 +250,7 @@ def lenses_jobs():
     data = integrations.lens_jobs(_integrations())
     if not data["connected"]:
         return jsonify(data)
-    catalog = lenses.load_catalog(LENSES_DIR)
+    catalog = _catalog()
     jobs = []
     for job in data["jobs"]:
         min_blank = lenses.parse_number(job.get("min_blank"))

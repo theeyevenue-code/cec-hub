@@ -1,0 +1,4 @@
+{
+  "_readme": "Per-machine lens declutter, so this Hub shows only the ranges you dispense. Copy this file to config/lens_filter.json and edit that one (it is git-ignored, so a price-list update pulled from GitHub never overwrites your choices, and the shared price files stay complete). 'keep_only' maps a lens category to the ranges to keep: within that category, only lenses whose brand+name contains one of the snippets survive. Any category you leave out is shown in full, so an empty keep_only (like this template) changes nothing. Matching is case-insensitive and loose, so 'Dynamic Prime' keeps every index / coating / photochromic variant of that range but not 'Dynamic Premium'. Example: \"keep_only\": { \"Progressive\": [\"Dynamic Prime\", \"iD LifeStyle 4\", \"iD MySelf Profile\"] }. Categories in the price file: Single vision, Progressive, Occupational, Bifocal.",
+  "keep_only": {}
+}
