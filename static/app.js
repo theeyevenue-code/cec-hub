@@ -457,6 +457,7 @@ function lensRowHTML(l, extraCellHTML) {
         <td><strong>${esc((l.brand + " " + l.name).trim())}</strong>
             ${l.best ? `<span class="badge-best">★ Best value</span>` : ""}
             ${meta ? `<div class="cell-sub design-sub">${esc(meta)}</div>` : ""}
+            ${l.add_range ? `<div class="cell-sub">${esc(l.add_range)}</div>` : ""}
             ${l.code ? `<div class="cell-sub code-sub">${esc(l.code)}</div>` : ""}
             ${l.coating ? `<div class="cell-sub">${esc(l.coating)}</div>` : ""}
             ${l.notes ? `<div class="cell-sub">${esc(l.notes)}</div>` : ""}
@@ -568,7 +569,7 @@ function wireLensLookup(cat) {
     const rows = (cat.lenses || []).map((l) => ({
         lens: l,
         hay: [l.brand, l.name, l.code, l.coating, l.index, l.category,
-              l.form, l.notes].join(" ").toLowerCase(),
+              l.form, l.add_range, l.notes].join(" ").toLowerCase(),
     }));
 
     function fill(el, allLabel, values) {

@@ -1,7 +1,7 @@
-brand,lens,code,category,index,form,type,blank_mm,sph_min,sph_max,cyl_max,combined_max,price,coating,notes
-Hoya,EXAMPLE Nulux 1.50,S-NULUX,Single vision,1.50,Aspheric,stock,70,-4.00,+4.00,-2.00,,18.50,Hi-Vision LongLife,EXAMPLE ROW — replace with the real guide
-Hoya,EXAMPLE Stellify 1.55,HLSY-1.55,Single vision,1.55,Spherical,stock,65,+0.25,+4.00,-2.00,,24.00,,EXAMPLE — 65mm blank in plus powers
-Hoya,EXAMPLE Stellify 1.50,HLSY-1.50-70,Single vision,1.50,Spherical,stock,75,-6.00,+4.00,-2.00,,21.00,,EXAMPLE — 75mm blank
-Hoya,EXAMPLE Nulux 1.60,S-NULUX-EYAS,Single vision,1.60,Aspheric,stock,70,-8.00,+6.00,-2.00,,32.00,,EXAMPLE
-Hoya,EXAMPLE SV Grind 1.50,RX-EXAMPLE,Single vision,1.50,Aspheric,grind,,-10.00,+8.00,-4.00,,45.00,,EXAMPLE — surfaced to any size
-Hoya,EXAMPLE MySelf 1.50,MYSELF-1.50,Progressive,1.50,Freeform,grind,,,,,,89.10,Hi-Vision ViewProtect,EXAMPLE progressive — reference only (no range needed)
+brand,lens,code,category,index,form,type,blank_mm,sph_min,sph_max,cyl_max,combined_max,add_range,price,coating,notes
+Hoya,EXAMPLE Nulux 1.50,S-NULUX,Single vision,1.50,Aspheric,stock,70,-4.00,+4.00,-2.00,,,18.50,Hi-Vision LongLife,EXAMPLE ROW — replace with the real guide
+Hoya,EXAMPLE Stellify 1.55,HLSY-1.55,Single vision,1.55,Spherical,stock,65,+0.25,+4.00,-2.00,,,24.00,,EXAMPLE — 65mm blank in plus powers
+Hoya,EXAMPLE Stellify 1.50,HLSY-1.50-70,Single vision,1.50,Spherical,stock,75,-6.00,+4.00,-2.00,,,21.00,,EXAMPLE — 75mm blank
+Hoya,EXAMPLE Nulux 1.60,S-NULUX-EYAS,Single vision,1.60,Aspheric,stock,70,-8.00,+6.00,-2.00,,,32.00,,EXAMPLE
+Hoya,EXAMPLE SV Grind 1.50,RX-EXAMPLE,Single vision,1.50,Aspheric,grind,,-10.00,+8.00,-4.00,,,45.00,,EXAMPLE — surfaced to any size
+Hoya,EXAMPLE MySelf 1.50,MYSELF-1.50,Progressive,1.50,Freeform,grind,,,,,,Add +0.75 to +3.50,89.10,Hi-Vision ViewProtect,EXAMPLE progressive — reference only (no sphere range needed)

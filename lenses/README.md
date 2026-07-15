@@ -44,6 +44,7 @@ aliases work — e.g. `diameter` for `blank_mm`, `cost` for `price`).
 | `sph_range` | *alt* | *instead of the two above*: one cell like `+4.00 to -4.00` |
 | `cyl_max` | no | biggest cyl it can do, e.g. `-2.00` (sign doesn't matter) |
 | `combined_max` | no | limit on sphere + cyl combined, if the guide states one |
+| `add_range` | no | free text for multifocals, e.g. `Add +0.75 to +3.50` or the boost values — shown & searchable, not matched on |
 | `price` | no | **cost per lens** — keep every file on the same basis (per lens, ex GST) or the "best value" comparison lies |
 | `coating` | no | e.g. `Hi-Vision LongLife` |
 | `notes` | no | anything else worth seeing on the results card |

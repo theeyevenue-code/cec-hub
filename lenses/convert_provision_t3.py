@@ -51,6 +51,27 @@ COATS_DYNSYNC = ["Super Hard", "Hi-Vision ViewProtect", "Hard Diamond Finish",
                  "Diamond Finish BlueControl", "Hard Mirror"]
 COATS_ENROUTE = ["EnRoute Glare Filter"]
 COATS_MIYO = ["MiyoSmart STX", "MiyoSmart STX Full Control"]
+COATS_GLASS = ["Multicoat (GMC)"]
+
+# Add-power ranges. The exact boost/focus values come from the pricelist
+# footnotes; the general +0.75 to +3.50 range is the Hoya iD standard,
+# confirmed on the MySelf availability chart (guide p138: "ADD 0.75~3.50").
+ADD_RANGES = [
+    ("VisuPro All Day", "Add +0.57 / +0.95 / +1.32 (Focus Max)"),
+    ("VisuPro Flex", "Add +0.58 / +0.77 / +0.96 / +1.16 (Focus Max)"),
+    ("Sync III", "Add +0.57 / +0.95 / +1.32 (boost)"),
+    ("Dynamic Sync", "Add +0.53 / +0.88 (boost)"),
+]
+
+
+def add_range_for(name: str, category: str) -> str:
+    """Add-power range for the row, or '' — reference only, never matched on."""
+    for key, val in ADD_RANGES:
+        if key in name:
+            return val
+    if category in ("Progressive", "Bifocal"):
+        return "Add +0.75 to +3.50"   # standard iD / made-to-order range
+    return ""                          # occupational/degressive: not a simple add
 
 # Big section banners, in file order (all appear BEFORE "SINGLE VISION -
 # GRIND"): (trigger substring, category, default coating layout).
@@ -74,8 +95,11 @@ MF_SUBSECTIONS = [
     ("SPORTIVE SINGLE VISION", "Single vision", COATS_MF8),
     ("MIYOSMART", "Single vision", COATS_MIYO),
     ("BIFOCAL", "Bifocal", COATS_BIFOCAL),
-    ("GLASS", "SKIP", None),        # glass range — niche, skip for now
-    ("POLARISED", "SKIP", None),    # polarised MF — sparse columns, skip
+    ("GLASS SINGLE VISION", "Single vision", COATS_GLASS),
+    ("GLASS PROGRESSIVES", "Progressive", COATS_GLASS),
+    # Polarised progressive headers (DYNAMIC ... POLARISED) carry no coating
+    # codes, but their data rows use the standard 8-col layout, so they just
+    # inherit the current Progressive / COATS_MF8 — no override needed.
 ]
 CORRIDOR_RE = re.compile(r"(\d+(?:/\d+)*\s*mm Corridors?)")
 
@@ -326,6 +350,7 @@ def emit(name, index, diamtr, code, values, category, coats, mode, corridor):
         common = {
             "brand": "Hoya", "lens": name, "code": code, "category": category,
             "index": index, "form": form_of(category, name),
+            "add_range": add_range_for(name, category),
             "price": val.lstrip("$"), "coating": coat,
         }
         # Availability ranges exist only for core Single vision (the cost
@@ -401,7 +426,7 @@ with OUT.open("w", encoding="utf-8", newline="") as f:
     writer = csv.DictWriter(f, fieldnames=[
         "brand", "lens", "code", "category", "index", "form", "type",
         "blank_mm", "sph_min", "sph_max", "cyl_max", "combined_max",
-        "price", "coating", "notes"])
+        "add_range", "price", "coating", "notes"])
     writer.writeheader()
     writer.writerows(rows_out)
 
