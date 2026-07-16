@@ -743,24 +743,7 @@ async function renderLenses() {
 
         <div id="lens-jobs"></div>
 
-        <div id="lens-catalog">${lensCatalogHTML(cat)}</div>
-
-        <div class="card">
-            <h2>⬆️ Add or update a price list</h2>
-            <p>Upload a supplier price CSV (e.g. the Hoya guide turned into a
-            spreadsheet). Uploading a file with the same name <strong>replaces</strong> the old
-            one — that's how new pricing goes in. The column layout is described in the
-            <code>lenses\\README.md</code> file — give a Claude session the supplier's PDF guide
-            and point it at that file to make the CSV.</p>
-            <div class="lens-form">
-                <div class="field"><label for="lf-upname">Supplier / file name (optional)</label>
-                    <input id="lf-upname" placeholder="hoya" autocomplete="off"></div>
-                <div class="field"><label for="lf-upfile">CSV file</label>
-                    <input id="lf-upfile" type="file" accept=".csv,text/csv"></div>
-                <button class="btn" id="lf-upload">Upload it</button>
-            </div>
-            <div class="status-msg" id="lf-upmsg"></div>
-        </div>`;
+        <div id="lens-catalog">${lensCatalogHTML(cat)}</div>`;
 
     wireLensLookup(cat);
     renderLensJobs();  // fills #lens-jobs only when the agent file exists
@@ -840,43 +823,6 @@ async function renderLenses() {
         });
     }
     [aEl, dblEl, pdEl].forEach((el) => el.addEventListener("input", suggest));
-
-    // Upload a price list CSV.
-    const upBtn = document.getElementById("lf-upload");
-    upBtn.addEventListener("click", async () => {
-        const msg = document.getElementById("lf-upmsg");
-        const file = document.getElementById("lf-upfile").files[0];
-        if (!file) {
-            msg.className = "status-msg error";
-            msg.textContent = "Pick a CSV file first.";
-            return;
-        }
-        const fd = new FormData();
-        fd.append("file", file);
-        const name = document.getElementById("lf-upname").value.trim();
-        if (name) fd.append("name", name);
-        upBtn.disabled = true;
-        msg.className = "status-msg";
-        msg.textContent = "Uploading…";
-        try {
-            const res = await fetch("/api/lenses/upload", { method: "POST", body: fd });
-            const out = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(out.error || "Something went wrong.");
-            msg.className = "status-msg ok";
-            msg.textContent = out.message +
-                ((out.row_errors || []).length
-                    ? ` (${out.row_errors.length} row${out.row_errors.length === 1 ? "" : "s"} couldn't be read — details in the loaded list below.)`
-                    : "");
-            const fresh = await getJSON("/api/lenses");
-            document.getElementById("lens-catalog").innerHTML = lensCatalogHTML(fresh);
-            wireLensLookup(fresh);
-        } catch (err) {
-            msg.className = "status-msg error";
-            msg.textContent = err.message;
-        } finally {
-            upBtn.disabled = false;
-        }
-    });
 }
 
 /* --- Go ---------------------------------------------------------------------------- */
