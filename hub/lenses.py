@@ -278,8 +278,12 @@ def group_products(lenses: list) -> list:
     and blank limits); this view is only for the library.
 
     Each product: brand, name, index, type, category, code, notes, source,
-    sph_min/sph_max (widest across bands), cyl_max (largest), blanks (sorted
-    list), coatings [{coating, price} cheapest first], price_from (cheapest).
+    add_range, sph_min/sph_max (widest across bands), cyl_max (largest),
+    blanks (sorted list), price_from (cheapest), and coatings — cheapest
+    first, each {coating, price, bands}. A band is {sph_min, sph_max,
+    cyl_max, blank}: which blank a given power comes on. Bands can differ
+    slightly by coating (the plus-power split moves), so the row shows the
+    selected coating's bands, not one flattened range.
     """
     groups, order = {}, []
     for l in lenses:
@@ -312,16 +316,25 @@ def group_products(lenses: list) -> list:
             g["blanks"].add(l["blank_mm"])
         coat = l.get("coating", "") or ""
         price = l.get("price")
+        entry = g["_coats"].setdefault(coat, {"price": None, "bands": []})
         # Price is constant per coating; keep the lowest just in case a file
         # ever disagrees, and don't let a rowless None wipe a real price.
-        if coat not in g["_coats"] or g["_coats"][coat] is None or (
-                price is not None and price < g["_coats"][coat]):
-            g["_coats"][coat] = price
+        if price is not None and (entry["price"] is None or price < entry["price"]):
+            entry["price"] = price
+        entry["bands"].append({
+            "sph_min": l.get("sph_min"), "sph_max": l.get("sph_max"),
+            "cyl_max": l.get("cyl_max"), "blank": l.get("blank_mm"),
+        })
 
     products = []
     for key in order:
         g = groups[key]
-        coatings = [{"coating": c, "price": p} for c, p in g.pop("_coats").items()]
+        coatings = []
+        for c, entry in g.pop("_coats").items():
+            bands = entry["bands"]
+            bands.sort(key=lambda b: (b["sph_min"] is None,
+                                      b["sph_min"] if b["sph_min"] is not None else 0))
+            coatings.append({"coating": c, "price": entry["price"], "bands": bands})
         coatings.sort(key=lambda c: (c["price"] is None, c["price"] or 0,
                                      c["coating"].lower()))
         g["blanks"] = sorted(g["blanks"])

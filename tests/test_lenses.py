@@ -478,6 +478,10 @@ def test_group_products_folds_coatings_and_blanks_into_one_row():
     # coatings cheapest-first, price lossless per coating
     assert [(c["coating"], c["price"]) for c in p["coatings"]] == [
         ("ViewProtect", 9.90), ("Full Control", 18.0)]
+    # each coating keeps its power->blank bands (which blank a power comes on)
+    vp = p["coatings"][0]
+    assert [(b["sph_min"], b["sph_max"], b["blank"]) for b in vp["bands"]] == [
+        (-6.0, -3.75, 70), (-3.50, 0.0, 75)]
 
 
 def test_group_products_splits_by_index_and_type():

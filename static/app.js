@@ -451,6 +451,7 @@ function lensCatalogHTML(cat) {
         <div class="lens-filters">
             <select id="lf-cat" class="lens-select" aria-label="Lens type"></select>
             <select id="lf-index" class="lens-select" aria-label="Index"></select>
+            <select id="lf-stock" class="lens-select" aria-label="Stock or grind"></select>
             <select id="lf-coat" class="lens-select" aria-label="Coating"></select>
         </div>
         <input class="search-box" id="lens-lookup" type="search" autocomplete="off"
@@ -464,8 +465,8 @@ function lensCatalogHTML(cat) {
 }
 
 // One skimmable row per product; the coating <select> drives the price cell.
-const LIB_TABLE_HEAD = `<tr><th>Lens</th><th>Index</th><th>Power</th><th>Blank</th>
-    <th>Coating</th><th>Price</th></tr>`;
+const LIB_TABLE_HEAD = `<tr><th>Lens</th><th>Index</th><th>Type</th><th>Power</th>
+    <th>Blank</th><th>Coating</th><th>Price</th></tr>`;
 
 // Staff shorthand for the coatings, front and centre. Anything not listed
 // keeps its name minus the "Hi-Vision" tier prefix (so Sun Pro, Meiryo…).
@@ -487,14 +488,38 @@ function coatShort(c) {
 
 function fmtIndex(v) { return v != null ? Number(v).toFixed(2) : "—"; }
 
-function blankLabel(p) {
-    const b = p.blanks || [];
-    if (!b.length) return p.type === "grind" ? "made to size" : "—";
-    const lo = Math.min(...b), hi = Math.max(...b);
-    return lo === hi ? fmtMM(lo) : `${parseFloat(lo)}–${fmtMM(hi)}`;
+// Power + Blank for a chosen coating, as aligned per-band lines so you can
+// read off which blank a given power comes on. Progressives have no sphere
+// grid — show the ADD range and whatever diameter(s) the file lists.
+function bandCells(p, coat) {
+    const bands = (coat && coat.bands) ? coat.bands : [];
+    const hasSph = bands.some((b) => b.sph_min != null);
+    if (hasSph) {
+        const power = bands.map((b) =>
+            `<div class="band">${esc(fmtPower(b.sph_min))} to ${esc(fmtPower(b.sph_max))}${
+                b.cyl_max != null ? ` <span class="cell-sub">cyl −${Number(b.cyl_max).toFixed(2)}</span>` : ""
+            }</div>`).join("");
+        const blank = bands.map((b) =>
+            `<div class="band">${b.blank != null ? esc(fmtMM(b.blank)) : "—"}</div>`).join("");
+        return { power, blank };
+    }
+    const power = p.add_range
+        ? `<span class="add-tag">ADD</span> ${esc(p.add_range.replace(/^Add\s+/i, ""))}`
+        : `<span class="cell-sub">not in file</span>`;
+    const dias = [...new Set(bands.map((b) => b.blank).filter((v) => v != null))]
+        .sort((a, b) => a - b);
+    const blank = dias.length ? dias.map((d) => esc(fmtMM(d))).join(" / ")
+        : (p.type === "grind" ? "made to size" : "—");
+    return { power, blank };
 }
 
-function productRowHTML(p, preCoat) {
+function typeChip(t) {
+    return t === "stock"
+        ? `<span class="type-chip type-stock">Stock</span>`
+        : `<span class="type-chip type-grind">Grind</span>`;
+}
+
+function productRowHTML(p, preCoat, idx) {
     const coats = p.coatings || [];
     // Default to the filtered coating if the user picked one, else cheapest.
     let sel = 0;
@@ -503,45 +528,29 @@ function productRowHTML(p, preCoat) {
         if (i >= 0) sel = i;
     }
     const priceTxt = (c) => c && c.price != null ? fmtMoney(c.price) : "no price yet";
-    const typeWord = p.type === "stock" ? "Stock" : "Grind";
-    const catWord = (p.category && p.category !== "Single vision") ? ` · ${esc(p.category)}` : "";
-    // Single vision carries a real sphere/cyl availability range. Progressives
-    // & occupationals don't — Hoya publishes their ADD and diameters (in Blank)
-    // but not a sphere grid (that's enforced at ordering), so show the ADD.
-    let powerCell;
-    if (p.sph_min != null) {
-        powerCell = `${esc(fmtPower(p.sph_min))} to ${esc(fmtPower(p.sph_max))}`
-            + (p.cyl_max != null
-                ? `<div class="cell-sub">cyl to −${Number(p.cyl_max).toFixed(2)}</div>` : "");
-    } else if (p.add_range) {
-        powerCell = `<span class="add-tag">ADD</span> ${esc(p.add_range.replace(/^Add\s+/i, ""))}`;
-    } else {
-        powerCell = `<span class="cell-sub">not in file</span>`;
-    }
+    const catWord = (p.category && p.category !== "Single vision")
+        ? ` <span class="cell-sub">${esc(p.category)}</span>` : "";
+    const cells = bandCells(p, coats[sel]);
 
-    let coatCell, priceCell;
+    let coatCell;
     if (coats.length <= 1) {
-        const c = coats[0];
-        coatCell = c ? `${esc(coatShort(c.coating))}` : "—";
-        priceCell = `<strong class="price-now">${esc(priceTxt(c))}</strong>`;
+        coatCell = coats[0] ? `${esc(coatShort(coats[0].coating))}` : "—";
     } else {
         coatCell = `<select class="lens-select coat-pick">
             ${coats.map((c, i) => `<option value="${i}" title="${esc(c.coating)}"
-                data-price="${c.price != null ? esc(fmtMoney(c.price)) : ""}"
                 ${i === sel ? "selected" : ""}>${esc(coatShort(c.coating))} — ${esc(priceTxt(c))}</option>`).join("")}
         </select>`;
-        priceCell = `<strong class="price-now">${esc(priceTxt(coats[sel]))}</strong>`;
     }
 
-    return `<tr>
-        <td><strong>${esc((p.brand + " " + p.name).trim())}</strong>
-            <div class="cell-sub">${typeWord}${catWord}</div>
+    return `<tr data-pidx="${idx}">
+        <td><strong>${esc((p.brand + " " + p.name).trim())}</strong>${catWord}
             ${p.code ? `<div class="cell-sub code-sub">${esc(p.code)}</div>` : ""}</td>
         <td><span class="idx-cell">${esc(fmtIndex(p.index))}</span></td>
-        <td>${powerCell}</td>
-        <td>${esc(blankLabel(p))}</td>
+        <td>${typeChip(p.type)}</td>
+        <td class="power-cell">${cells.power}</td>
+        <td class="blank-cell">${cells.blank}</td>
         <td>${coatCell}</td>
-        <td>${priceCell}</td>
+        <td><strong class="price-now">${esc(priceTxt(coats[sel]))}</strong></td>
     </tr>`;
 }
 
@@ -600,8 +609,10 @@ function wireLensLookup(cat) {
     const out = document.getElementById("lens-lookup-results");
     const catEl = document.getElementById("lf-cat");
     const idxEl = document.getElementById("lf-index");
+    const stockEl = document.getElementById("lf-stock");
     const coatEl = document.getElementById("lf-coat");
     if (!box || !out || !catEl) return;
+    let lastHits = [];
 
     const rows = (cat.products || []).map((p) => ({
         prod: p,
@@ -625,49 +636,60 @@ function wireLensLookup(cat) {
     fill(idxEl, "Any index",
          [...new Set(rows.map((r) => r.prod.index).filter((v) => v != null))]
              .sort((a, b) => a - b).map((v) => [String(v), fmtIndex(v)]));
+    fill(stockEl, "Stock & grind",
+         [["stock", "Stock only"], ["grind", "Grind only"]]);
     fill(coatEl, "Any coating",
          [...new Set(rows.flatMap((r) => (r.prod.coatings || [])
              .map((c) => c.coating)).filter(Boolean))].sort().map((c) => [c, c]));
 
     function apply() {
-        const cCat = catEl.value, cIdx = idxEl.value, cCoat = coatEl.value;
+        const cCat = catEl.value, cIdx = idxEl.value,
+              cStock = stockEl.value, cCoat = coatEl.value;
         const words = box.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-        if (!(cCat || cIdx || cCoat || words.length)) {
-            out.innerHTML = `<div class="empty-panel">Pick a type, index or coating above,
-                or start typing a lens name or index.</div>`;
+        if (!(cCat || cIdx || cStock || cCoat || words.length)) {
+            out.innerHTML = `<div class="empty-panel">Pick a type, index, stock/grind or
+                coating above, or start typing a lens name or index.</div>`;
             return;
         }
-        const hits = rows.filter((r) => {
+        lastHits = rows.filter((r) => {
             const p = r.prod;
             if (cCat && p.category !== cCat) return false;
             if (cIdx && String(p.index) !== cIdx) return false;
+            if (cStock && p.type !== cStock) return false;
             if (cCoat && !(p.coatings || []).some((c) => c.coating === cCoat)) return false;
             return words.every((w) => r.hay.includes(w));
         }).map((r) => r.prod);
-        if (!hits.length) {
+        if (!lastHits.length) {
             out.innerHTML = `<div class="empty-panel">Nothing loaded matches those filters.
                 Try widening them, or it may be a lens we don't have a price file for yet.</div>`;
             return;
         }
         out.innerHTML = `
-            <div class="updated-line" style="margin-top:12px">${hits.length}
-                lens${hits.length === 1 ? "" : "es"}${hits.length > LOOKUP_LIMIT
+            <div class="updated-line" style="margin-top:12px">${lastHits.length}
+                lens${lastHits.length === 1 ? "" : "es"}${lastHits.length > LOOKUP_LIMIT
                 ? ` — showing the first ${LOOKUP_LIMIT}` : ""}</div>
             <div class="table-scroll"><table class="stock-table lib-table">
                 <thead>${LIB_TABLE_HEAD}</thead>
-                <tbody>${hits.slice(0, LOOKUP_LIMIT)
-                    .map((p) => productRowHTML(p, cCoat)).join("")}</tbody>
+                <tbody>${lastHits.slice(0, LOOKUP_LIMIT)
+                    .map((p, i) => productRowHTML(p, cCoat, i)).join("")}</tbody>
             </table></div>`;
     }
-    // Coating picker updates just its own row's price cell (event delegation).
+    // Coating picker updates its own row: price AND the power/blank bands
+    // (which blank a power comes on can differ between coatings).
     out.addEventListener("change", (e) => {
         const pick = e.target.closest(".coat-pick");
         if (!pick) return;
-        const opt = pick.options[pick.selectedIndex];
-        const cell = pick.closest("tr").querySelector(".price-now");
-        if (cell) cell.textContent = opt.dataset.price || "no price yet";
+        const tr = pick.closest("tr");
+        const p = lastHits[+tr.dataset.pidx];
+        if (!p) return;
+        const coat = (p.coatings || [])[+pick.value];
+        const cells = bandCells(p, coat);
+        tr.querySelector(".price-now").textContent =
+            coat && coat.price != null ? fmtMoney(coat.price) : "no price yet";
+        tr.querySelector(".power-cell").innerHTML = cells.power;
+        tr.querySelector(".blank-cell").innerHTML = cells.blank;
     });
-    [catEl, idxEl, coatEl].forEach((el) => el.addEventListener("change", apply));
+    [catEl, idxEl, stockEl, coatEl].forEach((el) => el.addEventListener("change", apply));
     let timer = null;
     box.addEventListener("input", () => {
         clearTimeout(timer);

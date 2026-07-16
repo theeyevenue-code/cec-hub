@@ -584,6 +584,20 @@ main {
     margin-right: 4px;
     letter-spacing: 0.5px;
 }
+/* Stock vs grind — a key thing staff skim for, so give it a bold chip. */
+.type-chip {
+    display: inline-block;
+    font-size: 15px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 3px 12px;
+    white-space: nowrap;
+}
+.type-stock { background: #dff0e8; color: var(--green-dark); border: 1.5px solid #9fd3bd; }
+.type-grind { background: var(--amber-bg); color: var(--amber-ink); border: 1.5px solid var(--amber-line); }
+/* Power/blank shown as one line per availability band, so they align. */
+.lib-table .band { padding: 1px 0; white-space: nowrap; }
+.lib-table .band + .band { border-top: 1px dotted var(--line); }
 
 .job-row { padding: 14px 0; border-bottom: 1px solid var(--line); }
 .job-row:last-child { border-bottom: none; padding-bottom: 0; }
