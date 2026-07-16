@@ -12,7 +12,6 @@ import re
 from datetime import datetime, date, timedelta
 from pathlib import Path
 
-MAX_DIGEST_LINES = 200
 MAX_CSV_ROWS = 200
 
 NOT_CONNECTED = (
@@ -111,35 +110,6 @@ def reviews_status(cfg: dict, today: date | None = None) -> dict:
         "bot_enabled": bot_enabled,
         "last_run": last_run,
         "last_result": last_result,
-        "message": "",
-    }
-
-
-# --- Orders ------------------------------------------------------------------
-
-def orders_digest(cfg: dict) -> dict:
-    """The Optomate agent's orders digest log + ready-to-collect list."""
-    agent = cfg.get("optomate_agent", {}) or {}
-    digest_path = agent.get("orders_digest_log", "")
-    ready_path = agent.get("uncollected_ready", "")
-
-    digest_raw = _read_text(digest_path)
-    ready_raw = _read_text(ready_path)
-
-    if digest_raw is None and ready_raw is None:
-        return {"connected": False, "message": NOT_CONNECTED}
-
-    digest = None
-    if digest_raw is not None:
-        lines = digest_raw.splitlines()
-        digest = "\n".join(lines[-MAX_DIGEST_LINES:])
-
-    return {
-        "connected": True,
-        "digest": digest,
-        "digest_updated": _mtime_display(digest_path) if digest_raw is not None else None,
-        "uncollected": ready_raw,
-        "uncollected_updated": _mtime_display(ready_path) if ready_raw is not None else None,
         "message": "",
     }
 

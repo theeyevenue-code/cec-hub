@@ -62,7 +62,6 @@ const routes = [
     { re: /^#\/sops$/, fn: renderSopList },
     { re: /^#\/sop\/([A-Za-z0-9._-]+)$/, fn: (m) => renderSop(m[1]) },
     { re: /^#\/reviews$/, fn: renderReviews },
-    { re: /^#\/orders$/, fn: renderOrders },
     { re: /^#\/stock$/, fn: renderStock },
     { re: /^#\/lenses$/, fn: renderLenses },
 ];
@@ -316,43 +315,6 @@ async function renderReviews() {
             <p>Nothing to do here day-to-day — it's just a window. If a patient mentions
             they got a review text, this is where it came from. If the number looks stuck
             on zero for a couple of weeks, mention it to Mark.</p>
-        </div>`;
-}
-
-/* --- Orders ------------------------------------------------------------------- */
-
-async function renderOrders() {
-    view.innerHTML = `<div class="loading-panel">Getting the orders list…</div>`;
-    let data;
-    try {
-        data = await getJSON("/api/orders/digest");
-    } catch (e) {
-        view.innerHTML = errorPanel(e.message);
-        return;
-    }
-    const head = `
-        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
-        <h1 class="page-title">Orders &amp; Collections</h1>
-        <p class="page-sub">What the Optomate helper has seen lately — read-only, Optomate is still the boss.</p>`;
-
-    if (!data.connected) {
-        view.innerHTML = head + `<div class="empty-panel">${esc(data.message)}</div>`;
-        return;
-    }
-    view.innerHTML = head + `
-        <div class="card">
-            <h2>🕶️ Ready to collect — not picked up yet</h2>
-            ${data.uncollected != null
-                ? `${data.uncollected_updated ? `<div class="updated-line">Last updated ${esc(data.uncollected_updated)}</div>` : ""}
-                   <div class="log-text">${esc(data.uncollected.trim() || "Nothing on the list — all collected.")}</div>`
-                : `<p>No ready-to-collect list on this computer yet.</p>`}
-        </div>
-        <div class="card">
-            <h2>📦 Recent orders digest</h2>
-            ${data.digest != null
-                ? `${data.digest_updated ? `<div class="updated-line">Last updated ${esc(data.digest_updated)}</div>` : ""}
-                   <div class="log-text">${esc(data.digest.trim() || "Nothing in the digest yet.")}</div>`
-                : `<p>No orders digest on this computer yet.</p>`}
         </div>`;
 }
 

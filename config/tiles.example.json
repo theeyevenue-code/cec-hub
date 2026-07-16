@@ -24,13 +24,6 @@
       "link": "#/reviews"
     },
     {
-      "id": "orders",
-      "icon": "📦",
-      "name": "Orders & Collections",
-      "description": "Recent orders digest and jobs ready to collect",
-      "link": "#/orders"
-    },
-    {
       "id": "stock",
       "icon": "🧾",
       "name": "Stock Orders",

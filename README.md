@@ -1,7 +1,7 @@
 # CEC Hub
 
 The staff home screen for Concord Eyecare. One local web app with big tiles:
-How-To Guides (SOPs) · Referral Letters · Google Reviews · Orders & Collections · Stock Orders · Lens Finder.
+How-To Guides (SOPs) · Referral Letters · Google Reviews · Stock Orders · Lens Finder.
 
 Built for everyone at the front desk — big text, big buttons, plain words, nothing scary.
 
@@ -33,7 +33,7 @@ Open `config\integrations.json` in Notepad and check the paths:
 | Section | Points at | Used by |
 |---|---|---|
 | `review_bot` | the review bot's `sent_log.json`, `review_bot.log`, `config.json` | Reviews page |
-| `optomate_agent` | the agent's `logs\orders-digest.log`, `logs\uncollected-ready.txt`, `inventory\proposals\` | Orders + Stock pages |
+| `optomate_agent` | the agent's `inventory\proposals\`, `logs\lens-jobs.jsonl` | Stock page + Lens Finder's "Recent lens jobs" |
 | `scorecard_drop` | the folder Karen saves the Friday scorecard photo into | referenced by the scorecard guide |
 
 If a path doesn't exist on this machine, the matching page simply says

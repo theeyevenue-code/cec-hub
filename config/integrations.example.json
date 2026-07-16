@@ -6,8 +6,6 @@
     "config": "C:\\Claude\\Claude Code\\CEC-Review-Bot\\cec-review-bot\\config.json"
   },
   "optomate_agent": {
-    "orders_digest_log": "C:\\CEC\\CEC-Optomate-Agent\\logs\\orders-digest.log",
-    "uncollected_ready": "C:\\CEC\\CEC-Optomate-Agent\\logs\\uncollected-ready.txt",
     "proposals_dir": "C:\\CEC\\CEC-Optomate-Agent\\inventory\\proposals",
     "lens_jobs": "C:\\CEC\\CEC-Optomate-Agent\\logs\\lens-jobs.jsonl"
   },

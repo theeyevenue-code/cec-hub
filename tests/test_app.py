@@ -15,8 +15,7 @@ class TestHomeAndConfig:
     def test_tiles_come_from_config(self, hub_client):
         data = hub_client.get("/api/tiles").get_json()
         ids = [t["id"] for t in data["tiles"]]
-        assert ids == ["sops", "referrals", "reviews", "orders", "stock",
-                       "lenses"]
+        assert ids == ["sops", "referrals", "reviews", "stock", "lenses"]
 
     def test_referral_tile_links_to_the_referral_app(self, hub_client):
         data = hub_client.get("/api/tiles").get_json()
@@ -118,26 +117,6 @@ class TestReviewsPage:
         assert data["connected"] is False
         assert "Not connected" in data["message"]
         assert "wrong" in data["message"]  # "Nothing is wrong — ..."
-
-
-class TestOrdersPage:
-    def test_connected_returns_digest_and_uncollected(self, hub_client):
-        data = hub_client.get("/api/orders/digest").get_json()
-        assert data["connected"] is True
-        assert "JOB 4411" in data["uncollected"]
-        assert "order line 249" in data["digest"]
-        assert data["digest_updated"]
-
-    def test_digest_is_tailed_to_200_lines(self, hub_client):
-        data = hub_client.get("/api/orders/digest").get_json()
-        lines = data["digest"].splitlines()
-        assert len(lines) == 200
-        assert lines[0] == "2026-07-03 order line 50"  # 250 written, first 50 dropped
-
-    def test_not_connected_is_calm_and_200(self, hub_client_disconnected):
-        res = hub_client_disconnected.get("/api/orders/digest")
-        assert res.status_code == 200
-        assert res.get_json()["connected"] is False
 
 
 class TestStockPage:

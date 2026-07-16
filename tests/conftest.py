@@ -52,15 +52,6 @@ def connected_world(tmp_path):
     )
 
     # --- Optomate agent files ---
-    agent_logs = tmp_path / "agent" / "logs"
-    agent_logs.mkdir(parents=True)
-    digest_lines = [f"2026-07-{(i % 8) + 1:02d} order line {i}" for i in range(250)]
-    (agent_logs / "orders-digest.log").write_text("\n".join(digest_lines), encoding="utf-8")
-    (agent_logs / "uncollected-ready.txt").write_text(
-        "JOB 4411 — frames — ready since 03/07\nJOB 4415 — contact lenses — ready since 05/07\n",
-        encoding="utf-8",
-    )
-
     proposals = tmp_path / "agent" / "inventory" / "proposals"
     proposals.mkdir(parents=True)
     (proposals / "frames-restock.csv").write_text(
@@ -85,8 +76,6 @@ def connected_world(tmp_path):
                 "config": str(bot_dir / "config.json"),
             },
             "optomate_agent": {
-                "orders_digest_log": str(agent_logs / "orders-digest.log"),
-                "uncollected_ready": str(agent_logs / "uncollected-ready.txt"),
                 "proposals_dir": str(proposals),
             },
         },
@@ -114,8 +103,6 @@ def hub_client_disconnected(tmp_path, monkeypatch):
             "config": str(tmp_path / "nope" / "config.json"),
         },
         "optomate_agent": {
-            "orders_digest_log": str(tmp_path / "nope" / "orders-digest.log"),
-            "uncollected_ready": str(tmp_path / "nope" / "uncollected-ready.txt"),
             "proposals_dir": str(tmp_path / "nope" / "proposals"),
         },
     })

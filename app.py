@@ -146,16 +146,11 @@ def sop_search():
     return jsonify({"results": sop_parser.search_sops(SOPS_DIR, query)})
 
 
-# --- Reviews / Orders / Stock ---------------------------------------------
+# --- Reviews / Stock ------------------------------------------------------
 
 @app.route("/api/reviews/status")
 def reviews_status():
     return jsonify(integrations.reviews_status(_integrations()))
-
-
-@app.route("/api/orders/digest")
-def orders_digest():
-    return jsonify(integrations.orders_digest(_integrations()))
 
 
 @app.route("/api/stock/proposals")
