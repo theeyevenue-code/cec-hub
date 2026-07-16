@@ -1,5 +1,7 @@
 {
-  "_readme": "Concord's own SELLING prices (per pair) shown in the Lens Finder next to the Hoya cost. Copy this file to config/cec_prices.json (git-ignored) and fill it in from your price list. A product's CEC price = the first 'prices' entry whose 'match' snippet appears in the brand+name AND whose 'by_index' has the product's index, UNLESS the name contains an 'exclude' snippet (use exclude for photochromic/polarised/tint variants that sell for more than the listed base price). Matching is case-insensitive substring on brand+name; index keys are strings like \"1.60\". An empty prices list (like this template) shows no CEC prices. Example: \"exclude\": [\"Sensity\", \"Polarised\"], \"prices\": [{\"match\": \"Dynamic Prime\", \"by_index\": {\"1.50\": 410, \"1.60\": 530}}].",
-  "exclude": [],
-  "prices": []
+  "_readme": "Concord's SELLING prices (per pair) shown in the Lens Finder next to the Hoya cost. Copy this file to config/cec_prices.json (git-ignored) and fill it in. Rules: 'design_prices' price progressives/occupationals by name snippet + index (coating doesn't change the base). 'sv_tiers' price single vision by COATING tier + index, so the sell price tracks the coating dropdown. 'surcharge' adds to any base when the name contains the snippet (e.g. photochromic). 'blank_names' suppress a price for variants that vary. Index keys are strings like \"1.60\". Empty lists (like this template) show no CEC prices. Example: {\"surcharge\": {\"Sensity\": 120}, \"blank_names\": [\"Polarised\"], \"design_prices\": [{\"match\": \"Dynamic Prime\", \"by_index\": {\"1.60\": 530}}], \"sv_tiers\": [{\"coating\": \"Diamond Finish\", \"by_index\": {\"1.67\": 290}}, {\"coating\": \"ViewProtect\", \"by_index\": {\"1.67\": 240}}]}.",
+  "surcharge": {},
+  "blank_names": [],
+  "design_prices": [],
+  "sv_tiers": []
 }

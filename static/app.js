@@ -449,6 +449,9 @@ function lensCatalogHTML(cat) {
     return `<div class="card"><h2>📚 Lens library</h2>
         <p>One row per lens — pick a coating to see its price. Narrow by type, index or
         coating, or just type a name or index (e.g. <strong>nulux 1.6</strong>).</p>
+        <p class="lens-note"><strong>/pr sell</strong> = Concord's price per pair · <strong>/lens
+        cost</strong> = Hoya cost. Photochromic is included where a sell price shows; not counted:
+        tint +$50 (grind only), polarised varies.</p>
         <div class="lens-filters">
             <select id="lf-cat" class="lens-select" aria-label="Lens type"></select>
             <select id="lf-index" class="lens-select" aria-label="Index"></select>
@@ -520,6 +523,12 @@ function typeChip(t) {
         : `<span class="type-chip type-grind">Grind</span>`;
 }
 
+// Concord's selling price for the chosen coating (per pair), or nothing.
+function cecHTML(coat) {
+    return coat && coat.cec_price != null
+        ? `$${esc(coat.cec_price)}<span class="unit"> /pr sell</span>` : "";
+}
+
 function productRowHTML(p, preCoat, idx) {
     const coats = p.coatings || [];
     // Default to the filtered coating if the user picked one, else cheapest.
@@ -552,8 +561,7 @@ function productRowHTML(p, preCoat, idx) {
         <td class="power-cell">${cells.power}</td>
         <td class="blank-cell">${cells.blank}</td>
         <td>${coatCell}</td>
-        <td>${p.cec_price != null
-                ? `<strong class="cec-price">$${esc(p.cec_price)}<span class="unit"> /pr sell</span></strong>` : ""}
+        <td><strong class="cec-price">${cecHTML(coats[sel])}</strong>
             <div class="hoya-cost"><span class="price-now">${esc(priceTxt(coats[sel]))}</span><span class="unit"> /lens cost</span></div></td>
     </tr>`;
 }
@@ -690,6 +698,7 @@ function wireLensLookup(cat) {
         const cells = bandCells(p, coat);
         tr.querySelector(".price-now").textContent =
             coat && coat.price != null ? fmtMoney(coat.price) : "no price yet";
+        tr.querySelector(".cec-price").innerHTML = cecHTML(coat);
         tr.querySelector(".power-cell").innerHTML = cells.power;
         tr.querySelector(".blank-cell").innerHTML = cells.blank;
     });

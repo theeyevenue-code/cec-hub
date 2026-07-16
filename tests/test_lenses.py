@@ -519,19 +519,39 @@ def test_mark_preferred_floats_everyday_lenses_and_honours_exclude():
     assert out[0]["name"] == "Nulux"
 
 
-def test_attach_cec_price_by_match_and_index():
+def test_attach_cec_price_design_sv_tiers_and_surcharge():
     prods = lenses.group_products([
-        _flat("Hoyalux Dynamic Prime", "1.60", "grind", "DF", 30.0, 70, None, None),
-        _flat("Hoyalux Dynamic Prime", "1.67", "grind", "DF", 40.0, 70, None, None),
-        _flat("Nulux", "1.50", "stock", "VP", 9.9, 70, -6.0, 0.0),
+        # progressive: priced by design+index, same across coatings
+        _flat("Hoyalux Dynamic Prime", "1.60", "grind", "Hi-Vision ViewProtect", 30.0, 70, None, None),
+        _flat("Hoyalux Dynamic Prime", "1.60", "grind", "Full Control", 39.0, 70, None, None),
+        # photochromic progressive: base + $120
+        _flat("Hoyalux Dynamic Prime Sensity 2", "1.60", "grind", "Hi-Vision ViewProtect", 42.0, 70, None, None),
+        # single vision: price depends on the coating tier
+        _flat("Nulux Eynoa", "1.67", "stock", "Hi-Vision ViewProtect", 27.8, 70, -9.5, 0.0),
+        _flat("Nulux Eynoa", "1.67", "stock", "Diamond Finish UV Control", 38.1, 70, -9.5, 0.0),
+        # polarised: blanked (varies)
+        _flat("Nulux Eynoa Polarised", "1.67", "stock", "Diamond Finish UV Control", 38.1, 70, -9.5, 0.0),
     ])
-    cfg = {"prices": [
-        {"match": "Dynamic Prime", "by_index": {"1.60": 530, "1.67": 630}},
-    ]}
-    out = {(p["name"], p["index"]): p for p in lenses.attach_cec_price(prods, cfg)}
-    assert out[("Hoyalux Dynamic Prime", "1.60")]["cec_price"] == 530
-    assert out[("Hoyalux Dynamic Prime", "1.67")]["cec_price"] == 630
-    assert out[("Nulux", "1.50")]["cec_price"] is None  # no matching entry
+    cfg = {
+        "surcharge": {"Sensity": 120},
+        "blank_names": ["Polarised"],
+        "design_prices": [{"match": "Dynamic Prime", "by_index": {"1.60": 530}}],
+        "sv_tiers": [
+            {"coating": "Diamond Finish", "by_index": {"1.67": 290}},
+            {"coating": "ViewProtect", "by_index": {"1.67": 240}},
+        ],
+    }
+    out = {p["name"]: p for p in lenses.attach_cec_price(prods, cfg)}
+    # progressive: same design price on every coating
+    assert all(c["cec_price"] == 530 for c in out["Hoyalux Dynamic Prime"]["coatings"])
+    # photochromic: +$120
+    assert out["Hoyalux Dynamic Prime Sensity 2"]["coatings"][0]["cec_price"] == 650
+    # single vision: VP=standard, Diamond Finish=premium
+    sv = {c["coating"]: c["cec_price"] for c in out["Nulux Eynoa"]["coatings"]}
+    assert sv["Hi-Vision ViewProtect"] == 240
+    assert sv["Diamond Finish UV Control"] == 290
+    # polarised: no price
+    assert all(c["cec_price"] is None for c in out["Nulux Eynoa Polarised"]["coatings"])
 
 
 def test_group_products_splits_by_index_and_type():

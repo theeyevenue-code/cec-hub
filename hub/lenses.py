@@ -380,36 +380,64 @@ def mark_preferred(products: list, cfg: dict | None) -> list:
 
 
 def attach_cec_price(products: list, cfg: dict | None) -> list:
-    """Tag each product with Concord's own selling price (per pair) from the
-    price list, so the library can show it beside the Hoya cost. cfg["prices"]
-    is a list of {match, by_index}: a product takes the first entry whose match
-    snippet is in brand+name and whose by_index has the product's index. Sets
-    cec_price (a number, per pair) or None."""
-    entries = []
-    for e in (cfg or {}).get("prices", []) or []:
+    """Tag each coating of each product with Concord's own selling price (per
+    pair) from the price list, so the library can show it beside the Hoya cost.
+
+    Progressives/occupationals price by design name + index ('design_prices',
+    coating doesn't move the base). Single vision prices by COATING tier + index
+    ('sv_tiers' — VP=Standard, Diamond Finish=Premium), so the sell price tracks
+    the coating dropdown. 'surcharge' adds to any base when the name contains the
+    snippet (photochromic Sensity +$120). 'blank_names' suppress a price (things
+    that vary — polarised, Sensity Colours, specialty lines). Sets each coating's
+    cec_price (number per pair, or None) and the product's cec_price to the
+    cheapest coating that has one."""
+    cfg = cfg or {}
+    surcharge = {str(k).strip().lower(): v
+                 for k, v in (cfg.get("surcharge") or {}).items()}
+    blank = [b.strip().lower() for b in cfg.get("blank_names", []) if str(b).strip()]
+    design = []
+    for e in cfg.get("design_prices", []) or []:
         m = str(e.get("match", "")).strip().lower()
         by = {str(k).strip(): v for k, v in (e.get("by_index") or {}).items()}
         if m and by:
-            entries.append((m, by))
-    # Snippets that suppress a CEC price — photochromic / polarised / tinted
-    # variants sell for more than the base Diamond Finish price, so rather than
-    # show that (understated) figure on them, show nothing until it's priced.
-    exclude = [x.strip().lower() for x in (cfg or {}).get("exclude", []) if str(x).strip()]
+            design.append((m, by))
+    sv_tiers = []
+    for e in cfg.get("sv_tiers", []) or []:
+        c = str(e.get("coating", "")).strip().lower()
+        by = {str(k).strip(): v for k, v in (e.get("by_index") or {}).items()}
+        if c and by:
+            sv_tiers.append((c, by))
+
     for p in products:
-        p["cec_price"] = None
+        name = f"{p.get('brand', '')} {p.get('name', '')}".lower()
         try:
             idx = f"{float(p.get('index')):.2f}" if p.get("index") is not None else None
         except (TypeError, ValueError):
             idx = None
-        if not entries or idx is None:
-            continue
-        label = f"{p.get('brand', '')} {p.get('name', '')}".lower()
-        if any(x in label for x in exclude):
-            continue
-        for m, by in entries:
-            if m in label and idx in by:
-                p["cec_price"] = by[idx]
-                break
+        is_sv = str(p.get("category", "")).strip().lower() in ("", "single vision", "sv")
+        blanked = idx is None or any(b in name for b in blank)
+        add = sum(v for k, v in surcharge.items() if k in name)
+        design_base = None
+        if not blanked:
+            for m, by in design:
+                if m in name and idx in by:
+                    design_base = by[idx]
+                    break
+        for coat in p.get("coatings", []):
+            price = None
+            if not blanked:
+                if design_base is not None:
+                    price = design_base
+                elif is_sv:
+                    cl = (coat.get("coating") or "").lower()
+                    for csnip, by in sv_tiers:
+                        if csnip in cl and idx in by:
+                            price = by[idx]
+                            break
+            coat["cec_price"] = (price + add) if price is not None else None
+        priced = [c["cec_price"] for c in p.get("coatings", [])
+                  if c.get("cec_price") is not None]
+        p["cec_price"] = min(priced) if priced else None
     return products
 
 
