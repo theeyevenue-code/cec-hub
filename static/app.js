@@ -413,8 +413,7 @@ function fmtMM(v) { return parseFloat(v) + "mm"; }
 function lensRowHTML(l, extraCellHTML) {
     const warnings = (l.warnings || []).map((w) =>
         `<div class="warn-note">⚠ ${esc(w)}</div>`).join("");
-    const meta = [(l.category && l.category !== "Single vision") ? l.category : "",
-                  l.form].filter(Boolean).join(" · ");
+    const meta = (l.category && l.category !== "Single vision") ? l.category : "";
     return `<tr class="${l.best ? "best-row" : ""}">
         <td><strong>${esc((l.brand + " " + l.name).trim())}</strong>
             ${l.best ? `<span class="badge-best">★ Best value</span>` : ""}
@@ -444,28 +443,78 @@ function lensCatalogHTML(cat) {
             <div class="empty-panel">${esc(cat.message)}</div></div>`;
     }
     const files = (cat.files || []).map((f) => `
-        <span class="chip">${esc(f.filename)} · ${esc(f.count)} lens${f.count === 1 ? "" : "es"}</span>`).join(" ");
+        <span class="chip">${esc(f.filename)} · ${esc(f.count)} price line${f.count === 1 ? "" : "s"}</span>`).join(" ");
     const errors = (cat.files || []).flatMap((f) => f.errors || []);
     return `<div class="card"><h2>📚 Lens library</h2>
-        <p>Browse the whole range — narrow by type, index, design and coating, the way you'd
-        pick a lens — or just type a name or code. Every detail comes from the price files.</p>
+        <p>One row per lens — pick a coating to see its price. Narrow by type, index or
+        coating, or just type a name or index (e.g. <strong>nulux 1.6</strong>).</p>
         <div class="lens-filters">
             <select id="lf-cat" class="lens-select" aria-label="Lens type"></select>
             <select id="lf-index" class="lens-select" aria-label="Index"></select>
             <select id="lf-coat" class="lens-select" aria-label="Coating"></select>
         </div>
         <input class="search-box" id="lens-lookup" type="search" autocomplete="off"
-            placeholder="…or type a name / code (e.g. stellify · S-NULUX · myself)"
+            placeholder="…or type a name, code or index (e.g. nulux · 1.60 · myself)"
             aria-label="Search lenses">
-        <div class="lens-guide-note">
-            💡 <strong>Aspheric (Nulux)</strong> — our go-to for plus powers &amp; higher Rx
-            (flatter, thinner). <strong>Spherical (Hilux)</strong> — better on curved /
-            high-base frames, e.g. wrap sunnies.</div>
         <div id="lens-lookup-results"></div>
         <div class="sop-card-meta" style="margin:14px 0 0">${files}</div>
         ${errors.length ? `<div class="confirm-strip"><p>Some rows couldn't be read:</p>
             ${errors.map((e) => `<div class="warn-note">⚠ ${esc(e)}</div>`).join("")}</div>` : ""}
     </div>`;
+}
+
+// One skimmable row per product; the coating <select> drives the price cell.
+const LIB_TABLE_HEAD = `<tr><th>Lens</th><th>Sphere</th><th>Blank</th>
+    <th>Coating</th><th>Price</th></tr>`;
+
+function fmtIndex(v) { return v != null ? Number(v).toFixed(2) : "—"; }
+
+function blankLabel(p) {
+    const b = p.blanks || [];
+    if (!b.length) return p.type === "grind" ? "made to size" : "—";
+    const lo = Math.min(...b), hi = Math.max(...b);
+    return lo === hi ? fmtMM(lo) : `${parseFloat(lo)}–${fmtMM(hi)}`;
+}
+
+function productRowHTML(p, preCoat) {
+    const coats = p.coatings || [];
+    // Default to the filtered coating if the user picked one, else cheapest.
+    let sel = 0;
+    if (preCoat) {
+        const i = coats.findIndex((c) => c.coating === preCoat);
+        if (i >= 0) sel = i;
+    }
+    const priceTxt = (c) => c && c.price != null ? fmtMoney(c.price) : "no price yet";
+    const typeWord = p.type === "stock" ? "Stock" : "Grind";
+    const catWord = (p.category && p.category !== "Single vision") ? ` · ${esc(p.category)}` : "";
+    const sphere = p.sph_min != null
+        ? `${esc(fmtPower(p.sph_min))} to ${esc(fmtPower(p.sph_max))}`
+        : `<span class="cell-sub">not in file</span>`;
+    const cylSub = p.cyl_max != null
+        ? `<div class="cell-sub">cyl to −${Number(p.cyl_max).toFixed(2)}</div>` : "";
+
+    let coatCell, priceCell;
+    if (coats.length <= 1) {
+        const c = coats[0];
+        coatCell = c ? esc(c.coating) : "—";
+        priceCell = `<strong class="price-now">${esc(priceTxt(c))}</strong>`;
+    } else {
+        coatCell = `<select class="lens-select coat-pick">
+            ${coats.map((c, i) => `<option value="${i}" data-price="${c.price != null ? esc(fmtMoney(c.price)) : ""}"
+                ${i === sel ? "selected" : ""}>${esc(c.coating)} — ${esc(priceTxt(c))}</option>`).join("")}
+        </select>`;
+        priceCell = `<strong class="price-now">${esc(priceTxt(coats[sel]))}</strong>`;
+    }
+
+    return `<tr>
+        <td><strong>${esc((p.brand + " " + p.name).trim())}</strong>
+            <div class="cell-sub">${esc(fmtIndex(p.index))} · ${typeWord}${catWord}</div>
+            ${p.code ? `<div class="cell-sub code-sub">${esc(p.code)}</div>` : ""}</td>
+        <td>${sphere}${cylSub}</td>
+        <td>${esc(blankLabel(p))}</td>
+        <td>${coatCell}</td>
+        <td>${priceCell}</td>
+    </tr>`;
 }
 
 const JOB_STATUS_CHIP = {
@@ -515,7 +564,7 @@ async function renderLensJobs() {
     </div>`;
 }
 
-const LOOKUP_LIMIT = 60;
+const LOOKUP_LIMIT = 80;
 const CAT_ORDER = ["Single vision", "Progressive", "Occupational", "Bifocal"];
 
 function wireLensLookup(cat) {
@@ -526,55 +575,70 @@ function wireLensLookup(cat) {
     const coatEl = document.getElementById("lf-coat");
     if (!box || !out || !catEl) return;
 
-    const rows = (cat.lenses || []).map((l) => ({
-        lens: l,
-        hay: [l.brand, l.name, l.code, l.coating, l.index, l.category,
-              l.form, l.add_range, l.notes].join(" ").toLowerCase(),
+    const rows = (cat.products || []).map((p) => ({
+        prod: p,
+        // Search hay: name/code/category/notes, the index in both "1.6" and
+        // "1.60" forms, plain-word type, and every coating name — so "nulux
+        // 1.6", "myself vp" or "grind 1.67" all narrow the way you'd expect.
+        hay: [p.brand, p.name, p.code, p.category, p.notes,
+              p.index, fmtIndex(p.index), (p.type === "stock" ? "stock" : "grind"),
+              ...(p.coatings || []).map((c) => c.coating)].join(" ").toLowerCase(),
     }));
 
     function fill(el, allLabel, values) {
         el.innerHTML = `<option value="">${esc(allLabel)}</option>` +
-            values.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+            values.map(([v, label]) =>
+                `<option value="${esc(v)}">${esc(label)}</option>`).join("");
     }
     fill(catEl, "All lens types",
-         CAT_ORDER.filter((c) => rows.some((r) => r.lens.category === c)));
+         CAT_ORDER.filter((c) => rows.some((r) => r.prod.category === c))
+             .map((c) => [c, c]));
     fill(idxEl, "Any index",
-         [...new Set(rows.map((r) => r.lens.index).filter((v) => v != null))]
-             .sort((a, b) => a - b).map(String));
+         [...new Set(rows.map((r) => r.prod.index).filter((v) => v != null))]
+             .sort((a, b) => a - b).map((v) => [String(v), fmtIndex(v)]));
     fill(coatEl, "Any coating",
-         [...new Set(rows.map((r) => r.lens.coating).filter(Boolean))].sort());
+         [...new Set(rows.flatMap((r) => (r.prod.coatings || [])
+             .map((c) => c.coating)).filter(Boolean))].sort().map((c) => [c, c]));
 
     function apply() {
         const cCat = catEl.value, cIdx = idxEl.value, cCoat = coatEl.value;
         const words = box.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
         if (!(cCat || cIdx || cCoat || words.length)) {
             out.innerHTML = `<div class="empty-panel">Pick a type, index or coating above,
-                or start typing a lens name or code.</div>`;
+                or start typing a lens name or index.</div>`;
             return;
         }
         const hits = rows.filter((r) => {
-            const l = r.lens;
-            if (cCat && l.category !== cCat) return false;
-            if (cIdx && String(l.index) !== cIdx) return false;
-            if (cCoat && l.coating !== cCoat) return false;
+            const p = r.prod;
+            if (cCat && p.category !== cCat) return false;
+            if (cIdx && String(p.index) !== cIdx) return false;
+            if (cCoat && !(p.coatings || []).some((c) => c.coating === cCoat)) return false;
             return words.every((w) => r.hay.includes(w));
-        }).map((r) => r.lens);
+        }).map((r) => r.prod);
         if (!hits.length) {
             out.innerHTML = `<div class="empty-panel">Nothing loaded matches those filters.
                 Try widening them, or it may be a lens we don't have a price file for yet.</div>`;
             return;
         }
         out.innerHTML = `
-            <div class="updated-line" style="margin-top:12px">${hits.length} matching
-                line${hits.length === 1 ? "" : "s"}${hits.length > LOOKUP_LIMIT
+            <div class="updated-line" style="margin-top:12px">${hits.length}
+                lens${hits.length === 1 ? "" : "es"}${hits.length > LOOKUP_LIMIT
                 ? ` — showing the first ${LOOKUP_LIMIT}` : ""}</div>
-            <div class="table-scroll"><table class="stock-table">
-                <thead>${LENS_TABLE_HEAD}</thead>
-                <tbody>${hits.slice(0, LOOKUP_LIMIT).map((l) => lensRowHTML(l)).join("")}</tbody>
+            <div class="table-scroll"><table class="stock-table lib-table">
+                <thead>${LIB_TABLE_HEAD}</thead>
+                <tbody>${hits.slice(0, LOOKUP_LIMIT)
+                    .map((p) => productRowHTML(p, cCoat)).join("")}</tbody>
             </table></div>`;
     }
-    [catEl, idxEl, coatEl].forEach((el) =>
-        el.addEventListener("change", apply));
+    // Coating picker updates just its own row's price cell (event delegation).
+    out.addEventListener("change", (e) => {
+        const pick = e.target.closest(".coat-pick");
+        if (!pick) return;
+        const opt = pick.options[pick.selectedIndex];
+        const cell = pick.closest("tr").querySelector(".price-now");
+        if (cell) cell.textContent = opt.dataset.price || "no price yet";
+    });
+    [catEl, idxEl, coatEl].forEach((el) => el.addEventListener("change", apply));
     let timer = null;
     box.addEventListener("input", () => {
         clearTimeout(timer);

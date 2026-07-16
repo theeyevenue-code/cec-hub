@@ -279,7 +279,10 @@ def test_api_catalog(hub_client_lenses):
     data = client.get("/api/lenses").get_json()
     assert data["message"] == ""
     assert [f["filename"] for f in data["files"]] == ["hoya.csv"]
-    assert len(data["lenses"]) == 5
+    # The library now serves grouped products (one row per lens+index+type);
+    # the five distinct sample lenses stay five products.
+    assert len(data["products"]) == 5
+    assert all("coatings" in p and "price_from" in p for p in data["products"])
 
 
 def test_api_find_best_option(hub_client_lenses):
@@ -445,3 +448,46 @@ def test_filter_empty_or_absent_config_is_a_no_op():
     cat = _catalogue(("Hoya", "Hoyalux Dynamic Premium", "Progressive"))
     for cfg in ({}, {"keep_only": {}}, None):
         assert lenses.apply_lens_filter(cat, cfg)["lenses"] == cat["lenses"]
+
+
+# --- Library grouping (group_products) --------------------------------------
+
+def _flat(name, index, typ, coating, price, blank, smin, smax, cyl=None):
+    return {"brand": "Hoya", "name": name, "index": index, "type": typ,
+            "category": "Single vision", "code": "S-" + name.upper(),
+            "notes": "", "source": "hoya.csv", "coating": coating,
+            "price": price, "blank_mm": blank,
+            "sph_min": smin, "sph_max": smax, "cyl_max": cyl}
+
+
+def test_group_products_folds_coatings_and_blanks_into_one_row():
+    # One lens, two coatings, each split across two blank/power bands.
+    flat = [
+        _flat("Nulux", "1.50", "stock", "ViewProtect", 9.90, 75, -3.50, 0.0, 2.0),
+        _flat("Nulux", "1.50", "stock", "ViewProtect", 9.90, 70, -6.0, -3.75, 2.0),
+        _flat("Nulux", "1.50", "stock", "Full Control", 18.0, 75, -3.50, 0.0, 2.0),
+        _flat("Nulux", "1.50", "stock", "Full Control", 18.0, 70, -6.0, -3.75, 2.0),
+    ]
+    prods = lenses.group_products(flat)
+    assert len(prods) == 1
+    p = prods[0]
+    assert (p["sph_min"], p["sph_max"]) == (-6.0, 0.0)  # widest across bands
+    assert p["cyl_max"] == 2.0
+    assert p["blanks"] == [70, 75]
+    assert p["price_from"] == 9.90  # cheapest coating
+    # coatings cheapest-first, price lossless per coating
+    assert [(c["coating"], c["price"]) for c in p["coatings"]] == [
+        ("ViewProtect", 9.90), ("Full Control", 18.0)]
+
+
+def test_group_products_splits_by_index_and_type():
+    flat = [
+        _flat("Nulux", "1.50", "stock", "VP", 9.9, 70, -6.0, 0.0),
+        _flat("Nulux", "1.60", "stock", "VP", 12.0, 70, -6.0, 0.0),
+        _flat("Nulux", "1.50", "grind", "VP", 27.8, 70, -9.5, 0.0),
+    ]
+    keys = sorted((p["name"], p["index"], p["type"])
+                  for p in lenses.group_products(flat))
+    assert keys == [("Nulux", "1.50", "grind"),
+                    ("Nulux", "1.50", "stock"),
+                    ("Nulux", "1.60", "stock")]

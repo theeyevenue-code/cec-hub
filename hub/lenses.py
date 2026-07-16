@@ -266,6 +266,72 @@ def apply_lens_filter(catalog: dict, cfg: dict | None) -> dict:
     return {**catalog, "lenses": kept, "files": files}
 
 
+def group_products(lenses: list) -> list:
+    """Collapse the flat rows into one product per lens + index + type, for
+    BROWSING. In the price files a lens repeats once per coating and once per
+    power band (each band carries the blank it needs), so a single lens can be
+    30-40 rows. Price only ever moves with coating — it's identical across the
+    blank/power bands of a coating — so folding the coatings into a list and
+    the blanks into a range is lossless for price and far easier to skim.
+
+    The finder still matches on the flat rows (which keep the per-band power
+    and blank limits); this view is only for the library.
+
+    Each product: brand, name, index, type, category, code, notes, source,
+    sph_min/sph_max (widest across bands), cyl_max (largest), blanks (sorted
+    list), coatings [{coating, price} cheapest first], price_from (cheapest).
+    """
+    groups, order = {}, []
+    for l in lenses:
+        key = (l.get("brand", ""), l.get("name", ""), l.get("index"),
+               l.get("type", ""))
+        g = groups.get(key)
+        if g is None:
+            g = groups[key] = {
+                "brand": l.get("brand", ""), "name": l.get("name", ""),
+                "index": l.get("index"), "type": l.get("type", ""),
+                "category": l.get("category", ""), "code": l.get("code", ""),
+                "notes": l.get("notes", ""), "source": l.get("source", ""),
+                "sph_min": None, "sph_max": None, "cyl_max": None,
+                "blanks": set(), "_coats": {},
+            }
+            order.append(key)
+        if l.get("sph_min") is not None:
+            g["sph_min"] = (l["sph_min"] if g["sph_min"] is None
+                            else min(g["sph_min"], l["sph_min"]))
+        if l.get("sph_max") is not None:
+            g["sph_max"] = (l["sph_max"] if g["sph_max"] is None
+                            else max(g["sph_max"], l["sph_max"]))
+        if l.get("cyl_max") is not None:
+            g["cyl_max"] = (l["cyl_max"] if g["cyl_max"] is None
+                            else max(g["cyl_max"], l["cyl_max"]))
+        if l.get("blank_mm") is not None:
+            g["blanks"].add(l["blank_mm"])
+        coat = l.get("coating", "") or ""
+        price = l.get("price")
+        # Price is constant per coating; keep the lowest just in case a file
+        # ever disagrees, and don't let a rowless None wipe a real price.
+        if coat not in g["_coats"] or g["_coats"][coat] is None or (
+                price is not None and price < g["_coats"][coat]):
+            g["_coats"][coat] = price
+
+    products = []
+    for key in order:
+        g = groups[key]
+        coatings = [{"coating": c, "price": p} for c, p in g.pop("_coats").items()]
+        coatings.sort(key=lambda c: (c["price"] is None, c["price"] or 0,
+                                     c["coating"].lower()))
+        g["blanks"] = sorted(g["blanks"])
+        g["coatings"] = coatings
+        g["price_from"] = next((c["price"] for c in coatings
+                                if c["price"] is not None), None)
+        products.append(g)
+
+    products.sort(key=lambda p: (p["brand"].lower(), p["index"] or 0,
+                                 p["name"].lower()))
+    return products
+
+
 def sv_only(lenses: list) -> list:
     """Just the single-vision lenses — what the cost engine matches on.
     Progressives/bifocals/occupationals are browse-only (made to order,

@@ -551,15 +551,18 @@ main {
     flex: 1 1 180px;
 }
 .lens-select:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 4px #cde8dd; }
-.lens-guide-note {
-    background: var(--mint-soft);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 12px 16px;
-    font-size: 17px;
-    color: var(--ink);
-    margin-bottom: 16px;
+
+/* Skimmable library: one row per lens, compact coating picker per row. */
+.lib-table td { vertical-align: top; }
+.lib-table .coat-pick {
+    flex: none;
+    width: auto;
+    max-width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 16px;
 }
+.lib-table .price-now { font-size: 20px; color: var(--ink); white-space: nowrap; }
 
 .job-row { padding: 14px 0; border-bottom: 1px solid var(--line); }
 .job-row:last-child { border-bottom: none; padding-bottom: 0; }

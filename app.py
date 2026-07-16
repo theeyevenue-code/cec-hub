@@ -181,7 +181,11 @@ def stock_approve():
 
 @app.route("/api/lenses")
 def lenses_catalog():
-    return jsonify(_catalog())
+    # The library browses PRODUCTS (one row per lens+index+type, coatings and
+    # blanks folded in). The finder keeps using the flat rows via /find.
+    cat = _catalog()
+    return jsonify({"products": lenses.group_products(cat["lenses"]),
+                    "files": cat["files"], "message": cat["message"]})
 
 
 @app.route("/api/lenses/find")
