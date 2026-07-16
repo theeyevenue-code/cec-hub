@@ -464,7 +464,7 @@ function lensCatalogHTML(cat) {
 }
 
 // One skimmable row per product; the coating <select> drives the price cell.
-const LIB_TABLE_HEAD = `<tr><th>Lens</th><th>Index</th><th>Sphere</th><th>Blank</th>
+const LIB_TABLE_HEAD = `<tr><th>Lens</th><th>Index</th><th>Power</th><th>Blank</th>
     <th>Coating</th><th>Price</th></tr>`;
 
 // Staff shorthand for the coatings, front and centre. Anything not listed
@@ -505,11 +505,19 @@ function productRowHTML(p, preCoat) {
     const priceTxt = (c) => c && c.price != null ? fmtMoney(c.price) : "no price yet";
     const typeWord = p.type === "stock" ? "Stock" : "Grind";
     const catWord = (p.category && p.category !== "Single vision") ? ` · ${esc(p.category)}` : "";
-    const sphere = p.sph_min != null
-        ? `${esc(fmtPower(p.sph_min))} to ${esc(fmtPower(p.sph_max))}`
-        : `<span class="cell-sub">not in file</span>`;
-    const cylSub = p.cyl_max != null
-        ? `<div class="cell-sub">cyl to −${Number(p.cyl_max).toFixed(2)}</div>` : "";
+    // Single vision carries a real sphere/cyl availability range. Progressives
+    // & occupationals don't — Hoya publishes their ADD and diameters (in Blank)
+    // but not a sphere grid (that's enforced at ordering), so show the ADD.
+    let powerCell;
+    if (p.sph_min != null) {
+        powerCell = `${esc(fmtPower(p.sph_min))} to ${esc(fmtPower(p.sph_max))}`
+            + (p.cyl_max != null
+                ? `<div class="cell-sub">cyl to −${Number(p.cyl_max).toFixed(2)}</div>` : "");
+    } else if (p.add_range) {
+        powerCell = `<span class="add-tag">ADD</span> ${esc(p.add_range.replace(/^Add\s+/i, ""))}`;
+    } else {
+        powerCell = `<span class="cell-sub">not in file</span>`;
+    }
 
     let coatCell, priceCell;
     if (coats.length <= 1) {
@@ -530,7 +538,7 @@ function productRowHTML(p, preCoat) {
             <div class="cell-sub">${typeWord}${catWord}</div>
             ${p.code ? `<div class="cell-sub code-sub">${esc(p.code)}</div>` : ""}</td>
         <td><span class="idx-cell">${esc(fmtIndex(p.index))}</span></td>
-        <td>${sphere}${cylSub}</td>
+        <td>${powerCell}</td>
         <td>${esc(blankLabel(p))}</td>
         <td>${coatCell}</td>
         <td>${priceCell}</td>

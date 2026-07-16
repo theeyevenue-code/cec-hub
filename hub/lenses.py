@@ -292,10 +292,13 @@ def group_products(lenses: list) -> list:
                 "index": l.get("index"), "type": l.get("type", ""),
                 "category": l.get("category", ""), "code": l.get("code", ""),
                 "notes": l.get("notes", ""), "source": l.get("source", ""),
+                "add_range": l.get("add_range", ""),
                 "sph_min": None, "sph_max": None, "cyl_max": None,
                 "blanks": set(), "_coats": {},
             }
             order.append(key)
+        if not g["add_range"] and l.get("add_range"):
+            g["add_range"] = l["add_range"]
         if l.get("sph_min") is not None:
             g["sph_min"] = (l["sph_min"] if g["sph_min"] is None
                             else min(g["sph_min"], l["sph_min"]))
