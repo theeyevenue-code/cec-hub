@@ -525,6 +525,9 @@ main {
     white-space: nowrap;
 }
 .best-row td { background: #dff0e8; }
+/* Fits, but a thinner index than we'd use for this power — de-emphasised. */
+.thin-row td { background: #fbfaf4; color: var(--muted); }
+.thin-row .badge-best { opacity: 1; }
 
 .cell-sub { font-size: 15px; color: var(--muted); }
 .code-sub {

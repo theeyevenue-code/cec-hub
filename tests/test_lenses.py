@@ -129,37 +129,54 @@ def test_load_catalog_ignores_underscore_files(tmp_path):
 
 # --- Matching ----------------------------------------------------------------
 
-def test_find_cheapest_stock_beats_grind():
+def test_recommended_index_thresholds():
+    # Concord's thinner-leaning table: <=2 -> 1.50, <=4 -> 1.60, <=6 -> 1.67.
+    assert lenses.recommended_index(-1.50) == 1.50
+    assert lenses.recommended_index(-3.00) == 1.60
+    assert lenses.recommended_index(-6.00) == 1.67
+    assert lenses.recommended_index(-8.00) == 1.74
+    # strongest meridian, not just sphere: -3.00/-1.50 cyl -> -4.50 -> 1.67
+    assert lenses.recommended_index(-3.00, -1.50) == 1.67
+
+
+def test_find_prefers_index_appropriate_over_cheapest():
+    # -3.00/-1.00 -> strongest meridian 4.00 -> wants 1.60. The 1.50s fit but
+    # come out thick, so the 1.60 leads and the cheaper 1.50 is flagged.
     result = lenses.find_options(_sample(), sph=-3.0, cyl=-1.0)
-    options = result["options"]
-    assert options[0]["name"] == "Nulux 1.50" and options[0]["best"] is True
-    prices = [o["price"] for o in options]
-    assert prices == sorted(prices)
-    assert options[1]["dearer_by"] == round(options[1]["price"] - 18.50, 2)
-    assert "saves $26.50" in result["verdict"]
+    assert result["rec_index"] == 1.60
+    best = result["options"][0]
+    assert best["name"] == "Nulux 1.60" and best["best"] is True
+    n150 = next(o for o in result["options"] if o["name"] == "Nulux 1.50")
+    assert n150["under_index"] is True and not n150.get("best")
+    assert "too thick" in result["verdict"]
 
 
-def test_find_higher_index_stock_beats_grind_when_150_runs_out():
-    # -5.00 is past Nulux 1.50 but inside Stellify 1.50's range.
+def test_find_flags_when_no_appropriate_index_is_loaded():
+    # -5.00/-0.50 -> wants 1.67, which the sample doesn't have, so the best is
+    # the thinnest that fits and it's flagged rather than silently recommended.
     result = lenses.find_options(_sample(), sph=-5.0, cyl=-0.5)
-    assert result["options"][0]["name"] == "Stellify 1.50"
-    assert "saves $24.00" in result["verdict"]
+    assert result["rec_index"] == 1.67
+    best = result["options"][0]
+    assert best["best"] is True and best["under_index"] is True
+    assert "1.67" in result["verdict"] and "thick" in result["verdict"]
 
 
 def test_find_grind_only_job():
     result = lenses.find_options(_sample(), sph=-9.0)
     assert [o["name"] for o in result["options"]] == ["SV Grind 1.50"]
-    assert result["verdict"].startswith("No stock lens covers")
+    assert result["options"][0]["best"] is True
+    assert "as a grind" in result["verdict"]
 
 
-def test_find_grind_cheaper_than_stock_verdict():
+def test_find_grind_cheaper_than_stock():
+    # No index column -> nothing is flagged thick, so the cheapest fit wins.
     rows = ("lens,type,blank_mm,sph_min,sph_max,price\n"
             "Dear Stock,stock,70,-4,+4,50.00\n"
             "Cheap Grind,grind,,-10,+8,30.00\n")
     parsed, _ = lenses.parse_csv_text(rows, "x.csv")
     result = lenses.find_options(parsed, sph=-2.0)
     assert result["options"][0]["name"] == "Cheap Grind"
-    assert result["verdict"].startswith("Grinding is actually cheaper")
+    assert "Cheap Grind" in result["verdict"] and "as a grind" in result["verdict"]
 
 
 def test_find_nothing_fits():
@@ -290,8 +307,10 @@ def test_api_find_best_option(hub_client_lenses):
     res = client.get("/api/lenses/find?sph=-3.00&cyl=-1.00")
     data = res.get_json()
     assert res.status_code == 200
-    assert data["options"][0]["name"] == "Nulux 1.50"
-    assert "Best value" in data["verdict"] or "saves" in data["verdict"]
+    # -3.00/-1.00 wants 1.60, so the 1.60 leads (not the cheaper 1.50).
+    assert data["options"][0]["name"] == "Nulux 1.60"
+    assert data["rec_index"] == 1.60
+    assert "Best value" in data["verdict"]
 
 
 def test_api_find_requires_sphere(hub_client_lenses):

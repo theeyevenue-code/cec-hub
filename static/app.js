@@ -414,9 +414,10 @@ function lensRowHTML(l, extraCellHTML) {
     const warnings = (l.warnings || []).map((w) =>
         `<div class="warn-note">⚠ ${esc(w)}</div>`).join("");
     const meta = (l.category && l.category !== "Single vision") ? l.category : "";
-    return `<tr class="${l.best ? "best-row" : ""}">
+    return `<tr class="${l.best ? "best-row" : ""} ${l.under_index ? "thin-row" : ""}">
         <td><strong>${esc((l.brand + " " + l.name).trim())}</strong>
             ${l.best ? `<span class="badge-best">★ Best value</span>` : ""}
+            ${l.under_index ? `<span class="chip chip-amber">thick at this power</span>` : ""}
             ${meta ? `<div class="cell-sub design-sub">${esc(meta)}</div>` : ""}
             ${l.add_range ? `<div class="cell-sub">${esc(l.add_range)}</div>` : ""}
             ${l.code ? `<div class="cell-sub code-sub">${esc(l.code)}</div>` : ""}

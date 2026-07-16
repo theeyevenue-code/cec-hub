@@ -358,9 +358,43 @@ def sv_only(lenses: list) -> list:
             in ("", "single vision", "sv")]
 
 
+# Minimum lens index we'd want for a given power, so the finder leads with a
+# lens that won't be needlessly thick — a 1.50 technically covers -6.00 but
+# comes out thick, which is bad for the patient and the margin. Read each row
+# as "strongest meridian up to this power -> at least this index"; anything
+# stronger than the last row uses INDEX_ABOVE. EDIT HERE to retune the practice
+# thresholds. Concord's thinner-leaning table (set 2026-07-17).
+INDEX_BY_POWER = [
+    (2.00, 1.50),
+    (4.00, 1.60),
+    (6.00, 1.67),
+]
+INDEX_ABOVE = 1.74
+
+
+def strongest_meridian(sph: float, cyl: float = 0.0) -> float:
+    """The larger-magnitude principal meridian — what drives thickness."""
+    return max(abs(sph), abs(sph + (cyl or 0.0)))
+
+
+def recommended_index(sph: float, cyl: float = 0.0) -> float:
+    """Minimum lens index we'd want for this Rx's strongest meridian."""
+    power = strongest_meridian(sph, cyl)
+    for limit, idx in INDEX_BY_POWER:
+        if power <= limit:
+            return idx
+    return INDEX_ABOVE
+
+
+def _fmt_index(v):
+    return f"{v:.2f}"
+
+
 def find_options(lenses: list, sph: float, cyl: float = 0.0,
                  min_blank: float | None = None) -> dict:
-    """Which lenses can make this Rx, cheapest first, and in plain words why.
+    """Which lenses can make this Rx — the cheapest INDEX-APPROPRIATE one first
+    (a thinner-index lens that only technically fits is flagged, not led with),
+    and in plain words why.
 
     cyl is taken in minus-cyl form; a plus cyl is transposed automatically
     (sph + cyl, cyl sign flipped) so it's checked the way stock ranges are
@@ -370,6 +404,7 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
     transposed = False
     if cyl > 0:
         sph, cyl, transposed = sph + cyl, -cyl, True
+    rec_index = recommended_index(sph, cyl)
 
     options, misses = [], []
     for lens in lenses:
@@ -404,29 +439,36 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
                     f"its {_fmt_mm(lens['blank_mm'])} blank is smaller than "
                     f"the {_fmt_mm(min_blank)} this frame needs")
 
-        entry = {**lens, "warnings": warnings}
+        under = lens["index"] is not None and lens["index"] < rec_index
+        entry = {**lens, "warnings": warnings, "under_index": under}
         if reasons:
             misses.append({**entry, "reasons": reasons})
         else:
             options.append(entry)
 
-    options.sort(key=lambda o: (o["price"] is None, o["price"] or 0,
-                                o["index"] or 0))
-    best = options[0] if options and options[0]["price"] is not None else None
+    # Index-appropriate lenses first, then by price; so the cheapest lens that
+    # is the right thickness leads, and thinner-index bargains sit below it.
+    options.sort(key=lambda o: (o["under_index"], o["price"] is None,
+                                o["price"] or 0, o["index"] or 0))
+    appropriate = [o for o in options
+                   if not o["under_index"] and o["price"] is not None]
+    best = (appropriate[0] if appropriate
+            else next((o for o in options if o["price"] is not None), None))
     if best:
         best["best"] = True
-        for o in options[1:]:
-            if o["price"] is not None:
+        for o in options:
+            if o is not best and o["price"] is not None:
                 o["dearer_by"] = round(o["price"] - best["price"], 2)
 
     return {
         "rx": {"sph": sph, "cyl": cyl, "transposed": transposed,
                "display": f"{_fmt_power(sph)} / {_fmt_power(cyl)}" if cyl
                           else _fmt_power(sph)},
+        "rec_index": rec_index,
         "min_blank": min_blank,
         "options": options,
         "misses": misses,
-        "verdict": _verdict(options, best),
+        "verdict": _verdict(options, best, rec_index),
     }
 
 
@@ -434,7 +476,7 @@ def _label(lens):
     return f"{lens['brand']} {lens['name']}".strip()
 
 
-def _verdict(options, best):
+def _verdict(options, best, rec_index=None):
     """One plain-words sentence for the top of the results."""
     if not options:
         return ("Nothing in the catalogue covers this job. Check the Rx, or "
@@ -442,29 +484,36 @@ def _verdict(options, best):
     if best is None:
         return ("Some lenses fit, but none of them have a price loaded, so "
                 "there's no cheapest to point at yet.")
-    priced_grind = next((o for o in options
-                         if o["type"] == "grind" and o["price"] is not None), None)
+
+    where = "off the shelf" if best["type"] == "stock" else "as a grind"
+    line = f"Best value: {_label(best)} — ${best['price']:.2f} a lens, {where}."
+
+    # Index appropriateness — the whole point of leading with this lens.
+    if rec_index is not None and best.get("under_index"):
+        line += (f" ⚠ Nothing at {_fmt_index(rec_index)} (what we'd use for this "
+                 "power) is loaded and priced for this Rx, so this is the thinnest "
+                 "that fits — expect it thick and double-check.")
+    elif rec_index is not None:
+        cheaper_thin = next((o for o in options
+                             if o["price"] is not None and o.get("under_index")
+                             and o["price"] < best["price"]), None)
+        if cheaper_thin:
+            line += (f" ({_label(cheaper_thin)} at {_fmt_index(cheaper_thin['index'])} "
+                     f"fits for ${cheaper_thin['price']:.2f} but would be too thick — "
+                     f"{_fmt_index(rec_index)} is the sensible minimum for this power.)")
+
+    # Stock-vs-grind saving, only meaningful when the pick is a stock lens.
     if best["type"] == "stock":
-        line = (f"Best value: {_label(best)} — ${best['price']:.2f} a lens, "
-                "off the shelf.")
+        priced_grind = next((o for o in options if o["type"] == "grind"
+                             and not o.get("under_index") and o["price"] is not None), None)
         if priced_grind and priced_grind is not best:
             saving = priced_grind["price"] - best["price"]
             if saving > 0:
-                line += (f" That saves ${saving:.2f} a lens compared with "
-                         f"grinding ({_label(priced_grind)} at "
-                         f"${priced_grind['price']:.2f}).")
-        if best["warnings"]:
-            line += (" Check its amber notes first — not all of its limits "
-                     "are in the file.")
-        return line
-    priced_stock = next((o for o in options
-                         if o["type"] == "stock" and o["price"] is not None), None)
-    if priced_stock:
-        return (f"Grinding is actually cheaper here: {_label(best)} at "
-                f"${best['price']:.2f} a lens beats the cheapest stock lens "
-                f"({_label(priced_stock)} at ${priced_stock['price']:.2f}).")
-    return (f"No stock lens covers this job — it needs a grind: "
-            f"{_label(best)} at ${best['price']:.2f} a lens.")
+                line += (f" Saves ${saving:.2f} a lens vs grinding "
+                         f"({_label(priced_grind)} at ${priced_grind['price']:.2f}).")
+    if best["warnings"]:
+        line += " Check its amber notes first — not all of its limits are in the file."
+    return line
 
 
 def min_blank_from_frame(frame: dict):
