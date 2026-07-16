@@ -552,7 +552,9 @@ function productRowHTML(p, preCoat, idx) {
         <td class="power-cell">${cells.power}</td>
         <td class="blank-cell">${cells.blank}</td>
         <td>${coatCell}</td>
-        <td><strong class="price-now">${esc(priceTxt(coats[sel]))}</strong></td>
+        <td>${p.cec_price != null
+                ? `<strong class="cec-price">$${esc(p.cec_price)}<span class="unit"> /pr sell</span></strong>` : ""}
+            <div class="hoya-cost"><span class="price-now">${esc(priceTxt(coats[sel]))}</span><span class="unit"> /lens cost</span></div></td>
     </tr>`;
 }
 

@@ -379,6 +379,40 @@ def mark_preferred(products: list, cfg: dict | None) -> list:
     return sorted(products, key=lambda p: ranks[id(p)])
 
 
+def attach_cec_price(products: list, cfg: dict | None) -> list:
+    """Tag each product with Concord's own selling price (per pair) from the
+    price list, so the library can show it beside the Hoya cost. cfg["prices"]
+    is a list of {match, by_index}: a product takes the first entry whose match
+    snippet is in brand+name and whose by_index has the product's index. Sets
+    cec_price (a number, per pair) or None."""
+    entries = []
+    for e in (cfg or {}).get("prices", []) or []:
+        m = str(e.get("match", "")).strip().lower()
+        by = {str(k).strip(): v for k, v in (e.get("by_index") or {}).items()}
+        if m and by:
+            entries.append((m, by))
+    # Snippets that suppress a CEC price — photochromic / polarised / tinted
+    # variants sell for more than the base Diamond Finish price, so rather than
+    # show that (understated) figure on them, show nothing until it's priced.
+    exclude = [x.strip().lower() for x in (cfg or {}).get("exclude", []) if str(x).strip()]
+    for p in products:
+        p["cec_price"] = None
+        try:
+            idx = f"{float(p.get('index')):.2f}" if p.get("index") is not None else None
+        except (TypeError, ValueError):
+            idx = None
+        if not entries or idx is None:
+            continue
+        label = f"{p.get('brand', '')} {p.get('name', '')}".lower()
+        if any(x in label for x in exclude):
+            continue
+        for m, by in entries:
+            if m in label and idx in by:
+                p["cec_price"] = by[idx]
+                break
+    return products
+
+
 def sv_only(lenses: list) -> list:
     """Just the single-vision lenses — what the cost engine matches on.
     Progressives/bifocals/occupationals are browse-only (made to order,

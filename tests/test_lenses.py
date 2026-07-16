@@ -519,6 +519,21 @@ def test_mark_preferred_floats_everyday_lenses_and_honours_exclude():
     assert out[0]["name"] == "Nulux"
 
 
+def test_attach_cec_price_by_match_and_index():
+    prods = lenses.group_products([
+        _flat("Hoyalux Dynamic Prime", "1.60", "grind", "DF", 30.0, 70, None, None),
+        _flat("Hoyalux Dynamic Prime", "1.67", "grind", "DF", 40.0, 70, None, None),
+        _flat("Nulux", "1.50", "stock", "VP", 9.9, 70, -6.0, 0.0),
+    ])
+    cfg = {"prices": [
+        {"match": "Dynamic Prime", "by_index": {"1.60": 530, "1.67": 630}},
+    ]}
+    out = {(p["name"], p["index"]): p for p in lenses.attach_cec_price(prods, cfg)}
+    assert out[("Hoyalux Dynamic Prime", "1.60")]["cec_price"] == 530
+    assert out[("Hoyalux Dynamic Prime", "1.67")]["cec_price"] == 630
+    assert out[("Nulux", "1.50")]["cec_price"] is None  # no matching entry
+
+
 def test_group_products_splits_by_index_and_type():
     flat = [
         _flat("Nulux", "1.50", "stock", "VP", 9.9, 70, -6.0, 0.0),

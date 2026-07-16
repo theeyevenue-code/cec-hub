@@ -577,6 +577,11 @@ main {
     font-size: 16px;
 }
 .lib-table .price-now { font-size: 20px; color: var(--ink); white-space: nowrap; }
+/* CEC selling price (per pair) sits above the Hoya cost (per lens). */
+.lib-table .cec-price { font-size: 20px; color: var(--green-deep); white-space: nowrap; display: block; }
+.lib-table .hoya-cost { margin-top: 2px; }
+.lib-table .hoya-cost .price-now { font-size: 16px; color: var(--muted); }
+.lib-table .unit { font-size: 12px; font-weight: 600; color: var(--muted); }
 .add-tag {
     font-size: 13px;
     font-weight: 700;

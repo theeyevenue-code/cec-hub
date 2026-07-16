@@ -187,6 +187,7 @@ def lenses_catalog():
     cat = _catalog()
     products = lenses.group_products(cat["lenses"])
     products = lenses.mark_preferred(products, _config_json("lens_filter.json", {}))
+    products = lenses.attach_cec_price(products, _config_json("cec_prices.json", {}))
     return jsonify({"products": products,
                     "files": cat["files"], "message": cat["message"]})
 
