@@ -601,6 +601,15 @@ main {
 /* Power/blank shown as one line per availability band, so they align. */
 .lib-table .band { padding: 1px 0; white-space: nowrap; }
 .lib-table .band + .band { border-top: 1px dotted var(--line); }
+/* Everyday lenses (on Concord's price list) float to the top with a star. */
+.chip-pref {
+    background: var(--green-deep);
+    color: #fff;
+    font-weight: 700;
+    border: none;
+    margin-left: 8px;
+}
+.lib-table .pref-row td { background: #f2f9f5; }
 
 .job-row { padding: 14px 0; border-bottom: 1px solid var(--line); }
 .job-row:last-child { border-bottom: none; padding-bottom: 0; }

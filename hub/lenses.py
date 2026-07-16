@@ -348,6 +348,37 @@ def group_products(lenses: list) -> list:
     return products
 
 
+def mark_preferred(products: list, cfg: dict | None) -> list:
+    """Flag the lenses this practice uses day-to-day (the ones on its own price
+    list) and float them to the top of the library, so the everyday lenses are
+    what you skim first. cfg["preferred"] has "match" (name snippets to boost)
+    and optional "exclude" (snippets that veto a match), both case-insensitive
+    substring checks against brand+name. Order within the preferred and the
+    rest is preserved (a stable sort), and every product gets a "preferred"
+    flag either way."""
+    pref = (cfg or {}).get("preferred") or {}
+    match = [m.strip().lower() for m in pref.get("match", []) if str(m).strip()]
+    exclude = [x.strip().lower() for x in pref.get("exclude", []) if str(x).strip()]
+
+    def rank(p):
+        """First matching 'match' snippet's position = display priority, so the
+        ORDER of the match list decides what sits highest. len(match) means not
+        preferred (sinks below everything preferred)."""
+        label = f"{p.get('brand', '')} {p.get('name', '')}".lower()
+        if any(x in label for x in exclude):
+            return len(match)
+        for i, m in enumerate(match):
+            if m in label:
+                return i
+        return len(match)
+
+    ranks = {id(p): rank(p) for p in products}
+    for p in products:
+        p["preferred"] = ranks[id(p)] < len(match)
+    # Stable sort by rank keeps group_products' order within each match snippet.
+    return sorted(products, key=lambda p: ranks[id(p)])
+
+
 def sv_only(lenses: list) -> list:
     """Just the single-vision lenses — what the cost engine matches on.
     Progressives/bifocals/occupationals are browse-only (made to order,

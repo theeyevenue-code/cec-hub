@@ -503,6 +503,22 @@ def test_group_products_folds_coatings_and_blanks_into_one_row():
         (-6.0, -3.75, 70), (-3.50, 0.0, 75)]
 
 
+def test_mark_preferred_floats_everyday_lenses_and_honours_exclude():
+    prods = lenses.group_products([
+        _flat("Nulux", "1.50", "stock", "VP", 9.9, 70, -6.0, 0.0),
+        _flat("Nulux Sportive", "1.50", "grind", "VP", 20.0, 70, -6.0, 0.0),
+        _flat("EnRoute Eyas", "1.60", "grind", "VP", 30.0, 70, -6.0, 0.0),
+    ])
+    cfg = {"preferred": {"match": ["Nulux"], "exclude": ["Sportive"]}}
+    out = lenses.mark_preferred(prods, cfg)
+    by = {p["name"]: p for p in out}
+    assert by["Nulux"]["preferred"] is True
+    assert by["Nulux Sportive"]["preferred"] is False   # vetoed by exclude
+    assert by["EnRoute Eyas"]["preferred"] is False      # no match
+    # preferred float to the front
+    assert out[0]["name"] == "Nulux"
+
+
 def test_group_products_splits_by_index_and_type():
     flat = [
         _flat("Nulux", "1.50", "stock", "VP", 9.9, 70, -6.0, 0.0),

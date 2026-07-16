@@ -543,8 +543,9 @@ function productRowHTML(p, preCoat, idx) {
         </select>`;
     }
 
-    return `<tr data-pidx="${idx}">
-        <td><strong>${esc((p.brand + " " + p.name).trim())}</strong>${catWord}
+    return `<tr data-pidx="${idx}" class="${p.preferred ? "pref-row" : ""}">
+        <td><strong>${esc((p.brand + " " + p.name).trim())}</strong>
+            ${p.preferred ? `<span class="chip chip-pref">★ we use</span>` : ""}${catWord}
             ${p.code ? `<div class="cell-sub code-sub">${esc(p.code)}</div>` : ""}</td>
         <td><span class="idx-cell">${esc(fmtIndex(p.index))}</span></td>
         <td>${typeChip(p.type)}</td>
