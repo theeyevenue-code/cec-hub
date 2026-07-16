@@ -420,7 +420,7 @@ function lensRowHTML(l, extraCellHTML) {
             ${meta ? `<div class="cell-sub design-sub">${esc(meta)}</div>` : ""}
             ${l.add_range ? `<div class="cell-sub">${esc(l.add_range)}</div>` : ""}
             ${l.code ? `<div class="cell-sub code-sub">${esc(l.code)}</div>` : ""}
-            ${l.coating ? `<div class="cell-sub">${esc(l.coating)}</div>` : ""}
+            ${l.coating ? `<div class="cell-sub" title="${esc(l.coating)}">${esc(coatShort(l.coating))}</div>` : ""}
             ${l.notes ? `<div class="cell-sub">${esc(l.notes)}</div>` : ""}
             ${warnings}</td>
         <td>${l.index != null ? esc(l.index) : "—"}</td>
@@ -464,8 +464,26 @@ function lensCatalogHTML(cat) {
 }
 
 // One skimmable row per product; the coating <select> drives the price cell.
-const LIB_TABLE_HEAD = `<tr><th>Lens</th><th>Sphere</th><th>Blank</th>
+const LIB_TABLE_HEAD = `<tr><th>Lens</th><th>Index</th><th>Sphere</th><th>Blank</th>
     <th>Coating</th><th>Price</th></tr>`;
+
+// Staff shorthand for the coatings, front and centre. Anything not listed
+// keeps its name minus the "Hi-Vision" tier prefix (so Sun Pro, Meiryo…).
+const COATING_SHORT = {
+    "Hi-Vision ViewProtect": "VP",
+    "ViewProtect BlueControl": "VP BlueControl",
+    "Diamond Finish": "DF",
+    "Diamond Finish UV Control": "DF",
+    "Diamond Finish UV BlueControl": "DF BlueControl",
+    "Diamond Finish BlueControl": "DF BlueControl",
+    "Full Control": "FC",
+    "Hard Diamond Finish": "Hard DF",
+    "MiyoSmart STX Full Control": "MiyoSmart FC",
+};
+function coatShort(c) {
+    if (!c) return "";
+    return COATING_SHORT[c] || c.replace(/^Hi-Vision\s+/, "");
+}
 
 function fmtIndex(v) { return v != null ? Number(v).toFixed(2) : "—"; }
 
@@ -496,20 +514,22 @@ function productRowHTML(p, preCoat) {
     let coatCell, priceCell;
     if (coats.length <= 1) {
         const c = coats[0];
-        coatCell = c ? esc(c.coating) : "—";
+        coatCell = c ? `${esc(coatShort(c.coating))}` : "—";
         priceCell = `<strong class="price-now">${esc(priceTxt(c))}</strong>`;
     } else {
         coatCell = `<select class="lens-select coat-pick">
-            ${coats.map((c, i) => `<option value="${i}" data-price="${c.price != null ? esc(fmtMoney(c.price)) : ""}"
-                ${i === sel ? "selected" : ""}>${esc(c.coating)} — ${esc(priceTxt(c))}</option>`).join("")}
+            ${coats.map((c, i) => `<option value="${i}" title="${esc(c.coating)}"
+                data-price="${c.price != null ? esc(fmtMoney(c.price)) : ""}"
+                ${i === sel ? "selected" : ""}>${esc(coatShort(c.coating))} — ${esc(priceTxt(c))}</option>`).join("")}
         </select>`;
         priceCell = `<strong class="price-now">${esc(priceTxt(coats[sel]))}</strong>`;
     }
 
     return `<tr>
         <td><strong>${esc((p.brand + " " + p.name).trim())}</strong>
-            <div class="cell-sub">${esc(fmtIndex(p.index))} · ${typeWord}${catWord}</div>
+            <div class="cell-sub">${typeWord}${catWord}</div>
             ${p.code ? `<div class="cell-sub code-sub">${esc(p.code)}</div>` : ""}</td>
+        <td><span class="idx-cell">${esc(fmtIndex(p.index))}</span></td>
         <td>${sphere}${cylSub}</td>
         <td>${esc(blankLabel(p))}</td>
         <td>${coatCell}</td>
@@ -582,7 +602,8 @@ function wireLensLookup(cat) {
         // 1.6", "myself vp" or "grind 1.67" all narrow the way you'd expect.
         hay: [p.brand, p.name, p.code, p.category, p.notes,
               p.index, fmtIndex(p.index), (p.type === "stock" ? "stock" : "grind"),
-              ...(p.coatings || []).map((c) => c.coating)].join(" ").toLowerCase(),
+              ...(p.coatings || []).flatMap((c) => [c.coating, coatShort(c.coating)]),
+             ].join(" ").toLowerCase(),
     }));
 
     function fill(el, allLabel, values) {

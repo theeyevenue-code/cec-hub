@@ -554,6 +554,17 @@ main {
 
 /* Skimmable library: one row per lens, compact coating picker per row. */
 .lib-table td { vertical-align: top; }
+.idx-cell {
+    display: inline-block;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--green-deep);
+    background: var(--mint-soft);
+    border: 1.5px solid var(--line);
+    border-radius: 8px;
+    padding: 2px 10px;
+    white-space: nowrap;
+}
 .lib-table .coat-pick {
     flex: none;
     width: auto;
