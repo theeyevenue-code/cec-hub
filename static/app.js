@@ -301,7 +301,9 @@ async function renderReviews() {
     }
     const n = data.sent_last_7_days;
     view.innerHTML = head + `
-        <div class="card stat-card">
+        ${data.alert ? `<div class="confirm-strip review-alert">
+            <p>⚠ ${esc(data.alert)}</p></div>` : ""}
+        <div class="card stat-card${data.alert ? " stat-card-warn" : ""}">
             <div class="stat-number">${n == null ? "—" : esc(n)}</div>
             <div class="stat-label">review invitations sent in the last 7 days</div>
             <div class="stat-foot">
@@ -313,8 +315,10 @@ async function renderReviews() {
         <div class="card">
             <h2>What this page tells you</h2>
             <p>Nothing to do here day-to-day — it's just a window. If a patient mentions
-            they got a review text, this is where it came from. If the number looks stuck
-            on zero for a couple of weeks, mention it to Mark.</p>
+            they got a review text, this is where it came from.</p>
+            <p>You don't have to watch the number: if the helper stops running, gets
+            switched off, or hits errors, this page says so in amber at the top. If you
+            see that, tell Mark — otherwise it's working.</p>
         </div>`;
 }
 

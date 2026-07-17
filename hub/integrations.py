@@ -24,6 +24,32 @@ FINISHED_RE = re.compile(
     r"Sent: (\d+), Skipped: (\d+), Errors: (\d+)"
 )
 
+# The helper sends every evening, so two quiet days means something is wrong.
+REVIEW_STALE_DAYS = 2
+
+
+def _reviews_alert(bot_enabled, last_run, last_run_date, last_errors, today):
+    """Plain-words warning when the review helper needs a human, else "".
+
+    This page used to ask staff to notice the number was "stuck on zero for a
+    couple of weeks" — nobody ever notices a slow-moving number, and reviews
+    quietly stopping costs real growth. So the page works it out itself."""
+    if bot_enabled is False:
+        return ("The review helper is switched OFF, so no review texts are "
+                "going out. Tell Mark if that isn't on purpose.")
+    if last_run_date is None:
+        return ("The review helper hasn't recorded a run yet. Tell Mark if it "
+                "stays like this.")
+    days = (today - last_run_date).days
+    if days >= REVIEW_STALE_DAYS:
+        return (f"The review helper hasn't run since {last_run} — it normally "
+                f"runs every evening. Tell Mark.")
+    if last_errors:
+        s = "" if last_errors == 1 else "s"
+        return (f"The last run hit {last_errors} error{s} — some patients may "
+                f"not have been texted. Tell Mark.")
+    return ""
+
 
 def load_integrations(path: Path) -> dict:
     """Read config\\integrations.json. Missing or broken file -> {}."""
@@ -94,6 +120,7 @@ def reviews_status(cfg: dict, today: date | None = None) -> dict:
             pass
 
     last_run, last_result = None, None
+    last_run_date, last_errors = None, None
     if log_raw is not None:
         for line in reversed(log_raw.splitlines()):
             m = FINISHED_RE.match(line.strip())
@@ -102,6 +129,7 @@ def reviews_status(cfg: dict, today: date | None = None) -> dict:
                 last_run = dt.strftime("%d/%m/%Y %I:%M %p").replace(" 0", " ").lower()
                 last_result = (f"sent {m.group(2)} · skipped {m.group(3)}"
                                f" · errors {m.group(4)}")
+                last_run_date, last_errors = dt.date(), int(m.group(4))
                 break
 
     return {
@@ -110,6 +138,8 @@ def reviews_status(cfg: dict, today: date | None = None) -> dict:
         "bot_enabled": bot_enabled,
         "last_run": last_run,
         "last_result": last_result,
+        "alert": _reviews_alert(bot_enabled, last_run, last_run_date,
+                                last_errors, today),
         "message": "",
     }
 

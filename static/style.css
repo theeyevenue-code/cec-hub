@@ -473,6 +473,12 @@ main {
 }
 .confirm-strip p { font-size: 19px; color: var(--amber-ink); margin-bottom: 12px; }
 
+/* Review helper needs a human — say so loudly instead of hoping someone
+   notices the number sitting still. */
+.review-alert { margin-bottom: 16px; }
+.review-alert p { margin: 0; font-weight: 700; }
+.stat-card-warn { border-color: var(--amber-line); }
+
 .status-msg { margin-top: 12px; font-size: 19px; }
 .status-msg.ok { color: #1d5741; font-weight: 700; }
 .status-msg.error { color: var(--danger-ink); font-weight: 700; }

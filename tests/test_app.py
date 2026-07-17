@@ -119,6 +119,43 @@ class TestReviewsPage:
         assert "wrong" in data["message"]  # "Nothing is wrong — ..."
 
 
+class TestReviewsAlert:
+    """The page works out for itself that the helper needs a human, rather
+    than asking staff to notice a number sitting still for a fortnight."""
+
+    from datetime import date as _date, timedelta as _timedelta
+    from hub import integrations as _ints
+
+    def _alert(self, enabled=True, ran_days_ago=0, errors=0, ever_ran=True):
+        today = self._date(2026, 7, 17)
+        ran = today - self._timedelta(days=ran_days_ago) if ever_ran else None
+        return self._ints._reviews_alert(
+            enabled, "17/07/2026 6:00 pm", ran, errors if ever_ran else None, today)
+
+    def test_quiet_when_all_is_well(self):
+        assert self._alert() == ""
+        assert self._alert(ran_days_ago=1) == ""   # ran yesterday: fine
+
+    def test_warns_when_helper_has_gone_quiet(self):
+        # It sends every evening, so two silent days means something's wrong.
+        assert "hasn't run since" in self._alert(ran_days_ago=2)
+        assert "hasn't run since" in self._alert(ran_days_ago=14)
+
+    def test_warns_when_switched_off(self):
+        assert "switched OFF" in self._alert(enabled=False)
+
+    def test_warns_on_errors_and_counts_them_readably(self):
+        assert "1 error " in self._alert(errors=1) + " "
+        assert "3 errors" in self._alert(errors=3)
+
+    def test_warns_when_it_has_never_run(self):
+        assert "hasn't recorded a run" in self._alert(ever_ran=False)
+
+    def test_off_beats_stale(self):
+        # Switched off is the more useful thing to say, so it wins.
+        assert "switched OFF" in self._alert(enabled=False, ran_days_ago=30)
+
+
 class TestStockPage:
     def test_lists_proposals_with_tables_and_approved_flags(self, hub_client):
         data = hub_client.get("/api/stock/proposals").get_json()
