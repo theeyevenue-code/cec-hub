@@ -12,15 +12,21 @@ class TestHomeAndConfig:
         assert b"CEC" in res.data
         assert b"Staff Hub" in res.data
 
+    # NB: /api/tiles deliberately reads this MACHINE's config\tiles.json (which
+    # is git-ignored and differs per machine — the practice server has an extra
+    # sighttrack tile and a real referral link). So assert the contract, not an
+    # exact list, or the suite goes red on every real machine.
     def test_tiles_come_from_config(self, hub_client):
         data = hub_client.get("/api/tiles").get_json()
         ids = [t["id"] for t in data["tiles"]]
-        assert ids == ["sops", "referrals", "reviews", "stock", "lenses"]
+        assert {"sops", "referrals", "reviews", "invoices", "stock"} <= set(ids)
+        for tile in data["tiles"]:
+            assert tile.get("name") and tile.get("link")
 
     def test_referral_tile_links_to_the_referral_app(self, hub_client):
         data = hub_client.get("/api/tiles").get_json()
         referrals = next(t for t in data["tiles"] if t["id"] == "referrals")
-        assert referrals["link"] == "http://localhost:5678"
+        assert ":5678" in referrals["link"]      # port, not the per-machine host
         assert referrals["external"] is True
 
     def test_merge_tiles_appends_new_template_tiles(self):

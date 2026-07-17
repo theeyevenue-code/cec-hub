@@ -24,6 +24,13 @@
       "link": "#/reviews"
     },
     {
+      "id": "invoices",
+      "icon": "🧾",
+      "name": "Supplier Invoices",
+      "description": "Check the invoice helper is entering invoices into Optomate",
+      "link": "#/invoices"
+    },
+    {
       "id": "stock",
       "icon": "🧾",
       "name": "Stock Orders",

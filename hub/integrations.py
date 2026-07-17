@@ -144,6 +144,102 @@ def reviews_status(cfg: dict, today: date | None = None) -> dict:
     }
 
 
+# --- Invoices (the supplier-invoice helper) ----------------------------------
+
+# It runs every evening, so two quiet days means something is wrong.
+INVOICE_STALE_DAYS = 2
+
+
+def _invoice_alert(suppliers, newest_dt, today):
+    """Plain-words warning when the invoice helper needs a human, else "".
+
+    Same idea as the review-bot alert: nobody notices a number sitting still,
+    so the page works it out itself and says so in words."""
+    if not suppliers:
+        return ""
+    if any(s.get("error") for s in suppliers):
+        return ("The invoice helper hit an error on its last run, so some invoices "
+                "may not be entered. Tell Mark.")
+    if newest_dt is None:
+        return ("The invoice helper hasn't recorded a run yet. Tell Mark if it "
+                "stays like this.")
+    days = (today - newest_dt.date()).days
+    if days >= INVOICE_STALE_DAYS:
+        return (f"The invoice helper hasn't run since "
+                f"{newest_dt.strftime('%d/%m/%Y')} — it normally runs every "
+                f"evening. Tell Mark.")
+    if all(not s.get("live") for s in suppliers):
+        return ("The invoice helper is in TRIAL mode: it reads the invoices but "
+                "is NOT entering them into Optomate yet. That's Mark's switch.")
+    waiting = sum(len(s.get("needs_human") or []) for s in suppliers)
+    if waiting:
+        return (f"{waiting} invoice{'s' if waiting != 1 else ''} couldn't be entered "
+                f"automatically and {'are' if waiting != 1 else 'is'} waiting for "
+                f"Mark. Nothing is lost — they just need a person to look.")
+    return ""
+
+
+def invoice_status(cfg: dict, today: date | None = None) -> dict:
+    """Per-supplier status of the invoice helper, from the JSON each batch
+    drops after every run. Plain enough for the front desk to eyeball."""
+    agent = cfg.get("optomate_agent", {}) or {}
+    dir_str = agent.get("logs_dir", "")
+    logs_dir = Path(dir_str) if dir_str else None
+    if not logs_dir or not logs_dir.is_dir():
+        return {"connected": False, "suppliers": [], "message": NOT_CONNECTED}
+
+    suppliers, newest = [], None
+    for path in sorted(logs_dir.glob("inventory-status-*.json")):
+        raw = _read_text(str(path))
+        if raw is None:
+            continue
+        try:
+            rec = json.loads(raw)
+        except ValueError:
+            continue
+        when = None
+        try:
+            when = datetime.fromisoformat(str(rec.get("ts", "")))
+        except ValueError:
+            pass
+        if when and (newest is None or when > newest):
+            newest = when
+        suppliers.append({
+            "supplier": str(rec.get("supplier", "?")),
+            "live": bool(rec.get("live")),
+            "written": int(rec.get("written") or 0),
+            "value": float(rec.get("value") or 0),
+            "credits": int(rec.get("credits") or 0),
+            "credit_value": float(rec.get("credit_value") or 0),
+            "needs_human": list(rec.get("needs_human") or []),
+            "error": rec.get("error"),
+            "last_run": when.strftime("%d/%m/%Y %I:%M %p").replace(" 0", " ").lower()
+                        if when else None,
+        })
+
+    if not suppliers:
+        return {"connected": False, "suppliers": [], "message": NOT_CONNECTED}
+
+    today = today or date.today()
+    failed_marker = _read_text(str(logs_dir / "INVENTORY-LAST-RUN-FAILED.txt"))
+    alert = _invoice_alert(suppliers, newest, today)
+    if failed_marker and not alert:
+        alert = "The invoice helper's last run FAILED. Tell Mark."
+
+    return {
+        "connected": True,
+        "suppliers": sorted(suppliers, key=lambda s: s["supplier"]),
+        "entered_total": round(sum(s["value"] for s in suppliers), 2),
+        "entered_count": sum(s["written"] for s in suppliers),
+        "waiting": sum(len(s["needs_human"]) for s in suppliers),
+        "live": any(s["live"] for s in suppliers),
+        "last_run": newest.strftime("%d/%m/%Y %I:%M %p").replace(" 0", " ").lower()
+                    if newest else None,
+        "alert": alert,
+        "message": "",
+    }
+
+
 # --- Lens jobs (spectacle orders extracted by the agent) ----------------------
 
 MAX_LENS_JOBS = 50

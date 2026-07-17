@@ -7,7 +7,8 @@
   },
   "optomate_agent": {
     "proposals_dir": "C:\\CEC\\CEC-Optomate-Agent\\inventory\\proposals",
-    "lens_jobs": "C:\\CEC\\CEC-Optomate-Agent\\logs\\lens-jobs.jsonl"
+    "lens_jobs": "C:\\CEC\\CEC-Optomate-Agent\\logs\\lens-jobs.jsonl",
+    "logs_dir": "C:\\CEC\\CEC-Optomate-Agent\\logs"
   },
   "scorecard_drop": "C:\\Claude\\Claude Code\\Claude Second Brain\\scorecard-drop"
 }

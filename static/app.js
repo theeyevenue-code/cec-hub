@@ -62,6 +62,7 @@ const routes = [
     { re: /^#\/sops$/, fn: renderSopList },
     { re: /^#\/sop\/([A-Za-z0-9._-]+)$/, fn: (m) => renderSop(m[1]) },
     { re: /^#\/reviews$/, fn: renderReviews },
+    { re: /^#\/invoices$/, fn: renderInvoices },
     { re: /^#\/stock$/, fn: renderStock },
     { re: /^#\/lenses$/, fn: renderLenses },
 ];
@@ -319,6 +320,93 @@ async function renderReviews() {
             <p>You don't have to watch the number: if the helper stops running, gets
             switched off, or hits errors, this page says so in amber at the top. If you
             see that, tell Mark — otherwise it's working.</p>
+        </div>`;
+}
+
+/* --- Invoices (the supplier-invoice helper) ------------------------------------ */
+
+const SUPPLIER_NAMES = { HOY: "Hoya (lenses)", COOPER: "CooperVision (contact lenses)" };
+
+async function renderInvoices() {
+    view.innerHTML = `<div class="loading-panel">Checking the invoice helper…</div>`;
+    let data;
+    try {
+        data = await getJSON("/api/invoices/status");
+    } catch (e) {
+        view.innerHTML = errorPanel(e.message);
+        return;
+    }
+    const head = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Supplier Invoices</h1>
+        <p class="page-sub">Every evening this reads the invoices suppliers email us
+        and enters them into Optomate by itself. This page shows you it's working.</p>`;
+
+    if (!data.connected) {
+        view.innerHTML = head + `<div class="empty-panel">${esc(data.message)}</div>`;
+        return;
+    }
+
+    const good = !data.alert;
+    const banner = good
+        ? `<div class="card" style="border-left:6px solid #438F73">
+             <h2>✅ All working</h2>
+             <p>The invoice helper ran and had nothing that needs a person.
+             You don't need to do anything.</p>
+           </div>`
+        : `<div class="card" style="border-left:6px solid #b8860b">
+             <h2>⚠️ Needs a look</h2>
+             <p>${esc(data.alert)}</p>
+           </div>`;
+
+    const rows = (data.suppliers || []).map((s) => {
+        const name = SUPPLIER_NAMES[s.supplier] || s.supplier;
+        const waiting = (s.needs_human || []).length;
+        return `<tr>
+            <td><strong>${esc(name)}</strong></td>
+            <td>${s.live ? "Entering" : "Trial only"}</td>
+            <td>${s.written} invoice${s.written === 1 ? "" : "s"}</td>
+            <td>$${s.value.toFixed(2)}</td>
+            <td>${waiting ? `<span class="chip chip-amber">${waiting} waiting</span>` : "—"}</td>
+            <td>${esc(s.last_run || "—")}</td>
+        </tr>`;
+    }).join("");
+
+    const waitingItems = (data.suppliers || [])
+        .flatMap((s) => (s.needs_human || []).map((n) => ({ sup: s.supplier, n })));
+
+    view.innerHTML = head + banner + `
+        <div class="card">
+            <h2>📋 Last run — each supplier</h2>
+            ${data.last_run ? `<div class="updated-line">Last checked ${esc(data.last_run)}</div>` : ""}
+            <table class="lens-table">
+                <thead><tr>
+                    <th>Supplier</th><th>Mode</th><th>Entered</th>
+                    <th>Value</th><th>Waiting</th><th>Last run</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+            ${!data.live ? `<p><strong>Trial mode:</strong> it is reading the invoices
+              but not entering them into Optomate yet. Mark turns this on.</p>` : ""}
+        </div>
+        ${waitingItems.length ? `
+        <div class="card">
+            <h2>🕓 Waiting for Mark (${waitingItems.length})</h2>
+            <p>These invoices were <strong>not</strong> entered because something
+            wasn't clear — usually a lens code the helper hasn't seen before.
+            Nothing is lost; they just need Mark to have a look.
+            <strong>Nothing for you to do.</strong></p>
+            <div class="log-text">${waitingItems.map((w) =>
+                esc(`${SUPPLIER_NAMES[w.sup] || w.sup}: ${w.n}`)).join("\n")}</div>
+        </div>` : ""}
+        <div class="card">
+            <h2>❓ What is this?</h2>
+            <p>Suppliers (Hoya, CooperVision) email us an invoice for every job.
+            Someone used to have to type each one into Optomate — and often it
+            didn't get done, so our costs looked wrong. This helper now does it
+            automatically every evening and checks its own sums.</p>
+            <p>Once a month it also compares what the supplier says they billed us
+            against what's actually in Optomate, so nothing can quietly go missing.</p>
         </div>`;
 }
 

@@ -153,6 +153,11 @@ def reviews_status():
     return jsonify(integrations.reviews_status(_integrations()))
 
 
+@app.route("/api/invoices/status")
+def invoices_status():
+    return jsonify(integrations.invoice_status(_integrations()))
+
+
 @app.route("/api/stock/proposals")
 def stock_proposals():
     return jsonify(integrations.stock_proposals(_integrations()))
