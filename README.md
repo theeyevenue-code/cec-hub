@@ -26,6 +26,18 @@ Built for everyone at the front desk — big text, big buttons, plain words, not
 5. Optional: right-click START.bat → Send to → Desktop (create shortcut), and
    rename the shortcut "CEC Hub".
 
+### Keeping it up (the server machine)
+
+On the machine that everyone else browses to, run **INSTALL-WATCHDOG.bat** once.
+It adds a Scheduled Task ("CEC Hub Watchdog") that checks every 5 minutes and
+restarts the Hub if it has stopped — no admin needed. This matters because the
+Startup shortcut only fires at logon, so without the watchdog a Hub that dies
+mid-day stays dead until a human notices (it happened: down 3 hours). Only real
+restarts get written to `watchdog.log`, so any line in there means it caught one.
+
+To check it: `schtasks /Query /TN "CEC Hub Watchdog"`, or stop the Hub and watch
+it come back within 5 minutes.
+
 ### Connecting the other systems on this machine
 
 Open `config\integrations.json` in Notepad and check the paths:

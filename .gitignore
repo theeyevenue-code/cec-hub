@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 hub.log
+watchdog.log
 .env
 
 # Per-machine config — every machine keeps its own copy, made from the
