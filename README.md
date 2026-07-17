@@ -38,6 +38,20 @@ restarts get written to `watchdog.log`, so any line in there means it caught one
 To check it: `schtasks /Query /TN "CEC Hub Watchdog"`, or stop the Hub and watch
 it come back within 5 minutes.
 
+**Never start the Hub from inside a Claude session.** A process launched from a
+Claude tool call is a child of the Claude desktop app, so when Claude restarts
+it takes the Hub down with it — silently, no error, the log just stops. That is
+exactly what happened on 2026-07-17: the Hub, the referral tool and SightTrack
+all died when Claude restarted at 14:23 and stayed down ~3 hours. To start it
+safely from a Claude session, go through the task (it's idempotent):
+
+```
+Start-ScheduledTask -TaskName "CEC Hub Watchdog"
+```
+
+The Startup-folder shortcut is fine (Explorer owns it), it just only fires at
+logon — which is why the watchdog is what actually keeps the Hub up.
+
 ### Connecting the other systems on this machine
 
 Open `config\integrations.json` in Notepad and check the paths:
