@@ -329,7 +329,7 @@ const SUPPLIER_NAMES = {
     HOY: "Hoya (lenses)", COOPER: "CooperVision (contact lenses)",
     MEN: "Menicon (ortho-K)", EYECU: "Eye CU (lens lab)",
     L4E: "Little 4 Eyes (frames)", AVIV: "Aviva Mann (frames)",
-    INTAKE: "📥 To sort",
+    INTAKE: "📥 To sort", HEALTH: "🩺 System check",
 };
 
 async function renderInvoices() {
@@ -367,7 +367,8 @@ async function renderInvoices() {
     // INTAKE isn't a supplier — it's the "unprocessed scans / new senders"
     // safety net. Keep it out of the per-supplier table; its items still show
     // in the "waiting for Mark" panel below.
-    const rows = (data.suppliers || []).filter((s) => s.supplier !== "INTAKE").map((s) => {
+    const rows = (data.suppliers || [])
+        .filter((s) => s.supplier !== "INTAKE" && s.supplier !== "HEALTH").map((s) => {
         const name = SUPPLIER_NAMES[s.supplier] || s.supplier;
         const waiting = (s.needs_human || []).length;
         return `<tr>
