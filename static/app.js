@@ -63,6 +63,7 @@ const routes = [
     { re: /^#\/sop\/([A-Za-z0-9._-]+)$/, fn: (m) => renderSop(m[1]) },
     { re: /^#\/reviews$/, fn: renderReviews },
     { re: /^#\/invoices$/, fn: renderInvoices },
+    { re: /^#\/followups$/, fn: renderFollowups },
     { re: /^#\/stock$/, fn: renderStock },
     { re: /^#\/lenses$/, fn: renderLenses },
 ];
@@ -421,6 +422,69 @@ async function renderInvoices() {
             automatically every evening and checks its own sums.</p>
             <p>Once a month it also compares what the supplier says they billed us
             against what's actually in Optomate, so nothing can quietly go missing.</p>
+        </div>`;
+}
+
+/* --- Revenue follow-ups ---------------------------------------------------------- */
+
+async function renderFollowups() {
+    view.innerHTML = `<div class="loading-panel">Getting the follow-up list…</div>`;
+    let data;
+    try {
+        data = await getJSON("/api/revenue/status");
+    } catch (e) {
+        view.innerHTML = errorPanel(e.message);
+        return;
+    }
+    const head = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Payment follow-ups</h1>
+        <p class="page-sub">Once a month the helper checks every recent sale against the
+        payments received. Patients whose sale is still unpaid after ${data.grace_days || 30}
+        days end up here — a short, friendly follow-up list, not a debt chase.</p>`;
+
+    if (!data.connected) {
+        view.innerHTML = head + `<div class="empty-panel">${esc(data.message)}</div>`;
+        return;
+    }
+
+    const chase = data.chase || [];
+    const banner = data.alert
+        ? `<div class="card" style="border-left:6px solid #b8860b">
+             <h2>⚠️ Needs a look</h2><p>${esc(data.alert)}</p></div>`
+        : (chase.length === 0
+            ? `<div class="card" style="border-left:6px solid #438F73">
+                 <h2>✅ Nothing to follow up</h2>
+                 <p>Every recent sale is either paid or too new to worry about.</p></div>`
+            : "");
+
+    const rows = chase.map((e) => `<tr>
+        <td><strong>${esc(e.name)}</strong></td>
+        <td>$${Number(e.owed).toFixed(2)}</td>
+        <td>${esc(e.since)}</td>
+        <td>${e.days} days</td>
+    </tr>`).join("");
+
+    view.innerHTML = head + banner + `
+        ${chase.length ? `
+        <div class="card">
+            <h2>💰 To follow up (${chase.length} — $${Number(data.chase_value).toFixed(2)})</h2>
+            ${data.last_run ? `<div class="updated-line">List refreshed ${esc(data.last_run)}</div>` : ""}
+            <table class="lens-table">
+                <thead><tr><th>Patient</th><th>Owing</th><th>Sale date</th><th>How long</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <p>A gentle "just confirming how you'd like to settle the balance" when they're
+            next in (or when their order is collected) is all this needs.
+            <strong>If something looks wrong — e.g. you know they paid — tell Mark</strong>;
+            the payment may have been keyed against the wrong record.</p>
+        </div>` : ""}
+        <div class="card">
+            <h2>❓ What is this?</h2>
+            <p>Sales are entered in Optomate at the consult, but payment often happens
+            later (deposits, pay-on-collection). Almost always that sorts itself out —
+            this list only shows the few that didn't: ${data.fully_paid || 0} recent patients
+            are fully paid, ${data.fresh_unpaid || 0} are simply not due yet.</p>
         </div>`;
 }
 

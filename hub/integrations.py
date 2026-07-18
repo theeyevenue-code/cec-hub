@@ -240,6 +240,49 @@ def invoice_status(cfg: dict, today: date | None = None) -> dict:
     }
 
 
+# --- Revenue follow-ups (patients with unpaid recent sales) -------------------
+
+def revenue_status(cfg: dict, today: date | None = None) -> dict:
+    """The monthly reconciliation's follow-up list: patients whose recent sale
+    is still unpaid past the grace period. Written by the agent's
+    pulls\\revenue_recon.py as logs\\revenue-chase.json. Names + amounts only —
+    it's a front-desk follow-up list, no clinical detail."""
+    agent = cfg.get("optomate_agent", {}) or {}
+    dir_str = agent.get("logs_dir", "")
+    logs_dir = Path(dir_str) if dir_str else None
+    raw = _read_text(str(logs_dir / "revenue-chase.json")) if logs_dir else None
+    if raw is None:
+        return {"connected": False, "chase": [], "message": NOT_CONNECTED}
+    try:
+        rec = json.loads(raw)
+    except ValueError:
+        return {"connected": False, "chase": [], "message": NOT_CONNECTED}
+
+    when = None
+    try:
+        when = datetime.fromisoformat(str(rec.get("ts", "")))
+    except ValueError:
+        pass
+    today = today or date.today()
+    stale = bool(when and (today - when.date()).days > 45)
+    return {
+        "connected": True,
+        "chase": list(rec.get("chase") or []),
+        "chase_value": round(sum(float(e.get("owed") or 0)
+                                 for e in rec.get("chase") or []), 2),
+        "fully_paid": int(rec.get("fully_paid") or 0),
+        "fresh_unpaid": int(rec.get("fresh_unpaid") or 0),
+        "legacy_count": int(rec.get("legacy_count") or 0),
+        "legacy_value": float(rec.get("legacy_value") or 0),
+        "grace_days": int(rec.get("grace_days") or 30),
+        "last_run": when.strftime("%d/%m/%Y") if when else None,
+        "alert": ("This list hasn't refreshed in over 6 weeks — "
+                  "the monthly reconciliation may have stopped. Tell Mark."
+                  if stale else None),
+        "message": "",
+    }
+
+
 # --- Lens jobs (spectacle orders extracted by the agent) ----------------------
 
 MAX_LENS_JOBS = 50

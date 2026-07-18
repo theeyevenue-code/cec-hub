@@ -31,6 +31,13 @@
       "link": "#/invoices"
     },
     {
+      "id": "followups",
+      "icon": "💰",
+      "name": "Payment follow-ups",
+      "description": "Recent sales still unpaid — a short friendly follow-up list",
+      "link": "#/followups"
+    },
+    {
       "id": "stock",
       "icon": "🧾",
       "name": "Stock Orders",
