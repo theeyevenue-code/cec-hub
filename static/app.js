@@ -332,7 +332,7 @@ const SUPPLIER_NAMES = {
     L4E: "Little 4 Eyes (frames)", AVIV: "Aviva Mann (frames)",
     BOLLE: "Bolle (safety eyewear)", SOS: "SOS Eyewear",
     INTAKE: "📥 To sort", HEALTH: "🩺 System check",
-    FRAMECHK: "🕶 Frame eInvoices to click",
+    FRAMECHK: "🕶 Frame eInvoices to click", WATCHDOG: "🐕 Watchdog",
 };
 
 async function renderInvoices() {
@@ -371,7 +371,7 @@ async function renderInvoices() {
     // (unprocessed scans, the system self-check, and unclicked ProAccounts frame
     // eInvoices). Keep them out of the per-supplier table; their items still show
     // in the "waiting for Mark" panel below.
-    const NOT_SUPPLIERS = new Set(["INTAKE", "HEALTH", "FRAMECHK"]);
+    const NOT_SUPPLIERS = new Set(["INTAKE", "HEALTH", "FRAMECHK", "WATCHDOG"]);
     const rows = (data.suppliers || [])
         .filter((s) => !NOT_SUPPLIERS.has(s.supplier)).map((s) => {
         const name = SUPPLIER_NAMES[s.supplier] || s.supplier;
