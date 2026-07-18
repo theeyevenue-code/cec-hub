@@ -328,6 +328,7 @@ async function renderReviews() {
 const SUPPLIER_NAMES = {
     HOY: "Hoya (lenses)", COOPER: "CooperVision (contact lenses)",
     MEN: "Menicon (ortho-K)", EYECU: "Eye CU (lens lab)",
+    L4E: "Little 4 Eyes (frames)", AVIV: "Aviva Mann (frames)",
     INTAKE: "📥 To sort",
 };
 
