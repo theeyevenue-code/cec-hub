@@ -325,7 +325,10 @@ async function renderReviews() {
 
 /* --- Invoices (the supplier-invoice helper) ------------------------------------ */
 
-const SUPPLIER_NAMES = { HOY: "Hoya (lenses)", COOPER: "CooperVision (contact lenses)" };
+const SUPPLIER_NAMES = {
+    HOY: "Hoya (lenses)", COOPER: "CooperVision (contact lenses)",
+    MEN: "Menicon (ortho-K)", EYECU: "Eye CU (lens lab)",
+};
 
 async function renderInvoices() {
     view.innerHTML = `<div class="loading-panel">Checking the invoice helper…</div>`;
