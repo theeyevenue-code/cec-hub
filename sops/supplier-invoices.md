@@ -47,3 +47,13 @@ Open the **CEC Hub** and tap the **🧾 Supplier Invoices** tile. You'll see one
 - If the tile ever says "hasn't run" or shows an error, that's for Mark, not you.
 
 > The golden rule: if in doubt, **don't type anything into Optomate — just tell Mark.** Nothing bad happens by waiting.
+
+---
+
+## The full picture (optional — for the curious)
+
+You don't need any of this for the day-to-day. It's just the whole system on one
+page: how an invoice gets from wherever it lands all the way to accurate costs in
+Optomate, and everything that quietly checks it went right.
+
+![How the whole supplier-invoice system works, end to end](images/system-flow.svg)
