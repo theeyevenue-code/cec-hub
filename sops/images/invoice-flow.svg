@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 820" font-family="Segoe UI, Arial, sans-serif" role="img" aria-label="What happens when a supplier invoice arrives">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+      <path d="M1,1 L10,6 L1,11" fill="none" stroke="#2e6a52" stroke-width="2.2"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="940" height="820" fill="#ffffff"/>
+  <text x="470" y="46" text-anchor="middle" font-size="30" font-weight="700" fill="#0f2b21">When a supplier invoice arrives</text>
+  <text x="470" y="78" text-anchor="middle" font-size="19" fill="#2e6a52">Almost always, there is nothing for you to do. Here is why.</text>
+
+  <!-- top box -->
+  <rect x="320" y="104" width="300" height="66" rx="14" fill="#e8f2ee" stroke="#438F73" stroke-width="2"/>
+  <text x="470" y="145" text-anchor="middle" font-size="21" font-weight="600" fill="#0f2b21">📄 A supplier bills us</text>
+
+  <!-- split lines -->
+  <path d="M470,170 L470,196 M235,196 L705,196 M235,196 L235,224 M705,196 L705,224" fill="none" stroke="#2e6a52" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <!-- LEFT: email -->
+  <rect x="70" y="228" width="330" height="86" rx="14" fill="#ffffff" stroke="#438F73" stroke-width="2"/>
+  <text x="235" y="262" text-anchor="middle" font-size="21" font-weight="700" fill="#0f2b21">📧 Comes by EMAIL</text>
+  <text x="235" y="292" text-anchor="middle" font-size="17" fill="#2e6a52">Hoya · CooperVision · Menicon · Eye CU</text>
+
+  <path d="M235,314 L235,352" fill="none" stroke="#2e6a52" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <rect x="70" y="356" width="330" height="96" rx="14" fill="#438F73"/>
+  <text x="235" y="392" text-anchor="middle" font-size="21" font-weight="700" fill="#ffffff">⚙️ Entered by itself</text>
+  <text x="235" y="420" text-anchor="middle" font-size="17" fill="#eaf5f0">The helper reads it and puts it</text>
+  <text x="235" y="440" text-anchor="middle" font-size="17" fill="#eaf5f0">into Optomate overnight.</text>
+
+  <!-- RIGHT: paper -->
+  <rect x="540" y="228" width="330" height="86" rx="14" fill="#ffffff" stroke="#438F73" stroke-width="2"/>
+  <text x="705" y="262" text-anchor="middle" font-size="21" font-weight="700" fill="#0f2b21">📄 Comes on PAPER</text>
+  <text x="705" y="292" text-anchor="middle" font-size="17" fill="#2e6a52">with the frames (e.g. Luxottica)</text>
+
+  <path d="M705,314 L705,352" fill="none" stroke="#2e6a52" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <rect x="540" y="356" width="330" height="96" rx="14" fill="#e8f2ee" stroke="#438F73" stroke-width="2"/>
+  <text x="705" y="392" text-anchor="middle" font-size="21" font-weight="700" fill="#0f2b21">🖨️ Scan it — one tap</text>
+  <text x="705" y="420" text-anchor="middle" font-size="17" fill="#2e6a52">Put it in the printer, tap the</text>
+  <text x="705" y="440" text-anchor="middle" font-size="17" fill="#2e6a52">“Invoices” button. That’s all.</text>
+
+  <!-- converge -->
+  <path d="M235,452 L235,486 L705,486 L705,452 M470,486 L470,516" fill="none" stroke="#2e6a52" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <!-- hub check -->
+  <rect x="285" y="520" width="370" height="80" rx="14" fill="#ffffff" stroke="#0f2b21" stroke-width="2.5"/>
+  <text x="470" y="552" text-anchor="middle" font-size="21" font-weight="700" fill="#0f2b21">🧾 Glance at “Supplier Invoices”</text>
+  <text x="470" y="580" text-anchor="middle" font-size="17" fill="#2e6a52">on the CEC Hub — once a day is plenty.</text>
+
+  <path d="M470,600 L470,624 M255,624 L685,624 M255,624 L255,652 M685,624 L685,652" fill="none" stroke="#2e6a52" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <!-- outcome OK -->
+  <rect x="70" y="656" width="370" height="110" rx="14" fill="#438F73"/>
+  <text x="255" y="694" text-anchor="middle" font-size="23" font-weight="700" fill="#ffffff">✅ “All working”</text>
+  <text x="255" y="726" text-anchor="middle" font-size="18" fill="#eaf5f0">You’re done.</text>
+  <text x="255" y="750" text-anchor="middle" font-size="18" fill="#eaf5f0">Nothing to do. 👍</text>
+
+  <!-- outcome needs Mark -->
+  <rect x="500" y="656" width="370" height="110" rx="14" fill="#fff7e6" stroke="#b8860b" stroke-width="2.5"/>
+  <text x="685" y="694" text-anchor="middle" font-size="23" font-weight="700" fill="#8a6100">⚠️ “Needs a look”</text>
+  <text x="685" y="726" text-anchor="middle" font-size="18" fill="#6b4d00">Tell Mark.</text>
+  <text x="685" y="750" text-anchor="middle" font-size="18" fill="#6b4d00">Nothing is lost — it just waits.</text>
+</svg>
