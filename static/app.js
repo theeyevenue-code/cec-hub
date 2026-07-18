@@ -330,6 +330,7 @@ const SUPPLIER_NAMES = {
     MEN: "Menicon (ortho-K)", EYECU: "Eye CU (lens lab)",
     L4E: "Little 4 Eyes (frames)", AVIV: "Aviva Mann (frames)",
     INTAKE: "📥 To sort", HEALTH: "🩺 System check",
+    FRAMECHK: "🕶 Frame eInvoices to click",
 };
 
 async function renderInvoices() {
@@ -364,11 +365,13 @@ async function renderInvoices() {
              <p>${esc(data.alert)}</p>
            </div>`;
 
-    // INTAKE isn't a supplier — it's the "unprocessed scans / new senders"
-    // safety net. Keep it out of the per-supplier table; its items still show
+    // INTAKE / HEALTH / FRAMECHK aren't suppliers — they're safety nets
+    // (unprocessed scans, the system self-check, and unclicked ProAccounts frame
+    // eInvoices). Keep them out of the per-supplier table; their items still show
     // in the "waiting for Mark" panel below.
+    const NOT_SUPPLIERS = new Set(["INTAKE", "HEALTH", "FRAMECHK"]);
     const rows = (data.suppliers || [])
-        .filter((s) => s.supplier !== "INTAKE" && s.supplier !== "HEALTH").map((s) => {
+        .filter((s) => !NOT_SUPPLIERS.has(s.supplier)).map((s) => {
         const name = SUPPLIER_NAMES[s.supplier] || s.supplier;
         const waiting = (s.needs_human || []).length;
         return `<tr>
