@@ -330,6 +330,7 @@ const SUPPLIER_NAMES = {
     MEN: "Menicon (ortho-K)", EYECU: "Eye CU (lens lab)",
     ALC: "Alcon (contact lenses)",
     L4E: "Little 4 Eyes (frames)", AVIV: "Aviva Mann (frames)",
+    BOLLE: "Bolle (safety eyewear)", SOS: "SOS Eyewear",
     INTAKE: "📥 To sort", HEALTH: "🩺 System check",
     FRAMECHK: "🕶 Frame eInvoices to click",
 };
