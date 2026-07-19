@@ -283,6 +283,38 @@ def revenue_status(cfg: dict, today: date | None = None) -> dict:
     }
 
 
+# --- Specialist letters (staged correspondence waiting to be linked) ----------
+
+def letters_status(cfg: dict, today: date | None = None) -> dict:
+    """Incoming specialist letters the agent has already matched to a patient
+    and staged in C:\\CEC\\letters-inbox — each just needs the 3-click link in
+    Optomate (patient -> Docs -> Add). Written by inbox\\letters_watch.py."""
+    agent = cfg.get("optomate_agent", {}) or {}
+    dir_str = agent.get("logs_dir", "")
+    logs_dir = Path(dir_str) if dir_str else None
+    raw = _read_text(str(logs_dir / "letters-inbox.json")) if logs_dir else None
+    if raw is None:
+        return {"connected": False, "waiting": [], "message": NOT_CONNECTED}
+    try:
+        rec = json.loads(raw)
+    except ValueError:
+        return {"connected": False, "waiting": [], "message": NOT_CONNECTED}
+    when = None
+    try:
+        when = datetime.fromisoformat(str(rec.get("ts", "")))
+    except ValueError:
+        pass
+    waiting = [str(f) for f in rec.get("waiting_files") or []]
+    return {
+        "connected": True,
+        "waiting": waiting,
+        "unmatched": [f for f in waiting if f.startswith("UNMATCHED")],
+        "matched": [f for f in waiting if not f.startswith("UNMATCHED")],
+        "last_run": when.strftime("%d/%m/%Y") if when else None,
+        "message": "",
+    }
+
+
 # --- Lens jobs (spectacle orders extracted by the agent) ----------------------
 
 MAX_LENS_JOBS = 50

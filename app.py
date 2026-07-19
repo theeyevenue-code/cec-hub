@@ -163,6 +163,11 @@ def revenue_status():
     return jsonify(integrations.revenue_status(_integrations()))
 
 
+@app.route("/api/letters/status")
+def letters_status():
+    return jsonify(integrations.letters_status(_integrations()))
+
+
 @app.route("/api/stock/proposals")
 def stock_proposals():
     return jsonify(integrations.stock_proposals(_integrations()))

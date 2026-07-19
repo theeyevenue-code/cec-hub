@@ -38,6 +38,13 @@
       "link": "#/followups"
     },
     {
+      "id": "letters",
+      "icon": "📄",
+      "name": "Specialist letters",
+      "description": "Reports from specialists, matched to the patient — just link them in",
+      "link": "#/letters"
+    },
+    {
       "id": "stock",
       "icon": "🧾",
       "name": "Stock Orders",

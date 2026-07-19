@@ -64,6 +64,7 @@ const routes = [
     { re: /^#\/reviews$/, fn: renderReviews },
     { re: /^#\/invoices$/, fn: renderInvoices },
     { re: /^#\/followups$/, fn: renderFollowups },
+    { re: /^#\/letters$/, fn: renderLetters },
     { re: /^#\/stock$/, fn: renderStock },
     { re: /^#\/lenses$/, fn: renderLenses },
 ];
@@ -485,6 +486,66 @@ async function renderFollowups() {
             later (deposits, pay-on-collection). Almost always that sorts itself out —
             this list only shows the few that didn't: ${data.fully_paid || 0} recent patients
             are fully paid, ${data.fresh_unpaid || 0} are simply not due yet.</p>
+        </div>`;
+}
+
+/* --- Specialist letters ----------------------------------------------------------- */
+
+async function renderLetters() {
+    view.innerHTML = `<div class="loading-panel">Checking for specialist letters…</div>`;
+    let data;
+    try {
+        data = await getJSON("/api/letters/status");
+    } catch (e) {
+        view.innerHTML = errorPanel(e.message);
+        return;
+    }
+    const head = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Specialist letters</h1>
+        <p class="page-sub">When a specialist emails us a report about a patient, the helper
+        saves it, works out whose it is, and lists it here. You just link it into their file.</p>`;
+
+    if (!data.connected) {
+        view.innerHTML = head + `<div class="empty-panel">${esc(data.message)}</div>`;
+        return;
+    }
+
+    const matched = data.matched || [];
+    const unmatched = data.unmatched || [];
+    const banner = (!matched.length && !unmatched.length)
+        ? `<div class="card" style="border-left:6px solid #438F73">
+             <h2>✅ Nothing waiting</h2><p>Every letter received has been dealt with.</p></div>`
+        : "";
+
+    view.innerHTML = head + banner + `
+        ${matched.length ? `
+        <div class="card">
+            <h2>📄 To link into the patient's file (${matched.length})</h2>
+            ${data.last_run ? `<div class="updated-line">Last checked ${esc(data.last_run)}</div>` : ""}
+            <p>Each file below is in <strong>C:\\CEC\\letters-inbox</strong>, already named
+            <em>Surname_First_patientnumber</em>. For each one:</p>
+            <ol>
+                <li>Open that patient in Optomate → <strong>Docs</strong> tab</li>
+                <li>Click <strong>[…]</strong> next to Document, pick the file from
+                    <strong>letters-inbox</strong>, then <strong>Add</strong></li>
+                <li>Delete the file from letters-inbox once it's linked</li>
+            </ol>
+            <div class="log-text">${matched.map((f) => esc(f)).join("\n")}</div>
+        </div>` : ""}
+        ${unmatched.length ? `
+        <div class="card">
+            <h2>❓ Couldn't tell whose these are (${unmatched.length})</h2>
+            <p>The helper couldn't confidently match a patient — open the file and check
+            the name yourself. <strong>Never guess</strong>; ask Mark if unsure.</p>
+            <div class="log-text">${unmatched.map((f) => esc(f)).join("\n")}</div>
+        </div>` : ""}
+        <div class="card">
+            <h2>❓ What is this?</h2>
+            <p>Ophthalmologists and clinics email reports about our patients to info@.
+            They used to sit in the inbox until someone found, downloaded, renamed and
+            filed them. The helper now does all of that — Optomate just needs a person
+            to do the final "Add" so the document is properly registered on the file.</p>
         </div>`;
 }
 
