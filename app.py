@@ -168,6 +168,30 @@ def letters_status():
     return jsonify(integrations.letters_status(_integrations()))
 
 
+@app.route("/api/tasks", methods=["GET", "POST"])
+def tasks():
+    from hub import lists
+    if request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        ok, err = lists.tasks_mutate(str(body.get("action") or ""), body, _staff_name())
+        if not ok:
+            return jsonify({"error": err}), 400
+    return jsonify({"tasks": lists.tasks_list()})
+
+
+@app.route("/api/credits", methods=["GET", "POST"])
+def credits():
+    from hub import lists
+    if request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        ok, err = lists.credits_mutate(_integrations(), str(body.get("action") or ""),
+                                       body, _staff_name())
+        if not ok:
+            return jsonify({"error": err}), 400
+    return jsonify({"credits": lists.credits_list(_integrations()),
+                    "suppliers": lists.CREDIT_SUPPLIERS})
+
+
 @app.route("/api/attention")
 def attention():
     return jsonify(integrations.attention_summary(_integrations()))

@@ -2,6 +2,13 @@
   "_readme": "Home-screen tiles. Edit names/descriptions freely — the app reads this file fresh on every page load. 'link' starting with #/ opens a Hub page; a full http link opens in a new tab (external: true).",
   "tiles": [
     {
+      "id": "todo",
+      "icon": "✅",
+      "name": "To-do list",
+      "description": "Shared list — add it here and it can't be forgotten",
+      "link": "#/todo"
+    },
+    {
       "id": "sops",
       "icon": "📋",
       "name": "How-To Guides",
@@ -36,6 +43,13 @@
       "name": "Payment follow-ups",
       "description": "Recent sales still unpaid — a short friendly follow-up list",
       "link": "#/followups"
+    },
+    {
+      "id": "credits",
+      "icon": "💳",
+      "name": "Credits we're owed",
+      "description": "Log a return — the helper watches until the credit arrives",
+      "link": "#/credits"
     },
     {
       "id": "letters",

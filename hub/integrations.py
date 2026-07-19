@@ -423,6 +423,40 @@ def attention_summary(cfg: dict) -> dict:
     except Exception:
         pass
 
+    try:
+        from hub import lists
+        open_tasks = [t for t in lists.tasks_list() if not t.get("done")]
+        if open_tasks:
+            tiles["todo"] = {"count": len(open_tasks), "alert": False,
+                             "todos": [{"do": _short(t.get("text", "?"), 60),
+                                        "how": f"added by {t.get('by', '?')}"}
+                                       for t in open_tasks[:3]]}
+    except Exception:
+        pass
+
+    try:
+        from hub import lists
+        creds = [c for c in lists.credits_list(cfg) if c.get("status") != "done"]
+        if creds:
+            todos = []
+            arrived = [c for c in creds if c.get("status") == "arrived"]
+            possible = [c for c in creds if c.get("status") == "possible"]
+            waiting = [c for c in creds if c.get("status") == "open"]
+            for c in arrived[:2]:
+                m = c.get("matched") or {}
+                todos.append({"do": f"Credit arrived ✓ — tick it off",
+                              "how": _short(f"{c.get('text', '?')} (${m.get('value', '?')})", 60)})
+            for c in possible[:1]:
+                todos.append({"do": "Possible credit match — check it",
+                              "how": _short(c.get("text", "?"), 60)})
+            if waiting:
+                names = " · ".join(_short(c.get("text", "?"), 24) for c in waiting[:2])
+                todos.append({"do": f"Waiting on {len(waiting)} credit{'s' if len(waiting) != 1 else ''}",
+                              "how": names})
+            tiles["credits"] = {"count": len(creds), "alert": False, "todos": todos[:3]}
+    except Exception:
+        pass
+
     return {"tiles": tiles}
 
 

@@ -65,6 +65,8 @@ const routes = [
     { re: /^#\/invoices$/, fn: renderInvoices },
     { re: /^#\/followups$/, fn: renderFollowups },
     { re: /^#\/letters$/, fn: renderLetters },
+    { re: /^#\/todo$/, fn: renderTodo },
+    { re: /^#\/credits$/, fn: renderCredits },
     { re: /^#\/stock$/, fn: renderStock },
     { re: /^#\/lenses$/, fn: renderLenses },
 ];
@@ -571,6 +573,153 @@ async function renderLetters() {
             filed them. The helper now does all of that — Optomate just needs a person
             to do the final "Add" so the document is properly registered on the file.</p>
         </div>`;
+}
+
+/* --- To-do list ------------------------------------------------------------------ */
+
+async function postJSON(url, body) {
+    const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Something went wrong.");
+    return data;
+}
+
+async function renderTodo() {
+    view.innerHTML = `<div class="loading-panel">Getting the list…</div>`;
+    let data;
+    try {
+        data = await getJSON("/api/tasks");
+    } catch (e) {
+        view.innerHTML = errorPanel(e.message);
+        return;
+    }
+    const tasks = data.tasks || [];
+    const open = tasks.filter((t) => !t.done);
+    const done = tasks.filter((t) => t.done);
+
+    const row = (t) => `<li class="todo-row${t.done ? " todo-done" : ""}" data-id="${esc(t.id)}">
+        <button class="todo-tick" data-act="toggle" title="${t.done ? "Not done after all" : "Done!"}">
+            ${t.done ? "✅" : "⬜"}</button>
+        <span class="todo-text">${esc(t.text)}</span>
+        <span class="todo-meta">${esc(t.by || "")}${t.done ? " · done" : ""}</span>
+        <button class="todo-x" data-act="delete" title="Remove">✕</button>
+    </li>`;
+
+    view.innerHTML = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">To-do list</h1>
+        <p class="page-sub">Shared between everyone. Add it here and it can't be forgotten —
+        open items show on the Hub's front page until someone ticks them.</p>
+        <div class="card">
+            <form id="todo-add" class="todo-addbar">
+                <input id="todo-input" type="text" maxlength="200" autocomplete="off"
+                       placeholder="Type a task and press Enter — e.g. Order more contact lens solution">
+                <button class="btn" type="submit">Add</button>
+            </form>
+            <ul class="todo-list">${open.map(row).join("") ||
+                `<li class="todo-empty">Nothing to do — lovely.</li>`}</ul>
+        </div>
+        ${done.length ? `<div class="card">
+            <h2>Done (${done.length})</h2>
+            <ul class="todo-list">${done.slice(0, 20).map(row).join("")}</ul>
+        </div>` : ""}`;
+
+    document.getElementById("todo-add").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const inp = document.getElementById("todo-input");
+        if (!inp.value.trim()) return;
+        try { await postJSON("/api/tasks", { action: "add", text: inp.value }); renderTodo(); }
+        catch (e) { alert(e.message); }
+    });
+    view.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        const id = ev.target.closest(".todo-row").dataset.id;
+        const act = ev.target.dataset.act;
+        if (act === "delete" && !confirm("Remove this task?")) return;
+        try { await postJSON("/api/tasks", { action: act, id }); renderTodo(); }
+        catch (e) { alert(e.message); }
+    }));
+}
+
+/* --- Credits watch-list ------------------------------------------------------------ */
+
+async function renderCredits() {
+    view.innerHTML = `<div class="loading-panel">Getting the credits list…</div>`;
+    let data;
+    try {
+        data = await getJSON("/api/credits");
+    } catch (e) {
+        view.innerHTML = errorPanel(e.message);
+        return;
+    }
+    const creds = data.credits || [];
+    const sup = data.suppliers || {};
+    const active = creds.filter((c) => c.status !== "done");
+    const settled = creds.filter((c) => c.status === "done");
+
+    const badge = (c) => c.status === "arrived"
+        ? `<span class="chip chip-green">✓ arrived${c.matched && c.matched.value ? ` — $${Number(c.matched.value).toFixed(2)}` : ""}</span>`
+        : c.status === "possible"
+            ? `<span class="chip chip-amber">possible match — check</span>`
+            : `<span class="chip">waiting since ${esc(c.added || "")}</span>`;
+
+    const row = (c) => `<li class="todo-row" data-id="${esc(c.id)}">
+        <button class="todo-tick" data-act="done" title="Settled — tick off">⬜</button>
+        <span class="todo-text"><strong>${esc(sup[c.supplier] || c.supplier)}</strong> — ${esc(c.text)}
+            ${badge(c)}
+            ${c.matched && c.matched.cn ? `<span class="todo-meta">credit note ${esc(c.matched.cn)}</span>` : ""}
+        </span>
+        <span class="todo-meta">${esc(c.by || "")}</span>
+        <button class="todo-x" data-act="delete" title="Remove">✕</button>
+    </li>`;
+
+    view.innerHTML = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Credits we're owed</h1>
+        <p class="page-sub">Add it the moment you send something back. Every night the helper
+        watches Optomate for the supplier's credit — when it lands, the entry turns
+        <strong>✓ arrived</strong> by itself. You just tick it off. Nothing gets forgotten.</p>
+        <div class="card">
+            <form id="credit-add" class="todo-addbar">
+                <select id="credit-sup">${Object.entries(sup).map(([k, v]) =>
+                    `<option value="${esc(k)}">${esc(v)}</option>`).join("")}</select>
+                <input id="credit-input" type="text" maxlength="200" autocomplete="off"
+                       placeholder="Who / what — e.g. Mr John Smith, scratched lens returned">
+                <button class="btn" type="submit">Watch for this credit</button>
+            </form>
+            <ul class="todo-list">${active.map(row).join("") ||
+                `<li class="todo-empty">No credits outstanding.</li>`}</ul>
+        </div>
+        ${settled.length ? `<div class="card">
+            <h2>Settled (${settled.length})</h2>
+            <ul class="todo-list">${settled.slice(0, 20).map((c) => `
+                <li class="todo-row todo-done"><span class="todo-tick">✅</span>
+                <span class="todo-text">${esc(sup[c.supplier] || c.supplier)} — ${esc(c.text)}</span>
+                <span class="todo-meta">${esc(c.done_date || "")}</span></li>`).join("")}</ul>
+        </div>` : ""}`;
+
+    document.getElementById("credit-add").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const inp = document.getElementById("credit-input");
+        const supSel = document.getElementById("credit-sup");
+        if (!inp.value.trim()) return;
+        try {
+            await postJSON("/api/credits", { action: "add", text: inp.value, supplier: supSel.value });
+            renderCredits();
+        } catch (e) { alert(e.message); }
+    });
+    view.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        const id = ev.target.closest(".todo-row").dataset.id;
+        const act = ev.target.dataset.act;
+        if (act === "delete" && !confirm("Remove this credit entry?")) return;
+        try { await postJSON("/api/credits", { action: act, id }); renderCredits(); }
+        catch (e) { alert(e.message); }
+    }));
 }
 
 /* --- Stock ---------------------------------------------------------------------- */
