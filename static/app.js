@@ -113,9 +113,12 @@ async function renderHome() {
                 <span class="tile-icon" aria-hidden="true">${esc(t.icon)}</span>
                 <span class="tile-name">${esc(t.name)}</span>
                 <ul class="tile-attn-items">
-                    ${(a.items || []).map((i) => `<li>${esc(i)}</li>`).join("")}
+                    ${(a.todos || []).map((td) => `<li>
+                        <span class="todo-do">${esc(td.do)}</span>
+                        <span class="todo-how">${esc(td.how)}</span>
+                    </li>`).join("")}
                 </ul>
-                <span class="tile-more">tap for the full list →</span>
+                <span class="tile-more">open →</span>
             </a>`;
         }
         return `<a class="tile" href="${esc(t.link)}"${target}>

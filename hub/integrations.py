@@ -333,17 +333,34 @@ def attention_summary(cfg: dict) -> dict:
     try:
         inv = invoice_status(cfg)
         if inv.get("connected"):
-            items = [w for s in inv.get("suppliers", []) for w in s.get("needs_human", [])]
+            frames = sort = mark = 0
+            for s in inv.get("suppliers", []):
+                n = len(s.get("needs_human") or [])
+                sup = str(s.get("supplier", "")).upper()
+                if sup == "FRAMECHK":
+                    frames += n
+                elif sup == "INTAKE":
+                    sort += n
+                else:
+                    mark += n
             alert = inv.get("alert") or ""
             # only go LOUD for a real breakage (error / not running / trial mode) —
-            # the "N invoices waiting for Mark" alert just restates the items below
+            # the "N invoices waiting for Mark" alert just restates the to-dos
             loud = bool(re.search(r"error|hasn't|TRIAL", alert))
-            if loud or items:
-                tiles["invoices"] = {
-                    "count": len(items) + (1 if loud else 0),
-                    "alert": loud,
-                    "items": ([_short(alert)] if loud else []) + [_short(i) for i in items[:4]],
-                }
+            todos = []
+            if loud:
+                todos.append({"do": "Something broke — tell Mark", "how": _short(alert, 60)})
+            if frames:
+                todos.append({"do": f"Click {frames} frame invoice{'s' if frames != 1 else ''} in",
+                              "how": "Optomate → ProAccounts eInvoice list"})
+            if sort:
+                todos.append({"do": f"Sort {sort} new invoice{'s' if sort != 1 else ''}",
+                              "how": "Mark's job — unknown sender/scan"})
+            if mark:
+                todos.append({"do": f"{mark} waiting for Mark", "how": "not a staff job"})
+            if todos:
+                tiles["invoices"] = {"count": frames + sort + mark + (1 if loud else 0),
+                                     "alert": loud, "todos": todos[:3]}
     except Exception:
         pass
 
@@ -351,38 +368,46 @@ def attention_summary(cfg: dict) -> dict:
         rev = revenue_status(cfg)
         chase = rev.get("chase", []) if rev.get("connected") else []
         if chase or rev.get("alert"):
-            items = [f"{e.get('name', '?')} — ${float(e.get('owed') or 0):,.2f} ({e.get('days', '?')} days)"
-                     for e in chase[:4]]
-            tiles["followups"] = {
-                "count": len(chase) + (1 if rev.get("alert") else 0),
-                "alert": bool(rev.get("alert")),
-                "items": ([_short(rev["alert"])] if rev.get("alert") else []) + items,
-            }
+            top = " · ".join(f"{str(e.get('name', '?')).split()[-1]} ${float(e.get('owed') or 0):,.0f}"
+                             for e in chase[:3])
+            todos = [{"do": f"Gently remind {len(chase)} patient{'s' if len(chase) != 1 else ''}",
+                      "how": f"when next in — {top}…" if top else "when they're next in"}]
+            if rev.get("alert"):
+                todos.insert(0, {"do": "Tell Mark", "how": _short(rev["alert"], 60)})
+            tiles["followups"] = {"count": len(chase) + (1 if rev.get("alert") else 0),
+                                  "alert": bool(rev.get("alert")), "todos": todos[:3]}
     except Exception:
         pass
 
     try:
         let = letters_status(cfg)
         if let.get("connected") and let.get("waiting"):
-            per_patient = {}          # one line per patient, however many files
+            per_patient = {}          # one entry per patient, however many files
             for f in let.get("matched", []):
                 stem = f.split("__", 1)[0].split("_")
                 n = " ".join(reversed(stem[:2])) if len(stem) >= 2 else f
                 per_patient[n] = per_patient.get(n, 0) + 1
-            items = [f"link {n}'s letter" + (f"s ({c})" if c > 1 else "")
-                     for n, c in list(per_patient.items())[:3]]
+            todos = []
+            if per_patient:
+                names = " · ".join(n.split()[-1] + (f" ×{c}" if c > 1 else "")
+                                   for n, c in list(per_patient.items())[:3])
+                todos.append({"do": f"Link {sum(per_patient.values())} letter"
+                                    f"{'s' if sum(per_patient.values()) != 1 else ''} in",
+                              "how": f"patient → Docs → Add — {names}"})
             un = len(let.get("unmatched", []))
             if un:
-                items.append(f"{un} letter{'s' if un != 1 else ''} need a name check")
+                todos.append({"do": f"Name-check {un} letter{'s' if un != 1 else ''}",
+                              "how": "open it, read the patient name"})
             tiles["letters"] = {"count": len(let["waiting"]), "alert": False,
-                                "items": items[:4]}
+                                "todos": todos[:3]}
     except Exception:
         pass
 
     try:
         rv = reviews_status(cfg)
         if rv.get("connected") and rv.get("alert"):
-            tiles["reviews"] = {"count": 1, "alert": True, "items": [_short(rv["alert"])]}
+            tiles["reviews"] = {"count": 1, "alert": True,
+                                "todos": [{"do": "Tell Mark", "how": _short(rv["alert"], 60)}]}
     except Exception:
         pass
 
@@ -392,7 +417,9 @@ def attention_summary(cfg: dict) -> dict:
             if st.get("connected") else []
         if pending:
             tiles["stock"] = {"count": len(pending), "alert": False,
-                              "items": [_short(p.get("filename", "?")) for p in pending[:3]]}
+                              "todos": [{"do": f"Approve {len(pending)} stock proposal"
+                                               f"{'s' if len(pending) != 1 else ''}",
+                                         "how": "tap to review"}]}
     except Exception:
         pass
 
