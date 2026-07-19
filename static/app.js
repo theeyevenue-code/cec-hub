@@ -419,6 +419,7 @@ const SUPPLIER_NAMES = {
     ALC: "Alcon (contact lenses)",
     L4E: "Little 4 Eyes (frames)", AVIV: "Aviva Mann (frames)",
     BOLLE: "Bolle (safety eyewear)", SOS: "SOS Eyewear",
+    SUN: "Sunshades (sunglasses)", CZ: "Carl Zeiss (lenses)",
     INTAKE: "📥 To sort", HEALTH: "🩺 System check",
     FRAMECHK: "🕶 Frame eInvoices to click", WATCHDOG: "🐕 Watchdog",
 };
