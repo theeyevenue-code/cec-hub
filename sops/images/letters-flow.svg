@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 700" font-family="Segoe UI, Arial, sans-serif" role="img" aria-label="What happens when a specialist sends us a report">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+      <path d="M1,1 L10,6 L1,11" fill="none" stroke="#2e6a52" stroke-width="2.2"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="940" height="700" fill="#ffffff"/>
+  <text x="470" y="46" text-anchor="middle" font-size="30" font-weight="700" fill="#0f2b21">When a specialist sends us a report</text>
+  <text x="470" y="78" text-anchor="middle" font-size="19" fill="#2e6a52">The helper finds it and works out whose it is. You just link it in.</text>
+
+  <!-- 1. letter arrives -->
+  <rect x="290" y="104" width="360" height="66" rx="14" fill="#ffffff" stroke="#438F73" stroke-width="2"/>
+  <text x="470" y="132" text-anchor="middle" font-size="21" font-weight="700" fill="#0f2b21">📧 A specialist emails a report</text>
+  <text x="470" y="158" text-anchor="middle" font-size="16" fill="#2e6a52">Retina Associates · Central Sydney Eye · Burwood …</text>
+
+  <path d="M470,170 L470,200" fill="none" stroke="#2e6a52" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <!-- 2. helper -->
+  <rect x="250" y="204" width="440" height="90" rx="14" fill="#438F73"/>
+  <text x="470" y="240" text-anchor="middle" font-size="21" font-weight="700" fill="#ffffff">🤖 The helper files it by itself</text>
+  <text x="470" y="266" text-anchor="middle" font-size="16" fill="#eaf5f0">Saves it in the letters-inbox folder, already named</text>
+  <text x="470" y="286" text-anchor="middle" font-size="16" fill="#eaf5f0">Surname_First_patientnumber — no searching, no renaming.</text>
+
+  <!-- split -->
+  <path d="M470,294 L470,320 M245,320 L695,320 M245,320 L245,348 M695,320 L695,348" fill="none" stroke="#2e6a52" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <!-- LEFT: matched -->
+  <rect x="60" y="352" width="370" height="66" rx="14" fill="#e8f2ee" stroke="#438F73" stroke-width="2"/>
+  <text x="245" y="380" text-anchor="middle" font-size="20" font-weight="700" fill="#0f2b21">🖥 Hub: “📄 Specialist letters”</text>
+  <text x="245" y="406" text-anchor="middle" font-size="16" fill="#2e6a52">shows who each letter belongs to</text>
+
+  <path d="M245,418 L245,448" fill="none" stroke="#2e6a52" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <rect x="60" y="452" width="370" height="150" rx="14" fill="#ffffff" stroke="#0f2b21" stroke-width="2.5"/>
+  <text x="245" y="486" text-anchor="middle" font-size="21" font-weight="700" fill="#0f2b21">🖱 YOUR bit — 3 clicks</text>
+  <text x="245" y="516" text-anchor="middle" font-size="17" fill="#2e6a52">1. Open that patient → Docs tab</text>
+  <text x="245" y="540" text-anchor="middle" font-size="17" fill="#2e6a52">2. Click […] → pick the file → Add</text>
+  <text x="245" y="564" text-anchor="middle" font-size="17" fill="#2e6a52">3. Delete it from letters-inbox</text>
+  <text x="245" y="590" text-anchor="middle" font-size="15" fill="#6b8078">Same idea as Quick Scan — you already know it.</text>
+
+  <!-- RIGHT: unmatched -->
+  <rect x="510" y="352" width="370" height="66" rx="14" fill="#fff7e6" stroke="#b8860b" stroke-width="2.5"/>
+  <text x="695" y="380" text-anchor="middle" font-size="20" font-weight="700" fill="#8a6100">❓ “Couldn't tell whose”</text>
+  <text x="695" y="406" text-anchor="middle" font-size="16" fill="#6b4d00">a few letters don't name the patient clearly</text>
+
+  <path d="M695,418 L695,448" fill="none" stroke="#b8860b" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <rect x="510" y="452" width="370" height="150" rx="14" fill="#ffffff" stroke="#b8860b" stroke-width="2.5"/>
+  <text x="695" y="486" text-anchor="middle" font-size="21" font-weight="700" fill="#8a6100">👀 Open it and check the name</text>
+  <text x="695" y="516" text-anchor="middle" font-size="17" fill="#6b4d00">Read the letter, find the patient yourself,</text>
+  <text x="695" y="540" text-anchor="middle" font-size="17" fill="#6b4d00">then the same 3 clicks.</text>
+  <text x="695" y="572" text-anchor="middle" font-size="17" font-weight="700" fill="#8a6100">Never guess — ask Mark if unsure.</text>
+
+  <text x="470" y="664" text-anchor="middle" font-size="17" fill="#2e6a52">Nothing is ever lost — a letter stays on the Hub list until someone links it.</text>
+</svg>

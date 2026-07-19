@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 640" font-family="Segoe UI, Arial, sans-serif" role="img" aria-label="How payment follow-ups work">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+      <path d="M1,1 L10,6 L1,11" fill="none" stroke="#2e6a52" stroke-width="2.2"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="940" height="640" fill="#ffffff"/>
+  <text x="470" y="46" text-anchor="middle" font-size="30" font-weight="700" fill="#0f2b21">Payment follow-ups — how it works</text>
+  <text x="470" y="78" text-anchor="middle" font-size="19" fill="#2e6a52">A friendly reminder list. Not a debt chase.</text>
+
+  <!-- 1. sale -->
+  <rect x="290" y="104" width="360" height="66" rx="14" fill="#ffffff" stroke="#438F73" stroke-width="2"/>
+  <text x="470" y="132" text-anchor="middle" font-size="21" font-weight="700" fill="#0f2b21">🛒 A sale is entered at the consult</text>
+  <text x="470" y="158" text-anchor="middle" font-size="16" fill="#2e6a52">deposit now, rest at collection — the normal rhythm</text>
+
+  <path d="M470,170 L470,200" fill="none" stroke="#2e6a52" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <!-- 2. helper -->
+  <rect x="250" y="204" width="440" height="88" rx="14" fill="#438F73"/>
+  <text x="470" y="240" text-anchor="middle" font-size="21" font-weight="700" fill="#ffffff">🤖 Once a month the helper checks</text>
+  <text x="470" y="266" text-anchor="middle" font-size="16" fill="#eaf5f0">every recent sale against every payment received —</text>
+  <text x="470" y="284" text-anchor="middle" font-size="16" fill="#eaf5f0">almost everyone has paid ✅</text>
+
+  <path d="M470,292 L470,322" fill="none" stroke="#2e6a52" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <!-- 3. hub list -->
+  <rect x="250" y="326" width="440" height="72" rx="14" fill="#e8f2ee" stroke="#438F73" stroke-width="2"/>
+  <text x="470" y="356" text-anchor="middle" font-size="20" font-weight="700" fill="#0f2b21">🖥 Hub: “💰 Payment follow-ups”</text>
+  <text x="470" y="382" text-anchor="middle" font-size="16" fill="#2e6a52">the few still unpaid after 30 days — name, amount, sale date</text>
+
+  <!-- split -->
+  <path d="M470,398 L470,424 M245,424 L695,424 M245,424 L245,452 M695,424 L695,452" fill="none" stroke="#2e6a52" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <!-- LEFT: your bit -->
+  <rect x="60" y="456" width="370" height="120" rx="14" fill="#ffffff" stroke="#0f2b21" stroke-width="2.5"/>
+  <text x="245" y="490" text-anchor="middle" font-size="21" font-weight="700" fill="#0f2b21">💬 YOUR bit — one gentle line</text>
+  <text x="245" y="520" text-anchor="middle" font-size="17" fill="#2e6a52">Next time they're in (or at collection):</text>
+  <text x="245" y="546" text-anchor="middle" font-size="17" font-style="italic" fill="#2e6a52">“Just confirming how you'd like to</text>
+  <text x="245" y="568" text-anchor="middle" font-size="17" font-style="italic" fill="#2e6a52">settle the balance today?”</text>
+
+  <!-- RIGHT: already paid -->
+  <rect x="510" y="456" width="370" height="120" rx="14" fill="#fff7e6" stroke="#b8860b" stroke-width="2.5"/>
+  <text x="695" y="490" text-anchor="middle" font-size="21" font-weight="700" fill="#8a6100">🤔 “But I already paid…”</text>
+  <text x="695" y="520" text-anchor="middle" font-size="17" fill="#6b4d00">Believe them and tell Mark —</text>
+  <text x="695" y="544" text-anchor="middle" font-size="17" fill="#6b4d00">the payment is probably sitting on</text>
+  <text x="695" y="566" text-anchor="middle" font-size="17" fill="#6b4d00">the wrong record. Never argue.</text>
+
+  <text x="470" y="616" text-anchor="middle" font-size="17" fill="#2e6a52">You never chase anyone by phone or letter — this is only for when they're already talking to us.</text>
+</svg>

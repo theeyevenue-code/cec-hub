@@ -45,7 +45,7 @@ h1, h2, h3, .brand, .tile-name, .stat-number {
 
 main {
     width: 100%;
-    max-width: 1080px;
+    max-width: 1320px;   /* was 1080 — SOP pages felt narrow and diagrams shrank */
     margin: 0 auto;
     padding: 28px 22px 60px;
     flex: 1;
@@ -273,8 +273,9 @@ main {
 
 .tick-hint { font-size: 16px; color: var(--muted); margin-bottom: 18px; }
 
-.sop-blocks h2 { font-size: 26px; margin: 26px 0 14px; }
-.sop-blocks p { margin-bottom: 16px; font-size: 20px; }
+.sop-blocks { overflow-wrap: break-word; }   /* nothing ever clips at the edge */
+.sop-blocks h2 { font-size: 28px; margin: 28px 0 14px; }
+.sop-blocks p { margin-bottom: 16px; font-size: 21px; line-height: 1.55; }
 .sop-blocks ul { margin: 0 0 18px 8px; list-style: none; }
 .sop-blocks ul li {
     font-size: 20px;
@@ -290,6 +291,7 @@ main {
     top: 2px;
 }
 .sop-blocks img {
+    width: 100%;         /* diagrams use the whole column — bigger text, no squint */
     max-width: 100%;
     border-radius: 12px;
     border: 1px solid var(--line);
