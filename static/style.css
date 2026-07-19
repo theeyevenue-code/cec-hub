@@ -252,6 +252,36 @@ main {
     color: #8a6100;
 }
 
+/* --- home: needs-attention block (2 across) + layout edit mode ----------------- */
+.attn-head {
+    font-family: 'Urbanist', 'Work Sans', 'Segoe UI', system-ui, sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: #8a6100;
+    margin: 4px 0 12px;
+}
+.attn-head-quiet { color: var(--muted); margin-top: 30px; }
+.attn-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);   /* 2 across -> 2x2 with four hot tiles */
+    gap: 18px;
+    margin-bottom: 8px;
+}
+@media (max-width: 760px) { .attn-grid { grid-template-columns: 1fr; } }
+.home-edit-btn { float: right; font-size: 15px; }
+.tile-editing { opacity: 0.92; cursor: default; }
+.tile-editbar { display: flex; gap: 6px; }
+.tile-editbar button {
+    font-size: 15px;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+}
+.hidden-bar { margin-top: 18px; font-size: 16px; color: var(--muted); }
+.hidden-bar .chip { cursor: pointer; }
+
 /* --- shared list pages (to-do, credits) --------------------------------------- */
 .todo-addbar { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
 .todo-addbar input[type="text"] {

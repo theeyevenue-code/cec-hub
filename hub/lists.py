@@ -37,6 +37,38 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}{int(time.time() * 1000)}"
 
 
+# --- tile layout (order + hidden), editable from the Hub itself ----------------
+
+def layout_path() -> Path:
+    return HUB_DATA / "tile-layout.json"
+
+
+def layout_get() -> dict:
+    try:
+        d = json.loads(layout_path().read_text(encoding="utf-8"))
+        return {"order": list(d.get("order") or []), "hidden": list(d.get("hidden") or [])}
+    except (OSError, ValueError):
+        return {"order": [], "hidden": []}
+
+
+def layout_save(order, hidden) -> None:
+    layout_path().parent.mkdir(parents=True, exist_ok=True)
+    layout_path().write_text(json.dumps(
+        {"order": [str(x) for x in (order or [])][:50],
+         "hidden": [str(x) for x in (hidden or [])][:50]}, indent=1),
+        encoding="utf-8")
+
+
+def apply_layout(tiles: list) -> list:
+    """Order tiles by the saved layout (unknown ids keep config order at the
+    end) and drop hidden ones. Editable from the Hub's 'Edit layout' mode."""
+    lay = layout_get()
+    hidden = set(lay["hidden"])
+    pos = {tid: i for i, tid in enumerate(lay["order"])}
+    keep = [t for t in tiles if t.get("id") not in hidden]
+    return sorted(keep, key=lambda t: (pos.get(t.get("id"), 999),))
+
+
 # --- to-do list ---------------------------------------------------------------
 
 def tasks_path() -> Path:

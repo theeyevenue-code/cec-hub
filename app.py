@@ -112,9 +112,21 @@ def sop_image(filename):
 
 @app.route("/api/tiles")
 def tiles():
+    from hub import lists
     real = _load_json(CONFIG_DIR / "tiles.json", None)
     example = _load_json(CONFIG_DIR / "tiles.example.json", {"tiles": []})
-    return jsonify(merge_tiles(real, example))
+    merged = merge_tiles(real, example)
+    merged["tiles"] = lists.apply_layout(merged.get("tiles") or [])
+    merged["hidden"] = lists.layout_get()["hidden"]
+    return jsonify(merged)
+
+
+@app.route("/api/tilelayout", methods=["POST"])
+def tilelayout():
+    from hub import lists
+    body = request.get_json(silent=True) or {}
+    lists.layout_save(body.get("order") or [], body.get("hidden") or [])
+    return jsonify({"ok": True})
 
 
 @app.route("/api/staff")

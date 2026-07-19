@@ -103,37 +103,96 @@ async function renderHome() {
     const who = getStaff();
     const hello = who ? `Hello ${esc(who)} — what do you need?`
                       : "What do you need?";
-    const tiles = (data.tiles || []).map((t) => {
+
+    const all = data.tiles || [];
+    // needs-attention tiles live in their own compact 2-across block up top
+    // (2x2 when four of them); everything quiet stays in the normal grid below
+    const hot = all.filter((t) => attn[t.id] && attn[t.id].count > 0)
+        .sort((x, y) => (attn[y.id].alert - attn[x.id].alert) ||
+                        (attn[y.id].count - attn[x.id].count));
+    const quiet = all.filter((t) => !hot.includes(t));
+
+    const hotTile = (t) => {
+        const a = attn[t.id];
+        return `<a class="tile tile-attn${a.alert ? " tile-alert" : ""}" href="${esc(t.link)}">
+            <span class="tile-badge">${a.count > 9 ? "9+" : a.count}</span>
+            <span class="tile-icon" aria-hidden="true">${esc(t.icon)}</span>
+            <span class="tile-name">${esc(t.name)}</span>
+            <ul class="tile-attn-items">
+                ${(a.todos || []).map((td) => `<li>
+                    <span class="todo-do">${esc(td.do)}</span>
+                    <span class="todo-how">${esc(td.how)}</span>
+                </li>`).join("")}
+            </ul>
+            <span class="tile-more">open →</span>
+        </a>`;
+    };
+    const quietTile = (t, i) => {
         const external = !!t.external;
         const target = external ? ` target="_blank" rel="noopener"` : "";
-        const a = attn[t.id];
-        // quiet tiles stay exactly as they were — only ones needing a person
-        // grow a badge and their top items, so the grid is scannable at a glance
-        if (a && a.count > 0) {
-            return `<a class="tile tile-attn${a.alert ? " tile-alert" : ""}" href="${esc(t.link)}"${target}>
-                <span class="tile-badge">${a.count > 9 ? "9+" : a.count}</span>
-                <span class="tile-icon" aria-hidden="true">${esc(t.icon)}</span>
-                <span class="tile-name">${esc(t.name)}</span>
-                <ul class="tile-attn-items">
-                    ${(a.todos || []).map((td) => `<li>
-                        <span class="todo-do">${esc(td.do)}</span>
-                        <span class="todo-how">${esc(td.how)}</span>
-                    </li>`).join("")}
-                </ul>
-                <span class="tile-more">open →</span>
-            </a>`;
-        }
-        return `<a class="tile" href="${esc(t.link)}"${target}>
+        const editBtns = homeEdit ? `<span class="tile-editbar">
+            <button data-move="-1" data-id="${esc(t.id)}" title="Move earlier">←</button>
+            <button data-move="1" data-id="${esc(t.id)}" title="Move later">→</button>
+            <button data-hide="${esc(t.id)}" title="Hide this tile">hide</button>
+        </span>` : "";
+        return `<a class="tile${homeEdit ? " tile-editing" : ""}" href="${homeEdit ? "#" : esc(t.link)}"${target}>
+            ${editBtns}
             <span class="tile-icon" aria-hidden="true">${esc(t.icon)}</span>
             <span class="tile-name">${esc(t.name)}</span>
             <span class="tile-desc">${esc(t.description)}</span>
-            ${external ? `<span class="tile-external">Opens in a new tab</span>` : ""}
+            ${external && !homeEdit ? `<span class="tile-external">Opens in a new tab</span>` : ""}
         </a>`;
-    }).join("");
+    };
+
     view.innerHTML = `
-        <div class="greeting">${hello}</div>
-        <div class="tile-grid">${tiles}</div>`;
+        <div class="greeting">${hello}
+            <button class="btn btn-quiet home-edit-btn" id="home-edit">
+                ${homeEdit ? "✔ Done" : "✏ Edit layout"}</button>
+        </div>
+        ${hot.length ? `<div class="attn-head">Needs attention</div>
+            <div class="attn-grid">${hot.map(hotTile).join("")}</div>` : ""}
+        ${hot.length && quiet.length ? `<div class="attn-head attn-head-quiet">Everything else</div>` : ""}
+        <div class="tile-grid">${quiet.map(quietTile).join("")}</div>
+        ${homeEdit && (data.hidden || []).length ? `<div class="hidden-bar">
+            Hidden: ${(data.hidden || []).map((h) =>
+                `<button class="chip" data-show="${esc(h)}">${esc(h)} — show</button>`).join(" ")}
+        </div>` : ""}`;
+
+    document.getElementById("home-edit").addEventListener("click", () => {
+        homeEdit = !homeEdit;
+        renderHome();
+    });
+    if (homeEdit) {
+        const order = all.map((t) => t.id);
+        const save = async (newOrder, newHidden) => {
+            await postJSON("/api/tilelayout", {
+                order: newOrder || order,
+                hidden: newHidden || (data.hidden || []),
+            }).catch((e) => alert(e.message));
+            renderHome();
+        };
+        view.querySelectorAll("[data-move]").forEach((b) => b.addEventListener("click", (ev) => {
+            ev.preventDefault(); ev.stopPropagation();
+            const id = ev.target.dataset.id;
+            const d = parseInt(ev.target.dataset.move, 10);
+            const i = order.indexOf(id);
+            const j = i + d;
+            if (i < 0 || j < 0 || j >= order.length) return;
+            [order[i], order[j]] = [order[j], order[i]];
+            save(order);
+        }));
+        view.querySelectorAll("[data-hide]").forEach((b) => b.addEventListener("click", (ev) => {
+            ev.preventDefault(); ev.stopPropagation();
+            save(order, [...(data.hidden || []), ev.target.dataset.hide]);
+        }));
+        view.querySelectorAll("[data-show]").forEach((b) => b.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            save(order, (data.hidden || []).filter((h) => h !== ev.target.dataset.show));
+        }));
+    }
 }
+
+let homeEdit = false;
 
 /* --- SOP list -------------------------------------------------------------- */
 
