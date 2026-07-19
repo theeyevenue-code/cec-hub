@@ -85,8 +85,15 @@ window.addEventListener("hashchange", route);
 async function renderHome() {
     view.innerHTML = `<div class="loading-panel">Opening the Hub…</div>`;
     let data;
+    let attn = {};
     try {
-        data = await getJSON("/api/tiles");
+        // attention is best-effort: the home page must render even if it fails
+        const [tilesData, attnData] = await Promise.all([
+            getJSON("/api/tiles"),
+            getJSON("/api/attention").catch(() => ({ tiles: {} })),
+        ]);
+        data = tilesData;
+        attn = attnData.tiles || {};
     } catch (e) {
         view.innerHTML = errorPanel(e.message);
         return;
@@ -97,6 +104,20 @@ async function renderHome() {
     const tiles = (data.tiles || []).map((t) => {
         const external = !!t.external;
         const target = external ? ` target="_blank" rel="noopener"` : "";
+        const a = attn[t.id];
+        // quiet tiles stay exactly as they were — only ones needing a person
+        // grow a badge and their top items, so the grid is scannable at a glance
+        if (a && a.count > 0) {
+            return `<a class="tile tile-attn${a.alert ? " tile-alert" : ""}" href="${esc(t.link)}"${target}>
+                <span class="tile-badge">${a.count > 9 ? "9+" : a.count}</span>
+                <span class="tile-icon" aria-hidden="true">${esc(t.icon)}</span>
+                <span class="tile-name">${esc(t.name)}</span>
+                <ul class="tile-attn-items">
+                    ${(a.items || []).map((i) => `<li>${esc(i)}</li>`).join("")}
+                </ul>
+                <span class="tile-more">tap for the full list →</span>
+            </a>`;
+        }
         return `<a class="tile" href="${esc(t.link)}"${target}>
             <span class="tile-icon" aria-hidden="true">${esc(t.icon)}</span>
             <span class="tile-name">${esc(t.name)}</span>

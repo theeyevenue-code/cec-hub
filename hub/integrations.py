@@ -315,6 +315,90 @@ def letters_status(cfg: dict, today: date | None = None) -> dict:
     }
 
 
+# --- Attention summary (badges + top items for the home grid) -----------------
+
+def _short(s: str, n: int = 72) -> str:
+    s = str(s).strip()
+    return s if len(s) <= n else s[: n - 1].rstrip() + "…"
+
+
+def attention_summary(cfg: dict) -> dict:
+    """One glance for the home page: per tile, HOW MANY things want a person and
+    the top few, so staff can scan the grid without clicking into anything.
+    Tiles with nothing pending simply aren't in the result — quiet stays quiet.
+    Every source degrades to 'no entry' on any error; the home page must never
+    break because one integration is down."""
+    tiles = {}
+
+    try:
+        inv = invoice_status(cfg)
+        if inv.get("connected"):
+            items = [w for s in inv.get("suppliers", []) for w in s.get("needs_human", [])]
+            alert = inv.get("alert") or ""
+            # only go LOUD for a real breakage (error / not running / trial mode) —
+            # the "N invoices waiting for Mark" alert just restates the items below
+            loud = bool(re.search(r"error|hasn't|TRIAL", alert))
+            if loud or items:
+                tiles["invoices"] = {
+                    "count": len(items) + (1 if loud else 0),
+                    "alert": loud,
+                    "items": ([_short(alert)] if loud else []) + [_short(i) for i in items[:4]],
+                }
+    except Exception:
+        pass
+
+    try:
+        rev = revenue_status(cfg)
+        chase = rev.get("chase", []) if rev.get("connected") else []
+        if chase or rev.get("alert"):
+            items = [f"{e.get('name', '?')} — ${float(e.get('owed') or 0):,.2f} ({e.get('days', '?')} days)"
+                     for e in chase[:4]]
+            tiles["followups"] = {
+                "count": len(chase) + (1 if rev.get("alert") else 0),
+                "alert": bool(rev.get("alert")),
+                "items": ([_short(rev["alert"])] if rev.get("alert") else []) + items,
+            }
+    except Exception:
+        pass
+
+    try:
+        let = letters_status(cfg)
+        if let.get("connected") and let.get("waiting"):
+            per_patient = {}          # one line per patient, however many files
+            for f in let.get("matched", []):
+                stem = f.split("__", 1)[0].split("_")
+                n = " ".join(reversed(stem[:2])) if len(stem) >= 2 else f
+                per_patient[n] = per_patient.get(n, 0) + 1
+            items = [f"link {n}'s letter" + (f"s ({c})" if c > 1 else "")
+                     for n, c in list(per_patient.items())[:3]]
+            un = len(let.get("unmatched", []))
+            if un:
+                items.append(f"{un} letter{'s' if un != 1 else ''} need a name check")
+            tiles["letters"] = {"count": len(let["waiting"]), "alert": False,
+                                "items": items[:4]}
+    except Exception:
+        pass
+
+    try:
+        rv = reviews_status(cfg)
+        if rv.get("connected") and rv.get("alert"):
+            tiles["reviews"] = {"count": 1, "alert": True, "items": [_short(rv["alert"])]}
+    except Exception:
+        pass
+
+    try:
+        st = stock_proposals(cfg)
+        pending = [p for p in st.get("proposals", []) if not p.get("approved")] \
+            if st.get("connected") else []
+        if pending:
+            tiles["stock"] = {"count": len(pending), "alert": False,
+                              "items": [_short(p.get("filename", "?")) for p in pending[:3]]}
+    except Exception:
+        pass
+
+    return {"tiles": tiles}
+
+
 # --- Lens jobs (spectacle orders extracted by the agent) ----------------------
 
 MAX_LENS_JOBS = 50

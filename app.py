@@ -168,6 +168,11 @@ def letters_status():
     return jsonify(integrations.letters_status(_integrations()))
 
 
+@app.route("/api/attention")
+def attention():
+    return jsonify(integrations.attention_summary(_integrations()))
+
+
 @app.route("/api/stock/proposals")
 def stock_proposals():
     return jsonify(integrations.stock_proposals(_integrations()))

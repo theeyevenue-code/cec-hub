@@ -197,6 +197,59 @@ main {
     transition: border-color 0.15s ease, transform 0.1s ease;
 }
 .tile:hover, .tile:focus-visible { border-color: var(--green); transform: translateY(-2px); }
+
+/* --- tiles that need a person: badge + top items, scannable from across the room --- */
+.tile-attn {
+    position: relative;
+    border-color: #b8860b;
+    background: #fffdf5;
+}
+.tile-attn:hover, .tile-attn:focus-visible { border-color: #8a6100; }
+.tile-alert { border-width: 3px; }   /* something actually broke — louder */
+.tile-badge {
+    position: absolute;
+    top: -12px;
+    right: -10px;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 8px;
+    border-radius: 17px;
+    background: #b8860b;
+    color: #fff;
+    font-size: 19px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow);
+}
+.tile-attn-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.tile-attn-items li {
+    font-size: 16px;
+    line-height: 1.35;
+    color: #6b4d00;
+    padding-left: 18px;
+    position: relative;
+}
+.tile-attn-items li::before {
+    content: "•";
+    color: #b8860b;
+    position: absolute;
+    left: 2px;
+}
+.tile-more {
+    margin-top: auto;
+    font-size: 15px;
+    font-weight: 700;
+    color: #8a6100;
+}
 .tile:focus-visible { outline: 4px solid #9fd0bc; outline-offset: 2px; }
 
 .tile-icon { font-size: 46px; line-height: 1; }
