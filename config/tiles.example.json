@@ -5,14 +5,14 @@
       "id": "todo",
       "icon": "✅",
       "name": "To-do list",
-      "description": "Shared list — add it here and it can't be forgotten",
+      "description": "Jobs we've written down. Tick them off as you go",
       "link": "#/todo"
     },
     {
       "id": "sops",
       "icon": "📋",
       "name": "How-To Guides",
-      "description": "Step-by-step instructions for everyday jobs (SOPs)",
+      "description": "Step-by-step instructions for everyday jobs",
       "link": "#/sops"
     },
     {
@@ -33,36 +33,36 @@
     {
       "id": "invoices",
       "icon": "🧾",
-      "name": "Supplier Invoices",
-      "description": "Check the invoice helper is entering invoices into Optomate",
+      "name": "Invoices",
+      "description": "The few invoices that need a person — the rest do themselves",
       "link": "#/invoices"
     },
     {
       "id": "followups",
       "icon": "💰",
-      "name": "Payment follow-ups",
-      "description": "Recent sales still unpaid — a short friendly follow-up list",
+      "name": "Payments to mention",
+      "description": "Patients to gently remind about a balance when they're in",
       "link": "#/followups"
     },
     {
       "id": "credits",
       "icon": "💳",
       "name": "Credits we're owed",
-      "description": "Log a return — the helper watches until the credit arrives",
+      "description": "Sent something back? Log it — it ticks off when the money comes",
       "link": "#/credits"
     },
     {
       "id": "letters",
       "icon": "📄",
       "name": "Specialist letters",
-      "description": "Reports from specialists, matched to the patient — just link them in",
+      "description": "Reports about our patients — file each one with 3 clicks",
       "link": "#/letters"
     },
     {
       "id": "stock",
       "icon": "🧾",
       "name": "Stock Orders",
-      "description": "Check suggested stock orders and approve them",
+      "description": "Suggested stock orders — look and approve",
       "link": "#/stock"
     },
     {

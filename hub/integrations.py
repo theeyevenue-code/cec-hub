@@ -365,10 +365,10 @@ def attention_summary(cfg: dict) -> dict:
                                      + (f" · +{extra} more" if extra > 0 else "")
                                      or "Optomate → ProAccounts eInvoice list"})
             if sort:
-                todos.append({"do": f"Sort {sort} new invoice{'s' if sort != 1 else ''}",
-                              "how": "Mark's job — unknown sender/scan"})
+                todos.append({"do": f"{sort} new invoice{'s' if sort != 1 else ''} to file",
+                              "how": "for Mark — a company we haven't set up yet"})
             if mark:
-                todos.append({"do": f"{mark} waiting for Mark", "how": "not a staff job"})
+                todos.append({"do": f"{mark} for Mark to check", "how": "nothing for staff here"})
             if todos:
                 tiles["invoices"] = {"count": frames + sort + mark + (1 if loud else 0),
                                      "alert": loud, "todos": todos[:3]}
@@ -407,8 +407,8 @@ def attention_summary(cfg: dict) -> dict:
                               "how": f"patient → Docs → Add — {names}"})
             un = len(let.get("unmatched", []))
             if un:
-                todos.append({"do": f"Name-check {un} letter{'s' if un != 1 else ''}",
-                              "how": "open it, read the patient name"})
+                todos.append({"do": f"{un} letter{'s' if un != 1 else ''}: whose is it?",
+                              "how": "open the file, read the name on it"})
             tiles["letters"] = {"count": len(let["waiting"]), "alert": False,
                                 "todos": todos[:3]}
     except Exception:
