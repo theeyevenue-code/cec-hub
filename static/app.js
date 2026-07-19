@@ -108,7 +108,8 @@ async function renderHome() {
     // needs-attention tiles live in their own compact 2-across block up top
     // (2x2 when four of them); everything quiet stays in the normal grid below
     const hot = all.filter((t) => attn[t.id] && attn[t.id].count > 0)
-        .sort((x, y) => (attn[y.id].alert - attn[x.id].alert) ||
+        .sort((x, y) => ((x.id === "todo" ? -1 : 0) - (y.id === "todo" ? -1 : 0)) ||
+                        (attn[y.id].alert - attn[x.id].alert) ||
                         (attn[y.id].count - attn[x.id].count));
     const quiet = all.filter((t) => !hot.includes(t));
 

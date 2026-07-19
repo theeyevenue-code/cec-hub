@@ -331,18 +331,26 @@ def attention_summary(cfg: dict) -> dict:
     tiles = {}
 
     try:
+        from hub.lists import CREDIT_SUPPLIERS as SUP_LABELS
         inv = invoice_status(cfg)
         if inv.get("connected"):
             frames = sort = mark = 0
+            frame_specifics = []
             for s in inv.get("suppliers", []):
-                n = len(s.get("needs_human") or [])
                 sup = str(s.get("supplier", "")).upper()
-                if sup == "FRAMECHK":
-                    frames += n
-                elif sup == "INTAKE":
-                    sort += n
-                else:
-                    mark += n
+                for item in s.get("needs_human") or []:
+                    if sup == "FRAMECHK":
+                        frames += 1
+                        m = re.match(r"^([A-Z0-9]+):\s*frame invoice\s+(\S+)(?:\s*\(~\$([\d,.]+)\))?",
+                                     str(item))
+                        if m:
+                            lbl = SUP_LABELS.get(m.group(1), m.group(1))
+                            frame_specifics.append(
+                                f"{lbl} {m.group(2)}" + (f" ${m.group(3)}" if m.group(3) else ""))
+                    elif sup == "INTAKE":
+                        sort += 1
+                    else:
+                        mark += 1
             alert = inv.get("alert") or ""
             # only go LOUD for a real breakage (error / not running / trial mode) —
             # the "N invoices waiting for Mark" alert just restates the to-dos
@@ -351,8 +359,11 @@ def attention_summary(cfg: dict) -> dict:
             if loud:
                 todos.append({"do": "Something broke — tell Mark", "how": _short(alert, 60)})
             if frames:
+                extra = frames - len(frame_specifics[:3])
                 todos.append({"do": f"Click {frames} frame invoice{'s' if frames != 1 else ''} in",
-                              "how": "Optomate → ProAccounts eInvoice list"})
+                              "how": " · ".join(frame_specifics[:3])
+                                     + (f" · +{extra} more" if extra > 0 else "")
+                                     or "Optomate → ProAccounts eInvoice list"})
             if sort:
                 todos.append({"do": f"Sort {sort} new invoice{'s' if sort != 1 else ''}",
                               "how": "Mark's job — unknown sender/scan"})
