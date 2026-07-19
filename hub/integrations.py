@@ -368,8 +368,8 @@ def attention_summary(cfg: dict) -> dict:
         rev = revenue_status(cfg)
         chase = rev.get("chase", []) if rev.get("connected") else []
         if chase or rev.get("alert"):
-            top = " · ".join(f"{str(e.get('name', '?')).split()[-1]} ${float(e.get('owed') or 0):,.0f}"
-                             for e in chase[:3])
+            top = " · ".join(f"{e.get('name', '?')} ${float(e.get('owed') or 0):,.0f}"
+                             for e in chase[:2])
             todos = [{"do": f"Gently remind {len(chase)} patient{'s' if len(chase) != 1 else ''}",
                       "how": f"when next in — {top}…" if top else "when they're next in"}]
             if rev.get("alert"):
@@ -389,8 +389,8 @@ def attention_summary(cfg: dict) -> dict:
                 per_patient[n] = per_patient.get(n, 0) + 1
             todos = []
             if per_patient:
-                names = " · ".join(n.split()[-1] + (f" ×{c}" if c > 1 else "")
-                                   for n, c in list(per_patient.items())[:3])
+                names = " · ".join(n + (f" ×{c}" if c > 1 else "")
+                                   for n, c in list(per_patient.items())[:2])
                 todos.append({"do": f"Link {sum(per_patient.values())} letter"
                                     f"{'s' if sum(per_patient.values()) != 1 else ''} in",
                               "how": f"patient → Docs → Add — {names}"})

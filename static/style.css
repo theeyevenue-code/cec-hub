@@ -282,6 +282,17 @@ main {
 .hidden-bar { margin-top: 18px; font-size: 16px; color: var(--muted); }
 .hidden-bar .chip { cursor: pointer; }
 
+.plain-list { list-style: none; margin: 12px 0 0; padding: 0; }
+.plain-list li {
+    font-size: 19px;
+    padding: 8px 0 8px 26px;
+    position: relative;
+    border-bottom: 1px solid var(--line);
+}
+.plain-list li:last-child { border-bottom: none; }
+.plain-list li::before { content: "→"; position: absolute; left: 0; color: var(--green); font-weight: 700; }
+.details-toggle { margin: 8px 0 20px; }
+
 /* --- shared list pages (to-do, credits) --------------------------------------- */
 .todo-addbar { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
 .todo-addbar input[type="text"] {
