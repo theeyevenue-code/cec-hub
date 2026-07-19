@@ -416,7 +416,7 @@ async function renderReviews() {
 const SUPPLIER_NAMES = {
     HOY: "Hoya (lenses)", COOPER: "CooperVision (contact lenses)",
     MEN: "Menicon (ortho-K)", EYECU: "Eye CU (lens lab)",
-    ALC: "Alcon (contact lenses)",
+    ALC: "Alcon (contact lenses)", INN: "Innovatus / Innovative Contacts",
     L4E: "Little 4 Eyes (frames)", AVIV: "Aviva Mann (frames)",
     BOLLE: "Bolle (safety eyewear)", SOS: "SOS Eyewear",
     SUN: "Sunshades (sunglasses)", CZ: "Carl Zeiss (lenses)",
