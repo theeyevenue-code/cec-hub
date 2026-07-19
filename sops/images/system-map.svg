@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 760" font-family="Segoe UI, Arial, sans-serif" role="img" aria-label="The whole CEC system on one page">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+      <path d="M1,1 L10,6 L1,11" fill="none" stroke="#2e6a52" stroke-width="2.2"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="940" height="760" fill="#ffffff"/>
+  <text x="470" y="44" text-anchor="middle" font-size="30" font-weight="700" fill="#0f2b21">The whole system on one page</text>
+  <text x="470" y="76" text-anchor="middle" font-size="19" fill="#2e6a52">Things flow in → the helpers work overnight → you see simple lists. That's all of it.</text>
+
+  <!-- COLUMN 1: what flows in -->
+  <text x="170" y="122" text-anchor="middle" font-size="21" font-weight="700" fill="#0f2b21">Comes in by itself</text>
+  <rect x="40" y="136" width="260" height="58" rx="12" fill="#ffffff" stroke="#438F73" stroke-width="2"/>
+  <text x="170" y="162" text-anchor="middle" font-size="18" font-weight="700" fill="#0f2b21">📧 Supplier invoices</text>
+  <text x="170" y="184" text-anchor="middle" font-size="14" fill="#2e6a52">Hoya, CooperVision, Alcon …</text>
+
+  <rect x="40" y="206" width="260" height="58" rx="12" fill="#ffffff" stroke="#438F73" stroke-width="2"/>
+  <text x="170" y="232" text-anchor="middle" font-size="18" font-weight="700" fill="#0f2b21">📄 Specialist reports</text>
+  <text x="170" y="254" text-anchor="middle" font-size="14" fill="#2e6a52">about our patients</text>
+
+  <rect x="40" y="276" width="260" height="58" rx="12" fill="#ffffff" stroke="#438F73" stroke-width="2"/>
+  <text x="170" y="302" text-anchor="middle" font-size="18" font-weight="700" fill="#0f2b21">💳 Sales &amp; payments</text>
+  <text x="170" y="324" text-anchor="middle" font-size="14" fill="#2e6a52">entered in Optomate as usual</text>
+
+  <rect x="40" y="346" width="260" height="58" rx="12" fill="#ffffff" stroke="#438F73" stroke-width="2"/>
+  <text x="170" y="372" text-anchor="middle" font-size="18" font-weight="700" fill="#0f2b21">🖨 Paper invoices</text>
+  <text x="170" y="394" text-anchor="middle" font-size="14" fill="#2e6a52">scanned with one tap</text>
+
+  <path d="M300,265 L360,265" fill="none" stroke="#2e6a52" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+  <!-- COLUMN 2: the helpers -->
+  <text x="470" y="122" text-anchor="middle" font-size="21" font-weight="700" fill="#0f2b21">Helpers work overnight</text>
+  <rect x="364" y="136" width="212" height="268" rx="14" fill="#438F73"/>
+  <text x="470" y="172" text-anchor="middle" font-size="19" font-weight="700" fill="#ffffff">🤖 Every night</text>
+  <text x="470" y="200" text-anchor="middle" font-size="15" fill="#eaf5f0">enters the invoices</text>
+  <text x="470" y="222" text-anchor="middle" font-size="15" fill="#eaf5f0">files the letters</text>
+  <text x="470" y="244" text-anchor="middle" font-size="15" fill="#eaf5f0">sorts the email</text>
+  <text x="470" y="266" text-anchor="middle" font-size="15" fill="#eaf5f0">checks the sums</text>
+  <text x="470" y="288" text-anchor="middle" font-size="15" fill="#eaf5f0">once a month:</text>
+  <text x="470" y="308" text-anchor="middle" font-size="15" fill="#eaf5f0">audits vs statements +</text>
+  <text x="470" y="328" text-anchor="middle" font-size="15" fill="#eaf5f0">payment follow-ups</text>
+  <text x="470" y="362" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">🐕 Every morning a watchdog</text>
+  <text x="470" y="384" text-anchor="middle" font-size="15" fill="#eaf5f0">emails Mark ONLY if something broke</text>
+
+  <path d="M576,265 L636,265" fill="none" stroke="#2e6a52" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+  <!-- COLUMN 3: what you see -->
+  <text x="770" y="122" text-anchor="middle" font-size="21" font-weight="700" fill="#0f2b21">You see simple lists</text>
+  <rect x="640" y="136" width="260" height="128" rx="14" fill="#ffffff" stroke="#0f2b21" stroke-width="2.5"/>
+  <text x="770" y="166" text-anchor="middle" font-size="19" font-weight="700" fill="#0f2b21">🖥 THE HUB</text>
+  <text x="770" y="192" text-anchor="middle" font-size="15" fill="#2e6a52">🕶 frame invoices to click</text>
+  <text x="770" y="214" text-anchor="middle" font-size="15" fill="#2e6a52">📄 letters to link (3 clicks)</text>
+  <text x="770" y="236" text-anchor="middle" font-size="15" fill="#2e6a52">💰 payments to mention</text>
+  <text x="770" y="256" text-anchor="middle" font-size="15" fill="#2e6a52">📖 how-to guides · ✅ all-good signs</text>
+
+  <rect x="640" y="278" width="260" height="60" rx="12" fill="#e8f2ee" stroke="#438F73" stroke-width="2"/>
+  <text x="770" y="304" text-anchor="middle" font-size="17" font-weight="700" fill="#0f2b21">🗄 Optomate</text>
+  <text x="770" y="326" text-anchor="middle" font-size="14" fill="#2e6a52">stock &amp; costs stay accurate by themselves</text>
+
+  <rect x="640" y="350" width="260" height="54" rx="12" fill="#e8f2ee" stroke="#438F73" stroke-width="2"/>
+  <text x="770" y="374" text-anchor="middle" font-size="17" font-weight="700" fill="#0f2b21">📬 Mark's email</text>
+  <text x="770" y="394" text-anchor="middle" font-size="14" fill="#2e6a52">watchdog alert · Tuesday brief</text>
+
+  <!-- the one thing to remember -->
+  <rect x="170" y="452" width="600" height="86" rx="16" fill="#0f2b21"/>
+  <text x="470" y="490" text-anchor="middle" font-size="24" font-weight="700" fill="#ffffff">Remember ONE thing:</text>
+  <text x="470" y="522" text-anchor="middle" font-size="22" fill="#7dd3ae">the Hub — 192.168.1.62:5680</text>
+
+  <!-- three-line cheat sheet -->
+  <text x="470" y="586" text-anchor="middle" font-size="18" font-weight="700" fill="#0f2b21">The whole routine:</text>
+  <text x="470" y="616" text-anchor="middle" font-size="17" fill="#2e6a52">1 · Staff glance at the Hub once a day and clear its short lists</text>
+  <text x="470" y="644" text-anchor="middle" font-size="17" fill="#2e6a52">2 · Mark reads a watchdog email only when something broke (silence = fine)</text>
+  <text x="470" y="672" text-anchor="middle" font-size="17" fill="#2e6a52">3 · To change anything: open Claude in the CEC Bots folder and say it in plain words</text>
+
+  <text x="470" y="726" text-anchor="middle" font-size="15" fill="#6b8078">Folders, schedules and code live behind the scenes — the map is in How-To Guides if you ever need it.</text>
+</svg>
