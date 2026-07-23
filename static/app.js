@@ -721,15 +721,35 @@ async function renderCredits() {
     const active = creds.filter((c) => c.status !== "done");
     const settled = creds.filter((c) => c.status === "done");
 
+    const money = (n) => `$${Number(n).toFixed(2)}`;
+    // Total dollars still owed to us (everything not yet ticked off).
+    const outstanding = active.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+    const overdueCount = active.filter((c) => c.overdue).length;
+
+    const amountChip = (c) => Number(c.amount)
+        ? `<span class="chip chip-on">${money(c.amount)}</span>` : "";
+
+    // How long it's been waiting — red + "chase" once overdue.
+    const ageBadge = (c) => {
+        const d = c.days_open;
+        if (c.overdue) {
+            return `<span class="chip" style="background:var(--danger-bg);border-color:var(--danger-ink);color:var(--danger-ink)"
+                >⚠ chase — waiting ${d} days</span>`;
+        }
+        if (typeof d === "number") return `<span class="chip">waiting ${d} day${d === 1 ? "" : "s"}</span>`;
+        return `<span class="chip">waiting since ${esc(c.added || "")}</span>`;
+    };
+
     const badge = (c) => c.status === "arrived"
-        ? `<span class="chip chip-green">✓ arrived${c.matched && c.matched.value ? ` — $${Number(c.matched.value).toFixed(2)}` : ""}</span>`
+        ? `<span class="chip chip-green">✓ arrived${c.matched && c.matched.value ? ` — ${money(c.matched.value)}` : ""} — check your statement, then tick</span>`
         : c.status === "possible"
-            ? `<span class="chip chip-amber">possible match — check</span>`
-            : `<span class="chip">waiting since ${esc(c.added || "")}</span>`;
+            ? `<span class="chip chip-amber">possible match — check</span> ${ageBadge(c)}`
+            : ageBadge(c);
 
     const row = (c) => `<li class="todo-row" data-id="${esc(c.id)}">
-        <button class="todo-tick" data-act="done" title="Settled — tick off">⬜</button>
+        <button class="todo-tick" data-act="done" title="On our statement — tick off">⬜</button>
         <span class="todo-text"><strong>${esc(sup[c.supplier] || c.supplier)}</strong> — ${esc(c.text)}
+            ${amountChip(c)}
             ${badge(c)}
             ${c.matched && c.matched.cn ? `<span class="todo-meta">credit note ${esc(c.matched.cn)}</span>` : ""}
         </span>
@@ -742,13 +762,19 @@ async function renderCredits() {
         <h1 class="page-title">Credits we're owed</h1>
         <p class="page-sub">Add it the moment you send something back. Every night the helper
         watches Optomate for the supplier's credit — when it lands, the entry turns
-        <strong>✓ arrived</strong> by itself. You just tick it off. Nothing gets forgotten.</p>
+        <strong>✓ arrived</strong> by itself. Confirm it's on your statement, then tick it off.
+        Anything <strong style="color:var(--danger-ink)">⚠ chasing</strong> has been waiting over 4 weeks.</p>
         <div class="card">
+            <div class="page-sub" style="margin-top:0">
+                <strong>${money(outstanding)}</strong> owed to us across ${active.length} credit${active.length === 1 ? "" : "s"}${overdueCount ? ` · <strong style="color:var(--danger-ink)">${overdueCount} to chase</strong>` : ""}.
+            </div>
             <form id="credit-add" class="todo-addbar">
                 <select id="credit-sup">${Object.entries(sup).map(([k, v]) =>
                     `<option value="${esc(k)}">${esc(v)}</option>`).join("")}</select>
                 <input id="credit-input" type="text" maxlength="200" autocomplete="off"
                        placeholder="Who / what — e.g. Mr John Smith, scratched lens returned">
+                <input id="credit-amount" type="text" inputmode="decimal" autocomplete="off"
+                       style="max-width:8em" placeholder="$ amount">
                 <button class="btn" type="submit">Watch for this credit</button>
             </form>
             <ul class="todo-list">${active.map(row).join("") ||
@@ -766,9 +792,11 @@ async function renderCredits() {
         ev.preventDefault();
         const inp = document.getElementById("credit-input");
         const supSel = document.getElementById("credit-sup");
+        const amt = document.getElementById("credit-amount");
         if (!inp.value.trim()) return;
         try {
-            await postJSON("/api/credits", { action: "add", text: inp.value, supplier: supSel.value });
+            await postJSON("/api/credits", { action: "add", text: inp.value,
+                supplier: supSel.value, amount: amt.value });
             renderCredits();
         } catch (e) { alert(e.message); }
     });

@@ -19,6 +19,11 @@ from pathlib import Path
 
 HUB_DATA = Path(__file__).resolve().parent.parent / "data"
 
+# A credit still waiting on the supplier this many days is "overdue — chase it".
+# Soft, not an alarm: supplier statements are monthly, so ~4 weeks = one cycle
+# gone by with nothing back. (Mark, 23 Jul 2026.)
+CREDIT_OVERDUE_DAYS = 28
+
 
 def _load(path: Path, key: str) -> list:
     try:
@@ -128,10 +133,49 @@ def credits_path(cfg: dict) -> Path:
     return (Path(dir_str) if dir_str else HUB_DATA) / "credits-watch.json"
 
 
+def _parse_amount(raw) -> float | None:
+    """Turn whatever a human typed for a dollar amount into a number, or None.
+    Accepts '12.50', '$1,234.50', 12.5, '' -> None. Never raises."""
+    if raw is None:
+        return None
+    s = re.sub(r"[^0-9.]", "", str(raw))
+    if not s:
+        return None
+    try:
+        val = round(float(s), 2)
+    except ValueError:
+        return None
+    return val if val > 0 else None
+
+
+def _days_since(iso: str) -> int | None:
+    """Whole days between an ISO date string and today. None if unparseable."""
+    try:
+        return (date.today() - date.fromisoformat(str(iso)[:10])).days
+    except (ValueError, TypeError):
+        return None
+
+
+def _annotate(c: dict) -> dict:
+    """Add read-time ageing fields (not persisted): how long it's been waiting
+    and whether that's overdue. Only entries still waiting on the supplier
+    (open / possible) can be overdue — 'arrived' just needs a tick-off."""
+    days = _days_since(c.get("added", ""))
+    c["days_open"] = days
+    c["overdue"] = bool(
+        days is not None
+        and days >= CREDIT_OVERDUE_DAYS
+        and c.get("status") in ("open", "possible")
+    )
+    return c
+
+
 def credits_list(cfg: dict) -> list:
     order = {"possible": 0, "open": 1, "arrived": 2, "done": 3}
-    items = _load(credits_path(cfg), "credits")
-    return sorted(items, key=lambda c: (order.get(c.get("status"), 1),
+    items = [_annotate(c) for c in _load(credits_path(cfg), "credits")]
+    # Overdue first (chase these), then by the existing status order, oldest first.
+    return sorted(items, key=lambda c: (0 if c.get("overdue") else 1,
+                                        order.get(c.get("status"), 1),
                                         str(c.get("added", ""))))
 
 
@@ -146,6 +190,7 @@ def credits_mutate(cfg: dict, action: str, payload: dict, who: str):
         if supplier not in CREDIT_SUPPLIERS:
             supplier = "OTHER"
         items.insert(0, {"id": _new_id("c"), "text": text, "supplier": supplier,
+                         "amount": _parse_amount(payload.get("amount")),
                          "by": who, "added": date.today().isoformat(),
                          "status": "open", "matched": None})
     else:
