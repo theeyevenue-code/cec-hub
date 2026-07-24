@@ -339,6 +339,14 @@ main {
 }
 .todo-done .todo-text { text-decoration: line-through; opacity: 0.55; }
 .todo-empty { font-size: 19px; color: var(--muted); padding: 14px 4px; }
+.todo-opt { display: flex; align-items: center; gap: 6px; font-size: 14px;
+    color: var(--muted); white-space: nowrap; }
+.todo-opt input[type="date"] { font-size: 15px; padding: 8px; }
+.todo-due, .todo-repeat {
+    display: inline-block; margin-left: 10px; padding: 2px 9px; border-radius: 999px;
+    font-size: 13px; vertical-align: middle; background: var(--chip-bg, #eef1f6);
+    color: var(--muted); }
+.todo-overdue { background: #fbe3e3; color: #b03030; font-weight: 600; }
 .chip-green { background: #e1f3ea; color: #0f5c3f; border-color: #438F73; }
 .tile:focus-visible { outline: 4px solid #9fd0bc; outline-offset: 2px; }
 
@@ -822,4 +830,100 @@ main {
     .sop-btn { background: none; color: #000 !important; padding: 0; min-height: 0; font-weight: 700; text-decoration: underline; }
     .sop-btn::after { content: " (" attr(href) ")"; font-size: 10pt; }
     .mark-flag { border: 1pt dashed #8a6d1a; background: #fff; }
+    .sysmap { display: none; }
+}
+
+/* --- System map (bottom of home) ------------------------------------------ */
+.sysmap {
+    margin: 40px auto 8px;
+    max-width: 760px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+.sysmap > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 16px 20px;
+    font-weight: 700;
+    color: var(--ink);
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.sysmap > summary::-webkit-details-marker { display: none; }
+.sysmap > summary:hover { background: var(--mint-soft); }
+.sysmap-sum-icon { font-size: 18px; }
+.sysmap-sum-hint { color: var(--muted); font-weight: 500; }
+.sysmap[open] > summary { border-bottom: 1px solid var(--line); }
+.sysmap-body { padding: 22px 20px 24px; }
+.sysmap-owner-row {
+    text-align: center;
+    background: var(--info-bg);
+    border: 1px solid var(--info-line);
+    color: var(--info-ink);
+    font-weight: 700;
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin: 0 auto;
+    max-width: 460px;
+}
+.sysmap-arrows {
+    text-align: center;
+    color: var(--info-line);
+    font-size: 18px;
+    letter-spacing: 2px;
+    margin: 6px 0 12px;
+}
+.sysmap-tools {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+.sysmap-tool {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 4px;
+    background: var(--mint-soft);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 10px;
+}
+.sysmap-tool-icon { font-size: 24px; }
+.sysmap-tool-name { font-weight: 700; color: var(--ink); font-size: 15px; }
+.sysmap-tool-port { color: var(--muted); font-size: 13px; }
+.sysmap-tool-owner { color: var(--body); font-size: 13px; margin-top: 4px; line-height: 1.35; }
+.sysmap-tool-owner b { color: var(--green-deep); }
+.sysmap-safe {
+    margin-top: 16px;
+    background: #eef6f1;
+    border: 1px solid var(--green);
+    color: var(--green-dark);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 15px;
+    text-align: center;
+}
+.sysmap-restart {
+    margin-top: 14px;
+    color: var(--body);
+    font-size: 14px;
+    line-height: 1.5;
+}
+.sysmap-restart code {
+    display: inline-block;
+    margin-top: 6px;
+    background: var(--ink);
+    color: #eaf3ee;
+    padding: 4px 9px;
+    border-radius: 7px;
+    font-size: 13px;
+}
+@media (max-width: 560px) {
+    .sysmap-tools { grid-template-columns: 1fr; }
 }

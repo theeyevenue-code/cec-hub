@@ -157,7 +157,8 @@ async function renderHome() {
         ${homeEdit && (data.hidden || []).length ? `<div class="hidden-bar">
             Hidden: ${(data.hidden || []).map((h) =>
                 `<button class="chip" data-show="${esc(h)}">${esc(h)} — show</button>`).join(" ")}
-        </div>` : ""}`;
+        </div>` : ""}
+        ${sysMapPanel()}`;
 
     document.getElementById("home-edit").addEventListener("click", () => {
         homeEdit = !homeEdit;
@@ -194,6 +195,42 @@ async function renderHome() {
 }
 
 let homeEdit = false;
+
+/* --- System map: what keeps the always-on tools running -------------------- */
+/* A quiet, collapsed reference at the bottom of the home view. Its whole job is
+   to answer the recurring worry: "if I close Claude, do the tools stop?" No —
+   each tool is owned by its own Windows Scheduled Task, not by Claude. */
+function sysMapPanel() {
+    const tools = [
+        { icon: "📝", name: "Referral generator", port: "5678", owner: "CEC Referral Watchdog" },
+        { icon: "👁", name: "SightTrack",          port: "5681", owner: "CEC SightTrack Watchdog" },
+        { icon: "🧭", name: "CEC Hub (this page)",  port: "5680", owner: "CEC Hub Watchdog" },
+    ];
+    const card = (t) => `<div class="sysmap-tool">
+        <span class="sysmap-tool-icon" aria-hidden="true">${t.icon}</span>
+        <span class="sysmap-tool-name">${esc(t.name)}</span>
+        <span class="sysmap-tool-port">port ${esc(t.port)}</span>
+        <span class="sysmap-tool-owner">kept alive by<br><b>${esc(t.owner)}</b></span>
+    </div>`;
+    return `<details class="sysmap">
+        <summary><span class="sysmap-sum-icon">🔧</span> How the tools stay running
+            <span class="sysmap-sum-hint">— why closing Claude is safe</span></summary>
+        <div class="sysmap-body">
+            <div class="sysmap-owner-row">Windows Task Scheduler starts &amp; babysits each tool</div>
+            <div class="sysmap-arrows" aria-hidden="true">▼&nbsp;&nbsp;&nbsp;&nbsp;▼&nbsp;&nbsp;&nbsp;&nbsp;▼</div>
+            <div class="sysmap-tools">${tools.map(card).join("")}</div>
+            <div class="sysmap-safe">✓ Claude is <b>not</b> in this chain. Closing or restarting
+                Claude does <b>not</b> stop these tools — the Scheduled Tasks do.</div>
+            <div class="sysmap-restart">
+                <b>When a tool needs a restart</b> (e.g. after new code): don't launch it from
+                Claude directly — that ties it to Claude and it dies when Claude closes. Instead
+                ask Claude to <i>trigger the watchdog task</i>, or run in PowerShell:
+                <code>Start-ScheduledTask -TaskName 'CEC&nbsp;Referral&nbsp;Watchdog'</code>
+                (swap in the tool's task name from above).
+            </div>
+        </div>
+    </details>`;
+}
 
 /* --- SOP list -------------------------------------------------------------- */
 
@@ -661,10 +698,21 @@ async function renderTodo() {
     const open = tasks.filter((t) => !t.done);
     const done = tasks.filter((t) => t.done);
 
+    const REPEAT_LABEL = { daily: "every day", weekdays: "Mon–Fri",
+                           weekly: "weekly", every: "repeats" };
+    const dueChip = (t) => {
+        if (!t.due) return "";
+        const cls = t.overdue ? "todo-due todo-overdue" : "todo-due";
+        const label = t.overdue ? "overdue " + fmtDue(t.due) : "due " + fmtDue(t.due);
+        return `<span class="${cls}">${esc(label)}</span>`;
+    };
+    const repeatChip = (t) => t.repeat
+        ? `<span class="todo-repeat">🔁 ${esc(REPEAT_LABEL[t.repeat.kind] || "repeats")}</span>` : "";
+
     const row = (t) => `<li class="todo-row${t.done ? " todo-done" : ""}" data-id="${esc(t.id)}">
         <button class="todo-tick" data-act="toggle" title="${t.done ? "Not done after all" : "Done!"}">
             ${t.done ? "✅" : "⬜"}</button>
-        <span class="todo-text">${esc(t.text)}</span>
+        <span class="todo-text">${esc(t.text)}${dueChip(t)}${repeatChip(t)}</span>
         <span class="todo-meta">${esc(t.by || "")}${t.done ? " · done" : ""}</span>
         <button class="todo-x" data-act="delete" title="Remove">✕</button>
     </li>`;
@@ -673,11 +721,21 @@ async function renderTodo() {
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">To-do list</h1>
         <p class="page-sub">Shared between everyone. Add it here and it can't be forgotten —
-        open items show on the Hub's front page until someone ticks them.</p>
+        open items show on the Hub's front page until someone ticks them. Give it a due date
+        or make it repeat, and it rolls over each day until it's ticked.</p>
         <div class="card">
             <form id="todo-add" class="todo-addbar">
                 <input id="todo-input" type="text" maxlength="200" autocomplete="off"
-                       placeholder="Type a task and press Enter — e.g. Order more contact lens solution">
+                       placeholder="Type a task — e.g. Order more contact lens solution">
+                <label class="todo-opt">Due
+                    <input id="todo-due" type="date"></label>
+                <label class="todo-opt">Repeat
+                    <select id="todo-repeat">
+                        <option value="">No</option>
+                        <option value="daily">Every day</option>
+                        <option value="weekdays">Mon–Fri</option>
+                        <option value="weekly">Weekly</option>
+                    </select></label>
                 <button class="btn" type="submit">Add</button>
             </form>
             <ul class="todo-list">${open.map(row).join("") ||
@@ -692,7 +750,12 @@ async function renderTodo() {
         ev.preventDefault();
         const inp = document.getElementById("todo-input");
         if (!inp.value.trim()) return;
-        try { await postJSON("/api/tasks", { action: "add", text: inp.value }); renderTodo(); }
+        const body = { action: "add", text: inp.value };
+        const due = document.getElementById("todo-due").value;
+        const rep = document.getElementById("todo-repeat").value;
+        if (due) body.due = due;
+        if (rep) body.repeat = { kind: rep };
+        try { await postJSON("/api/tasks", body); renderTodo(); }
         catch (e) { alert(e.message); }
     });
     view.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", async (ev) => {
@@ -901,6 +964,19 @@ async function renderStock() {
 function fmtPower(v) { return (v >= 0 ? "+" : "") + Number(v).toFixed(2); }
 function fmtMoney(v) { return "$" + Number(v).toFixed(2); }
 function fmtMM(v) { return parseFloat(v) + "mm"; }
+function fmtDue(iso) {
+    // "today" / "tomorrow" / "yesterday", else "Fri 1 Aug". iso = YYYY-MM-DD.
+    const parts = String(iso).split("-").map(Number);
+    if (parts.length !== 3) return iso;
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    const now = new Date();
+    const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days = Math.round((d - t0) / 86400000);
+    if (days === 0) return "today";
+    if (days === 1) return "tomorrow";
+    if (days === -1) return "yesterday";
+    return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
 
 function lensRowHTML(l, extraCellHTML) {
     const warnings = (l.warnings || []).map((w) =>
