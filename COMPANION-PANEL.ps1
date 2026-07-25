@@ -9,9 +9,9 @@
 # and this tucks behind it (that's the trade-off of the pinned-window choice).
 # The always-on-top version would need a small desktop app instead.
 
-$HUB_URL = 'http://192.168.1.62:5680/#/todo'
-$W = 400
-$H = 720
+$HUB_URL = 'http://192.168.1.62:5680/#/panel'
+$W = 360
+$H = 640
 
 Add-Type -AssemblyName System.Windows.Forms
 $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea

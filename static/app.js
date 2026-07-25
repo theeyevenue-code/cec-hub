@@ -66,6 +66,7 @@ const routes = [
     { re: /^#\/followups$/, fn: renderFollowups },
     { re: /^#\/letters$/, fn: renderLetters },
     { re: /^#\/todo$/, fn: renderTodo },
+    { re: /^#\/panel$/, fn: renderPanel },
     { re: /^#\/credits$/, fn: renderCredits },
     { re: /^#\/stock$/, fn: renderStock },
     { re: /^#\/lenses$/, fn: renderLenses },
@@ -73,6 +74,8 @@ const routes = [
 
 function route() {
     const hash = location.hash || "#/";
+    // panel-mode = the slim companion window; strips the Hub chrome (see CSS)
+    document.body.classList.toggle("panel-mode", hash === "#/panel");
     for (const r of routes) {
         const m = hash.match(r.re);
         if (m) { r.fn(m); window.scrollTo(0, 0); return; }
@@ -698,17 +701,6 @@ async function renderTodo() {
     const open = tasks.filter((t) => !t.done);
     const done = tasks.filter((t) => t.done);
 
-    const REPEAT_LABEL = { daily: "every day", weekdays: "Mon–Fri",
-                           weekly: "weekly", every: "repeats" };
-    const dueChip = (t) => {
-        if (!t.due) return "";
-        const cls = t.overdue ? "todo-due todo-overdue" : "todo-due";
-        const label = t.overdue ? "overdue " + fmtDue(t.due) : "due " + fmtDue(t.due);
-        return `<span class="${cls}">${esc(label)}</span>`;
-    };
-    const repeatChip = (t) => t.repeat
-        ? `<span class="todo-repeat">🔁 ${esc(REPEAT_LABEL[t.repeat.kind] || "repeats")}</span>` : "";
-
     const row = (t) => `<li class="todo-row${t.done ? " todo-done" : ""}" data-id="${esc(t.id)}">
         <button class="todo-tick" data-act="toggle" title="${t.done ? "Not done after all" : "Done!"}">
             ${t.done ? "✅" : "⬜"}</button>
@@ -764,6 +756,88 @@ async function renderTodo() {
         const act = ev.target.dataset.act;
         if (act === "delete" && !confirm("Remove this task?")) return;
         try { await postJSON("/api/tasks", { action: act, id }); renderTodo(); }
+        catch (e) { alert(e.message); }
+    }));
+}
+
+/* --- Companion panel (slim corner window: compact to-do only) ---------------------- */
+
+async function renderPanel() {
+    let tasks = [];
+    try {
+        tasks = (await getJSON("/api/tasks")).tasks || [];
+    } catch (e) {
+        view.innerHTML = `<div class="p-wrap"><p class="p-err">${esc(e.message)}</p></div>`;
+        return;
+    }
+    const open = tasks.filter((t) => !t.done);
+    const done = tasks.filter((t) => t.done);
+
+    const row = (t) => `<li class="p-row${t.done ? " p-done" : ""}" data-id="${esc(t.id)}">
+        <button class="p-tick" data-act="toggle" aria-label="${t.done ? "undo" : "done"}">${t.done ? "✅" : "⬜"}</button>
+        <span class="p-text">${esc(t.text)}${dueChip(t)}${repeatChip(t)}</span>
+        <button class="p-x" data-act="delete" aria-label="remove">✕</button>
+    </li>`;
+
+    view.innerHTML = `<div class="p-wrap">
+        <div class="p-head">
+            <span class="p-title">To-do</span>
+            <select id="panel-staff" class="p-staff" title="Who's using this?">
+                <option value="">— you —</option>
+            </select>
+            <button id="panel-refresh" class="p-refresh" title="Refresh">⟳</button>
+        </div>
+        <form id="panel-add" class="p-add">
+            <input id="panel-input" type="text" maxlength="200" autocomplete="off"
+                   placeholder="Add a task…">
+            <div class="p-add-opts">
+                <input id="panel-due" type="date" title="Due date">
+                <select id="panel-repeat" title="Repeat">
+                    <option value="">once</option>
+                    <option value="daily">daily</option>
+                    <option value="weekdays">Mon–Fri</option>
+                    <option value="weekly">weekly</option>
+                </select>
+                <button class="btn p-add-btn" type="submit">Add</button>
+            </div>
+        </form>
+        <ul class="p-list">${open.map(row).join("") ||
+            `<li class="p-empty">Nothing to do 🎉</li>`}</ul>
+        ${done.length ? `<details class="p-done-wrap"><summary>Done (${done.length})</summary>
+            <ul class="p-list">${done.slice(0, 15).map(row).join("")}</ul></details>` : ""}
+    </div>`;
+
+    // staff picker (attribution — the topbar one is hidden in panel mode)
+    const staffSel = document.getElementById("panel-staff");
+    try {
+        (((await getJSON("/api/staff")).staff) || []).forEach((name) => {
+            const o = document.createElement("option");
+            o.value = name; o.textContent = name; staffSel.appendChild(o);
+        });
+        staffSel.value = getStaff();
+    } catch (e) { /* optional */ }
+    staffSel.addEventListener("change", () => setStaff(staffSel.value));
+
+    document.getElementById("panel-refresh").addEventListener("click", renderPanel);
+
+    document.getElementById("panel-add").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const inp = document.getElementById("panel-input");
+        if (!inp.value.trim()) return;
+        const body = { action: "add", text: inp.value };
+        const due = document.getElementById("panel-due").value;
+        const rep = document.getElementById("panel-repeat").value;
+        if (due) body.due = due;
+        if (rep) body.repeat = { kind: rep };
+        try { await postJSON("/api/tasks", body); renderPanel(); }
+        catch (e) { alert(e.message); }
+    });
+    view.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        const id = ev.target.closest(".p-row").dataset.id;
+        const act = ev.target.dataset.act;
+        if (act === "delete" && !confirm("Remove this task?")) return;
+        try { await postJSON("/api/tasks", { action: act, id }); renderPanel(); }
         catch (e) { alert(e.message); }
     }));
 }
@@ -976,6 +1050,19 @@ function fmtDue(iso) {
     if (days === 1) return "tomorrow";
     if (days === -1) return "yesterday";
     return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
+
+const REPEAT_LABEL = { daily: "every day", weekdays: "Mon–Fri",
+                       weekly: "weekly", every: "repeats" };
+function dueChip(t) {
+    if (!t.due) return "";
+    const cls = t.overdue ? "todo-due todo-overdue" : "todo-due";
+    const label = t.overdue ? "overdue " + fmtDue(t.due) : "due " + fmtDue(t.due);
+    return `<span class="${cls}">${esc(label)}</span>`;
+}
+function repeatChip(t) {
+    return t.repeat
+        ? `<span class="todo-repeat">🔁 ${esc(REPEAT_LABEL[t.repeat.kind] || "repeats")}</span>` : "";
 }
 
 function lensRowHTML(l, extraCellHTML) {
