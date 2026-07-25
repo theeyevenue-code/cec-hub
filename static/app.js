@@ -760,54 +760,31 @@ async function renderTodo() {
     }));
 }
 
-/* --- Companion panel (slim corner window: compact to-do only) ---------------------- */
+/* --- Companion panel (slim corner window: tabbed compact Hub tools) ----------------
+   A small always-in-the-corner window that hosts several Hub tools behind a tiny
+   tab bar (To-do, Credits, …). Each tool renders a compact view into #p-body.
+   All money/clinical numbers come straight from the API — never computed here. */
+
+let panelTab = "todo";
+const PANEL_TABS = [
+    { id: "todo", label: "To-do", fn: panelTodo },
+    { id: "credits", label: "Credits", fn: panelCredits },
+];
 
 async function renderPanel() {
-    let tasks = [];
-    try {
-        tasks = (await getJSON("/api/tasks")).tasks || [];
-    } catch (e) {
-        view.innerHTML = `<div class="p-wrap"><p class="p-err">${esc(e.message)}</p></div>`;
-        return;
-    }
-    const open = tasks.filter((t) => !t.done);
-    const done = tasks.filter((t) => t.done);
-
-    const row = (t) => `<li class="p-row${t.done ? " p-done" : ""}" data-id="${esc(t.id)}">
-        <button class="p-tick" data-act="toggle" aria-label="${t.done ? "undo" : "done"}">${t.done ? "✅" : "⬜"}</button>
-        <span class="p-text">${esc(t.text)}${dueChip(t)}${repeatChip(t)}</span>
-        <button class="p-x" data-act="delete" aria-label="remove">✕</button>
-    </li>`;
-
     view.innerHTML = `<div class="p-wrap">
         <div class="p-head">
-            <span class="p-title">To-do</span>
+            <div class="p-tabs">${PANEL_TABS.map((t) =>
+                `<button class="p-tab${t.id === panelTab ? " on" : ""}" data-tab="${t.id}">${esc(t.label)}</button>`).join("")}</div>
             <select id="panel-staff" class="p-staff" title="Who's using this?">
                 <option value="">— you —</option>
             </select>
             <button id="panel-refresh" class="p-refresh" title="Refresh">⟳</button>
         </div>
-        <form id="panel-add" class="p-add">
-            <input id="panel-input" type="text" maxlength="200" autocomplete="off"
-                   placeholder="Add a task…">
-            <div class="p-add-opts">
-                <input id="panel-due" type="date" title="Due date">
-                <select id="panel-repeat" title="Repeat">
-                    <option value="">once</option>
-                    <option value="daily">daily</option>
-                    <option value="weekdays">Mon–Fri</option>
-                    <option value="weekly">weekly</option>
-                </select>
-                <button class="btn p-add-btn" type="submit">Add</button>
-            </div>
-        </form>
-        <ul class="p-list">${open.map(row).join("") ||
-            `<li class="p-empty">Nothing to do 🎉</li>`}</ul>
-        ${done.length ? `<details class="p-done-wrap"><summary>Done (${done.length})</summary>
-            <ul class="p-list">${done.slice(0, 15).map(row).join("")}</ul></details>` : ""}
+        <div class="p-body" id="p-body"><div class="p-empty">Loading…</div></div>
     </div>`;
 
-    // staff picker (attribution — the topbar one is hidden in panel mode)
+    // shared staff picker (attribution — the topbar one is hidden in panel mode)
     const staffSel = document.getElementById("panel-staff");
     try {
         (((await getJSON("/api/staff")).staff) || []).forEach((name) => {
@@ -817,28 +794,112 @@ async function renderPanel() {
         staffSel.value = getStaff();
     } catch (e) { /* optional */ }
     staffSel.addEventListener("change", () => setStaff(staffSel.value));
-
     document.getElementById("panel-refresh").addEventListener("click", renderPanel);
+    view.querySelectorAll(".p-tab").forEach((b) => b.addEventListener("click", () => {
+        panelTab = b.dataset.tab; renderPanel();
+    }));
+
+    const body = document.getElementById("p-body");
+    const tab = PANEL_TABS.find((t) => t.id === panelTab) || PANEL_TABS[0];
+    try { await tab.fn(body); }
+    catch (e) { body.innerHTML = `<p class="p-err">${esc(e.message)}</p>`; }
+}
+
+async function panelTodo(body) {
+    const tasks = (await getJSON("/api/tasks")).tasks || [];
+    const open = tasks.filter((t) => !t.done);
+    const done = tasks.filter((t) => t.done);
+    const row = (t) => `<li class="p-row${t.done ? " p-done" : ""}" data-id="${esc(t.id)}">
+        <button class="p-tick" data-act="toggle" aria-label="${t.done ? "undo" : "done"}">${t.done ? "✅" : "⬜"}</button>
+        <span class="p-text">${esc(t.text)}${dueChip(t)}${repeatChip(t)}</span>
+        <button class="p-x" data-act="delete" aria-label="remove">✕</button>
+    </li>`;
+    body.innerHTML = `
+        <form id="panel-add" class="p-add">
+            <input id="panel-input" type="text" maxlength="200" autocomplete="off" placeholder="Add a task…">
+            <div class="p-add-opts">
+                <input id="panel-due" type="date" title="Due date">
+                <select id="panel-repeat" title="Repeat">
+                    <option value="">once</option><option value="daily">daily</option>
+                    <option value="weekdays">Mon–Fri</option><option value="weekly">weekly</option>
+                </select>
+                <button class="btn p-add-btn" type="submit">Add</button>
+            </div>
+        </form>
+        <ul class="p-list">${open.map(row).join("") || `<li class="p-empty">Nothing to do 🎉</li>`}</ul>
+        ${done.length ? `<details class="p-done-wrap"><summary>Done (${done.length})</summary>
+            <ul class="p-list">${done.slice(0, 15).map(row).join("")}</ul></details>` : ""}`;
 
     document.getElementById("panel-add").addEventListener("submit", async (ev) => {
         ev.preventDefault();
         const inp = document.getElementById("panel-input");
         if (!inp.value.trim()) return;
-        const body = { action: "add", text: inp.value };
+        const payload = { action: "add", text: inp.value };
         const due = document.getElementById("panel-due").value;
         const rep = document.getElementById("panel-repeat").value;
-        if (due) body.due = due;
-        if (rep) body.repeat = { kind: rep };
-        try { await postJSON("/api/tasks", body); renderPanel(); }
-        catch (e) { alert(e.message); }
+        if (due) payload.due = due;
+        if (rep) payload.repeat = { kind: rep };
+        try { await postJSON("/api/tasks", payload); renderPanel(); } catch (e) { alert(e.message); }
     });
-    view.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", async (ev) => {
+    body.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", async (ev) => {
         ev.preventDefault();
         const id = ev.target.closest(".p-row").dataset.id;
         const act = ev.target.dataset.act;
         if (act === "delete" && !confirm("Remove this task?")) return;
-        try { await postJSON("/api/tasks", { action: act, id }); renderPanel(); }
-        catch (e) { alert(e.message); }
+        try { await postJSON("/api/tasks", { action: act, id }); renderPanel(); } catch (e) { alert(e.message); }
+    }));
+}
+
+async function panelCredits(body) {
+    const data = await getJSON("/api/credits");
+    const creds = data.credits || [];
+    const sup = data.suppliers || {};
+    const active = creds.filter((c) => c.status !== "done");
+    const money = (n) => `$${Number(n).toFixed(2)}`;
+    const outstanding = active.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+    const overdue = active.filter((c) => c.overdue).length;
+
+    // status/age straight from the API (nightly watcher sets arrived/possible)
+    const statusChip = (c) => {
+        if (c.status === "arrived") return `<span class="p-chip p-chip-ok">✓ arrived — check statement, then tick</span>`;
+        if (c.status === "possible") return `<span class="p-chip p-chip-warn">possible — check</span>`;
+        if (c.overdue) return `<span class="p-chip p-chip-crit">⚠ chase — ${c.days_open}d</span>`;
+        if (typeof c.days_open === "number") return `<span class="p-chip">waiting ${c.days_open}d</span>`;
+        return "";
+    };
+    const row = (c) => `<li class="p-row" data-id="${esc(c.id)}">
+        <button class="p-tick" data-act="done" title="On our statement — tick off">⬜</button>
+        <span class="p-text"><strong>${esc(sup[c.supplier] || c.supplier)}</strong> — ${esc(c.text)}
+            ${Number(c.amount) ? `<span class="p-chip p-chip-amt">${money(c.amount)}</span>` : ""}
+            ${statusChip(c)}</span>
+        <button class="p-x" data-act="delete" aria-label="remove">✕</button>
+    </li>`;
+    body.innerHTML = `
+        <div class="p-owed"><strong>${money(outstanding)}</strong> owed · ${active.length} credit${active.length === 1 ? "" : "s"}${overdue ? ` · <span class="p-owed-chase">${overdue} to chase</span>` : ""}</div>
+        <form id="credit-add" class="p-add">
+            <input id="credit-input" type="text" maxlength="200" autocomplete="off" placeholder="Who / what — e.g. Mr Smith, scratched lens back">
+            <div class="p-add-opts">
+                <select id="credit-sup">${Object.entries(sup).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("")}</select>
+                <input id="credit-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="$" style="max-width:5.5em">
+                <button class="btn p-add-btn" type="submit">Watch</button>
+            </div>
+        </form>
+        <ul class="p-list">${active.map(row).join("") || `<li class="p-empty">No credits outstanding 🎉</li>`}</ul>`;
+
+    document.getElementById("credit-add").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const txt = document.getElementById("credit-input").value.trim();
+        if (!txt) return;
+        const payload = { action: "add", supplier: document.getElementById("credit-sup").value,
+                          text: txt, amount: document.getElementById("credit-amount").value };
+        try { await postJSON("/api/credits", payload); renderPanel(); } catch (e) { alert(e.message); }
+    });
+    body.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        const id = ev.target.closest(".p-row").dataset.id;
+        const act = ev.target.dataset.act;
+        if (act === "delete" && !confirm("Remove this credit?")) return;
+        try { await postJSON("/api/credits", { action: act, id }); renderPanel(); } catch (e) { alert(e.message); }
     }));
 }
 
