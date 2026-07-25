@@ -769,6 +769,7 @@ let panelTab = "todo";
 const PANEL_TABS = [
     { id: "todo", label: "To-do", fn: panelTodo },
     { id: "credits", label: "Credits", fn: panelCredits },
+    { id: "check", label: "Check", fn: panelCheck },
 ];
 
 async function renderPanel() {
@@ -901,6 +902,60 @@ async function panelCredits(body) {
         if (act === "delete" && !confirm("Remove this credit?")) return;
         try { await postJSON("/api/credits", { action: act, id }); renderPanel(); } catch (e) { alert(e.message); }
     }));
+}
+
+// Order checker: scan/type an order number -> the speccheck engine's verdict.
+// The Hub only proxies; the numbers come from the engine (see hub/ordercheck.py).
+const OC_CHECK_LABEL = { expiry: "Rx expiry", script: "Script match", type: "Lens type" };
+const OC_VCLASS = { GREEN: "oc-ok", ISSUE: "oc-crit", UNVERIFIED: "oc-warn" };
+const OC_MARK = { GREEN: "✓", ISSUE: "✕", UNVERIFIED: "?" };
+
+function ocRender(data) {
+    if (!data.connected) return `<div class="oc-msg">${esc(data.message || "Not connected.")}</div>`;
+    if (data.error) return `<div class="oc-msg oc-msg-warn">${esc(data.error)}</div>`;
+    const r = data.result;
+    if (!r) return `<div class="oc-msg">No result.</div>`;
+    const lines = Object.entries(r.checks || {}).map(([k, c]) => `
+        <div class="oc-line">
+            <span class="oc-k">${esc(OC_CHECK_LABEL[k] || k)}</span>
+            <span class="oc-badge ${OC_VCLASS[c.status] || ""}">${esc(c.status)}${c.shadow ? " · shadow" : ""}</span>
+            ${c.reason ? `<div class="oc-reason">${esc(c.reason)}</div>` : ""}
+        </div>`).join("");
+    return `<div class="oc-card ${OC_VCLASS[r.verdict] || ""}">
+        <div class="oc-verdict">${OC_MARK[r.verdict] || ""} ${esc(r.verdict)} <span class="oc-order">· order ${esc(r.order)}</span></div>
+        ${lines}
+    </div>`;
+}
+
+async function panelCheck(body) {
+    body.innerHTML = `
+        <form id="oc-form" class="p-add">
+            <input id="oc-order" type="text" inputmode="numeric" autocomplete="off"
+                   placeholder="Scan or type an order number…">
+            <div class="p-add-opts">
+                <button class="btn p-add-btn" type="submit" style="flex:1">Check order</button>
+            </div>
+        </form>
+        <div id="oc-result" class="oc-result">
+            <div class="oc-hint">Scan an order barcode or type the number, then Check.</div>
+        </div>`;
+    const input = document.getElementById("oc-order");
+    const out = document.getElementById("oc-result");
+    input.focus();
+
+    document.getElementById("oc-form").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const order = input.value.trim();
+        if (!order) return;
+        out.innerHTML = `<div class="oc-hint">Checking order ${esc(order)}…</div>`;
+        try {
+            const data = await getJSON(`/api/order-check?order=${encodeURIComponent(order)}`);
+            out.innerHTML = ocRender(data);
+        } catch (e) {
+            out.innerHTML = `<div class="oc-msg oc-msg-warn">${esc(e.message)}</div>`;
+        }
+        input.select();   // ready for the next scan
+    });
 }
 
 /* --- Credits watch-list ------------------------------------------------------------ */

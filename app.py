@@ -204,6 +204,13 @@ def credits():
                     "suppliers": lists.CREDIT_SUPPLIERS})
 
 
+@app.route("/api/order-check")
+def order_check():
+    from hub import ordercheck
+    order = request.args.get("order", "")
+    return jsonify(ordercheck.check(_integrations(), order))
+
+
 @app.route("/api/attention")
 def attention():
     return jsonify(integrations.attention_summary(_integrations()))
