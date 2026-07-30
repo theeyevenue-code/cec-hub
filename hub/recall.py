@@ -1,13 +1,14 @@
 """Recall tile — ask the Optomate agent to build a recall batch PREVIEW.
 
 Mark picks a month and a touch (T-4 a month early / T0 due now / T+6 overdue)
-and gets back the counts, plus the path to a local file listing the actual
-patients and the exact message.
+and gets back the full batch: every patient, the exact message, and tick boxes
+to pull individuals out of the batch (his request, 2026-07-30 — the list shows
+in full from the start, like the Payment follow-ups tile shows names).
 
-PHI: **the Hub never receives a patient.** The agent writes the patient list to
-a file on the practice PC (local-reports\\) and hands back counts and that path
-only — the Hub stays a no-patient-data layer, same rule as the rest of the app.
-This module logs nothing about any patient.
+The patient list stays on the practice network exactly like the rest of the
+Hub; this module still logs nothing about any patient. Un-ticked patients are
+remembered in the agent's local-reports folder per month+touch, so the eventual
+sender honours them.
 
 Nothing here can send. `recall.preview` has no send path at all; live sending
 still lives behind the agent's own two-key gate and Mark's explicit go-ahead.
@@ -116,7 +117,27 @@ def preview(cfg: dict, month: str, touch: str) -> dict:
         return {"connected": True, "error": str(data["error"])}
 
     data["connected"] = True
-    # Belt and braces: this endpoint must never carry patient rows.
-    for phi_key in ("rows", "patients", "members", "recipients"):
-        data.pop(phi_key, None)
     return data
+
+
+def set_deselected(cfg: dict, month: str, touch: str, pids) -> dict:
+    """Remember which patients Mark un-ticked for one month+touch batch.
+    Written to the agent's local-reports so the eventual sender sees the same
+    list. Path is built ONLY from the validated month+touch."""
+    month = str(month or "").strip()
+    touch = str(touch or "").strip().upper()
+    if not MONTH_RE.match(month) or touch not in TOUCHES:
+        return {"error": "Bad month or reminder."}
+    try:
+        clean = sorted({int(p) for p in (pids or [])})
+    except (TypeError, ValueError):
+        return {"error": "Bad patient list."}
+    dpath = agent_dir(cfg)
+    if dpath is None or not (dpath / "local-reports").is_dir():
+        return {"error": "The recall engine isn't connected on this computer yet."}
+    out = (dpath / "local-reports" /
+           f"recall-deselect-{month.replace('-', '')}-"
+           f"{touch.replace('+', 'plus').replace('-', 'minus')}.json")
+    out.write_text(json.dumps({"month": month, "touch": touch, "pids": clean},
+                              indent=1), encoding="utf-8")
+    return {"ok": True, "deselected": len(clean)}

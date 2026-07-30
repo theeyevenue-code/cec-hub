@@ -213,16 +213,28 @@ def order_check():
 
 @app.route("/api/recall/preview", methods=["POST"])
 def recall_preview():
-    """Build a recall batch preview for one month + touch. Returns COUNTS ONLY
-    plus the path to the local patient list — no patient data crosses this API,
-    and nothing can be sent from here."""
+    """Build a recall batch preview for one month + touch: full patient list,
+    exact messages, tick-box state. Practice-network only, like every other Hub
+    page. Nothing can be sent from here."""
     from hub import recall
     data = request.get_json(silent=True) or {}
     result = recall.preview(_integrations(), data.get("month", ""),
                             data.get("touch", "T0"))
-    # Deliberately not logging month/touch counts against a staff name — this is
-    # a read-only preview and the log is not the place for cohort sizes.
+    # Deliberately not logging patients — the log is not the place for PHI.
     return jsonify(result)
+
+
+@app.route("/api/recall/deselect", methods=["POST"])
+def recall_deselect():
+    """Remember which patients Mark un-ticked for one batch (stored with the
+    agent so the eventual sender honours it)."""
+    from hub import recall
+    data = request.get_json(silent=True) or {}
+    result = recall.set_deselected(_integrations(), data.get("month", ""),
+                                   data.get("touch", "T0"),
+                                   data.get("pids", []))
+    status = 400 if result.get("error") else 200
+    return jsonify(result), status
 
 
 @app.route("/recall-preview/<month>/<touch>")

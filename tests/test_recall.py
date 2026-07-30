@@ -113,21 +113,53 @@ def test_json_on_last_line_wins(cfg, monkeypatch):
     assert recall.preview(cfg, "2026-08", "T0")["to_send"] == 9
 
 
-# --- PHI must not come back through the Hub ---------------------------------
+# --- the full batch passes through (Mark wants the list up-front) -----------
 
-def test_patient_rows_are_stripped_even_if_the_agent_sends_them(cfg, monkeypatch):
+def test_patient_rows_pass_through_for_the_full_list(cfg, monkeypatch):
     class P:
         stdout = json.dumps({
             "ok": True, "to_send": 2,
-            "rows": [{"first_name": "Jane", "mobile": "0400111222"}],
-            "patients": ["someone"], "recipients": ["someone"],
+            "rows": [{"pid": 1, "name": "Jane Doe", "mobile": "0400111222",
+                      "deselected": False}],
         })
         returncode = 0
     monkeypatch.setattr(recall.subprocess, "run", lambda *a, **k: P())
     out = recall.preview(cfg, "2026-08", "T0")
-    for key in ("rows", "patients", "recipients"):
-        assert key not in out
+    assert out["rows"][0]["name"] == "Jane Doe"
     assert out["to_send"] == 2
+
+
+# --- deselection ------------------------------------------------------------
+
+def test_set_deselected_writes_the_agent_file(cfg):
+    out = recall.set_deselected(cfg, "2026-08", "T-4", [3, 1, 2, 2])
+    assert out == {"ok": True, "deselected": 3}
+    f = (recall.agent_dir(cfg) / "local-reports"
+         / "recall-deselect-202608-Tminus4.json")
+    saved = json.loads(f.read_text(encoding="utf-8"))
+    assert saved["pids"] == [1, 2, 3]          # deduped + sorted
+    assert saved["month"] == "2026-08" and saved["touch"] == "T-4"
+
+
+def test_set_deselected_empty_list_clears(cfg):
+    recall.set_deselected(cfg, "2026-08", "T0", [5])
+    out = recall.set_deselected(cfg, "2026-08", "T0", [])
+    assert out["deselected"] == 0
+    f = recall.agent_dir(cfg) / "local-reports" / "recall-deselect-202608-T0.json"
+    assert json.loads(f.read_text(encoding="utf-8"))["pids"] == []
+
+
+@pytest.mark.parametrize("month,touch,pids", [
+    ("nope", "T0", [1]),
+    ("2026-08", "TX", [1]),
+    ("2026-08", "T0", ["abc"]),
+])
+def test_set_deselected_rejects_bad_input(cfg, month, touch, pids):
+    assert recall.set_deselected(cfg, month, touch, pids).get("error")
+
+
+def test_set_deselected_not_connected_without_agent():
+    assert recall.set_deselected({}, "2026-08", "T0", [1]).get("error")
 
 
 # --- preview_file path safety ----------------------------------------------

@@ -1640,88 +1640,121 @@ function renderRecalls() {
     view.innerHTML = `
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Recalls</h1>
-        <p class="page-sub">See who is due for a recall, print Angie's phone list, and
-        check exactly who would get a text before anything is sent.</p>
+        <p class="page-sub">Everyone who would get a recall text, shown in full before
+        anything is sent. Un-tick anyone who shouldn't get one.</p>
 
         <div class="card" style="border-left:6px solid #438F73">
             <h2>✅ Nothing sends from this screen</h2>
-            <p>This is the look-before-you-leap screen. Sending recall texts is still
-            done deliberately by Mark — it is not automatic and there is no send button
-            here yet.</p>
+            <p>Sending recall texts is still done deliberately by Mark — it is not
+            automatic and there is no send button here yet. Un-ticking someone here is
+            remembered, so they'll be left out when the batch is eventually sent.</p>
         </div>
 
         <div class="card">
-            <h2>📱 Who would get a text?</h2>
-            <p>Pick the month people are <strong>due</strong>, and which reminder it is.</p>
             <div class="lens-form" style="gap:10px;flex-wrap:wrap">
                 <label>Due month
                     <select id="rc-month">${recallMonthOptions(thisMonth)}</select>
                 </label>
                 <label>Which reminder
                     <select id="rc-touch">
-                        ${RECALL_TOUCHES.map((t) => `<option value="${t.code}">${esc(t.code)} — ${esc(t.label)}</option>`).join("")}
+                        ${RECALL_TOUCHES.map((t) => `<option value="${t.code}"${t.code === "T0" ? " selected" : ""}>${esc(t.code)} — ${esc(t.label)}</option>`).join("")}
                     </select>
                 </label>
-                <button class="btn" id="rc-go">Show me who would get a text</button>
             </div>
-            <div id="rc-out" style="margin-top:12px"></div>
-        </div>
-
-        <div class="card">
-            <h2>☎️ Angie's phone list</h2>
-            <p>The people who were texted but still haven't booked — most overdue first,
-            one row per person, with a box to tick as she calls. It is made on the
-            practice computer; ask Mark to print it if it isn't already out.</p>
+            <div id="rc-out" style="margin-top:12px">
+                <div class="loading-panel">Working out who is due…</div>
+            </div>
         </div>`;
 
     const out = document.getElementById("rc-out");
-    document.getElementById("rc-go").addEventListener("click", async () => {
-        const month = document.getElementById("rc-month").value;
-        const touch = document.getElementById("rc-touch").value;
-        out.innerHTML = `<div class="loading-panel">Working out who is due…</div>`;
-        let d;
-        try {
-            d = await postJSON("/api/recall/preview", { month, touch });
-        } catch (e) {
-            out.innerHTML = errorPanel(e.message);
-            return;
-        }
-        if (d.connected === false) {
-            out.innerHTML = `<div class="empty-panel">${esc(d.message)}</div>`;
-            return;
-        }
-        if (d.error) {
-            out.innerHTML = `<div class="empty-panel">${esc(d.error)}</div>`;
-            return;
-        }
+    const load = () => loadRecallBatch(out);
+    document.getElementById("rc-month").addEventListener("change", load);
+    document.getElementById("rc-touch").addEventListener("change", load);
+    load();   // full list from the start — no extra click
+}
 
-        const seg = Object.entries(d.by_segment || {})
-            .map(([k, v]) => `${esc(k)}: ${v}`).join(" · ") || "—";
-        const warn = (d.distinct_messages || 1) > 1
-            ? `<div class="card" style="border-left:6px solid #b8860b;margin-top:10px">
-                 <h2>⚠️ Different wording in one batch</h2>
-                 <p>${d.distinct_messages} different message texts. Everyone is supposed to
-                 get the same neutral wording — tell Mark before sending.</p></div>` : "";
-        const shared = d.shared_mobiles
-            ? `<p><strong>Note:</strong> ${d.patients_on_shared_mobiles} of these people
-               share ${d.shared_mobiles} phone number${d.shared_mobiles === 1 ? "" : "s"} —
-               that phone would get more than one text.</p>` : "";
+async function loadRecallBatch(out) {
+    const month = document.getElementById("rc-month").value;
+    const touch = document.getElementById("rc-touch").value;
+    out.innerHTML = `<div class="loading-panel">Working out who is due…</div>`;
+    let d;
+    try {
+        d = await postJSON("/api/recall/preview", { month, touch });
+    } catch (e) {
+        out.innerHTML = errorPanel(e.message);
+        return;
+    }
+    if (d.connected === false) {
+        out.innerHTML = `<div class="empty-panel">${esc(d.message)}</div>`;
+        return;
+    }
+    if (d.error) {
+        out.innerHTML = `<div class="empty-panel">${esc(d.error)}</div>`;
+        return;
+    }
 
-        out.innerHTML = `
-            <div class="card" style="margin:0">
-                <h2>${d.to_send} ${d.to_send === 1 ? "person" : "people"} would get a text</h2>
-                <div class="updated-line">${esc(d.month_label)} · reminder ${esc(d.touch)}</div>
-                <p>${seg}</p>
-                <p style="color:#55636b;font-size:13px">
-                    ${d.due_in_month} due that month. Not texted:
-                    ${d.skipped_no_mobile} no mobile,
-                    ${d.skipped_opted_out} asked us not to send recalls,
-                    ${d.skipped_already_sent} already texted this round.</p>
-                ${shared}
-                <a class="btn" target="_blank"
-                   href="/recall-preview/${encodeURIComponent(d.month)}/${encodeURIComponent(d.touch)}">
-                   See the full list and the exact message</a>
-            </div>${warn}`;
+    const rows = d.rows || [];
+    const seg = Object.entries(d.by_segment || {})
+        .map(([k, v]) => `${esc(k)}: ${v}`).join(" · ") || "—";
+    const sample = rows.find((r) => !r.household && !r.deselected);
+    const hhSample = rows.find((r) => r.household && !r.deselected);
+
+    const fmtD = (iso) => {
+        const [y, m, dd] = iso.split("-");
+        return `${Number(dd)}/${Number(m)}/${y.slice(2)}`;
+    };
+    const tableRows = rows.map((r) => `
+        <tr data-pid="${r.pid}" class="${r.deselected ? "rc-off" : ""}">
+            <td><input type="checkbox" class="rc-tick" data-pid="${r.pid}"
+                 ${r.deselected ? "" : "checked"}></td>
+            <td><strong>${esc(r.name)}</strong></td>
+            <td>${esc(r.mobile)}</td>
+            <td>${fmtD(r.last_exam)}</td>
+            <td>${fmtD(r.due)}</td>
+            <td>${esc(r.optom || "")}</td>
+            <td>${r.household ? `👨‍👩‍👧 one text for ${r.household_size}` : ""}</td>
+        </tr>`).join("");
+
+    out.innerHTML = `
+        <h2>${d.to_send} ${d.to_send === 1 ? "person" : "people"} · ${d.messages_to_send}
+            text message${d.messages_to_send === 1 ? "" : "s"}</h2>
+        <div class="updated-line">${esc(d.month_label)} · reminder ${esc(d.touch)} · ${seg}</div>
+        <p style="color:#55636b;font-size:13px">
+            ${d.due_in_month} due that month. Left out automatically:
+            ${d.skipped_no_mobile} no mobile ·
+            ${d.skipped_opted_out} asked for no recalls ·
+            ${d.skipped_already_sent} already texted this round
+            ${d.deselected ? ` · <strong>${d.deselected} un-ticked by you</strong>` : ""}</p>
+        ${sample ? `<p style="margin:6px 0 2px"><strong>The message:</strong></p>
+            <p style="font-family:Consolas,monospace;font-size:13px;background:#f6f8f9;
+               padding:8px 10px;border:1px solid #dde5e9">${esc(sample.message)}</p>` : ""}
+        ${hhSample ? `<p style="margin:6px 0 2px"><strong>Families sharing a mobile get one
+            combined text instead:</strong></p>
+            <p style="font-family:Consolas,monospace;font-size:13px;background:#f6f8f9;
+               padding:8px 10px;border:1px solid #dde5e9">${esc(hhSample.message)}</p>` : ""}
+        <table class="lens-table" style="margin-top:10px">
+            <thead><tr><th>Send?</th><th>Patient</th><th>Mobile</th><th>Last exam</th>
+            <th>Due</th><th>Optometrist</th><th></th></tr></thead>
+            <tbody>${tableRows}</tbody>
+        </table>
+        <p style="margin-top:8px">
+            <a class="btn btn-quiet" target="_blank"
+               href="/recall-preview/${encodeURIComponent(d.month)}/${encodeURIComponent(d.touch)}">
+               Print-friendly copy</a></p>`;
+
+    // Un-tick = saved immediately; the batch recounts (household texts shrink too).
+    out.querySelectorAll(".rc-tick").forEach((box) => {
+        box.addEventListener("change", async () => {
+            const unticked = [...out.querySelectorAll(".rc-tick")]
+                .filter((b) => !b.checked).map((b) => Number(b.dataset.pid));
+            try {
+                await postJSON("/api/recall/deselect", { month, touch, pids: unticked });
+            } catch (e) {
+                out.insertAdjacentHTML("afterbegin", errorPanel(e.message));
+                return;
+            }
+            loadRecallBatch(out);
+        });
     });
 }
 

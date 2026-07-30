@@ -1042,3 +1042,7 @@ main {
 @media (max-width: 560px) {
     .sysmap-tools { grid-template-columns: 1fr; }
 }
+
+/* Recalls tile — un-ticked rows stay visible but clearly out of the batch */
+.rc-off td { color: #9aa5ad; text-decoration: line-through; }
+.rc-off td:first-child { text-decoration: none; }
