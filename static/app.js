@@ -70,6 +70,7 @@ const routes = [
     { re: /^#\/credits$/, fn: renderCredits },
     { re: /^#\/stock$/, fn: renderStock },
     { re: /^#\/lenses$/, fn: renderLenses },
+    { re: /^#\/recalls$/, fn: renderRecalls },
 ];
 
 function route() {
@@ -1607,6 +1608,121 @@ async function renderLenses() {
         });
     }
     [aEl, dblEl, pdEl].forEach((el) => el.addEventListener("input", suggest));
+}
+
+/* --- Recalls (v1: look only — nothing can be sent from here) ----------------------- */
+
+// T-4 goes out about a month BEFORE the due month, T+6 about six weeks after,
+// so Mark routinely wants next month's or last month's cohort, not just this one.
+const RECALL_TOUCHES = [
+    { code: "T-4", label: "First reminder — about a month before they're due" },
+    { code: "T0", label: "Due now" },
+    { code: "T+6", label: "Overdue nudge — about six weeks after they were due" },
+];
+
+function recallMonthOptions(selected) {
+    const now = new Date();
+    const opts = [];
+    for (let d = -2; d <= 2; d++) {
+        const dt = new Date(now.getFullYear(), now.getMonth() + d, 1);
+        const val = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+        const name = dt.toLocaleString("en-AU", { month: "long", year: "numeric" });
+        const tag = d === 0 ? " (this month)" : (d === -1 ? " (last month)"
+            : (d === 1 ? " (next month)" : ""));
+        opts.push(`<option value="${val}"${val === selected ? " selected" : ""}>${esc(name)}${tag}</option>`);
+    }
+    return opts.join("");
+}
+
+function renderRecalls() {
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    view.innerHTML = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Recalls</h1>
+        <p class="page-sub">See who is due for a recall, print Angie's phone list, and
+        check exactly who would get a text before anything is sent.</p>
+
+        <div class="card" style="border-left:6px solid #438F73">
+            <h2>✅ Nothing sends from this screen</h2>
+            <p>This is the look-before-you-leap screen. Sending recall texts is still
+            done deliberately by Mark — it is not automatic and there is no send button
+            here yet.</p>
+        </div>
+
+        <div class="card">
+            <h2>📱 Who would get a text?</h2>
+            <p>Pick the month people are <strong>due</strong>, and which reminder it is.</p>
+            <div class="lens-form" style="gap:10px;flex-wrap:wrap">
+                <label>Due month
+                    <select id="rc-month">${recallMonthOptions(thisMonth)}</select>
+                </label>
+                <label>Which reminder
+                    <select id="rc-touch">
+                        ${RECALL_TOUCHES.map((t) => `<option value="${t.code}">${esc(t.code)} — ${esc(t.label)}</option>`).join("")}
+                    </select>
+                </label>
+                <button class="btn" id="rc-go">Show me who would get a text</button>
+            </div>
+            <div id="rc-out" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card">
+            <h2>☎️ Angie's phone list</h2>
+            <p>The people who were texted but still haven't booked — most overdue first,
+            one row per person, with a box to tick as she calls. It is made on the
+            practice computer; ask Mark to print it if it isn't already out.</p>
+        </div>`;
+
+    const out = document.getElementById("rc-out");
+    document.getElementById("rc-go").addEventListener("click", async () => {
+        const month = document.getElementById("rc-month").value;
+        const touch = document.getElementById("rc-touch").value;
+        out.innerHTML = `<div class="loading-panel">Working out who is due…</div>`;
+        let d;
+        try {
+            d = await postJSON("/api/recall/preview", { month, touch });
+        } catch (e) {
+            out.innerHTML = errorPanel(e.message);
+            return;
+        }
+        if (d.connected === false) {
+            out.innerHTML = `<div class="empty-panel">${esc(d.message)}</div>`;
+            return;
+        }
+        if (d.error) {
+            out.innerHTML = `<div class="empty-panel">${esc(d.error)}</div>`;
+            return;
+        }
+
+        const seg = Object.entries(d.by_segment || {})
+            .map(([k, v]) => `${esc(k)}: ${v}`).join(" · ") || "—";
+        const warn = (d.distinct_messages || 1) > 1
+            ? `<div class="card" style="border-left:6px solid #b8860b;margin-top:10px">
+                 <h2>⚠️ Different wording in one batch</h2>
+                 <p>${d.distinct_messages} different message texts. Everyone is supposed to
+                 get the same neutral wording — tell Mark before sending.</p></div>` : "";
+        const shared = d.shared_mobiles
+            ? `<p><strong>Note:</strong> ${d.patients_on_shared_mobiles} of these people
+               share ${d.shared_mobiles} phone number${d.shared_mobiles === 1 ? "" : "s"} —
+               that phone would get more than one text.</p>` : "";
+
+        out.innerHTML = `
+            <div class="card" style="margin:0">
+                <h2>${d.to_send} ${d.to_send === 1 ? "person" : "people"} would get a text</h2>
+                <div class="updated-line">${esc(d.month_label)} · reminder ${esc(d.touch)}</div>
+                <p>${seg}</p>
+                <p style="color:#55636b;font-size:13px">
+                    ${d.due_in_month} due that month. Not texted:
+                    ${d.skipped_no_mobile} no mobile,
+                    ${d.skipped_opted_out} asked us not to send recalls,
+                    ${d.skipped_already_sent} already texted this round.</p>
+                ${shared}
+                <a class="btn" target="_blank"
+                   href="/recall-preview/${encodeURIComponent(d.month)}/${encodeURIComponent(d.touch)}">
+                   See the full list and the exact message</a>
+            </div>${warn}`;
+    });
 }
 
 /* --- Go ---------------------------------------------------------------------------- */

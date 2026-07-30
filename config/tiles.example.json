@@ -71,6 +71,13 @@
       "name": "Lens Finder",
       "description": "Which lenses can make an Rx — cheapest option first",
       "link": "#/lenses"
+    },
+    {
+      "id": "recalls",
+      "icon": "📱",
+      "name": "Recalls",
+      "description": "See who's due, check who'd get a text before it's sent",
+      "link": "#/recalls"
     }
   ]
 }

@@ -211,6 +211,33 @@ def order_check():
     return jsonify(ordercheck.check(_integrations(), order))
 
 
+@app.route("/api/recall/preview", methods=["POST"])
+def recall_preview():
+    """Build a recall batch preview for one month + touch. Returns COUNTS ONLY
+    plus the path to the local patient list — no patient data crosses this API,
+    and nothing can be sent from here."""
+    from hub import recall
+    data = request.get_json(silent=True) or {}
+    result = recall.preview(_integrations(), data.get("month", ""),
+                            data.get("touch", "T0"))
+    # Deliberately not logging month/touch counts against a staff name — this is
+    # a read-only preview and the log is not the place for cohort sizes.
+    return jsonify(result)
+
+
+@app.route("/recall-preview/<month>/<touch>")
+def recall_preview_file(month, touch):
+    """Serve the generated recall patient list (PHI — practice network only, same
+    as the rest of the Hub). Path is rebuilt from a validated month+touch, never
+    from anything the caller supplies."""
+    from hub import recall
+    path = recall.preview_file(_integrations(), month, touch)
+    if path is None:
+        return ("That preview hasn't been made yet — press "
+                "\"Show me who would get a text\" first.", 404)
+    return send_from_directory(path.parent, path.name)
+
+
 @app.route("/api/attention")
 def attention():
     return jsonify(integrations.attention_summary(_integrations()))
