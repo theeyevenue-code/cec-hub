@@ -1814,13 +1814,18 @@ function renderRecallSendArea(d) {
                 turns it on (two settings in the recall engine).</span>
         </div>`;
     }
+    const label = d.pilot_next
+        ? `Send a test run first (up to 25 of the ${n} messages)`
+        : `Send these ${n} text messages now`;
+    const hint = d.pilot_next
+        ? "First live send is a small test — check they arrive, then press again for the rest."
+        : "Sends the exact list above, minus anyone un-ticked.";
     return `
         <div style="margin-top:14px;padding:12px;border:2px solid #b3261e;border-radius:8px">
             <button class="btn" id="rc-send"
-                style="background:#b3261e;border-color:#b3261e">
-                Send these ${n} text messages now</button>
+                style="background:#b3261e;border-color:#b3261e">${label}</button>
             <span id="rc-send-note" style="font-size:13px;color:#55636b;margin-left:8px">
-                Sends the exact list above, minus anyone un-ticked.</span>
+                ${hint}</span>
         </div>`;
 }
 
@@ -1829,9 +1834,10 @@ function wireRecallSendButton(out, d, month, touch) {
     if (!sendBtn) return;   // sending switched off — nothing to wire
     const note = document.getElementById("rc-send-note");
     sendBtn.addEventListener("click", async () => {
-        const sure = window.confirm(
-            `Send ${d.messages_to_send} text messages now? This cannot be undone.`);
-        if (!sure) return;
+        const what = d.pilot_next
+            ? `Send a TEST RUN now (up to 25 real text messages)?`
+            : `Send ${d.messages_to_send} text messages now?`;
+        if (!window.confirm(`${what} This cannot be undone.`)) return;
         sendBtn.disabled = true;
         note.textContent = "Sending…";
         try {
@@ -1840,7 +1846,8 @@ function wireRecallSendButton(out, d, month, touch) {
             note.textContent = r.error ? r.error
                 : `Done: ${r.sent} sent, ${r.failed || 0} failed`
                   + (r.held_uncertain ? `, ${r.held_uncertain} held for checking` : "")
-                  + ".";
+                  + `.` + (r.note ? ` ${r.note}` : "");
+            window.alert(note.textContent);
         } catch (e) {
             note.textContent = e.message;
         }
