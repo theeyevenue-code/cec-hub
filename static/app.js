@@ -1667,9 +1667,9 @@ function renderRecalls() {
         </div>
 
         <div class="card">
-            <h2>☎️ Angie's phone list</h2>
+            <h2>☎️ Phone recall list</h2>
             <p>The people who were texted but still haven't booked — most overdue
-            first, grouped by family, with a box to tick as she calls.</p>
+            first, grouped by family, with a box to tick off each call.</p>
             <p>
                 <a class="btn" href="/recall-chase-sheet" target="_blank">Open the phone list</a>
                 <button class="btn btn-quiet" id="rc-chase-refresh">Make a fresh list</button>
@@ -1780,7 +1780,10 @@ async function loadRecallBatch(out, quiet = false) {
         <p style="margin-top:8px">
             <a class="btn btn-quiet" target="_blank"
                href="/recall-preview/${encodeURIComponent(d.month)}/${encodeURIComponent(d.touch)}">
-               Print-friendly copy</a></p>`;
+               Print-friendly copy</a></p>
+        ${renderRecallSendArea(d)}`;
+
+    wireRecallSendButton(out, d, month, touch);
 
     // Un-tick = saved immediately, then the counts refresh in place (the row
     // greys out straight away so it never feels stuck).
@@ -1797,6 +1800,51 @@ async function loadRecallBatch(out, quiet = false) {
             }
             loadRecallBatch(out, true);   // quiet refresh — table stays visible
         });
+    });
+}
+
+function renderRecallSendArea(d) {
+    const n = d.messages_to_send;
+    if (!d.live_enabled) {
+        return `
+        <div style="margin-top:14px;padding:12px;border:2px solid #c9d2d8;border-radius:8px">
+            <button class="btn" disabled>Send these ${n} text messages</button>
+            <span style="font-size:13px;color:#55636b;margin-left:8px">
+                Sending is <strong>switched off</strong>. It stays off until Mark
+                turns it on (two settings in the recall engine).</span>
+        </div>`;
+    }
+    return `
+        <div style="margin-top:14px;padding:12px;border:2px solid #b3261e;border-radius:8px">
+            <button class="btn" id="rc-send"
+                style="background:#b3261e;border-color:#b3261e">
+                Send these ${n} text messages now</button>
+            <span id="rc-send-note" style="font-size:13px;color:#55636b;margin-left:8px">
+                Sends the exact list above, minus anyone un-ticked.</span>
+        </div>`;
+}
+
+function wireRecallSendButton(out, d, month, touch) {
+    const sendBtn = document.getElementById("rc-send");
+    if (!sendBtn) return;   // sending switched off — nothing to wire
+    const note = document.getElementById("rc-send-note");
+    sendBtn.addEventListener("click", async () => {
+        const sure = window.confirm(
+            `Send ${d.messages_to_send} text messages now? This cannot be undone.`);
+        if (!sure) return;
+        sendBtn.disabled = true;
+        note.textContent = "Sending…";
+        try {
+            const r = await postJSON("/api/recall/send",
+                { month, touch, hash: d.batch_hash });
+            note.textContent = r.error ? r.error
+                : `Done: ${r.sent} sent, ${r.failed || 0} failed`
+                  + (r.held_uncertain ? `, ${r.held_uncertain} held for checking` : "")
+                  + ".";
+        } catch (e) {
+            note.textContent = e.message;
+        }
+        loadRecallBatch(out, true);
     });
 }
 

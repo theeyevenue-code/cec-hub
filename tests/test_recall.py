@@ -231,3 +231,48 @@ def test_refresh_chase_sheet_errors_when_no_file_appears(cfg, monkeypatch):
     monkeypatch.setattr(recall.subprocess, "run", lambda *a, **k: P())
     out = recall.refresh_chase_sheet(cfg)
     assert out.get("error")
+
+
+# --- the send path ------------------------------------------------------------
+
+def test_send_rejects_bad_hash_without_running(cfg, monkeypatch):
+    monkeypatch.setattr(recall.subprocess, "run",
+                        lambda *a, **k: pytest.fail("should not run"))
+    for bad in ("", "not-a-hash", "ABC!", "x" * 100):
+        assert recall.send(cfg, "2026-08", "T0", bad).get("error")
+
+
+def test_send_rejects_bad_month_touch_limit(cfg, monkeypatch):
+    monkeypatch.setattr(recall.subprocess, "run",
+                        lambda *a, **k: pytest.fail("should not run"))
+    h = "a" * 16
+    assert recall.send(cfg, "nope", "T0", h).get("error")
+    assert recall.send(cfg, "2026-08", "TX", h).get("error")
+    assert recall.send(cfg, "2026-08", "T0", h, limit="lots").get("error")
+
+
+def test_send_passes_hash_and_limit_through(cfg, monkeypatch):
+    seen = {}
+
+    class P:
+        stdout = json.dumps({"ok": True, "sent": 2, "failed": 0})
+        returncode = 0
+
+    def fake_run(argv, **kw):
+        seen["argv"] = argv
+        return P()
+
+    monkeypatch.setattr(recall.subprocess, "run", fake_run)
+    out = recall.send(cfg, "2026-08", "T0", "AB12CD34", limit=25)
+    assert out["sent"] == 2
+    assert "ab12cd34" in seen["argv"]      # normalised to lower-case
+    assert "--limit" in seen["argv"] and "25" in seen["argv"]
+    assert "recall.send_batch" in seen["argv"][2]
+
+
+def test_send_timeout_warns_about_the_journal(cfg, monkeypatch):
+    def boom(*a, **k):
+        raise recall.subprocess.TimeoutExpired(cmd="x", timeout=1)
+    monkeypatch.setattr(recall.subprocess, "run", boom)
+    out = recall.send(cfg, "2026-08", "T0", "a" * 16)
+    assert "journal" in out["error"]

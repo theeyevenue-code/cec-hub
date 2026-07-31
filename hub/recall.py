@@ -122,6 +122,54 @@ def preview(cfg: dict, month: str, touch: str) -> dict:
     return data
 
 
+HASH_RE = re.compile(r"^[0-9a-f]{8,64}$")
+
+
+def send(cfg: dict, month: str, touch: str, batch_hash: str,
+         limit=None) -> dict:
+    """Send the reviewed batch. The agent refuses unless the hash of a FRESH
+    rebuild matches what Mark reviewed, the config gates are on, Twilio is
+    configured, and the batch is under the safety cap. Never raises."""
+    month = str(month or "").strip()
+    touch = str(touch or "").strip().upper()
+    batch_hash = str(batch_hash or "").strip().lower()
+    if not MONTH_RE.match(month) or touch not in TOUCHES:
+        return {"error": "Bad month or reminder."}
+    if not HASH_RE.match(batch_hash):
+        return {"error": "Missing batch fingerprint — refresh the list first."}
+    argv_limit = []
+    if limit is not None:
+        try:
+            argv_limit = ["--limit", str(max(1, int(limit)))]
+        except (TypeError, ValueError):
+            return {"error": "Bad limit."}
+    dpath = agent_dir(cfg)
+    if dpath is None or not (dpath / "recall").is_dir():
+        return not_connected("The recall engine isn't connected on this computer yet.")
+    python = _agent_cfg(cfg).get("python") or sys.executable
+    try:
+        proc = subprocess.run(
+            [python, "-m", "recall.send_batch", "--month", month,
+             "--touch", touch, "--expect-hash", batch_hash, "--json",
+             *argv_limit],
+            cwd=str(dpath), capture_output=True, text=True, timeout=600,
+        )
+    except subprocess.TimeoutExpired:
+        return {"error": "The send took too long — check the journal before "
+                         "trying again (some messages may have gone out)."}
+    except OSError:
+        return not_connected("Couldn't start the recall engine on this computer.")
+    line = ""
+    for candidate in reversed((proc.stdout or "").splitlines()):
+        if candidate.strip():
+            line = candidate.strip()
+            break
+    try:
+        return json.loads(line) if line else {"error": "No answer from the sender."}
+    except ValueError:
+        return {"error": "Couldn't read the sender's answer."}
+
+
 CHASE_RE = re.compile(r"^recall-call-sheet-chase-(\d{8})\.html$")
 
 

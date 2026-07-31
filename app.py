@@ -241,6 +241,24 @@ def recall_deselect():
     return jsonify(result), status
 
 
+@app.route("/api/recall/send", methods=["POST"])
+def recall_send():
+    """Send the reviewed recall batch. Layers of protection: the agent's config
+    gates (off = dry run, nothing sends), the batch-hash check (list changed =
+    refuse), the safety cap, and the crash journal. Who pressed it is logged."""
+    from hub import recall
+    data = request.get_json(silent=True) or {}
+    result = recall.send(_integrations(), data.get("month", ""),
+                         data.get("touch", "T0"), data.get("hash", ""),
+                         data.get("limit"))
+    if result.get("sent"):
+        logger.info(f"RECALL SEND by {_staff_name()}: {data.get('month')}/"
+                    f"{data.get('touch')} -> {result.get('sent')} sent, "
+                    f"{result.get('failed', 0)} failed")
+    status = 400 if result.get("error") else 200
+    return jsonify(result), status
+
+
 @app.route("/recall-chase-sheet")
 def recall_chase_sheet():
     """Serve the newest generated phone chase list (Angie's sheet). PHI —
