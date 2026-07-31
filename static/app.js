@@ -1644,10 +1644,10 @@ function renderRecalls() {
         anything is sent. Un-tick anyone who shouldn't get one.</p>
 
         <div class="card" style="border-left:6px solid #438F73">
-            <h2>✅ Nothing sends from this screen</h2>
-            <p>Sending recall texts is still done deliberately by Mark — it is not
-            automatic and there is no send button here yet. Un-ticking someone here is
-            remembered, so they'll be left out when the batch is eventually sent.</p>
+            <h2>✅ Nothing sends by itself</h2>
+            <p>Texts only go out when Mark presses the send button at the bottom —
+            and that button stays switched off until he turns sending on. Un-ticking
+            someone is remembered, so they'll be left out when the batch is sent.</p>
         </div>
 
         <div class="card">
