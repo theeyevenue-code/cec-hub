@@ -66,13 +66,17 @@ const routes = [
     { re: /^#\/followups$/, fn: renderFollowups },
     { re: /^#\/letters$/, fn: renderLetters },
     { re: /^#\/todo$/, fn: renderTodo },
+    { re: /^#\/panel$/, fn: renderPanel },
     { re: /^#\/credits$/, fn: renderCredits },
     { re: /^#\/stock$/, fn: renderStock },
     { re: /^#\/lenses$/, fn: renderLenses },
+    { re: /^#\/recalls$/, fn: renderRecalls },
 ];
 
 function route() {
     const hash = location.hash || "#/";
+    // panel-mode = the slim companion window; strips the Hub chrome (see CSS)
+    document.body.classList.toggle("panel-mode", hash === "#/panel");
     for (const r of routes) {
         const m = hash.match(r.re);
         if (m) { r.fn(m); window.scrollTo(0, 0); return; }
@@ -157,7 +161,8 @@ async function renderHome() {
         ${homeEdit && (data.hidden || []).length ? `<div class="hidden-bar">
             Hidden: ${(data.hidden || []).map((h) =>
                 `<button class="chip" data-show="${esc(h)}">${esc(h)} — show</button>`).join(" ")}
-        </div>` : ""}`;
+        </div>` : ""}
+        ${sysMapPanel()}`;
 
     document.getElementById("home-edit").addEventListener("click", () => {
         homeEdit = !homeEdit;
@@ -194,6 +199,42 @@ async function renderHome() {
 }
 
 let homeEdit = false;
+
+/* --- System map: what keeps the always-on tools running -------------------- */
+/* A quiet, collapsed reference at the bottom of the home view. Its whole job is
+   to answer the recurring worry: "if I close Claude, do the tools stop?" No —
+   each tool is owned by its own Windows Scheduled Task, not by Claude. */
+function sysMapPanel() {
+    const tools = [
+        { icon: "📝", name: "Referral generator", port: "5678", owner: "CEC Referral Watchdog" },
+        { icon: "👁", name: "SightTrack",          port: "5681", owner: "CEC SightTrack Watchdog" },
+        { icon: "🧭", name: "CEC Hub (this page)",  port: "5680", owner: "CEC Hub Watchdog" },
+    ];
+    const card = (t) => `<div class="sysmap-tool">
+        <span class="sysmap-tool-icon" aria-hidden="true">${t.icon}</span>
+        <span class="sysmap-tool-name">${esc(t.name)}</span>
+        <span class="sysmap-tool-port">port ${esc(t.port)}</span>
+        <span class="sysmap-tool-owner">kept alive by<br><b>${esc(t.owner)}</b></span>
+    </div>`;
+    return `<details class="sysmap">
+        <summary><span class="sysmap-sum-icon">🔧</span> How the tools stay running
+            <span class="sysmap-sum-hint">— why closing Claude is safe</span></summary>
+        <div class="sysmap-body">
+            <div class="sysmap-owner-row">Windows Task Scheduler starts &amp; babysits each tool</div>
+            <div class="sysmap-arrows" aria-hidden="true">▼&nbsp;&nbsp;&nbsp;&nbsp;▼&nbsp;&nbsp;&nbsp;&nbsp;▼</div>
+            <div class="sysmap-tools">${tools.map(card).join("")}</div>
+            <div class="sysmap-safe">✓ Claude is <b>not</b> in this chain. Closing or restarting
+                Claude does <b>not</b> stop these tools — the Scheduled Tasks do.</div>
+            <div class="sysmap-restart">
+                <b>When a tool needs a restart</b> (e.g. after new code): don't launch it from
+                Claude directly — that ties it to Claude and it dies when Claude closes. Instead
+                ask Claude to <i>trigger the watchdog task</i>, or run in PowerShell:
+                <code>Start-ScheduledTask -TaskName 'CEC&nbsp;Referral&nbsp;Watchdog'</code>
+                (swap in the tool's task name from above).
+            </div>
+        </div>
+    </details>`;
+}
 
 /* --- SOP list -------------------------------------------------------------- */
 
@@ -664,7 +705,7 @@ async function renderTodo() {
     const row = (t) => `<li class="todo-row${t.done ? " todo-done" : ""}" data-id="${esc(t.id)}">
         <button class="todo-tick" data-act="toggle" title="${t.done ? "Not done after all" : "Done!"}">
             ${t.done ? "✅" : "⬜"}</button>
-        <span class="todo-text">${esc(t.text)}</span>
+        <span class="todo-text">${esc(t.text)}${dueChip(t)}${repeatChip(t)}</span>
         <span class="todo-meta">${esc(t.by || "")}${t.done ? " · done" : ""}</span>
         <button class="todo-x" data-act="delete" title="Remove">✕</button>
     </li>`;
@@ -673,11 +714,21 @@ async function renderTodo() {
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">To-do list</h1>
         <p class="page-sub">Shared between everyone. Add it here and it can't be forgotten —
-        open items show on the Hub's front page until someone ticks them.</p>
+        open items show on the Hub's front page until someone ticks them. Give it a due date
+        or make it repeat, and it rolls over each day until it's ticked.</p>
         <div class="card">
             <form id="todo-add" class="todo-addbar">
                 <input id="todo-input" type="text" maxlength="200" autocomplete="off"
-                       placeholder="Type a task and press Enter — e.g. Order more contact lens solution">
+                       placeholder="Type a task — e.g. Order more contact lens solution">
+                <label class="todo-opt">Due
+                    <input id="todo-due" type="date"></label>
+                <label class="todo-opt">Repeat
+                    <select id="todo-repeat">
+                        <option value="">No</option>
+                        <option value="daily">Every day</option>
+                        <option value="weekdays">Mon–Fri</option>
+                        <option value="weekly">Weekly</option>
+                    </select></label>
                 <button class="btn" type="submit">Add</button>
             </form>
             <ul class="todo-list">${open.map(row).join("") ||
@@ -692,7 +743,12 @@ async function renderTodo() {
         ev.preventDefault();
         const inp = document.getElementById("todo-input");
         if (!inp.value.trim()) return;
-        try { await postJSON("/api/tasks", { action: "add", text: inp.value }); renderTodo(); }
+        const body = { action: "add", text: inp.value };
+        const due = document.getElementById("todo-due").value;
+        const rep = document.getElementById("todo-repeat").value;
+        if (due) body.due = due;
+        if (rep) body.repeat = { kind: rep };
+        try { await postJSON("/api/tasks", body); renderTodo(); }
         catch (e) { alert(e.message); }
     });
     view.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", async (ev) => {
@@ -703,6 +759,204 @@ async function renderTodo() {
         try { await postJSON("/api/tasks", { action: act, id }); renderTodo(); }
         catch (e) { alert(e.message); }
     }));
+}
+
+/* --- Companion panel (slim corner window: tabbed compact Hub tools) ----------------
+   A small always-in-the-corner window that hosts several Hub tools behind a tiny
+   tab bar (To-do, Credits, …). Each tool renders a compact view into #p-body.
+   All money/clinical numbers come straight from the API — never computed here. */
+
+let panelTab = "todo";
+const PANEL_TABS = [
+    { id: "todo", label: "To-do", fn: panelTodo },
+    { id: "credits", label: "Credits", fn: panelCredits },
+    { id: "check", label: "Check", fn: panelCheck },
+];
+
+async function renderPanel() {
+    view.innerHTML = `<div class="p-wrap">
+        <div class="p-head">
+            <div class="p-tabs">${PANEL_TABS.map((t) =>
+                `<button class="p-tab${t.id === panelTab ? " on" : ""}" data-tab="${t.id}">${esc(t.label)}</button>`).join("")}</div>
+            <select id="panel-staff" class="p-staff" title="Who's using this?">
+                <option value="">— you —</option>
+            </select>
+            <button id="panel-refresh" class="p-refresh" title="Refresh">⟳</button>
+        </div>
+        <div class="p-body" id="p-body"><div class="p-empty">Loading…</div></div>
+    </div>`;
+
+    // shared staff picker (attribution — the topbar one is hidden in panel mode)
+    const staffSel = document.getElementById("panel-staff");
+    try {
+        (((await getJSON("/api/staff")).staff) || []).forEach((name) => {
+            const o = document.createElement("option");
+            o.value = name; o.textContent = name; staffSel.appendChild(o);
+        });
+        staffSel.value = getStaff();
+    } catch (e) { /* optional */ }
+    staffSel.addEventListener("change", () => setStaff(staffSel.value));
+    document.getElementById("panel-refresh").addEventListener("click", renderPanel);
+    view.querySelectorAll(".p-tab").forEach((b) => b.addEventListener("click", () => {
+        panelTab = b.dataset.tab; renderPanel();
+    }));
+
+    const body = document.getElementById("p-body");
+    const tab = PANEL_TABS.find((t) => t.id === panelTab) || PANEL_TABS[0];
+    try { await tab.fn(body); }
+    catch (e) { body.innerHTML = `<p class="p-err">${esc(e.message)}</p>`; }
+}
+
+async function panelTodo(body) {
+    const tasks = (await getJSON("/api/tasks")).tasks || [];
+    const open = tasks.filter((t) => !t.done);
+    const done = tasks.filter((t) => t.done);
+    const row = (t) => `<li class="p-row${t.done ? " p-done" : ""}" data-id="${esc(t.id)}">
+        <button class="p-tick" data-act="toggle" aria-label="${t.done ? "undo" : "done"}">${t.done ? "✅" : "⬜"}</button>
+        <span class="p-text">${esc(t.text)}${dueChip(t)}${repeatChip(t)}</span>
+        <button class="p-x" data-act="delete" aria-label="remove">✕</button>
+    </li>`;
+    body.innerHTML = `
+        <form id="panel-add" class="p-add">
+            <input id="panel-input" type="text" maxlength="200" autocomplete="off" placeholder="Add a task…">
+            <div class="p-add-opts">
+                <input id="panel-due" type="date" title="Due date">
+                <select id="panel-repeat" title="Repeat">
+                    <option value="">once</option><option value="daily">daily</option>
+                    <option value="weekdays">Mon–Fri</option><option value="weekly">weekly</option>
+                </select>
+                <button class="btn p-add-btn" type="submit">Add</button>
+            </div>
+        </form>
+        <ul class="p-list">${open.map(row).join("") || `<li class="p-empty">Nothing to do 🎉</li>`}</ul>
+        ${done.length ? `<details class="p-done-wrap"><summary>Done (${done.length})</summary>
+            <ul class="p-list">${done.slice(0, 15).map(row).join("")}</ul></details>` : ""}`;
+
+    document.getElementById("panel-add").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const inp = document.getElementById("panel-input");
+        if (!inp.value.trim()) return;
+        const payload = { action: "add", text: inp.value };
+        const due = document.getElementById("panel-due").value;
+        const rep = document.getElementById("panel-repeat").value;
+        if (due) payload.due = due;
+        if (rep) payload.repeat = { kind: rep };
+        try { await postJSON("/api/tasks", payload); renderPanel(); } catch (e) { alert(e.message); }
+    });
+    body.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        const id = ev.target.closest(".p-row").dataset.id;
+        const act = ev.target.dataset.act;
+        if (act === "delete" && !confirm("Remove this task?")) return;
+        try { await postJSON("/api/tasks", { action: act, id }); renderPanel(); } catch (e) { alert(e.message); }
+    }));
+}
+
+async function panelCredits(body) {
+    const data = await getJSON("/api/credits");
+    const creds = data.credits || [];
+    const sup = data.suppliers || {};
+    const active = creds.filter((c) => c.status !== "done");
+    const money = (n) => `$${Number(n).toFixed(2)}`;
+    const outstanding = active.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+    const overdue = active.filter((c) => c.overdue).length;
+
+    // status/age straight from the API (nightly watcher sets arrived/possible)
+    const statusChip = (c) => {
+        if (c.status === "arrived") return `<span class="p-chip p-chip-ok">✓ arrived — check statement, then tick</span>`;
+        if (c.status === "possible") return `<span class="p-chip p-chip-warn">possible — check</span>`;
+        if (c.overdue) return `<span class="p-chip p-chip-crit">⚠ chase — ${c.days_open}d</span>`;
+        if (typeof c.days_open === "number") return `<span class="p-chip">waiting ${c.days_open}d</span>`;
+        return "";
+    };
+    const row = (c) => `<li class="p-row" data-id="${esc(c.id)}">
+        <button class="p-tick" data-act="done" title="On our statement — tick off">⬜</button>
+        <span class="p-text"><strong>${esc(sup[c.supplier] || c.supplier)}</strong> — ${esc(c.text)}
+            ${Number(c.amount) ? `<span class="p-chip p-chip-amt">${money(c.amount)}</span>` : ""}
+            ${statusChip(c)}</span>
+        <button class="p-x" data-act="delete" aria-label="remove">✕</button>
+    </li>`;
+    body.innerHTML = `
+        <div class="p-owed"><strong>${money(outstanding)}</strong> owed · ${active.length} credit${active.length === 1 ? "" : "s"}${overdue ? ` · <span class="p-owed-chase">${overdue} to chase</span>` : ""}</div>
+        <form id="credit-add" class="p-add">
+            <input id="credit-input" type="text" maxlength="200" autocomplete="off" placeholder="Who / what — e.g. Mr Smith, scratched lens back">
+            <div class="p-add-opts">
+                <select id="credit-sup">${Object.entries(sup).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("")}</select>
+                <input id="credit-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="$" style="max-width:5.5em">
+                <button class="btn p-add-btn" type="submit">Watch</button>
+            </div>
+        </form>
+        <ul class="p-list">${active.map(row).join("") || `<li class="p-empty">No credits outstanding 🎉</li>`}</ul>`;
+
+    document.getElementById("credit-add").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const txt = document.getElementById("credit-input").value.trim();
+        if (!txt) return;
+        const payload = { action: "add", supplier: document.getElementById("credit-sup").value,
+                          text: txt, amount: document.getElementById("credit-amount").value };
+        try { await postJSON("/api/credits", payload); renderPanel(); } catch (e) { alert(e.message); }
+    });
+    body.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        const id = ev.target.closest(".p-row").dataset.id;
+        const act = ev.target.dataset.act;
+        if (act === "delete" && !confirm("Remove this credit?")) return;
+        try { await postJSON("/api/credits", { action: act, id }); renderPanel(); } catch (e) { alert(e.message); }
+    }));
+}
+
+// Order checker: scan/type an order number -> the speccheck engine's verdict.
+// The Hub only proxies; the numbers come from the engine (see hub/ordercheck.py).
+const OC_CHECK_LABEL = { expiry: "Rx expiry", script: "Script match", type: "Lens type" };
+const OC_VCLASS = { GREEN: "oc-ok", ISSUE: "oc-crit", UNVERIFIED: "oc-warn" };
+const OC_MARK = { GREEN: "✓", ISSUE: "✕", UNVERIFIED: "?" };
+
+function ocRender(data) {
+    if (!data.connected) return `<div class="oc-msg">${esc(data.message || "Not connected.")}</div>`;
+    if (data.error) return `<div class="oc-msg oc-msg-warn">${esc(data.error)}</div>`;
+    const r = data.result;
+    if (!r) return `<div class="oc-msg">No result.</div>`;
+    const lines = Object.entries(r.checks || {}).map(([k, c]) => `
+        <div class="oc-line">
+            <span class="oc-k">${esc(OC_CHECK_LABEL[k] || k)}</span>
+            <span class="oc-badge ${OC_VCLASS[c.status] || ""}">${esc(c.status)}${c.shadow ? " · shadow" : ""}</span>
+            ${c.reason ? `<div class="oc-reason">${esc(c.reason)}</div>` : ""}
+        </div>`).join("");
+    return `<div class="oc-card ${OC_VCLASS[r.verdict] || ""}">
+        <div class="oc-verdict">${OC_MARK[r.verdict] || ""} ${esc(r.verdict)} <span class="oc-order">· order ${esc(r.order)}</span></div>
+        ${lines}
+    </div>`;
+}
+
+async function panelCheck(body) {
+    body.innerHTML = `
+        <form id="oc-form" class="p-add">
+            <input id="oc-order" type="text" inputmode="numeric" autocomplete="off"
+                   placeholder="Scan or type an order number…">
+            <div class="p-add-opts">
+                <button class="btn p-add-btn" type="submit" style="flex:1">Check order</button>
+            </div>
+        </form>
+        <div id="oc-result" class="oc-result">
+            <div class="oc-hint">Scan an order barcode or type the number, then Check.</div>
+        </div>`;
+    const input = document.getElementById("oc-order");
+    const out = document.getElementById("oc-result");
+    input.focus();
+
+    document.getElementById("oc-form").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const order = input.value.trim();
+        if (!order) return;
+        out.innerHTML = `<div class="oc-hint">Checking order ${esc(order)}…</div>`;
+        try {
+            const data = await getJSON(`/api/order-check?order=${encodeURIComponent(order)}`);
+            out.innerHTML = ocRender(data);
+        } catch (e) {
+            out.innerHTML = `<div class="oc-msg oc-msg-warn">${esc(e.message)}</div>`;
+        }
+        input.select();   // ready for the next scan
+    });
 }
 
 /* --- Credits watch-list ------------------------------------------------------------ */
@@ -901,6 +1155,32 @@ async function renderStock() {
 function fmtPower(v) { return (v >= 0 ? "+" : "") + Number(v).toFixed(2); }
 function fmtMoney(v) { return "$" + Number(v).toFixed(2); }
 function fmtMM(v) { return parseFloat(v) + "mm"; }
+function fmtDue(iso) {
+    // "today" / "tomorrow" / "yesterday", else "Fri 1 Aug". iso = YYYY-MM-DD.
+    const parts = String(iso).split("-").map(Number);
+    if (parts.length !== 3) return iso;
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    const now = new Date();
+    const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days = Math.round((d - t0) / 86400000);
+    if (days === 0) return "today";
+    if (days === 1) return "tomorrow";
+    if (days === -1) return "yesterday";
+    return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
+
+const REPEAT_LABEL = { daily: "every day", weekdays: "Mon–Fri",
+                       weekly: "weekly", every: "repeats" };
+function dueChip(t) {
+    if (!t.due) return "";
+    const cls = t.overdue ? "todo-due todo-overdue" : "todo-due";
+    const label = t.overdue ? "overdue " + fmtDue(t.due) : "due " + fmtDue(t.due);
+    return `<span class="${cls}">${esc(label)}</span>`;
+}
+function repeatChip(t) {
+    return t.repeat
+        ? `<span class="todo-repeat">🔁 ${esc(REPEAT_LABEL[t.repeat.kind] || "repeats")}</span>` : "";
+}
 
 function lensRowHTML(l, extraCellHTML) {
     const warnings = (l.warnings || []).map((w) =>
@@ -1328,6 +1608,251 @@ async function renderLenses() {
         });
     }
     [aEl, dblEl, pdEl].forEach((el) => el.addEventListener("input", suggest));
+}
+
+/* --- Recalls (v1: look only — nothing can be sent from here) ----------------------- */
+
+// T-4 goes out about a month BEFORE the due month, T+6 about six weeks after,
+// so Mark routinely wants next month's or last month's cohort, not just this one.
+const RECALL_TOUCHES = [
+    { code: "T-4", label: "First reminder — about a month before they're due" },
+    { code: "T0", label: "Due now" },
+    { code: "T+6", label: "Overdue nudge — about six weeks after they were due" },
+];
+
+function recallMonthOptions(selected) {
+    const now = new Date();
+    const opts = [];
+    for (let d = -2; d <= 2; d++) {
+        const dt = new Date(now.getFullYear(), now.getMonth() + d, 1);
+        const val = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+        const name = dt.toLocaleString("en-AU", { month: "long", year: "numeric" });
+        const tag = d === 0 ? " (this month)" : (d === -1 ? " (last month)"
+            : (d === 1 ? " (next month)" : ""));
+        opts.push(`<option value="${val}"${val === selected ? " selected" : ""}>${esc(name)}${tag}</option>`);
+    }
+    return opts.join("");
+}
+
+function renderRecalls() {
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    view.innerHTML = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Recalls</h1>
+        <p class="page-sub">Everyone who would get a recall text, shown in full before
+        anything is sent. Un-tick anyone who shouldn't get one.</p>
+
+        <div class="card" style="border-left:6px solid #438F73">
+            <h2>✅ Nothing sends by itself</h2>
+            <p>Texts only go out when Mark presses the send button at the bottom —
+            and that button stays switched off until he turns sending on. Un-ticking
+            someone is remembered, so they'll be left out when the batch is sent.</p>
+        </div>
+
+        <div class="card">
+            <div class="lens-form" style="gap:10px;flex-wrap:wrap">
+                <label>Due month
+                    <select id="rc-month">${recallMonthOptions(thisMonth)}</select>
+                </label>
+                <label>Which reminder
+                    <select id="rc-touch">
+                        ${RECALL_TOUCHES.map((t) => `<option value="${t.code}"${t.code === "T0" ? " selected" : ""}>${esc(t.code)} — ${esc(t.label)}</option>`).join("")}
+                    </select>
+                </label>
+            </div>
+            <div id="rc-out" style="margin-top:12px">
+                <div class="loading-panel">Working out who is due…</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>☎️ Phone recall list</h2>
+            <p>The people who were texted but still haven't booked — most overdue
+            first, grouped by family, with a box to tick off each call.</p>
+            <p>
+                <a class="btn" href="/recall-chase-sheet" target="_blank">Open the phone list</a>
+                <button class="btn btn-quiet" id="rc-chase-refresh">Make a fresh list</button>
+                <span id="rc-chase-note" style="color:#55636b;font-size:13px"></span>
+            </p>
+        </div>`;
+
+    const out = document.getElementById("rc-out");
+    const load = () => loadRecallBatch(out);
+    document.getElementById("rc-month").addEventListener("change", load);
+    document.getElementById("rc-touch").addEventListener("change", load);
+    load();   // full list from the start — no extra click
+
+    const chaseBtn = document.getElementById("rc-chase-refresh");
+    const chaseNote = document.getElementById("rc-chase-note");
+    chaseBtn.addEventListener("click", async () => {
+        chaseBtn.disabled = true;
+        chaseNote.textContent = "Making the list — takes about a minute…";
+        try {
+            const r = await postJSON("/api/recall/chasesheet", {});
+            chaseNote.textContent = r.patients !== undefined
+                ? `Done — ${r.patients} people to call.`
+                : "Done.";
+            window.open("/recall-chase-sheet", "_blank");
+        } catch (e) {
+            chaseNote.textContent = e.message;
+        }
+        chaseBtn.disabled = false;
+    });
+}
+
+async function loadRecallBatch(out, quiet = false) {
+    const month = document.getElementById("rc-month").value;
+    const touch = document.getElementById("rc-touch").value;
+    if (!quiet) {
+        out.innerHTML = `<div class="loading-panel">Working out who is due…
+            <br><span style="font-size:12px;color:#55636b">First look of the day takes
+            up to a minute; after that it's quick.</span></div>`;
+    }
+    let d;
+    try {
+        d = await postJSON("/api/recall/preview", { month, touch });
+    } catch (e) {
+        out.innerHTML = errorPanel(e.message);
+        return;
+    }
+    if (d.connected === false) {
+        out.innerHTML = `<div class="empty-panel">${esc(d.message)}</div>`;
+        return;
+    }
+    if (d.error) {
+        out.innerHTML = `<div class="empty-panel">${esc(d.error)}</div>`;
+        return;
+    }
+
+    const rows = d.rows || [];
+    const seg = Object.entries(d.by_segment || {})
+        .map(([k, v]) => `${esc(k)}: ${v}`).join(" · ") || "—";
+    const sample = rows.find((r) => !r.household && !r.deselected);
+    const hhSample = rows.find((r) => r.household && !r.deselected);
+
+    const fmtD = (iso) => {
+        const [y, m, dd] = iso.split("-");
+        return `${Number(dd)}/${Number(m)}/${y.slice(2)}`;
+    };
+    // Hover any row to read that person's exact message.
+    const tableRows = rows.map((r) => `
+        <tr data-pid="${r.pid}" class="${r.deselected ? "rc-off" : ""}"
+            title="${esc(r.message)}">
+            <td><input type="checkbox" class="rc-tick" data-pid="${r.pid}"
+                 ${r.deselected ? "" : "checked"}></td>
+            <td><strong>${esc(r.name)}</strong></td>
+            <td>${esc(r.mobile)}</td>
+            <td>${fmtD(r.last_exam)}</td>
+            <td>${fmtD(r.due)}</td>
+            <td>${esc(r.optom || "")}</td>
+            <td>${r.household ? `👨‍👩‍👧 one text for ${r.household_size}` : ""}</td>
+        </tr>`).join("");
+
+    const freshness = d.data_age_seconds > 90
+        ? ` · numbers from ${Math.round(d.data_age_seconds / 60)} min ago`
+        : " · numbers are current";
+
+    out.innerHTML = `
+        <h2>${d.to_send} ${d.to_send === 1 ? "person" : "people"} · ${d.messages_to_send}
+            text message${d.messages_to_send === 1 ? "" : "s"}</h2>
+        <div class="updated-line">${esc(d.month_label)} · reminder ${esc(d.touch)} · ${seg}${freshness}</div>
+        <p style="color:#55636b;font-size:13px;margin:4px 0 0">Hover a row to read that
+        person's exact text. Un-tick anyone who shouldn't get one — it saves itself.</p>
+        <p style="color:#55636b;font-size:13px">
+            ${d.due_in_month} due that month. Left out automatically:
+            ${d.skipped_no_mobile} no mobile ·
+            ${d.skipped_opted_out} asked for no recalls ·
+            ${d.skipped_already_sent} already texted this round
+            ${d.deselected ? ` · <strong>${d.deselected} un-ticked by you</strong>` : ""}</p>
+        ${sample ? `<p style="margin:6px 0 2px"><strong>The message:</strong></p>
+            <p style="font-family:Consolas,monospace;font-size:13px;background:#f6f8f9;
+               padding:8px 10px;border:1px solid #dde5e9">${esc(sample.message)}</p>` : ""}
+        ${hhSample ? `<p style="margin:6px 0 2px"><strong>Families sharing a mobile get one
+            combined text instead:</strong></p>
+            <p style="font-family:Consolas,monospace;font-size:13px;background:#f6f8f9;
+               padding:8px 10px;border:1px solid #dde5e9">${esc(hhSample.message)}</p>` : ""}
+        <table class="lens-table" style="margin-top:10px">
+            <thead><tr><th>Send?</th><th>Patient</th><th>Mobile</th><th>Last exam</th>
+            <th>Due</th><th>Optometrist</th><th></th></tr></thead>
+            <tbody>${tableRows}</tbody>
+        </table>
+        <p style="margin-top:8px">
+            <a class="btn btn-quiet" target="_blank"
+               href="/recall-preview/${encodeURIComponent(d.month)}/${encodeURIComponent(d.touch)}">
+               Print-friendly copy</a></p>
+        ${renderRecallSendArea(d)}`;
+
+    wireRecallSendButton(out, d, month, touch);
+
+    // Un-tick = saved immediately, then the counts refresh in place (the row
+    // greys out straight away so it never feels stuck).
+    out.querySelectorAll(".rc-tick").forEach((box) => {
+        box.addEventListener("change", async () => {
+            box.closest("tr").classList.toggle("rc-off", !box.checked);
+            out.querySelectorAll(".rc-tick").forEach((b) => { b.disabled = true; });
+            const unticked = [...out.querySelectorAll(".rc-tick")]
+                .filter((b) => !b.checked).map((b) => Number(b.dataset.pid));
+            try {
+                await postJSON("/api/recall/deselect", { month, touch, pids: unticked });
+            } catch (e) {
+                out.insertAdjacentHTML("afterbegin", errorPanel(e.message));
+            }
+            loadRecallBatch(out, true);   // quiet refresh — table stays visible
+        });
+    });
+}
+
+function renderRecallSendArea(d) {
+    const n = d.messages_to_send;
+    if (!d.live_enabled) {
+        return `
+        <div style="margin-top:14px;padding:12px;border:2px solid #c9d2d8;border-radius:8px">
+            <button class="btn" disabled>Send these ${n} text messages</button>
+            <span style="font-size:13px;color:#55636b;margin-left:8px">
+                Sending is <strong>switched off</strong>. It stays off until Mark
+                turns it on (two settings in the recall engine).</span>
+        </div>`;
+    }
+    const label = d.pilot_next
+        ? `Send a test run first (up to 25 of the ${n} messages)`
+        : `Send these ${n} text messages now`;
+    const hint = d.pilot_next
+        ? "First live send is a small test — check they arrive, then press again for the rest."
+        : "Sends the exact list above, minus anyone un-ticked.";
+    return `
+        <div style="margin-top:14px;padding:12px;border:2px solid #b3261e;border-radius:8px">
+            <button class="btn" id="rc-send"
+                style="background:#b3261e;border-color:#b3261e">${label}</button>
+            <span id="rc-send-note" style="font-size:13px;color:#55636b;margin-left:8px">
+                ${hint}</span>
+        </div>`;
+}
+
+function wireRecallSendButton(out, d, month, touch) {
+    const sendBtn = document.getElementById("rc-send");
+    if (!sendBtn) return;   // sending switched off — nothing to wire
+    const note = document.getElementById("rc-send-note");
+    sendBtn.addEventListener("click", async () => {
+        const what = d.pilot_next
+            ? `Send a TEST RUN now (up to 25 real text messages)?`
+            : `Send ${d.messages_to_send} text messages now?`;
+        if (!window.confirm(`${what} This cannot be undone.`)) return;
+        sendBtn.disabled = true;
+        note.textContent = "Sending…";
+        try {
+            const r = await postJSON("/api/recall/send",
+                { month, touch, hash: d.batch_hash });
+            note.textContent = r.error ? r.error
+                : `Done: ${r.sent} sent, ${r.failed || 0} failed`
+                  + (r.held_uncertain ? `, ${r.held_uncertain} held for checking` : "")
+                  + `.` + (r.note ? ` ${r.note}` : "");
+            window.alert(note.textContent);
+        } catch (e) {
+            note.textContent = e.message;
+        }
+        loadRecallBatch(out, true);
+    });
 }
 
 /* --- Go ---------------------------------------------------------------------------- */

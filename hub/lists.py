@@ -14,7 +14,7 @@ who-is-this picker) and when, so the lists are self-explanatory.
 import json
 import re
 import time
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 HUB_DATA = Path(__file__).resolve().parent.parent / "data"
@@ -74,45 +74,207 @@ def apply_layout(tiles: list) -> list:
     return sorted(keep, key=lambda t: (pos.get(t.get("id"), 999),))
 
 
-# --- to-do list ---------------------------------------------------------------
+# --- to-do list (smart: due dates + recurrence + roll-forward) -----------------
+#
+# Storage stays a small JSON file (`data\tasks.json`, gitignored) with two lists:
+#   "tasks"  -> individual to-do items (one-offs AND generated recurrence
+#               occurrences). Record: {id,text,by,added,done,done_by,done_date,
+#               due(ISO|null), series_id(str|null)}.
+#   "series" -> the recurrence RULES (templates), kept separate from occurrences
+#               as the Codex review asked. Record: {id,text,by,repeat,next_due,
+#               active,added}.
+#
+# Recurrence model: ONE open occurrence per series at a time ("one rolling
+# obligation"), so a daily task missed for a week is a single overdue item, not
+# seven. When an occurrence is ticked, the series' next_due jumps to the next
+# scheduled date in the FUTURE; the next occurrence is generated lazily on read.
+# Dates are practice-local (the Hub runs on the Sydney practice PC).
+
+REPEAT_KINDS = {"daily", "weekdays", "weekly", "every"}
+
 
 def tasks_path() -> Path:
     return HUB_DATA / "tasks.json"
 
 
+def _parse_due(value):
+    """Accept an ISO 'YYYY-MM-DD' due date, else None."""
+    s = str(value or "").strip()[:10]
+    if not s:
+        return None
+    try:
+        return date.fromisoformat(s).isoformat()
+    except ValueError:
+        return None
+
+
+def _repeat_from_payload(value):
+    """Validate a repeat rule dict, else None (a one-off task)."""
+    if not isinstance(value, dict):
+        return None
+    kind = str(value.get("kind") or "").strip().lower()
+    if kind not in REPEAT_KINDS:
+        return None
+    rule = {"kind": kind}
+    if kind == "every":
+        try:
+            n = int(value.get("n"))
+        except (TypeError, ValueError):
+            return None
+        if not 1 <= n <= 365:
+            return None
+        rule["n"] = n
+    return rule
+
+
+def _advance(repeat: dict, after: date) -> date:
+    """The next scheduled date STRICTLY AFTER `after` for this rule."""
+    kind = repeat.get("kind")
+    if kind == "daily":
+        return after + timedelta(days=1)
+    if kind == "every":
+        return after + timedelta(days=int(repeat.get("n") or 1))
+    if kind == "weekly":
+        return after + timedelta(days=7)
+    if kind == "weekdays":
+        nxt = after + timedelta(days=1)
+        while nxt.weekday() >= 5:            # Sat=5, Sun=6
+            nxt += timedelta(days=1)
+        return nxt
+    return after + timedelta(days=1)
+
+
+def _occurrence_id(series_id: str, due: str) -> str:
+    return f"{series_id}#{due}"
+
+
+def _materialize(items: list, series: list, today: date) -> bool:
+    """Ensure each active series has its one current open occurrence once its
+    next_due has arrived. Idempotent (keyed by series#due). Returns True if it
+    changed anything."""
+    changed = False
+    open_by_series = {t.get("series_id") for t in items
+                      if t.get("series_id") and not t.get("done")}
+    have_ids = {t.get("id") for t in items}
+    for s in series:
+        if not s.get("active"):
+            continue
+        sid, due = s.get("id"), s.get("next_due")
+        if not sid or not due or sid in open_by_series:
+            continue
+        try:
+            due_d = date.fromisoformat(due)
+        except (TypeError, ValueError):
+            continue
+        if due_d > today:                    # not due yet — generate later
+            continue
+        oid = _occurrence_id(sid, due)
+        if oid in have_ids:                  # already generated (belt & braces)
+            continue
+        items.insert(0, {"id": oid, "text": s.get("text"), "by": s.get("by"),
+                         "added": today.isoformat(), "done": False,
+                         "due": due, "series_id": sid})
+        changed = True
+    return changed
+
+
+def _annotate_task(t: dict, today: date) -> dict:
+    """Add a derived `overdue` flag for the UI (does not touch storage)."""
+    out = dict(t)
+    due = t.get("due")
+    out["overdue"] = bool(due and not t.get("done") and due < today.isoformat())
+    return out
+
+
 def tasks_list() -> list:
-    # open tasks first, newest first inside each group
+    today = date.today()
     items = _load(tasks_path(), "tasks")
-    return sorted(items, key=lambda t: (bool(t.get("done")), str(t.get("added", ""))),
-                  reverse=False) if items else []
+    series = _load(tasks_path(), "series")
+    if _materialize(items, series, today):
+        _save_tasks(items, series)
+    # open first; within open, soonest due first (overdue floats up), then newest
+    def key(t):
+        done = bool(t.get("done"))
+        due = t.get("due") or "9999-99-99"
+        return (done, due, _neg_added(t))
+    ordered = sorted(items, key=key)
+    series_by_id = {s.get("id"): s for s in series}
+
+    def shape(t):
+        out = _annotate_task(t, today)
+        s = series_by_id.get(t.get("series_id"))
+        if s:
+            out["repeat"] = s.get("repeat")     # let the UI show a 🔁 label
+        return out
+    return [shape(t) for t in ordered]
+
+
+def _neg_added(t: dict):
+    # newest-first tiebreak within the same due bucket
+    return tuple(-c for c in bytes(str(t.get("added", "")), "utf-8"))
+
+
+def _save_tasks(items: list, series: list) -> None:
+    tasks_path().parent.mkdir(parents=True, exist_ok=True)
+    tasks_path().write_text(
+        json.dumps({"tasks": items, "series": series}, indent=1, ensure_ascii=False),
+        encoding="utf-8")
 
 
 def tasks_mutate(action: str, payload: dict, who: str):
     items = _load(tasks_path(), "tasks")
+    series = _load(tasks_path(), "series")
+    today = date.today()
+
     if action == "add":
         text = str(payload.get("text") or "").strip()[:200]
         if not text:
             return False, "Nothing to add — type the task first."
-        items.insert(0, {"id": _new_id("t"), "text": text, "by": who,
-                         "added": date.today().isoformat(), "done": False})
+        due = _parse_due(payload.get("due"))
+        repeat = _repeat_from_payload(payload.get("repeat"))
+        if repeat:
+            sid = _new_id("s")
+            series.insert(0, {"id": sid, "text": text, "by": who,
+                              "repeat": repeat, "next_due": due or today.isoformat(),
+                              "active": True, "added": today.isoformat()})
+            _materialize(items, series, today)   # create the first occurrence now
+        else:
+            items.insert(0, {"id": _new_id("t"), "text": text, "by": who,
+                             "added": today.isoformat(), "done": False,
+                             "due": due, "series_id": None})
     else:
         t = next((x for x in items if x.get("id") == payload.get("id")), None)
         if t is None:
             return False, "That task isn't there any more — refresh the page."
+        sid = t.get("series_id")
+        s = next((x for x in series if x.get("id") == sid), None) if sid else None
         if action == "toggle":
             t["done"] = not t.get("done")
             t["done_by"] = who if t["done"] else None
-            t["done_date"] = date.today().isoformat() if t["done"] else None
+            t["done_date"] = today.isoformat() if t["done"] else None
+            if s:
+                if t["done"]:
+                    base = t.get("due") or today.isoformat()
+                    anchor = max(date.fromisoformat(base), today)
+                    s["next_due"] = _advance(s["repeat"], anchor).isoformat()
+                else:                              # un-tick: make it current again
+                    s["next_due"] = t.get("due") or s.get("next_due")
         elif action == "edit":
             text = str(payload.get("text") or "").strip()[:200]
             if not text:
                 return False, "The task text can't be empty."
             t["text"] = text
+            if "due" in payload:
+                t["due"] = _parse_due(payload.get("due"))
+            if s:
+                s["text"] = text
         elif action == "delete":
             items = [x for x in items if x.get("id") != payload.get("id")]
+            if s:                                  # stop a series regenerating
+                s["active"] = False
         else:
             return False, "Unknown action."
-    _save(tasks_path(), "tasks", items)
+    _save_tasks(items, series)
     return True, ""
 
 
