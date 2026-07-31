@@ -1664,6 +1664,17 @@ function renderRecalls() {
             <div id="rc-out" style="margin-top:12px">
                 <div class="loading-panel">Working out who is due…</div>
             </div>
+        </div>
+
+        <div class="card">
+            <h2>☎️ Angie's phone list</h2>
+            <p>The people who were texted but still haven't booked — most overdue
+            first, grouped by family, with a box to tick as she calls.</p>
+            <p>
+                <a class="btn" href="/recall-chase-sheet" target="_blank">Open the phone list</a>
+                <button class="btn btn-quiet" id="rc-chase-refresh">Make a fresh list</button>
+                <span id="rc-chase-note" style="color:#55636b;font-size:13px"></span>
+            </p>
         </div>`;
 
     const out = document.getElementById("rc-out");
@@ -1671,12 +1682,33 @@ function renderRecalls() {
     document.getElementById("rc-month").addEventListener("change", load);
     document.getElementById("rc-touch").addEventListener("change", load);
     load();   // full list from the start — no extra click
+
+    const chaseBtn = document.getElementById("rc-chase-refresh");
+    const chaseNote = document.getElementById("rc-chase-note");
+    chaseBtn.addEventListener("click", async () => {
+        chaseBtn.disabled = true;
+        chaseNote.textContent = "Making the list — takes about a minute…";
+        try {
+            const r = await postJSON("/api/recall/chasesheet", {});
+            chaseNote.textContent = r.patients !== undefined
+                ? `Done — ${r.patients} people to call.`
+                : "Done.";
+            window.open("/recall-chase-sheet", "_blank");
+        } catch (e) {
+            chaseNote.textContent = e.message;
+        }
+        chaseBtn.disabled = false;
+    });
 }
 
-async function loadRecallBatch(out) {
+async function loadRecallBatch(out, quiet = false) {
     const month = document.getElementById("rc-month").value;
     const touch = document.getElementById("rc-touch").value;
-    out.innerHTML = `<div class="loading-panel">Working out who is due…</div>`;
+    if (!quiet) {
+        out.innerHTML = `<div class="loading-panel">Working out who is due…
+            <br><span style="font-size:12px;color:#55636b">First look of the day takes
+            up to a minute; after that it's quick.</span></div>`;
+    }
     let d;
     try {
         d = await postJSON("/api/recall/preview", { month, touch });
@@ -1703,8 +1735,10 @@ async function loadRecallBatch(out) {
         const [y, m, dd] = iso.split("-");
         return `${Number(dd)}/${Number(m)}/${y.slice(2)}`;
     };
+    // Hover any row to read that person's exact message.
     const tableRows = rows.map((r) => `
-        <tr data-pid="${r.pid}" class="${r.deselected ? "rc-off" : ""}">
+        <tr data-pid="${r.pid}" class="${r.deselected ? "rc-off" : ""}"
+            title="${esc(r.message)}">
             <td><input type="checkbox" class="rc-tick" data-pid="${r.pid}"
                  ${r.deselected ? "" : "checked"}></td>
             <td><strong>${esc(r.name)}</strong></td>
@@ -1715,10 +1749,16 @@ async function loadRecallBatch(out) {
             <td>${r.household ? `👨‍👩‍👧 one text for ${r.household_size}` : ""}</td>
         </tr>`).join("");
 
+    const freshness = d.data_age_seconds > 90
+        ? ` · numbers from ${Math.round(d.data_age_seconds / 60)} min ago`
+        : " · numbers are current";
+
     out.innerHTML = `
         <h2>${d.to_send} ${d.to_send === 1 ? "person" : "people"} · ${d.messages_to_send}
             text message${d.messages_to_send === 1 ? "" : "s"}</h2>
-        <div class="updated-line">${esc(d.month_label)} · reminder ${esc(d.touch)} · ${seg}</div>
+        <div class="updated-line">${esc(d.month_label)} · reminder ${esc(d.touch)} · ${seg}${freshness}</div>
+        <p style="color:#55636b;font-size:13px;margin:4px 0 0">Hover a row to read that
+        person's exact text. Un-tick anyone who shouldn't get one — it saves itself.</p>
         <p style="color:#55636b;font-size:13px">
             ${d.due_in_month} due that month. Left out automatically:
             ${d.skipped_no_mobile} no mobile ·
@@ -1742,18 +1782,20 @@ async function loadRecallBatch(out) {
                href="/recall-preview/${encodeURIComponent(d.month)}/${encodeURIComponent(d.touch)}">
                Print-friendly copy</a></p>`;
 
-    // Un-tick = saved immediately; the batch recounts (household texts shrink too).
+    // Un-tick = saved immediately, then the counts refresh in place (the row
+    // greys out straight away so it never feels stuck).
     out.querySelectorAll(".rc-tick").forEach((box) => {
         box.addEventListener("change", async () => {
+            box.closest("tr").classList.toggle("rc-off", !box.checked);
+            out.querySelectorAll(".rc-tick").forEach((b) => { b.disabled = true; });
             const unticked = [...out.querySelectorAll(".rc-tick")]
                 .filter((b) => !b.checked).map((b) => Number(b.dataset.pid));
             try {
                 await postJSON("/api/recall/deselect", { month, touch, pids: unticked });
             } catch (e) {
                 out.insertAdjacentHTML("afterbegin", errorPanel(e.message));
-                return;
             }
-            loadRecallBatch(out);
+            loadRecallBatch(out, true);   // quiet refresh — table stays visible
         });
     });
 }

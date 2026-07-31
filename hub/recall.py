@@ -88,9 +88,11 @@ def preview(cfg: dict, month: str, touch: str) -> dict:
 
     python = _agent_cfg(cfg).get("python") or sys.executable
     try:
+        # --max-age 600: reuse the agent's 10-minute Optomate snapshot, so
+        # un-ticking someone doesn't cost a fresh ~40s pull every time.
         proc = subprocess.run(
             [python, "-m", "recall.preview", "--month", month,
-             "--touch", touch, "--json"],
+             "--touch", touch, "--json", "--max-age", "600"],
             cwd=str(dpath), capture_output=True, text=True, timeout=TIMEOUT_S,
         )
     except subprocess.TimeoutExpired:
@@ -118,6 +120,52 @@ def preview(cfg: dict, month: str, touch: str) -> dict:
 
     data["connected"] = True
     return data
+
+
+CHASE_RE = re.compile(r"^recall-call-sheet-chase-(\d{8})\.html$")
+
+
+def latest_chase_sheet(cfg: dict) -> Path | None:
+    """Newest generated chase sheet (Angie's phone list), or None. Filenames
+    are matched against a strict pattern — nothing else is ever served."""
+    dpath = agent_dir(cfg)
+    if dpath is None:
+        return None
+    reports = dpath / "local-reports"
+    if not reports.is_dir():
+        return None
+    candidates = [p for p in reports.iterdir() if CHASE_RE.match(p.name)]
+    return max(candidates, key=lambda p: p.name) if candidates else None
+
+
+def refresh_chase_sheet(cfg: dict) -> dict:
+    """Regenerate Angie's phone list (runs the agent's read-only call_sheet).
+    Returns the headline counts. Never raises."""
+    dpath = agent_dir(cfg)
+    if dpath is None or not (dpath / "recall").is_dir():
+        return not_connected("The recall engine isn't connected on this computer yet.")
+    python = _agent_cfg(cfg).get("python") or sys.executable
+    try:
+        proc = subprocess.run(
+            [python, "-m", "recall.call_sheet"],
+            cwd=str(dpath), capture_output=True, text=True, timeout=TIMEOUT_S + 60,
+        )
+    except subprocess.TimeoutExpired:
+        return {"connected": True,
+                "error": "That took too long — is Optomate running on the server?"}
+    except OSError:
+        return not_connected("Couldn't start the recall engine on this computer.")
+    m = re.search(r"patients to call:\s*(\d+)\s+households:\s*(\d+)",
+                  proc.stdout or "")
+    sheet = latest_chase_sheet(cfg)
+    if sheet is None:
+        return {"connected": True,
+                "error": "The list didn't generate — tell Mark."}
+    out = {"connected": True, "ok": True, "stamp": CHASE_RE.match(sheet.name).group(1)}
+    if m:
+        out["patients"] = int(m.group(1))
+        out["households"] = int(m.group(2))
+    return out
 
 
 def set_deselected(cfg: dict, month: str, touch: str, pids) -> dict:

@@ -1,7 +1,9 @@
 """Tests for hub/recall.py — the Recalls tile's back end.
 
-Two things matter here: bad input never reaches the subprocess, and no patient
-data ever comes back through the Hub (counts + a file path only).
+What matters here: bad input never reaches a subprocess or the filesystem, all
+failure modes come back as friendly messages, and only strictly-patterned
+filenames are ever served. (The batch rows DO pass through — Mark wants the full
+list on screen — that's by design, same posture as the Payment follow-ups tile.)
 """
 
 import json
@@ -186,3 +188,46 @@ def test_preview_file_encodes_touch_safely(cfg):
 @pytest.mark.parametrize("bad", ["../../windows/win", "2026-08/../..", ""])
 def test_preview_file_rejects_path_tricks(cfg, bad):
     assert recall.preview_file(cfg, bad, "T0") is None
+
+
+# --- Angie's chase sheet through the Hub -------------------------------------
+
+def test_latest_chase_sheet_picks_the_newest(cfg):
+    d = recall.agent_dir(cfg) / "local-reports"
+    (d / "recall-call-sheet-chase-20260730.html").write_text("old", encoding="utf-8")
+    (d / "recall-call-sheet-chase-20260731.html").write_text("new", encoding="utf-8")
+    (d / "recall-call-sheet-chase-XXXX.html").write_text("junk", encoding="utf-8")
+    (d / "unrelated.html").write_text("no", encoding="utf-8")
+    got = recall.latest_chase_sheet(cfg)
+    assert got.name == "recall-call-sheet-chase-20260731.html"
+
+
+def test_latest_chase_sheet_none_when_absent(cfg):
+    assert recall.latest_chase_sheet(cfg) is None
+    assert recall.latest_chase_sheet({}) is None
+
+
+def test_refresh_chase_sheet_parses_counts(cfg, monkeypatch):
+    d = recall.agent_dir(cfg) / "local-reports"
+
+    class P:
+        stdout = "Phone recall sheet — x\n  patients to call: 98  households: 94\n"
+        returncode = 0
+
+    def fake_run(argv, **kw):
+        (d / "recall-call-sheet-chase-20260731.html").write_text("x", encoding="utf-8")
+        assert "recall.call_sheet" in argv[2]
+        return P()
+
+    monkeypatch.setattr(recall.subprocess, "run", fake_run)
+    out = recall.refresh_chase_sheet(cfg)
+    assert out["ok"] and out["patients"] == 98 and out["households"] == 94
+
+
+def test_refresh_chase_sheet_errors_when_no_file_appears(cfg, monkeypatch):
+    class P:
+        stdout = "boom"
+        returncode = 1
+    monkeypatch.setattr(recall.subprocess, "run", lambda *a, **k: P())
+    out = recall.refresh_chase_sheet(cfg)
+    assert out.get("error")
