@@ -259,6 +259,13 @@ def recall_send():
     return jsonify(result), status
 
 
+@app.route("/api/recall/history")
+def recall_history():
+    """What's been sent — by month and by patient (the dedup log, visible)."""
+    from hub import recall
+    return jsonify(recall.history(_integrations()))
+
+
 @app.route("/recall-chase-sheet")
 def recall_chase_sheet():
     """Serve the newest generated phone chase list (Angie's sheet). PHI —

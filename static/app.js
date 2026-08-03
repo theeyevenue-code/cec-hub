@@ -1667,6 +1667,15 @@ function renderRecalls() {
         </div>
 
         <div class="card">
+            <h2>📨 What's been sent</h2>
+            <p style="color:#55636b;font-size:13px;margin:0 0 8px">Every recall text that
+            has gone out, by month — and a lookup so you can check any patient before
+            worrying about double-texting. (The system skips anyone already texted this
+            round automatically; this is that record, visible.)</p>
+            <div id="rc-history"><div class="loading-panel">Checking the send record…</div></div>
+        </div>
+
+        <div class="card">
             <h2>☎️ Phone recall list</h2>
             <p>The people who were texted but still haven't booked — most overdue
             first, grouped by family, with a box to tick off each call.</p>
@@ -1682,6 +1691,8 @@ function renderRecalls() {
     document.getElementById("rc-month").addEventListener("change", load);
     document.getElementById("rc-touch").addEventListener("change", load);
     load();   // full list from the start — no extra click
+
+    loadRecallHistory(document.getElementById("rc-history"));
 
     const chaseBtn = document.getElementById("rc-chase-refresh");
     const chaseNote = document.getElementById("rc-chase-note");
@@ -1800,6 +1811,65 @@ async function loadRecallBatch(out, quiet = false) {
             }
             loadRecallBatch(out, true);   // quiet refresh — table stays visible
         });
+    });
+}
+
+async function loadRecallHistory(box) {
+    let h;
+    try {
+        h = await getJSON("/api/recall/history");
+    } catch (e) {
+        box.innerHTML = errorPanel(e.message);
+        return;
+    }
+    if (h.connected === false || h.error) {
+        box.innerHTML = `<div class="empty-panel">${esc(h.message || h.error)}</div>`;
+        return;
+    }
+    if (!h.batches || !h.batches.length) {
+        box.innerHTML = `<p>No recall texts have been sent yet.</p>`;
+        return;
+    }
+    const batchRows = h.batches.map((b) => `<tr>
+        <td><strong>${esc(b.month_label)}</strong></td>
+        <td>${esc(b.touch)}</td>
+        <td>${b.people} people</td>
+        <td>${esc(b.dates.join(", "))}</td>
+    </tr>`).join("");
+    box.innerHTML = `
+        <table class="lens-table">
+            <thead><tr><th>Due month</th><th>Reminder</th><th>Texted</th>
+            <th>Sent on</th></tr></thead>
+            <tbody>${batchRows}</tbody>
+        </table>
+        <p style="margin:12px 0 4px"><label><strong>Check a patient:</strong>
+            <input id="rc-hist-q" type="text" placeholder="start typing a name…"
+                   style="margin-left:6px;padding:4px 8px;min-width:220px"></label></p>
+        <div id="rc-hist-out" style="color:#55636b;font-size:13px">
+            ${h.patients.length} texts on record.</div>`;
+
+    const q = document.getElementById("rc-hist-q");
+    const out2 = document.getElementById("rc-hist-out");
+    q.addEventListener("input", () => {
+        const s = q.value.trim().toLowerCase();
+        if (s.length < 2) {
+            out2.innerHTML = `${h.patients.length} texts on record.`;
+            return;
+        }
+        const hits = h.patients.filter((p) => p.name.toLowerCase().includes(s));
+        if (!hits.length) {
+            out2.innerHTML = `Nobody matching "${esc(s)}" has been sent a recall text.`;
+            return;
+        }
+        out2.innerHTML = `<table class="lens-table"><thead>
+            <tr><th>Patient</th><th>Reminder</th><th>For due month</th><th>Sent</th></tr>
+            </thead><tbody>` + hits.slice(0, 30).map((p) => `<tr>
+                <td><strong>${esc(p.name)}</strong></td>
+                <td>${esc(p.touch)}</td>
+                <td>${esc(p.month_label)}</td>
+                <td>${esc(p.sent)}</td>
+            </tr>`).join("") + `</tbody></table>`
+            + (hits.length > 30 ? `<p>…and ${hits.length - 30} more — keep typing.</p>` : "");
     });
 }
 

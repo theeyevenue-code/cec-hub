@@ -170,6 +170,38 @@ def send(cfg: dict, month: str, touch: str, batch_hash: str,
         return {"error": "Couldn't read the sender's answer."}
 
 
+def history(cfg: dict) -> dict:
+    """Everything that has been SENT — by batch and by patient — from the
+    agent's dedup log (the same file the sender checks, so this view IS the
+    double-text protection, made visible). Never raises."""
+    dpath = agent_dir(cfg)
+    if dpath is None or not (dpath / "recall").is_dir():
+        return not_connected("The recall engine isn't connected on this computer yet.")
+    python = _agent_cfg(cfg).get("python") or sys.executable
+    try:
+        proc = subprocess.run(
+            [python, "-m", "recall.history", "--json"],
+            cwd=str(dpath), capture_output=True, text=True, timeout=TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return {"connected": True, "error": "That took too long."}
+    except OSError:
+        return not_connected("Couldn't start the recall engine on this computer.")
+    line = ""
+    for candidate in reversed((proc.stdout or "").splitlines()):
+        if candidate.strip():
+            line = candidate.strip()
+            break
+    try:
+        data = json.loads(line) if line else {}
+    except ValueError:
+        data = {}
+    if not data:
+        return {"connected": True, "error": "Couldn't read the sent history."}
+    data["connected"] = True
+    return data
+
+
 CHASE_RE = re.compile(r"^recall-call-sheet-chase-(\d{8})\.html$")
 
 

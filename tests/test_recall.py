@@ -276,3 +276,27 @@ def test_send_timeout_warns_about_the_journal(cfg, monkeypatch):
     monkeypatch.setattr(recall.subprocess, "run", boom)
     out = recall.send(cfg, "2026-08", "T0", "a" * 16)
     assert "journal" in out["error"]
+
+
+# --- sent history -------------------------------------------------------------
+
+def test_history_passes_through(cfg, monkeypatch):
+    class P:
+        stdout = json.dumps({"ok": True, "batches": [{"cycle": "2026-08"}],
+                             "patients": []})
+        returncode = 0
+    monkeypatch.setattr(recall.subprocess, "run", lambda *a, **k: P())
+    out = recall.history(cfg)
+    assert out["connected"] is True and out["batches"][0]["cycle"] == "2026-08"
+
+
+def test_history_not_connected_without_agent():
+    assert recall.history({})["connected"] is False
+
+
+def test_history_garbage_output_is_friendly(cfg, monkeypatch):
+    class P:
+        stdout = "boom"
+        returncode = 1
+    monkeypatch.setattr(recall.subprocess, "run", lambda *a, **k: P())
+    assert recall.history(cfg).get("error")
