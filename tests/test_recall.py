@@ -193,11 +193,17 @@ def test_preview_file_rejects_path_tricks(cfg, bad):
 # --- Angie's chase sheet through the Hub -------------------------------------
 
 def test_latest_chase_sheet_picks_the_newest(cfg):
+    import os
     d = recall.agent_dir(cfg) / "local-reports"
     (d / "recall-call-sheet-chase-20260730.html").write_text("old", encoding="utf-8")
     (d / "recall-call-sheet-chase-20260731.html").write_text("new", encoding="utf-8")
     (d / "recall-call-sheet-chase-XXXX.html").write_text("junk", encoding="utf-8")
     (d / "unrelated.html").write_text("no", encoding="utf-8")
+    # newest = most recently WRITTEN (mixed month/rolling stamps aren't name-
+    # orderable); pin mtimes so the test doesn't race the clock
+    os.utime(d / "recall-call-sheet-chase-20260730.html", (1000, 1000))
+    os.utime(d / "recall-call-sheet-chase-20260731.html", (2000, 2000))
+    os.utime(d / "recall-call-sheet-chase-XXXX.html", (3000, 3000))
     got = recall.latest_chase_sheet(cfg)
     assert got.name == "recall-call-sheet-chase-20260731.html"
 
@@ -300,3 +306,39 @@ def test_history_garbage_output_is_friendly(cfg, monkeypatch):
         returncode = 1
     monkeypatch.setattr(recall.subprocess, "run", lambda *a, **k: P())
     assert recall.history(cfg).get("error")
+
+
+# --- month-based phone list ----------------------------------------------------
+
+def test_chase_sheet_file_by_month(cfg):
+    d = recall.agent_dir(cfg) / "local-reports"
+    (d / "recall-call-sheet-202608.html").write_text("aug", encoding="utf-8")
+    got = recall.chase_sheet_file(cfg, "2026-08")
+    assert got is not None and got.name == "recall-call-sheet-202608.html"
+    assert recall.chase_sheet_file(cfg, "2026-09") is None      # not made yet
+    assert recall.chase_sheet_file(cfg, "../etc") is None       # junk rejected
+
+
+def test_refresh_passes_month_through(cfg, monkeypatch):
+    seen = {}
+
+    class P:
+        stdout = "  patients to call: 41  households: 39\n"
+        returncode = 0
+
+    def fake_run(argv, **kw):
+        seen["argv"] = argv
+        d = recall.agent_dir(cfg) / "local-reports"
+        (d / "recall-call-sheet-202608.html").write_text("x", encoding="utf-8")
+        return P()
+
+    monkeypatch.setattr(recall.subprocess, "run", fake_run)
+    out = recall.refresh_chase_sheet(cfg, "2026-08")
+    assert out["ok"] and out["patients"] == 41
+    assert "--month" in seen["argv"] and "2026-08" in seen["argv"]
+
+
+def test_refresh_rejects_bad_month(cfg, monkeypatch):
+    monkeypatch.setattr(recall.subprocess, "run",
+                        lambda *a, **k: pytest.fail("should not run"))
+    assert recall.refresh_chase_sheet(cfg, "augish").get("error")

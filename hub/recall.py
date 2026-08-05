@@ -202,33 +202,52 @@ def history(cfg: dict) -> dict:
     return data
 
 
-CHASE_RE = re.compile(r"^recall-call-sheet-chase-(\d{8})\.html$")
+CHASE_RE = re.compile(r"^recall-call-sheet-(chase-\d{8}|\d{6})\.html$")
 
 
-def latest_chase_sheet(cfg: dict) -> Path | None:
-    """Newest generated chase sheet (Angie's phone list), or None. Filenames
-    are matched against a strict pattern — nothing else is ever served."""
+def chase_sheet_file(cfg: dict, month: str = "") -> Path | None:
+    """The phone-list file to serve. With a month (YYYY-MM) -> that month's
+    sheet; without -> the newest sheet of any kind. Strict patterns only —
+    nothing else is ever served."""
     dpath = agent_dir(cfg)
     if dpath is None:
         return None
     reports = dpath / "local-reports"
     if not reports.is_dir():
         return None
+    month = str(month or "").strip()
+    if month:
+        if not MONTH_RE.match(month):
+            return None
+        p = reports / f"recall-call-sheet-{month.replace('-', '')}.html"
+        return p if p.is_file() else None
     candidates = [p for p in reports.iterdir() if CHASE_RE.match(p.name)]
-    return max(candidates, key=lambda p: p.name) if candidates else None
+    return max(candidates, key=lambda p: p.stat().st_mtime) if candidates else None
 
 
-def refresh_chase_sheet(cfg: dict) -> dict:
-    """Regenerate Angie's phone list (runs the agent's read-only call_sheet).
-    Returns the headline counts. Never raises."""
+def latest_chase_sheet(cfg: dict) -> Path | None:
+    """Kept for callers that just want 'the newest phone list'."""
+    return chase_sheet_file(cfg, "")
+
+
+def refresh_chase_sheet(cfg: dict, month: str = "") -> dict:
+    """Regenerate the phone recall list (read-only against Optomate). With a
+    month (YYYY-MM) -> everyone due that month still unbooked (Mark's preferred
+    view); without -> the rolling chase window. Never raises."""
+    month = str(month or "").strip()
+    if month and not MONTH_RE.match(month):
+        return {"error": "Pick a month first."}
     dpath = agent_dir(cfg)
     if dpath is None or not (dpath / "recall").is_dir():
         return not_connected("The recall engine isn't connected on this computer yet.")
     python = _agent_cfg(cfg).get("python") or sys.executable
+    argv = [python, "-m", "recall.call_sheet"]
+    if month:
+        argv += ["--month", month]
     try:
         proc = subprocess.run(
-            [python, "-m", "recall.call_sheet"],
-            cwd=str(dpath), capture_output=True, text=True, timeout=TIMEOUT_S + 60,
+            argv, cwd=str(dpath), capture_output=True, text=True,
+            timeout=TIMEOUT_S + 60,
         )
     except subprocess.TimeoutExpired:
         return {"connected": True,
@@ -237,11 +256,11 @@ def refresh_chase_sheet(cfg: dict) -> dict:
         return not_connected("Couldn't start the recall engine on this computer.")
     m = re.search(r"patients to call:\s*(\d+)\s+households:\s*(\d+)",
                   proc.stdout or "")
-    sheet = latest_chase_sheet(cfg)
+    sheet = chase_sheet_file(cfg, month)
     if sheet is None:
         return {"connected": True,
                 "error": "The list didn't generate — tell Mark."}
-    out = {"connected": True, "ok": True, "stamp": CHASE_RE.match(sheet.name).group(1)}
+    out = {"connected": True, "ok": True, "month": month}
     if m:
         out["patients"] = int(m.group(1))
         out["households"] = int(m.group(2))

@@ -1677,11 +1677,16 @@ function renderRecalls() {
 
         <div class="card">
             <h2>☎️ Phone recall list</h2>
-            <p>The people who were texted but still haven't booked — most overdue
-            first, grouped by family, with a box to tick off each call.</p>
-            <p>
-                <a class="btn" href="/recall-chase-sheet" target="_blank">Open the phone list</a>
-                <button class="btn btn-quiet" id="rc-chase-refresh">Make a fresh list</button>
+            <p>The people due that month who were texted but still haven't booked —
+            most overdue first, grouped by family, with a box to tick off each call.
+            Prints on A4.</p>
+            <p style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <label>Month
+                    <select id="rc-chase-month">${recallMonthOptions(thisMonth)}</select>
+                </label>
+                <button class="btn" id="rc-chase-refresh">Make the list</button>
+                <a class="btn btn-quiet" id="rc-chase-open" href="/recall-chase-sheet"
+                   target="_blank">Open the last one</a>
                 <span id="rc-chase-note" style="color:#55636b;font-size:13px"></span>
             </p>
         </div>`;
@@ -1696,15 +1701,25 @@ function renderRecalls() {
 
     const chaseBtn = document.getElementById("rc-chase-refresh");
     const chaseNote = document.getElementById("rc-chase-note");
+    const chaseMonth = document.getElementById("rc-chase-month");
+    const chaseOpen = document.getElementById("rc-chase-open");
+    const syncOpenLink = () => {
+        chaseOpen.href = "/recall-chase-sheet?month="
+            + encodeURIComponent(chaseMonth.value);
+    };
+    chaseMonth.addEventListener("change", syncOpenLink);
+    syncOpenLink();
     chaseBtn.addEventListener("click", async () => {
         chaseBtn.disabled = true;
         chaseNote.textContent = "Making the list — takes about a minute…";
         try {
-            const r = await postJSON("/api/recall/chasesheet", {});
+            const r = await postJSON("/api/recall/chasesheet",
+                { month: chaseMonth.value });
             chaseNote.textContent = r.patients !== undefined
                 ? `Done — ${r.patients} people to call.`
                 : "Done.";
-            window.open("/recall-chase-sheet", "_blank");
+            window.open("/recall-chase-sheet?month="
+                + encodeURIComponent(chaseMonth.value), "_blank");
         } catch (e) {
             chaseNote.textContent = e.message;
         }
