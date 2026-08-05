@@ -259,6 +259,13 @@ def recall_send():
     return jsonify(result), status
 
 
+@app.route("/api/recall/success")
+def recall_success():
+    """How many texted patients went on to book (optionally ?months=N)."""
+    from hub import recall
+    return jsonify(recall.success(_integrations(), request.args.get("months")))
+
+
 @app.route("/api/recall/history")
 def recall_history():
     """What's been sent — by month and by patient (the dedup log, visible)."""

@@ -202,6 +202,43 @@ def history(cfg: dict) -> dict:
     return data
 
 
+def success(cfg: dict, months=None) -> dict:
+    """Did the recalls work — how many texted patients went on to book, over
+    the whole record or the last N months. Never raises."""
+    dpath = agent_dir(cfg)
+    if dpath is None or not (dpath / "recall").is_dir():
+        return not_connected("The recall engine isn't connected on this computer yet.")
+    argv_months = []
+    if months not in (None, "", "all"):
+        try:
+            argv_months = ["--months", str(max(1, min(60, int(months))))]
+        except (TypeError, ValueError):
+            return {"error": "Bad period."}
+    python = _agent_cfg(cfg).get("python") or sys.executable
+    try:
+        proc = subprocess.run(
+            [python, "-m", "recall.success", "--json", *argv_months],
+            cwd=str(dpath), capture_output=True, text=True, timeout=TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return {"connected": True, "error": "That took too long."}
+    except OSError:
+        return not_connected("Couldn't start the recall engine on this computer.")
+    line = ""
+    for candidate in reversed((proc.stdout or "").splitlines()):
+        if candidate.strip():
+            line = candidate.strip()
+            break
+    try:
+        data = json.loads(line) if line else {}
+    except ValueError:
+        data = {}
+    if not data:
+        return {"connected": True, "error": "Couldn't read the success figures."}
+    data["connected"] = True
+    return data
+
+
 CHASE_RE = re.compile(r"^recall-call-sheet-(chase-\d{8}|\d{6})\.html$")
 
 

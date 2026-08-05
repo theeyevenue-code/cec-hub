@@ -1667,6 +1667,20 @@ function renderRecalls() {
         </div>
 
         <div class="card">
+            <h2>📈 Did the recalls work?</h2>
+            <p style="color:#55636b;font-size:13px;margin:0 0 8px">
+                How many texted patients went on to book an appointment.
+                <label style="margin-left:8px">Period
+                    <select id="rc-succ-months">
+                        <option value="all">everything so far</option>
+                        <option value="3">last 3 months</option>
+                        <option value="6">last 6 months</option>
+                        <option value="12">last 12 months</option>
+                    </select></label></p>
+            <div id="rc-success"><div class="loading-panel">Working out the numbers…</div></div>
+        </div>
+
+        <div class="card">
             <h2>📨 What's been sent</h2>
             <p style="color:#55636b;font-size:13px;margin:0 0 8px">Every recall text that
             has gone out, by month — and a lookup so you can check any patient before
@@ -1698,6 +1712,12 @@ function renderRecalls() {
     load();   // full list from the start — no extra click
 
     loadRecallHistory(document.getElementById("rc-history"));
+
+    const succBox = document.getElementById("rc-success");
+    const succSel = document.getElementById("rc-succ-months");
+    const loadSucc = () => loadRecallSuccess(succBox, succSel.value);
+    succSel.addEventListener("change", loadSucc);
+    loadSucc();
 
     const chaseBtn = document.getElementById("rc-chase-refresh");
     const chaseNote = document.getElementById("rc-chase-note");
@@ -1827,6 +1847,59 @@ async function loadRecallBatch(out, quiet = false) {
             loadRecallBatch(out, true);   // quiet refresh — table stays visible
         });
     });
+}
+
+async function loadRecallSuccess(box, months) {
+    box.innerHTML = `<div class="loading-panel">Working out the numbers…</div>`;
+    let s;
+    try {
+        s = await getJSON("/api/recall/success?months=" + encodeURIComponent(months));
+    } catch (e) {
+        box.innerHTML = errorPanel(e.message);
+        return;
+    }
+    if (s.connected === false || s.error) {
+        box.innerHTML = `<div class="empty-panel">${esc(s.message || s.error)}</div>`;
+        return;
+    }
+    if (!s.sent) {
+        box.innerHTML = `<p>${esc(s.message || "Nothing sent in this period yet.")}</p>`;
+        return;
+    }
+    const young = s.newest_batch_age_days !== null && s.newest_batch_age_days < 14
+        ? `<p style="background:#fff4e5;border-left:4px solid #b8860b;padding:8px 12px">
+             <strong>Too early to judge.</strong> The newest batch is only
+             ${s.newest_batch_age_days} day${s.newest_batch_age_days === 1 ? "" : "s"} old —
+             most bookings come in within a fortnight, so this figure will rise.</p>` : "";
+    const timing = s.median_days !== null
+        ? `<p style="color:#55636b;font-size:13px">Typically booked
+             <strong>${s.median_days} days</strong> after the text ·
+             ${s.within_7_days} within a week · ${s.within_14_days} within a fortnight.</p>`
+        : "";
+    const rows = s.batches.map((b) => `<tr>
+        <td><strong>${esc(b.month_label)}</strong></td>
+        <td>${esc(b.touch)}</td>
+        <td>${b.sent}</td>
+        <td>${b.booked}</td>
+        <td><strong>${b.pct}%</strong></td>
+    </tr>`).join("");
+    const byTouch = s.touches.map((t) =>
+        `${esc(t.touch)}: <strong>${t.pct}%</strong>`).join(" &nbsp;·&nbsp; ");
+
+    box.innerHTML = `
+        <p style="font-size:22px;margin:2px 0 2px">
+            <strong>${s.booked} of ${s.sent}</strong> booked
+            <span style="color:#438F73"><strong>(${s.pct}%)</strong></span></p>
+        ${young}${timing}
+        <p style="color:#55636b;font-size:13px">By reminder — ${byTouch}</p>
+        <table class="lens-table" style="margin-top:6px">
+            <thead><tr><th>Due month</th><th>Reminder</th><th>Texted</th>
+            <th>Booked</th><th>Rate</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+        <p style="color:#55636b;font-size:12px;margin-top:8px">"Booked" = the patient has
+        an appointment dated on or after the day we texted them. A fair guide, not proof
+        the text caused it — and it counts bookings, not attendance.</p>`;
 }
 
 async function loadRecallHistory(box) {

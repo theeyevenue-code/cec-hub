@@ -342,3 +342,47 @@ def test_refresh_rejects_bad_month(cfg, monkeypatch):
     monkeypatch.setattr(recall.subprocess, "run",
                         lambda *a, **k: pytest.fail("should not run"))
     assert recall.refresh_chase_sheet(cfg, "augish").get("error")
+
+
+# --- success rate -------------------------------------------------------------
+
+def test_success_passes_through_and_clamps_months(cfg, monkeypatch):
+    seen = {}
+
+    class P:
+        stdout = json.dumps({"ok": True, "sent": 190, "booked": 21, "pct": 11.1})
+        returncode = 0
+
+    def fake_run(argv, **kw):
+        seen["argv"] = argv
+        return P()
+
+    monkeypatch.setattr(recall.subprocess, "run", fake_run)
+    out = recall.success(cfg, "3")
+    assert out["pct"] == 11.1 and out["connected"] is True
+    assert "--months" in seen["argv"] and "3" in seen["argv"]
+    recall.success(cfg, "999")                       # clamped, not passed raw
+    assert "60" in seen["argv"]
+
+
+def test_success_all_period_sends_no_month_flag(cfg, monkeypatch):
+    seen = {}
+
+    class P:
+        stdout = json.dumps({"ok": True, "sent": 0})
+        returncode = 0
+
+    monkeypatch.setattr(recall.subprocess, "run",
+                        lambda argv, **k: (seen.update(argv=argv), P())[1])
+    recall.success(cfg, "all")
+    assert "--months" not in seen["argv"]
+
+
+def test_success_bad_period_rejected(cfg, monkeypatch):
+    monkeypatch.setattr(recall.subprocess, "run",
+                        lambda *a, **k: pytest.fail("should not run"))
+    assert recall.success(cfg, "ages").get("error")
+
+
+def test_success_not_connected_without_agent():
+    assert recall.success({}, None)["connected"] is False
