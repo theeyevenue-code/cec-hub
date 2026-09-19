@@ -1388,3 +1388,37 @@ body.lens-mono main { background: #fafafa; }
 .lens-page .opt-retired td { color: #999; }
 .lens-page .opt-retired .c-idx, .lens-page .opt-retired .lens-name, .lens-page .opt-retired .c-sup, .lens-page .opt-retired .c-type, .lens-page .opt-retired .c-sell { color: #999; }
 .lens-page .opt-table .warn-note { font-size: 13px; margin-top: 2px; }
+
+/* --- Lens label + answer-in-table-form (Mark, 20 Sep) ---------------------------- */
+.lens-page .lbl { display: inline-flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.lens-page .lbl-idx { font-size: 22px; font-weight: 700; color: var(--lp-ink); font-variant-numeric: tabular-nums; }
+.lens-page .lbl-cat { font-size: 13px; color: var(--lp-mute); text-transform: uppercase; letter-spacing: .05em; }
+.lens-page .lbl-name { font-size: 17px; font-weight: 700; color: var(--lp-ink); }
+.lens-page .lbl-big .lbl-idx { font-size: 34px; }
+.lens-page .lbl-big .lbl-cat { font-size: 14px; }
+.lens-page .lbl-big .lbl-name { font-size: 26px; }
+.lens-page .opt-thick .lbl-idx, .lens-page .opt-thick .lbl-name { color: var(--lp-mute); }
+.lens-page .opt-retired .lbl-idx, .lens-page .opt-retired .lbl-name { color: #999; }
+.lens-page .opt-table .c-lens { min-width: 300px; }
+/* Answer card: word left, one-row table right */
+.lens-page .answer { grid-template-columns: 170px 1fr; padding: 18px 22px 14px; }
+.lens-page .ans-word { font-size: 56px; padding-top: 10px; }
+.lens-page .ans-table { border: none; margin: 0; }
+.lens-page .ans-table th { background: transparent; border-bottom: 1px solid var(--lp-rule); padding: 4px 10px; }
+.lens-page .ans-table td { padding: 8px 10px; border-bottom: none; vertical-align: baseline; }
+.lens-page .ans-table .ans-pick .c-type { font-size: 18px; }
+.lens-page .ans-table .ans-pick .c-blank { font-size: 22px; font-weight: 700; color: var(--lp-ink); }
+.lens-page .ans-table .ans-pick .c-cost { font-size: 30px; }
+.lens-page .ans-table .ans-pick .c-sell { font-size: 24px; }
+.lens-page .ans-table .ans-pick .c-sup { font-size: 15px; }
+.lens-page .ans-table .ans-alt-row td { border-top: 1px solid var(--lp-rule-soft); color: var(--lp-mute); }
+.lens-page .ans-table .ans-alt-row .lbl-idx, .lens-page .ans-table .ans-alt-row .lbl-name, .lens-page .ans-table .ans-alt-row .c-cost { color: var(--lp-text); }
+.lens-page .ans-table .ans-alt-row .c-cost { font-size: 18px; }
+.lens-page .ans-table .ans-alt-row .c-sell { font-size: 16px; }
+.lens-page .ans-table tr td:first-child { border-left: none; }
+.lens-page .ans-more { margin-top: 6px; }
+.lens-page .ans-more summary { font-size: 13px; color: var(--lp-mute); cursor: pointer; list-style: none; }
+.lens-page .ans-more summary::before { content: "▸ "; }
+.lens-page .ans-more[open] summary::before { content: "▾ "; }
+.lens-page .ans-why { border-top: none; padding-top: 4px; }
+@media (max-width: 760px) { .lens-page .answer { grid-template-columns: 1fr; } .lens-page .ans-word { padding-top: 0; } }
