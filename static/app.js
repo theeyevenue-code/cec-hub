@@ -77,6 +77,8 @@ function route() {
     const hash = location.hash || "#/";
     // panel-mode = the slim companion window; strips the Hub chrome (see CSS)
     document.body.classList.toggle("panel-mode", hash === "#/panel");
+    // lens-mono = the Lens Finder's white, monochrome page (see .lens-page CSS)
+    document.body.classList.toggle("lens-mono", hash === "#/lenses");
     for (const r of routes) {
         const m = hash.match(r.re);
         if (m) { r.fn(m); window.scrollTo(0, 0); return; }
@@ -1243,7 +1245,7 @@ function answerCardHTML(data, sells) {
     let altLine = "";
     if (alt) {
         const diff = alt.price_now - best.price_now;
-        altLine = `<div class="ans-alt"><strong>${alt.type === "stock" ? "Stock" : "Grind"} instead:</strong>
+        altLine = `<div class="ans-alt"><strong>${alt.type === "stock" ? "Stock" : "Grind"} instead</strong>
             ${esc(alt.name)} · ${esc(fmtMoney(alt.price_now))} a lens${
             diff > 0 ? ` <span class="ans-diff-more">+${esc(fmtMoney(diff))}</span>` :
             diff < 0 ? ` <span class="ans-diff-less">−${esc(fmtMoney(-diff))} but stock comes first by practice rule</span>` : ""}</div>`;
@@ -1277,8 +1279,10 @@ function optionLineHTML(g, best, sells) {
     const range = l.sph_min != null
         ? `${esc(fmtPower(l.sph_min))} to ${esc(fmtPower(l.sph_max))}${l.cyl_max != null ? `, cyl to −${Number(l.cyl_max).toFixed(2)}` : ""}`
         : "range not in file";
-    const others = g.others.length
-        ? `<span class="opt-others">other coatings: ${g.others.map((o) =>
+    const seenCoat = new Set([l.coating]);
+    const otherCoats = g.others.filter((o) => !seenCoat.has(o.coating) && seenCoat.add(o.coating));
+    const others = otherCoats.length
+        ? `<span class="opt-others">other coatings: ${otherCoats.map((o) =>
             `${esc(coatShort(o.coating))} ${o.price_now != null ? esc(fmtMoney(o.price_now)) : "—"}`).join(" · ")}</span>` : "";
     const flags = [
         l.under_index ? `<span class="chip chip-amber">thicker than ideal</span>` : "",
@@ -1293,7 +1297,7 @@ function optionLineHTML(g, best, sells) {
         <span class="opt-type">${l.type === "stock" ? "Stock" : "Grind"}</span>
         <span class="opt-main">
             <span class="opt-name">${supplierChip(l.supplier)} ${esc(l.name)} ${flags}</span>
-            <span class="opt-meta">${esc(fmtIndex(l.index))} · ${l.blank_mm != null ? esc(fmtMM(l.blank_mm)) : "made to size"} · ${esc(coatShort(l.coating))}${l.material && !/^clear$/i.test(l.material) ? " · " + esc(l.material) : ""} · ${range}${l.code ? ` · code ${esc(l.code)}` : ""}</span>
+            <span class="opt-meta">${esc(fmtIndex(l.index))} · ${g.blanks.size ? esc([...g.blanks].sort((a, b) => a - b).map((b) => parseFloat(b)).join(" / ")) + "mm" : "made to size"} · ${esc(coatShort(l.coating))}${l.material && !/^clear$/i.test(l.material) ? " · " + esc(l.material) : ""} · ${range}${l.code ? ` · code ${esc(l.code)}` : ""}</span>
             ${others}${guide}${warn}
         </span>
         <span class="opt-price">${l.price_now != null ? `<span class="opt-cost">${esc(fmtMoney(l.price_now))}</span>` : `<span class="opt-cost opt-nocost">no price</span>`}
@@ -1316,30 +1320,32 @@ function groupOptions(options) {
     for (const o of options) {
         // A grind is made to size, so its blank bands are one lens; stock
         // bands are real different blanks.
+        // Two stock blanks with the same range and price are one line ("70 / 75mm").
         const key = [o.supplier, o.name, o.type, o.material || "",
-                     o.type === "stock" ? (o.blank_mm || "") : ""].join("|");
+                     o.type === "stock" ? [o.sph_min, o.sph_max, o.cyl_max].join(",") : ""].join("|");
         let g = byKey[key];
-        if (!g) { g = byKey[key] = { lead: o, others: [] }; groups.push(g); }
+        if (!g) { g = byKey[key] = { lead: o, others: [], blanks: new Set() }; groups.push(g); }
+        else if (o.coating === g.lead.coating) { /* same coating, another blank */ }
         else g.others.push(o);
+        if (o.blank_mm != null) g.blanks.add(o.blank_mm);
     }
     return groups;
 }
 
 function lensCatalogHTML(cat) {
     if (cat.message) {
-        return `<div class="card"><h2>📚 Lens library</h2>
+        return `<div class="card"><h2>Lens library</h2>
             <div class="empty-panel">${esc(cat.message)}</div></div>`;
     }
     const files = (cat.files || []).map((f) => `
         <span class="chip">${esc(f.filename)} · ${esc(f.count)} price line${f.count === 1 ? "" : "s"}</span>`).join(" ");
     const errors = (cat.files || []).flatMap((f) => f.errors || []);
-    return `<div class="card"><h2>📚 Lens library</h2>
-        <p>One row per lens — pick a coating to see its price. Narrow by supplier, type, index or
-        coating, or just type a name, code or index (e.g. <strong>clearview 1.67</strong>).</p>
-        <p class="lens-note"><strong>/pr sell</strong> = Concord's price per pair (coating included) ·
-        <strong>/lens cost</strong> = what the lab charges us. <em>deal price</em> is fixed for the
-        ZEISS term; <em>promo</em> is the launch level on unquoted lines${PROMO_UNTIL ? ` until ${esc(fmtDateLong(PROMO_UNTIL))}` : ""},
-        then the book. Greyed lenses are ones we no longer order.</p>
+    return `<div class="card"><h2>Lens library</h2>
+        <p class="lens-note">One row per lens; pick a coating to see its price. Type a name, code or
+        index, or narrow with the menus. <em>Sell</em> is our price per pair, <em>cost</em> is the
+        lab's price per lens. Deal prices are fixed for the ZEISS term; promo prices run
+        ${PROMO_UNTIL ? `until ${esc(fmtDateLong(PROMO_UNTIL))}` : "for the launch period"}, then the book.
+        Greyed lenses are ones we no longer order.</p>
         <div class="lens-filters">
             <select id="lf-sup" class="lens-select" aria-label="Supplier"></select>
             <select id="lf-cat" class="lens-select" aria-label="Lens type"></select>
@@ -1494,7 +1500,7 @@ async function renderLensJobs() {
     if (!data.connected || !(data.jobs || []).length) return;
 
     holder.innerHTML = `<div class="card">
-        <h2>🗒️ Recent lens jobs from Optomate</h2>
+        <h2>Recent lens jobs from Optomate</h2>
         <p class="updated-line">Each job entered in Optomate, checked against the loaded
             price files.${data.updated ? ` Last updated ${esc(data.updated)}.` : ""}
             Nothing is changed or sent — this is a second pair of eyes only.</p>
@@ -1650,16 +1656,13 @@ async function renderLenses() {
     PROMO_UNTIL = (cat.pricing || {}).promo_until || "";
     const sells = sellIndex(cat);
 
-    view.innerHTML = `
+    view.innerHTML = `<div class="lens-page">
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Lens Finder</h1>
-        <p class="page-sub">Type the Rx (one eye at a time) and the Finder says whether a
-        <strong>stock</strong> lens covers it or it's a <strong>grind</strong>, which lens to order,
-        and what the other route would cost. Switch to Hoya to see what the old supplier would
-        have done for the same Rx.</p>
+        <p class="page-sub">One eye at a time. Stock or grind, which lens, what it costs.</p>
 
         <div class="card">
-            <h2>🔍 Find the lens for a job</h2>
+            <h2>Find the lens</h2>
             <div class="lens-form">
                 <div class="field"><label for="lf-sph">Sphere</label>
                     <input id="lf-sph" inputmode="text" placeholder="-2.75" autocomplete="off"></div>
@@ -1671,9 +1674,9 @@ async function renderLenses() {
                 <button class="btn" id="lf-go">Find lenses</button>
             </div>
             <div class="lf-supplier" role="radiogroup" aria-label="Which supplier">
-                <label class="lf-radio lf-radio-zeiss"><input type="radio" name="lf-sup" value="current" checked> <strong>ZEISS + Synchrony</strong> — what we order now</label>
-                <label class="lf-radio lf-radio-hoya"><input type="radio" name="lf-sup" value="hoya"> <strong>Hoya</strong> — old supplier, for comparison</label>
-                <label class="lf-radio"><input type="radio" name="lf-sup" value="all"> Both, side by side</label>
+                <label class="lf-radio"><input type="radio" name="lf-sup" value="current" checked><span>ZEISS + Synchrony<small>what we order now</small></span></label>
+                <label class="lf-radio"><input type="radio" name="lf-sup" value="hoya"><span>Hoya<small>old supplier, to compare</small></span></label>
+                <label class="lf-radio"><input type="radio" name="lf-sup" value="all"><span>Both<small>side by side</small></span></label>
             </div>
             <details class="blank-helper">
                 <summary>Not sure what blank size the frame needs?</summary>
@@ -1694,7 +1697,7 @@ async function renderLenses() {
 
         <div id="lens-jobs"></div>
 
-        <div id="lens-catalog">${lensCatalogHTML(cat)}</div>`;
+        <div id="lens-catalog">${lensCatalogHTML(cat)}</div></div>`;
 
     wireLensLookup(cat);
     renderLensJobs();  // fills #lens-jobs only when the agent file exists
