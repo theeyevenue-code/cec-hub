@@ -102,8 +102,8 @@ means sphere −6.00…+6.00, cyl to −4.00, and the starred number is the **ma
    and **which price basis** applies (deal price · L50 promo until 11 Mar 2027 · L25 book · Hoya T3).
 3. Power availability is complete for the whole ZEISS range — SV, digital, office, progressive,
    bifocal — at the book's resolution (per material / index / diameter / coating, cyl and combined
-   limits, add range). Rows still carry an amber "confirm in VISUSTORE" note until the ZEISS
-   availability charts are loaded (see §6).
+   limits, add range), taken from ZEISS's own product guide (see §6). Only Synchrony rows keep an
+   amber "confirm in VISUSTORE" note until its guide is in hand.
 4. The library shows the practice's tier names (Signature / Everyday / Essential / Screen Relief /
    Desk Pair / SV Premium / SV Standard) beside the manufacturer's name, priced from one config.
 5. Hoya stays loaded for reference and for MiyoSmart, greyed as "no longer ordered" everywhere else.
