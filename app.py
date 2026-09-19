@@ -403,10 +403,24 @@ def lenses_find():
     kind = (request.args.get("kind") or "Single vision").strip()
     tint = (request.args.get("tint") or "").strip().lower() in ("1", "true", "yes", "on")
 
+    # Which supplier's range to search. "current" = what we order now (the
+    # orderable suppliers in lens_filter.json); "hoya" = the old range, ranked
+    # as if it were still ordered, for a side-by-side; "all" = everything,
+    # retired lenses greyed.
+    which = (request.args.get("supplier") or "current").strip().lower()
     catalog = _catalog()
-    result = lenses.find_options(catalog["lenses"], sph, cyl or 0.0, min_blank,
+    rows = catalog["lenses"]
+    if which == "hoya":
+        rows = [{**l, "orderable": True} for l in rows
+                if str(l.get("supplier") or l.get("brand") or "").lower() == "hoya"]
+    elif which != "all":
+        rows = [l for l in rows if l.get("orderable", True)]
+    result = lenses.find_options(rows, sph, cyl or 0.0, min_blank,
                                  add=add, kind=kind, fh=fh, tint=tint,
                                  pricing=_pricing())
+    result["supplier"] = which
+    if which == "hoya" and result.get("verdict"):
+        result["verdict"] = "HOYA (old supplier, for comparison) — " + result["verdict"]
     result["catalog_message"] = catalog["message"]
     return jsonify(result)
 

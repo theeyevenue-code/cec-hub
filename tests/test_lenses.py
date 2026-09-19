@@ -764,3 +764,17 @@ def test_api_find_accepts_kind_add_and_tint(hub_client_lenses):
     assert data["rx"]["tint"] is True
     cat = client.get("/api/lenses").get_json()
     assert "pricing" in cat and "prefer_stock" in cat["pricing"]
+
+
+def test_api_find_supplier_switch(hub_client_lenses):
+    client, lenses_dir = hub_client_lenses
+    (lenses_dir / "zeiss.csv").write_text(ZEISS_CSV, encoding="utf-8")
+    # default: only what we order (the neutral test filter retires nothing, so
+    # the sample Hoya rows are still "current" here) — the switch itself is what we test
+    hoya = client.get("/api/lenses/find?sph=-2.00&cyl=-2.50&supplier=hoya").get_json()
+    assert hoya["supplier"] == "hoya"
+    assert all(o["supplier"] == "Hoya" for o in hoya["options"])
+    assert hoya["verdict"].startswith("HOYA (old supplier, for comparison)")
+    assert hoya["options"][0]["orderable"] is True          # ranked as if still ordered
+    both = client.get("/api/lenses/find?sph=-2.00&cyl=-2.50&supplier=all").get_json()
+    assert {o["supplier"] for o in both["options"]} >= {"Hoya", "ZEISS"}

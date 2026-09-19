@@ -1457,14 +1457,6 @@ async function renderLensJobs() {
 
 const LOOKUP_LIMIT = 80;
 const CAT_ORDER = ["Single vision", "Progressive", "Anti-fatigue", "Occupational", "Bifocal"];
-// What the finder's "lens kind" picker offers, in staff words.
-const KIND_OPTIONS = [
-    ["Single vision", "Single vision (distance or reading)"],
-    ["Progressive", "Multifocal"],
-    ["Anti-fatigue", "Screen relief (anti-fatigue)"],
-    ["Occupational", "Desk / office pair"],
-    ["Bifocal", "Bifocal"],
-];
 
 function wireLensLookup(cat) {
     const box = document.getElementById("lens-lookup");
@@ -1597,25 +1589,25 @@ async function renderLenses() {
         <h1 class="page-title">Lens Finder</h1>
         <p class="page-sub">Type the Rx (one eye at a time) and the Finder says whether a
         <strong>stock</strong> lens covers it or it's a <strong>grind</strong>, which lens to order,
-        and what the other route would cost. ZEISS and Synchrony ranges, with our deal prices.</p>
+        and what the other route would cost. Switch to Hoya to see what the old supplier would
+        have done for the same Rx.</p>
 
         <div class="card">
             <h2>🔍 Find the lens for a job</h2>
             <div class="lens-form">
-                <div class="field"><label for="lf-kind">Lens kind</label>
-                    <select id="lf-kind" class="lens-select">${KIND_OPTIONS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select></div>
                 <div class="field"><label for="lf-sph">Sphere</label>
                     <input id="lf-sph" inputmode="text" placeholder="-2.75" autocomplete="off"></div>
                 <div class="field"><label for="lf-cyl">Cyl (optional)</label>
                     <input id="lf-cyl" inputmode="text" placeholder="-1.25" autocomplete="off"></div>
-                <div class="field" id="lf-add-field" hidden><label for="lf-add">Add</label>
-                    <input id="lf-add" inputmode="text" placeholder="2.00" autocomplete="off"></div>
                 <div class="field"><label for="lf-blank">Smallest blank for the frame (optional)</label>
                     <input id="lf-blank" inputmode="numeric" placeholder="e.g. 68" autocomplete="off"></div>
-                <div class="field" id="lf-fh-field" hidden><label for="lf-fh">Fitting height (optional)</label>
-                    <input id="lf-fh" inputmode="numeric" placeholder="e.g. 18" autocomplete="off"></div>
                 <label class="lf-check"><input type="checkbox" id="lf-tint"> Tinted job</label>
                 <button class="btn" id="lf-go">Find lenses</button>
+            </div>
+            <div class="lf-supplier" role="radiogroup" aria-label="Which supplier">
+                <label class="lf-radio lf-radio-zeiss"><input type="radio" name="lf-sup" value="current" checked> <strong>ZEISS + Synchrony</strong> — what we order now</label>
+                <label class="lf-radio lf-radio-hoya"><input type="radio" name="lf-sup" value="hoya"> <strong>Hoya</strong> — old supplier, for comparison</label>
+                <label class="lf-radio"><input type="radio" name="lf-sup" value="all"> Both, side by side</label>
             </div>
             <details class="blank-helper">
                 <summary>Not sure what blank size the frame needs?</summary>
@@ -1641,31 +1633,20 @@ async function renderLenses() {
     wireLensLookup(cat);
     renderLensJobs();  // fills #lens-jobs only when the agent file exists
 
-    const kindEl = document.getElementById("lf-kind");
     const sphEl = document.getElementById("lf-sph");
     const cylEl = document.getElementById("lf-cyl");
-    const addEl = document.getElementById("lf-add");
     const blankEl = document.getElementById("lf-blank");
-    const fhEl = document.getElementById("lf-fh");
     const tintEl = document.getElementById("lf-tint");
     const resultsEl = document.getElementById("lens-results");
-
-    function syncKind() {
-        const mto = kindEl.value !== "Single vision";
-        document.getElementById("lf-add-field").style.display = mto ? "" : "none";
-        document.getElementById("lf-fh-field").style.display = mto ? "" : "none";
-    }
-    kindEl.addEventListener("change", syncKind);
-    syncKind();
+    const supplierPick = () => (document.querySelector('input[name="lf-sup"]:checked') || {}).value || "current";
 
     async function runFind() {
         const params = new URLSearchParams();
         params.set("sph", sphEl.value.trim());
-        params.set("kind", kindEl.value);
+        params.set("kind", "Single vision");     // the finder is the stock-vs-grind question
+        params.set("supplier", supplierPick());
         if (cylEl.value.trim()) params.set("cyl", cylEl.value.trim());
-        if (kindEl.value !== "Single vision" && addEl.value.trim()) params.set("add", addEl.value.trim());
         if (blankEl.value.trim()) params.set("blank", blankEl.value.trim());
-        if (kindEl.value !== "Single vision" && fhEl.value.trim()) params.set("fh", fhEl.value.trim());
         if (tintEl.checked) params.set("tint", "1");
         resultsEl.innerHTML = `<div class="loading-panel">Checking the catalogue…</div>`;
         let data;
@@ -1679,8 +1660,9 @@ async function renderLenses() {
             resultsEl.innerHTML = `<div class="empty-panel">${esc(data.catalog_message)}</div>`;
             return;
         }
+        const supWord = { current: "ZEISS + Synchrony", hoya: "Hoya (old supplier)", all: "every supplier" }[data.supplier] || "";
         const rxLine = `Checked <strong>${esc(data.rx.display)}</strong>` +
-            (data.kind ? ` as ${esc(data.kind.toLowerCase())}` : "") +
+            (supWord ? ` against ${esc(supWord)}` : "") +
             (data.rx.tint ? `, tinted` : "") +
             (data.rx.transposed ? ` <span class="chip chip-amber">plus cyl — transposed to minus form first</span>` : "") +
             (data.min_blank != null ? `, needing a blank of at least ${esc(fmtMM(data.min_blank))}` : "") +
@@ -1693,9 +1675,10 @@ async function renderLenses() {
         const shown = live.slice(0, SHOW);
         const rest = live.slice(SHOW);
         const v = data.verdict || "";
-        const verdictCls = /^STOCK/.test(v) ? "verdict verdict-stock"
-            : /^GRIND/.test(v) ? "verdict verdict-grind"
-            : options.length ? "verdict verdict-mto" : "verdict verdict-none";
+        const verdictCls = (/STOCK covers/.test(v) ? "verdict verdict-stock"
+            : /GRIND/.test(v) ? "verdict verdict-grind"
+            : options.length ? "verdict verdict-mto" : "verdict verdict-none")
+            + (data.supplier === "hoya" ? " verdict-hoya" : "");
         const sellFor = (g) => sells[[g.lead.supplier, g.lead.name, fmtIndex(g.lead.index), g.lead.type].join("|")];
         resultsEl.innerHTML = `
             <div class="updated-line" style="margin-top:18px">${rxLine}</div>
@@ -1712,7 +1695,7 @@ async function renderLenses() {
                 </table></div>
             </details>` : ""}
             ${retired.length ? `<details class="miss-details">
-                <summary>${retired.length} lens${retired.length === 1 ? "" : "es"} we no longer order would also fit (Hoya)</summary>
+                <summary>${retired.length} lens${retired.length === 1 ? "" : "es"} we no longer order would also fit</summary>
                 <div class="table-scroll"><table class="stock-table">
                     <thead>${LENS_TABLE_HEAD}</thead>
                     <tbody>${retired.slice(0, 20).map((g) => lensRowHTML(g, sellFor(g))).join("")}</tbody>
@@ -1728,9 +1711,12 @@ async function renderLenses() {
     }
 
     document.getElementById("lf-go").addEventListener("click", runFind);
-    [sphEl, cylEl, addEl, blankEl, fhEl].forEach((el) => el.addEventListener("keydown", (e) => {
+    [sphEl, cylEl, blankEl].forEach((el) => el.addEventListener("keydown", (e) => {
         if (e.key === "Enter") runFind();
     }));
+    // Switching supplier re-runs the same Rx, so a comparison is one click.
+    document.querySelectorAll('input[name="lf-sup"]').forEach((el) =>
+        el.addEventListener("change", () => { if (sphEl.value.trim()) runFind(); }));
 
     // Blank-size helper: eye size + total decentration + 2mm spare.
     const aEl = document.getElementById("lf-a");

@@ -1073,3 +1073,15 @@ main {
 .lf-check { display: flex; align-items: center; gap: 8px; font-size: 17px; padding-bottom: 12px; }
 .lf-check input { width: 22px; height: 22px; }
 .lens-form select.lens-select { height: 52px; }
+
+/* Supplier switch under the finder form: ZEISS vs Hoya has to be unmissable. */
+.lf-supplier { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 6px; }
+.lf-radio {
+    display: flex; align-items: center; gap: 8px; font-size: 16px;
+    padding: 8px 14px; border-radius: 999px; border: 2px solid var(--line); background: #fff;
+}
+.lf-radio input { width: 20px; height: 20px; }
+.lf-radio:has(input:checked) { border-color: var(--green); background: #dff0e8; }
+.lf-radio-hoya:has(input:checked) { border-color: #b8860b; background: #fff3d6; }
+.verdict-hoya { border-style: dashed; border-color: #b8860b; background: #fff3d6; color: #5a4200; }
+.chip-other { background: #fff3d6; border-color: #d9b45c; color: #5a4200; }
