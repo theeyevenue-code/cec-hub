@@ -267,11 +267,15 @@ that, not from the PDF. What it gives, per product family × index × material v
   Sun UV and Mirror only on tinted/polarised.
 - Design/material codes (p35, p39, p59) for `code` on made-to-order rows where the V2 schedule
   has no ZEISS order number.
-- Not in the guide: Synchrony (still book-only — ask Eoin for the Synchrony equivalent), and
-  MyoCare/Sport/Safety (skip).
+- Not in the guide: Synchrony — its price book is the only range source and there is no separate
+  guide on Drive. The pages for the lines Concord uses are in **`lenses/synchrony-rx-ranges.txt`**
+  (FSV stock, SV grind, Ultra HDV, Performance HD, Curves + D28 bifocal, Work & Office HD, services,
+  coatings/tints). Same rectangle semantics; add ranges and cyl limits are in the same row. Build
+  Synchrony rows from that file. MyoCare/Sport/Safety: skip.
 
 **So the amber "confirm in VISUSTORE" note is NOT needed for ZEISS rows** whose range comes from the
-guide. Keep it only on Synchrony rows and on any ZEISS row the guide doesn't cover.
+guide. Synchrony rows carry a softer note ("range from the price book") — same numbers, but no
+independent guide to cross-check against.
 
 ## 7. Out of scope (say so if asked)
 

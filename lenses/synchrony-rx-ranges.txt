@@ -1,0 +1,247 @@
+# Rx ranges + book prices for the synchrony lines Concord uses (staff sheet 15 Sep 2026).
+# Source: synchrony Price Book L20 AU July 2026 (Drive: CEC-Reference and Images; text copy in
+# cec-second-brain/price-lists/supplier-price-books/synchrony-L20-2026-07.txt). synchrony has no
+# separate product/availability guide on Drive — the price book IS the range source.
+# Prices are L20 BOOK: multiply by 0.625 for L50 (to ~11 Mar 2027) then 0.9375 for L25;
+# V2-schedule deal prices override where quoted. * = maximum combined power. Per piece ex GST.
+# Pages kept: 3, 4, 6, 7, 8, 9, 10, 11. Dropped: Ultra HDC (p5), Access, Work & Go / Read.
+
+--- PAGE 3 --- Finished single vision (stock) — SV Standard tier: SMC70. 1.50 flat 70mm HMC+, SA56HM 1.56 aspheric, SA60HM 1.60; FSV Clear HC (tintable)
+synchrony Finished Single Vision (Stock)
+synchrony Finished Single Vision (Stock) | Design | Diameter | Rx Range | Net Price
+65mm | 0.00* to +6.00 | -2.00 | $4.25
+FSV Clear HC (tintable) | Spherical | 70mm | -6.00* to +4.00 | -2.00 | $4.25
+75mm | -4.00* to +4.00 | -2.00 | $8.05
+FSV Clear HMC+ | Spherical | 65mm | 0.00* to +6.00 | -2.00 | $7.55
+1.50 | 70mm | -6.00* to +6.00 | -2.00 | $7.55
+FSV Photo Grey DSHC | Spherical | 65mm | +0.25 to +4.00 | -2.00 | $22.70
+70mm | -6.00* to 0.00 | -2.00 | $22.70
+FSV Photo Grey HMC+ | Spherical | 65mm | 0.00 to +4.00 | -2.00 | $25.20
+70mm | -6.00* to 0.00 | -2.00 | $25.20
+FSV Trivex DSHC | Spherical | 65mm | +0.25 to +4.00 | -2.00 | $15.10
+1.53 | 70mm | -4.00 to 0.00 | -2.00 | $15.10
+FSV Trivex HMC | Spherical | 65mm | +0.25 to +4.00 | -2.00 | $22.15
+70mm | -4.00 to 0.00 | -2.00 | $22.15
+1.56 | FSV Clear HMC+ | Aspheric | 65mm | +0.25 to +6.00 | -2.00 | $5.05
+73mm | -6.00* to 0.00 | -2.00 | $5.05
+1.60 | FSV Clear HMC+ | Aspheric | 65mm | +0.25 to +6.00 | -2.00 | $22.15
+70/75mm | -8.00* to 0.00 | -3.00 | $22.15
+65mm | +2.25 to +6.00 | -2.00 | $34.30
+1.67 | FSV Clear HMC+ | Aspheric | 70mm | +0.25 to +2.00 | -2.00 | $34.30
+70mm | -10.00* to -6.25 | -2.00 | $34.30
+75mm | 0.00 to +6.00 | -2.00 | $34.30
+synchrony Finished Single Vision - Plano | Diameter | Rx Range | Net Price
+1.50 | FSV Smoke Grey/ Warm Brown/ Pioneer | - | 71mm | $6.05Plano
+FSV Sunlens Grey/ Brown/ Pioneer/ Clear | Box of 100 | 71mm | $252.20Plano
+*Maximum combined power
+Pricing per piece ex GST
+
+--- PAGE 4 --- Single vision GRIND — leftover grind, polarised (plan D)
+synchrony Single Vision (Grind)
+Net Price
+Single Vision Spherical | Rx Range | HMC+®
+HMC+® | HMC Blue ® | Back Surface | HC
+MultiCoat
+Clear | -10.75* to +10.50 | 5.00 | $43.70 | $46.75 | - | $23.50
+1.50 | Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -10.00* to +7.00 | 5.50 | $70.60 | $73.65 | - | $50.40
+Polarised Grey/ Brown/ Pioneer | -7.00* to +6.00 | 6.00 | $70.60 | - | $69.50 | $50.40
+1.53 | Clear | -7.00* to +7.00 | 4.00 | $60.50 | $63.55 | - | $40.30
+Polarised Grey/ Brown | -4.00* to +7.00 | 4.00 | $90.80 | - | $89.70 | $70.60
+Clear | -10.00* to +6.00 | 6.00 | $60.50 | - | - | $40.30
+1.59 | Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -10.00* to +6.00 | 6.00 | $90.80 | $93.85 | - | $70.60
+Polarised Grey/ Brown/ Pioneer | -10.00* to +8.00 | 6.00 | $90.80 | - | $89.70 | $70.60
+Clear | -12.00* to +7.00 | 6.00 | $65.65 | $68.70 | - | $45.45
+1.60 | Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -12.00* to +8.00 | 6.00 | $95.90 | $98.95 | - | $75.70
+Polarised Grey/ Brown/ Pioneer | -12.00* to +8.00 | 6.00 | $95.90 | - | $94.80 | $75.70
+Clear | -13.00* to +10.00 | 6.00 | $90.80 | $93.85 | - | -
+1.67 | Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -13.00* to +8.00 | 6.00 | $121.10 | $124.15 | - | -
+Polarised Grey/ Brown | -12.00* to +8.00 | 6.00 | $121.10 | - | $120.00 | -
+*Maximum combined power
+synchrony Mirror only available on tinted 1.50 and 1.60 materials
+synchrony Mirror comes standard with HMC+ Back Surface Multi-Coat
+HMC Blue is not available on tinted or polarised material.
+Pricing per piece ex GST
+
+--- PAGE 6 --- Progressive Ultra HDV — Essential tier
+synchrony Progressives
+Net Price
+synchrony Progressive Ultra HDV | Rx Range | Add | HMC+®
+HMC+® | HMC Blue ® | Back Surface | HC
+MultiCoat
+Clear | -10.00* to +6.00 | 6.00 | 0.75 to 3.50 | $60.50 | $63.55 | - | $40.30
+1.50 | Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -10.00* to +6.00 | 6.00 | 0.75 to 3.50 | $90.80 | $93.85 | - | $70.60
+Polarised Grey/Brown/Pioneer | -8.00* to +6.00 | 6.00 | 0.75 to 3.50 | $90.80 | - | $89.70 | $70.60
+1.53 | Clear | -7.00* to +5.00 | 3.50 | 0.75 to 3.50 | $80.75 | $83.80 | - | $60.55
+Polarised Grey/ Brown | -4.50* to +5.00 | 3.50 | 0.75 to 3.50 | $111.00 | - | $109.90 | $90.80
+Clear | -9.00* to +6.00 | 6.00 | 0.75 to 3.50 | $80.75 | $83.80 | - | $60.55
+1.59 | Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -9.00* to +6.00 | 6.00 | 0.75 to 3.50 | $111.00 | $114.05 | - | $90.80
+Polarised Grey/Brown/Pioneer | -9.00* to +6.00 | 6.00 | 0.75 to 3.50 | $111.00 | - | $109.90 | $90.80
+Clear | -12.00* to +6.00 | 6.00 | 0.75 to 3.50 | $85.80 | $88.85 | - | $65.60
+1.60 | Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -12.00* to +6.00 | 6.00 | 0.75 to 3.50 | $116.05 | $119.10 | - | $95.85
+Polarised Grey/Brown/Pioneer | -12.00* to +6.00 | 6.00 | 0.75 to 3.50 | $116.05 | - | $114.95 | $95.85
+1.67 | Clear | -12.00* to +8.00 | 6.00 | 0.75 to 3.50 | $111.00 | $114.05 | - | -
+Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -12.00* to +8.00 | 6.00 | 0.75 to 3.50 | $141.30 | $144.35 | - | -
+Polarised Grey/Brown/Pioneer | -11.00* to +6.00 | 6.00 | 0.75 to 3.50 | $141.30 | $144.35 | - | -
+1.74 | Clear | -16.00* to +10.00 | 6.00 | 0.75 to 3.50 | $126.10 | $129.15 | - | -
+*Maximum combined power
+synchrony Mirror only available on tinted 1.50 and 1.60 materials
+All synchrony Mirror comes standard with HMC+ Back Surface Multi-Coat
+HMC Blue is not available on tinted or polarised material.
+Pricing per piece ex GST
+
+--- PAGE 7 --- Progressive Performance HD (+ Short) — quoted in V2 schedule
+synchrony Progressives
+Net Price
+synchrony Performance HD (Short or Regular Corridor) | Rx Range | Add | HMC+®
+HMC+® | HMC Blue ® | Back Surface | HC
+MultiCoat
+Clear | -10.00* to +6.00 | 6.00 | 0.75 to 3.50 | $51.30 | $54.35 | - | $31.10
+1.50 | Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -10.00* to +6.00 | 6.00 | 0.75 to 3.50 | $77.90 | $80.95 | - | $57.70
+Polarised Grey/Brown/Pioneer | -8.00* to +6.00 | 6.00 | 0.75 to 3.50 | $77.90 | - | $76.80 | $57.70
+1.53 | Clear | -7.00* to +5.00 | 3.50 | 0.75 to 3.50 | $68.15 | $71.20 | - | $47.95
+Polarised Grey/ Brown | -4.50* to +5.00 | 3.50 | 0.75 to 3.50 | $98.40 | - | $97.30 | $78.20
+Clear | -9.00* to +6.00 | 6.00 | 0.75 to 3.50 | $68.15 | $71.20 | - | $47.95
+1.59 | Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -9.00* to +6.00 | 6.00 | 0.75 to 3.50 | $98.40 | $101.45 | - | $78.20
+Polarised Grey/Brown/Pioneer | -9.00* to +6.00 | 6.00 | 0.75 to 3.50 | $98.40 | - | $97.30 | $78.20
+Clear | -12.00* to +6.00 | 6.00 | 0.75 to 3.50 | $73.25 | $76.30 | - | $53.05
+1.60 | Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -12.00* to +6.00 | 6.00 | 0.75 to 3.50 | $103.50 | $106.55 | - | $83.30
+Polarised Grey/Brown/Pioneer | -12.00* to +6.00 | 6.00 | 0.75 to 3.50 | $103.50 | - | $102.40 | $83.30
+1.67 | Clear | -12.00* to +8.00 | 6.00 | 0.75 to 3.50 | $98.40 | $101.45 | - | -
+Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -12.00* to +8.00 | 6.00 | 0.75 to 3.50 | $128.70 | $131.75 | - | -
+Polarised Grey/Brown/Pioneer | -11.00* to +6.00 | 6.00 | 0.75 to 3.50 | $128.70 | $131.75 | - | -
+1.74 | Clear | -16.00* to +10.00 | 6.00 | 0.75 to 3.50 | $113.55 | $116.60 | - | -
+*Maximum combined power
+synchrony Mirror only available on tinted 1.50 and 1.60 materials
+All synchrony Mirror comes standard with HMC+ Back Surface Multi-Coat
+HMC Blue is not available on tinted or polarised material.
+Pricing per piece ex GST
+
+--- PAGE 8 --- Curves (wrap) + Bifocals & Trifocals — D28 bifocal
+synchrony Curves
+Net Price
+synchrony Single Vision Curves HDC | Rx Range | Add | HMC+®
+HMC+® | HMC Blue ® | Back Surface | HC
+MultiCoat
+Clear | -4.00* to +6.00 | 4.00 | - | $80.75 | $83.80 | - | $60.55
+1.60 | Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -4.00* to +6.00 | 4.00 | - | $111.00 | $114.05 | - | $90.80
+Polarised Grey/Brown/Pioneer | -6.00* to +6.00 | 4.00 | - | $111.00 | - | $109.90 | $90.80
+Net Price
+synchrony Progressive Curves HDC | Rx Range | Add | HMC+®
+HMC+® | HMC Blue ® | Back Surface | HC
+MultiCoat
+Clear | -4.00* to +4.00 | 4.00 | 0.75 to 3.50 | $85.80 | $88.85 | - | $65.60
+1.60 | Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -4.00* to +4.00 | 4.00 | 0.75 to 3.50 | $116.05 | $119.10 | $114.95 | $95.85
+Polarised Grey/Brown/Pioneer | -6.00* to +6.00 | 4.00 | 0.75 to 3.50 | $116.05 | - | $114.95 | $95.85
+synchrony Bifocals & Trifocals
+Net Price
+synchrony Bifocal | Rx Range | Add | HMC+®
+HMC+® | HMC Blue ® | Back Surface | HC
+MultiCoat
+D28 Clear | -8.00* to +8.00 | 4.00 | 1.00 to 3.50 | $44.20 | $47.25 | - | $24.00
+D28 Clear (76mm) | -8.00* to +8.00 | 4.00 | 1.00 to 3.50 | $44.20 | $47.25 | - | $24.00
+1.50 | D28 Photo Grey/Brown | -8.00* to +6.00 | 6.00 | 1.00 to 3.00 | $70.60 | $73.65 | - | $50.40
+D28 Polarised Grey/Brown | -8.00* to +6.00 | 4.00 | 1.00 to 3.00 | $70.60 | - | $69.50 | $50.40
+D35 Clear (76mm) | -10.00* to +8.00 | 4.00 | 1.00 to 3.00 | $45.45 | $48.50 | - | $25.25
+D35 Transitions Grey | -6.00* to +4.50 | 4.00 | 1.00 to 3.00 | $85.80 | - | - | $65.60
+1.53 | D28 Clear | -9.00* to +7.00 | 4.00 | 1.00 to 3.50 | $65.65 | $68.70 | - | $45.45
+D28 Transitions® Grey | -9.00* to +7.00 | 4.00 | 1.00 to 3.50 | $95.90 | - | - | $75.70
+1.59 | D28 Clear | -12.00* to +6.00 | 6.00 | 1.00 to 3.00 | $65.65 | $68.70 | - | $45.45
+1.60 | D28 Clear | -10.00* to +6.00 | 4.00 | 1.00 to 3.00 | $95.90 | $98.95 | - | $75.70
+Net Price
+synchrony Trifocal | Rx Range | Add | HMC+®
+HMC+® | HMC Blue ® | Back Surface | HC
+MultiCoat
+1.50 | D28/7 Clear | -7.00* to +8.00 | 4.00 | 1.50 to 3.50, 4.00 | $70.60 | $73.65 | - | $50.40
+*Maximum combined power
+synchrony Mirror only available on tinted 1.50 and 1.60 materials
+All synchrony Mirror comes standard with HMC+ Back Surface Multi-Coat
+HMC Blue is not available on tinted or polarised material.
+Pricing per piece ex GST
+
+--- PAGE 9 --- Workplace — Work & Office HD = Desk Pair tier
+synchrony Workplace
+synchrony Work & Go HD | Rx Range | Add | Net Price
+HMC+® | HMC Blue ® | HC
+1.50 | Clear | -10.00* to +6.00 | 6.00 | 0.75 to 3.50 | $55.50 | $58.55 | $35.30
+Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -10.00* to +6.00 | 6.00 | 0.75 to 3.50 | $85.80 | $88.85 | $65.60
+1.53 | Clear | -7.00* to +5.00 | 3.50 | 0.75 to 3.50 | $75.70 | $78.75 | $55.50
+1.59 | Clear | -9.00* to +6.00 | 6.00 | 0.75 to 3.50 | $75.70 | $78.75 | $55.50
+Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -9.00* to +6.00 | 6.00 | 0.75 to 3.50 | $105.90 | $108.95 | $85.70
+1.60 | Clear | -12.00* to +6.00 | 6.00 | 0.75 to 3.50 | $80.75 | $83.80 | $60.55
+Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -12.00* to +6.00 | 6.00 | 0.75 to 3.50 | $100.95 | $104.00 | $80.75
+1.67 | Clear | -12.00* to +8.00 | 6.00 | 0.75 to 3.50 | $105.90 | $108.95 | -
+Photo Grey/Brown/Pioneer/Extra Grey/Blue/Burgundy/Black | -12.00* to +8.00 | 6.00 | 0.75 to 3.50 | $136.30 | $139.35 | -
+1.74 | Clear | -16.00* to +10.00 | 6.00 | 0.75 to 3.50 | $121.10 | $124.15 | -
+synchrony Work & Office HD | Rx Range | Add | Net Price
+(Short or Regular Corridor) | HMC+® | HMC Blue ® | HC
+1.50 | Clear | -10.00* to +6.00 | 6.00 | 0.75 to 3.50 | $55.50 | $58.55 | $35.30
+1.53 | Clear | -7.00* to +5.00 | 3.50 | 0.75 to 3.50 | $75.70 | $78.75 | $55.50
+1.59 | Clear | -9.00* to +6.00 | 6.00 | 0.75 to 3.50 | $75.70 | $78.75 | $55.50
+1.60 | Clear | -12.00* to +6.00 | 6.00 | 0.75 to 3.50 | $80.75 | $83.80 | $60.55
+1.67 | Clear | -12.00* to +8.00 | 6.00 | 0.75 to 3.50 | $105.90 | $108.95 | -
+synchrony Work & Read HD | Rx Range | Add | Net Price
+HMC+® | HMC Blue ® | HC
+1.50 | Clear | -10.00* to +6.00 | 6.00 | 0.75 to 3.50 | $55.50 | $58.55 | $35.30
+1.53 | Clear | -7.00* to +5.00 | 3.50 | 0.75 to 3.50 | $75.70 | $78.75 | $55.50
+1.59 | Clear | -9.00* to +6.00 | 6.00 | 0.75 to 3.50 | $75.70 | $78.75 | $55.50
+1.60 | Clear | -12.00* to +6.00 | 6.00 | 0.75 to 3.50 | $80.75 | $83.80 | $60.55
+1.67 | Clear | -12.00* to +8.00 | 6.00 | 0.75 to 3.50 | $105.90 | $108.95 | -
+synchrony Access HD (Low or High Shift) | Rx Range | Add | Net Price
+HMC+ | HMC Blue | HC
+1.60 | Clear | -11.00* to +8.00 | (-6.00) | - | $79.20 | $82.25 | $59.00
+1.67 | Clear | -6.00* to +8.00 | (-4.50) | - | $103.50 | $106.55 | -
+synchrony Access (Low or High Shift) | Rx Range | Add | Net Price
+HMC+ | HMC Blue | HC
+1.50 | Clear | -6.00* to +6.00 | (-4.00) | - | $46.85 | $49.90 | $26.65
+1.59 | Clear | -2.00* to +4.00 | (-4.00) | - | $65.65 | $68.70 | $45.45
+*Maximum combined power
+synchrony Mirror only available on tinted 1.50 and 1.60 materials
+All synchrony Mirror comes standard with HMC+ Back Surface Multi-Coat
+HMC Blue is not available on tinted or polarised material.
+Pricing per piece ex GST
+
+--- PAGE 10 --- Fitting & services (cyl surcharges, out-of-range)
+synchrony Coatings, Tints & Services
+Fitting | Net Price | Services | Net Price
+Remote Trace & Edge - Shell/Metal | $4.20 | Polished Edges | $6.85
+Remote Trace & Edge - Nylon | $7.70 | Paint Groove | $15.00
+Remote Edge & Drill - Rimless | $14.90 | Outside Power Range Level 1 | $16.40
+Remote Trace & Edge - Reverse Bevel | $14.90 | Outside Power Range Level 2 (Technical) | $25.25
+Shell/Metal Fit | $6.50 | Curve Over Range Charge | $16.40
+Nylon Fit | $9.35 | Cyls 4.25D to 5.75D | $13.75
+Rimless Fit | $25.70 | Cyls 6.00D to 7.75D | $16.40
+Wrap Fit | $18.60 | Cyls 8.00D to 10.00D | $19.20
+Lindberg Nylon Fit | $15.85 | Prism 3.00 and over | $8.20
+Lindberg Rimless Fit | $31.70 | Prism 5.00 and over | $28.80
+Flair Rimless Fit | $36.05 | Over Prism Level 3 Charge | $35.80
+Complex Fit | $15.00 | Fresnell Prism | $123.40
+Complex Wrap Fit | $22.20 | Solder Repair | $27.80
+Reverse Bevel Fit | $16.85 | Shell Frame Repair | $27.80
+Lindberg Reverse Bevel | $22.80 | Supply and Attach Nose Pad | $10.70
+Certified Safety Fit | $14.25 | Drill Out and Replace Screw | $27.80
+Custom Made Former | $16.85 | Nylon Repair | $27.80
+Facet Edge | $73.25
+Franklin Fit | $73.25 | Pricing per piece ex GST
+Change over same size and shape (own risk) | $6.85
+Change over edge and fit (own risk) | $13.75
+Pricing per piece ex GST
+
+--- PAGE 11 --- Coatings & tints
+synchrony Coatings and Tints
+synchrony Coatings | Net Price
+HMC+® Multi-Coat | $20.20
+HMC+® Back Surface Multi-Coat | $19.10
+HMC Blue Multi-Coat | $23.25
+synchrony Mirror - Silver/Bronze/Strong Blue/Green/Red | $40.30
+Tints | Net Price
+Solid Tint | $7.10
+Graduated Tint | $9.85
+Enhanced Solid Tint | $8.40
+Enhanced Gradient Tint | $11.85
+Enhanced Double Gradient Tint # | $13.75
+Solid Match Tint (1.5 clear HC only) | $11.85
+Graduated Match Tint (1.5 Clear HC only) | $14.55
+UV Treatment | $7.30
+Specialty Tints # | $35.50
+Remove/Reduce Tint | $5.90
+Pricing per piece ex GST
