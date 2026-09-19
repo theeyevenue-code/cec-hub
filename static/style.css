@@ -1346,3 +1346,45 @@ body.lens-mono main { background: #fafafa; }
 .lens-page .key-sync::before  { background: var(--c-sync); }
 .lens-page .key-hoya::before  { background: var(--c-hoya); }
 .lens-page .key-price::before { background: var(--c-price); }
+
+
+/* --- Lens Finder: the options as a real table (Mark, 20 Sep) ---------------------
+   Index first and biggest, then supplier, lens, stock/grind, blank, range, cost, sell.
+   Straight columns, hairlines, numbers right-aligned in tabular figures. */
+.lens-page .opt-scroll { border: 1px solid var(--lp-rule); border-radius: 6px; margin-top: 6px; }
+.lens-page .opt-table { border-collapse: collapse; width: 100%; font-size: 16px; font-variant-numeric: tabular-nums; }
+.lens-page .opt-table th { background: #f5f5f5; color: var(--lp-mute); font-size: 12px; font-weight: 600;
+    letter-spacing: .06em; text-transform: uppercase; padding: 9px 12px; border-bottom: 1px solid var(--lp-rule);
+    text-align: left; white-space: nowrap; }
+.lens-page .opt-table td { padding: 10px 12px; border-bottom: 1px solid var(--lp-rule-soft); vertical-align: top; }
+.lens-page .opt-table tr:last-child td { border-bottom: none; }
+.lens-page .opt-table .c-idx { font-size: 22px; font-weight: 700; color: var(--lp-ink); width: 76px; padding-left: 14px; }
+.lens-page .opt-table .c-sup { font-weight: 700; font-size: 14px; letter-spacing: .02em; white-space: nowrap; }
+.lens-page .sup-zeiss { color: var(--c-zeiss); }
+.lens-page .sup-sync  { color: var(--c-sync); }
+.lens-page .sup-other { color: var(--c-hoya); }
+.lens-page .opt-table .c-lens { min-width: 240px; }
+.lens-page .opt-table .lens-name { font-size: 17px; font-weight: 700; color: var(--lp-ink); }
+.lens-page .opt-table .lens-sub { display: block; font-size: 13px; color: var(--lp-mute); margin-top: 2px; }
+.lens-page .opt-table .c-lens .chip { font-size: 11px; padding: 1px 7px; vertical-align: middle; margin-left: 4px; }
+.lens-page .chip-pick { background: var(--c-stock-bg); border-color: var(--c-stock); color: var(--c-stock); }
+.lens-page .opt-grind .chip-pick { background: var(--c-grind-bg); border-color: var(--c-grind); color: var(--c-grind); }
+.lens-page .opt-table .c-type { font-weight: 700; white-space: nowrap; }
+.lens-page .opt-stock .c-type { color: var(--c-stock); }
+.lens-page .opt-grind .c-type { color: var(--c-grind); }
+.lens-page .opt-table .c-blank, .lens-page .opt-table .c-range, .lens-page .opt-table .c-cyl { white-space: nowrap; color: var(--lp-text); }
+.lens-page .opt-table .c-cost { text-align: right; white-space: nowrap; font-weight: 700; font-size: 18px; color: var(--lp-ink); }
+.lens-page .opt-table .c-cost .chip-basis { display: block; margin: 2px 0 0 auto; width: max-content; font-weight: 600; }
+.lens-page .opt-table .cost-diff { display: block; font-size: 12px; font-weight: 500; color: var(--lp-mute); }
+.lens-page .opt-table .c-sell { text-align: right; white-space: nowrap; font-weight: 700; color: var(--c-stock); font-size: 17px; }
+.lens-page .opt-table th.c-cost, .lens-page .opt-table th.c-sell { text-align: right; }
+/* Row tint: the pick, and stock vs grind, by a coloured left edge — nothing else. */
+.lens-page .opt-row td:first-child { border-left: 5px solid transparent; }
+.lens-page .opt-stock td:first-child { border-left-color: var(--c-stock); }
+.lens-page .opt-grind td:first-child { border-left-color: var(--c-grind); }
+.lens-page .opt-best td { background: #f4faf6; }
+.lens-page .opt-best.opt-grind td { background: #fffaf0; }
+.lens-page .opt-thick .c-idx, .lens-page .opt-thick .lens-name { color: var(--lp-mute); }
+.lens-page .opt-retired td { color: #999; }
+.lens-page .opt-retired .c-idx, .lens-page .opt-retired .lens-name, .lens-page .opt-retired .c-sup, .lens-page .opt-retired .c-type, .lens-page .opt-retired .c-sell { color: #999; }
+.lens-page .opt-table .warn-note { font-size: 13px; margin-top: 2px; }
