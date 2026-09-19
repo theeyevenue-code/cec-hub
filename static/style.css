@@ -1085,3 +1085,97 @@ main {
 .lf-radio-hoya:has(input:checked) { border-color: #b8860b; background: #fff3d6; }
 .verdict-hoya { border-style: dashed; border-color: #b8860b; background: #fff3d6; color: #5a4200; }
 .chip-other { background: #fff3d6; border-color: #d9b45c; color: #5a4200; }
+
+
+/* --- Lens Finder design pass (Sep 2026): readable from a metre ------------------ */
+/* Order of size: STOCK/GRIND word > lens name > the facts (cost, blank, sells) >
+   everything else. Colour says only one thing: green = stock, amber = grind. */
+.rx-line { font-size: 16px; color: var(--muted); margin: 18px 0 10px; }
+
+.answer {
+    display: grid; grid-template-columns: 200px 1fr; gap: 8px 28px; align-items: start;
+    border-radius: 18px; border: 3px solid var(--line); padding: 22px 26px 20px;
+    margin-bottom: 18px; background: #fff;
+}
+.answer-stock { border-color: var(--green); background: #eaf6f0; }
+.answer-grind { border-color: var(--amber-line); background: #fff8e6; }
+.answer-none  { border-color: #bbb; background: #f3f3f3; }
+.answer-hoya  { border-style: dashed; border-color: #b8860b; background: #fff3d6; }
+.ans-tag {
+    grid-column: 1 / -1; font-size: 14px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: #5a4200;
+}
+.ans-word {
+    font-family: 'Urbanist', 'Work Sans', sans-serif; font-size: 58px; font-weight: 800;
+    line-height: 1; letter-spacing: .02em; display: flex; flex-direction: column; gap: 6px;
+    padding-top: 4px;
+}
+.answer-stock .ans-word { color: #1d5741; }
+.answer-grind .ans-word { color: #7a5a00; }
+.answer-none  .ans-word { color: #555; font-size: 40px; }
+.ans-word small { font-family: 'Work Sans', sans-serif; font-size: 15px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.ans-body { min-width: 0; }
+.ans-name { font-size: 28px; font-weight: 800; color: var(--ink); line-height: 1.25; margin: 2px 0 12px; }
+.ans-name .chip-sup { font-size: 14px; vertical-align: middle; position: relative; top: -3px; }
+.ans-facts { display: flex; flex-wrap: wrap; gap: 8px 30px; margin-bottom: 12px; }
+.ans-fact { display: flex; flex-direction: column; gap: 0; }
+.ans-fact .k { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.ans-fact .v { font-size: 24px; font-weight: 700; color: var(--ink); line-height: 1.2; white-space: nowrap; }
+.ans-fact .u { font-size: 14px; font-weight: 600; color: var(--muted); margin-left: 3px; }
+.ans-cost .v { font-size: 34px; }
+.ans-sell .v { color: var(--green-deep); }
+.ans-basis {
+    display: inline-block; vertical-align: middle; margin-left: 8px; font-size: 13px; font-weight: 700;
+    padding: 2px 9px; border-radius: 999px; background: #dff0e8; color: #1d5741; border: 1px solid var(--green);
+    position: relative; top: -4px;
+}
+.ans-basis-promo { background: var(--amber-bg); color: var(--amber-ink); border-color: var(--amber-line); }
+.ans-alt { font-size: 17px; color: var(--body); margin-bottom: 8px; }
+.ans-diff-more { color: var(--amber-ink); font-weight: 700; }
+.ans-diff-less { color: var(--muted); }
+.ans-why { font-size: 15px; line-height: 1.5; color: var(--muted); border-top: 1px solid rgba(0,0,0,.08); padding-top: 8px; margin-top: 4px; }
+.answer .warn-note { font-size: 15px; }
+
+.opts-head { font-size: 14px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; }
+.opts { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }
+.opt {
+    display: grid; grid-template-columns: 72px 1fr auto; gap: 14px; align-items: center;
+    padding: 10px 14px 10px 10px; border-bottom: 1px solid var(--line); border-left: 6px solid var(--line);
+}
+.opt:last-child { border-bottom: none; }
+.opt-stock { border-left-color: var(--green); }
+.opt-grind { border-left-color: var(--amber-line); }
+.opt-type { font-size: 14px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; text-align: center;
+    padding: 5px 0; border-radius: 8px; }
+.opt-stock .opt-type { background: #dff0e8; color: #1d5741; }
+.opt-grind .opt-type { background: var(--amber-bg); color: var(--amber-ink); }
+.opt-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.opt-name { font-size: 19px; font-weight: 700; color: var(--ink); }
+.opt-name .chip { vertical-align: middle; position: relative; top: -2px; }
+.opt-meta, .opt-others { font-size: 14px; color: var(--muted); }
+.opt-main .warn-note { font-size: 14px; }
+.opt-price { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; white-space: nowrap; }
+.opt-cost { font-size: 22px; font-weight: 800; color: var(--ink); }
+.opt-nocost { font-size: 16px; color: var(--muted); font-weight: 600; }
+.opt-diff { font-size: 14px; color: var(--muted); }
+.opt-sell { font-size: 14px; font-weight: 700; color: var(--green-deep); }
+.opt-thick .opt-name, .opt-thick .opt-cost { color: #5b6b62; }
+.opt-retired { background: #f6f6f6; }
+.opt-retired .opt-name, .opt-retired .opt-cost { color: #666; }
+.opt-retired .opt-type { background: #e6e6e6; color: #555; }
+
+@media (max-width: 760px) {
+    .answer { grid-template-columns: 1fr; gap: 10px; padding: 18px 18px 16px; }
+    .ans-word { font-size: 46px; flex-direction: row; align-items: baseline; gap: 12px; }
+    .ans-name { font-size: 24px; }
+    .ans-cost .v { font-size: 28px; }
+    .opt { grid-template-columns: 62px 1fr; }
+    .opt-price { grid-column: 2; flex-direction: row; gap: 10px; align-items: baseline; justify-content: flex-start; }
+}
+.ans-sibs { font-size: 15px; color: var(--muted); margin-bottom: 8px; }
+/* Collapsed sections under the results read as something you can open. */
+.miss-details > summary { font-size: 17px; font-weight: 600; color: var(--green-deep); cursor: pointer; list-style: none; padding: 8px 0; }
+.miss-details > summary::before { content: "▸ "; }
+.miss-details[open] > summary::before { content: "▾ "; }
+.miss-details .opts { margin-top: 6px; }

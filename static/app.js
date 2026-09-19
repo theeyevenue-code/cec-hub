@@ -1205,59 +1205,125 @@ function tierBadge(t) {
     return t ? `<span class="chip chip-tier">${esc(t)}</span>` : "";
 }
 
-// One finder row = one lens as it would be ordered (its standard coating),
-// with any other coatings of the same lens folded in underneath.
-function lensRowHTML(g, sell) {
+// --- The answer card ------------------------------------------------------------
+// Built from the pick itself (options[0] with best=true) so the facts staff need
+// at the bench are big: STOCK or GRIND, the lens, its blank, cost and sell price.
+// The engine's verdict sentence — the reasoning — sits underneath in small type.
+function answerCardHTML(data, sells) {
+    const options = data.options || [];
+    const best = options.find((o) => o.best);
+    const hoya = data.supplier === "hoya";
+    const tag = hoya ? `<div class="ans-tag">HOYA · old supplier, for comparison only</div>` : "";
+    if (!best) {
+        return `<div class="answer answer-none ${hoya ? "answer-hoya" : ""}">${tag}
+            <div class="ans-word">NO FIT</div>
+            <div class="ans-body">
+                <div class="ans-name">Nothing loaded covers this Rx</div>
+                <div class="ans-why">${esc(data.verdict || "")}</div>
+            </div></div>`;
+    }
+    const stock = best.type === "stock";
+    const sell = sells[[best.supplier, best.name, fmtIndex(best.index), best.type].join("|")];
+    const sellPrice = sell ? (sell.byCoating[best.coating] != null ? sell.byCoating[best.coating] : sell.any) : null;
+    // The other route, priced: cheapest still-ordered lens of the other type at
+    // a sensible index and the coating we'd actually order.
+    const alt = options.find((o) => o !== best && o.orderable && o.type !== best.type
+        && !o.hard_under && o.standard_coating && o.price_now != null);
+    const fact = (k, v, cls) => `<div class="ans-fact ${cls || ""}"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+    const basis = best.basis === "deal" ? `<span class="ans-basis">deal price</span>`
+        : best.basis === "promo" ? `<span class="ans-basis ans-basis-promo">promo to ${esc(fmtDateLong(PROMO_UNTIL))}</span>` : "";
+    const facts = [
+        fact("index", esc(fmtIndex(best.index))),
+        fact("blank", best.blank_mm != null ? esc(fmtMM(best.blank_mm)) : "made to size"),
+        fact("coating", esc(coatShort(best.coating) || "—")),
+        fact("cost", (best.price_now != null ? esc(fmtMoney(best.price_now)) : "—") + `<span class="u">/lens</span>` + basis, "ans-cost"),
+        sellPrice != null ? fact("sells", `$${esc(sellPrice)}<span class="u">/pair</span>`, "ans-sell") : "",
+        best.code ? fact("order code", esc(best.code)) : "",
+    ].join("");
+    let altLine = "";
+    if (alt) {
+        const diff = alt.price_now - best.price_now;
+        altLine = `<div class="ans-alt"><strong>${alt.type === "stock" ? "Stock" : "Grind"} instead:</strong>
+            ${esc(alt.name)} · ${esc(fmtMoney(alt.price_now))} a lens${
+            diff > 0 ? ` <span class="ans-diff-more">+${esc(fmtMoney(diff))}</span>` :
+            diff < 0 ? ` <span class="ans-diff-less">−${esc(fmtMoney(-diff))} but stock comes first by practice rule</span>` : ""}</div>`;
+    }
+    const notes = (best.warnings || []).map((w) => `<div class="warn-note">⚠ ${esc(w)}</div>`).join("");
+    // Same lens, other coatings — folded into the card so the list below is
+    // only genuinely different lenses.
+    const seen = new Set([best.coating]);
+    const sibs = options.filter((o) => o !== best && sameLens(o, best) && o.price_now != null
+        && !seen.has(o.coating) && seen.add(o.coating));
+    const sibLine = sibs.length ? `<div class="ans-sibs">Other coatings: ${sibs.map((o) =>
+        `${esc(coatShort(o.coating))} ${esc(fmtMoney(o.price_now))}`).join(" · ")}</div>` : "";
+    return `<div class="answer ${stock ? "answer-stock" : "answer-grind"} ${hoya ? "answer-hoya" : ""}">
+        ${tag}
+        <div class="ans-word">${stock ? "STOCK" : "GRIND"}<small>${stock ? "off the shelf" : "made to order"}</small></div>
+        <div class="ans-body">
+            <div class="ans-name">${supplierChip(best.supplier)} ${esc(best.name)}
+                ${best.under_index ? `<span class="chip chip-amber">one step thicker than ideal</span>` : ""}</div>
+            <div class="ans-facts">${facts}</div>
+            ${altLine}${sibLine}
+            ${notes}
+            <div class="ans-why">${esc(data.verdict || "")}</div>
+        </div></div>`;
+}
+
+// --- The other options: one line each, in the order we'd reach for them ------------
+function optionLineHTML(g, best, sells) {
     const l = g.lead;
-    const warnings = (l.warnings || []).map((w) =>
-        `<div class="warn-note">⚠ ${esc(w)}</div>`).join("");
-    const others = g.others.map((o) =>
-        `<div class="cell-sub coat-alt">${esc(coatShort(o.coating))}: ${o.price_now != null ? esc(fmtMoney(o.price_now)) : "no price"}${o.basis === "promo" ? " promo" : ""}</div>`).join("");
-    const tier = sell ? sell.tier : "";
-    const sellPrice = sell && sell.byCoating[l.coating] != null ? sell.byCoating[l.coating] : (sell ? sell.any : null);
-    const rowCls = [l.best ? "best-row" : "", l.under_index ? "thin-row" : "", !l.orderable ? "retired-row" : ""].join(" ");
-    return `<tr class="${rowCls}">
-        <td>${supplierChip(l.supplier)} <strong>${esc(l.name)}</strong>
-            ${l.best ? `<span class="badge-best">★ Use this</span>` : ""}
-            ${tierBadge(tier)}
-            ${l.under_index ? `<span class="chip chip-amber">thick at this power</span>` : ""}
-            ${!l.orderable ? `<span class="chip chip-off">not ordered any more</span>` : ""}
-            ${l.material && !/^clear$/i.test(l.material) ? `<div class="cell-sub">${esc(l.material)}</div>` : ""}
-            ${l.add_range ? `<div class="cell-sub">${esc(l.add_range)}</div>` : ""}
-            ${l.code ? `<div class="cell-sub code-sub">order code ${esc(l.code)}</div>` : ""}
-            <div class="cell-sub" title="${esc(l.coating)}">${esc(coatShort(l.coating))}</div>
-            ${others}
-            ${l.notes && /RANGE DIFFERS/.test(l.notes) ? `<div class="warn-note">⚠ ${esc(l.notes.replace(/^.*RANGE DIFFERS — /, "").replace(/;.*$/, ""))}</div>` : ""}
-            ${warnings}</td>
-        <td>${l.index != null ? esc(fmtIndex(l.index)) : "—"}</td>
-        <td>${typeChip(l.type)}</td>
-        <td>${l.blank_mm != null ? esc(fmtMM(l.blank_mm)) : (l.type === "grind" ? "made to size" : "—")}</td>
-        <td>${l.sph_min != null ? `${esc(fmtPower(l.sph_min))} to ${esc(fmtPower(l.sph_max))}` : "not in file"}
-            ${l.combined_max != null ? `<div class="cell-sub">combined to −${Number(l.combined_max).toFixed(2)}</div>` : ""}</td>
-        <td>${l.cyl_max != null ? "to −" + Number(l.cyl_max).toFixed(2) : "—"}</td>
-        <td>${l.price_now != null ? `<strong>${esc(fmtMoney(l.price_now))}</strong>` : "no price yet"}
+    const sell = sells[[l.supplier, l.name, fmtIndex(l.index), l.type].join("|")];
+    const sellPrice = sell ? (sell.byCoating[l.coating] != null ? sell.byCoating[l.coating] : sell.any) : null;
+    const range = l.sph_min != null
+        ? `${esc(fmtPower(l.sph_min))} to ${esc(fmtPower(l.sph_max))}${l.cyl_max != null ? `, cyl to −${Number(l.cyl_max).toFixed(2)}` : ""}`
+        : "range not in file";
+    const others = g.others.length
+        ? `<span class="opt-others">other coatings: ${g.others.map((o) =>
+            `${esc(coatShort(o.coating))} ${o.price_now != null ? esc(fmtMoney(o.price_now)) : "—"}`).join(" · ")}</span>` : "";
+    const flags = [
+        l.under_index ? `<span class="chip chip-amber">thicker than ideal</span>` : "",
+        !l.orderable ? `<span class="chip chip-off">not ordered any more</span>` : "",
+    ].join("");
+    const warn = (l.warnings || []).filter((w) => !/no longer ordered/.test(w))
+        .map((w) => `<div class="warn-note">⚠ ${esc(w)}</div>`).join("");
+    const guide = l.notes && /RANGE DIFFERS/.test(l.notes)
+        ? `<div class="warn-note">⚠ ${esc(l.notes.replace(/^.*RANGE DIFFERS — /, "").replace(/;.*$/, ""))}</div>` : "";
+    const diff = best && best.price_now != null && l.price_now != null ? l.price_now - best.price_now : null;
+    return `<li class="opt opt-${l.type} ${l.under_index ? "opt-thick" : ""} ${!l.orderable ? "opt-retired" : ""}">
+        <span class="opt-type">${l.type === "stock" ? "Stock" : "Grind"}</span>
+        <span class="opt-main">
+            <span class="opt-name">${supplierChip(l.supplier)} ${esc(l.name)} ${flags}</span>
+            <span class="opt-meta">${esc(fmtIndex(l.index))} · ${l.blank_mm != null ? esc(fmtMM(l.blank_mm)) : "made to size"} · ${esc(coatShort(l.coating))}${l.material && !/^clear$/i.test(l.material) ? " · " + esc(l.material) : ""} · ${range}${l.code ? ` · code ${esc(l.code)}` : ""}</span>
+            ${others}${guide}${warn}
+        </span>
+        <span class="opt-price">${l.price_now != null ? `<span class="opt-cost">${esc(fmtMoney(l.price_now))}</span>` : `<span class="opt-cost opt-nocost">no price</span>`}
             ${basisChip(l.basis)}
-            ${l.dearer_by > 0 ? `<div class="cell-sub">+${esc(fmtMoney(l.dearer_by))} vs the pick</div>` : ""}
-            ${sellPrice != null ? `<div class="cell-sub sell-sub">sells $${esc(sellPrice)} /pr</div>` : ""}</td>
-    </tr>`;
+            ${diff != null && diff !== 0 && !l.best ? `<span class="opt-diff">${diff > 0 ? "+" : "−"}${esc(fmtMoney(Math.abs(diff)))} vs pick</span>` : ""}
+            ${sellPrice != null ? `<span class="opt-sell">sells $${esc(sellPrice)}/pr</span>` : ""}
+        </span>
+    </li>`;
 }
 
 // Fold the flat option rows into one per lens-as-ordered: same supplier,
 // name, type, material and blank; the first row (already sorted: standard
 // coating first) leads, the rest are "other coatings".
+function sameLens(a, b) {
+    return a.supplier === b.supplier && a.name === b.name && a.type === b.type
+        && (a.material || "") === (b.material || "");
+}
 function groupOptions(options) {
     const groups = [], byKey = {};
     for (const o of options) {
-        const key = [o.supplier, o.name, o.type, o.material || "", o.blank_mm || ""].join("|");
+        // A grind is made to size, so its blank bands are one lens; stock
+        // bands are real different blanks.
+        const key = [o.supplier, o.name, o.type, o.material || "",
+                     o.type === "stock" ? (o.blank_mm || "") : ""].join("|");
         let g = byKey[key];
         if (!g) { g = byKey[key] = { lead: o, others: [] }; groups.push(g); }
         else g.others.push(o);
     }
     return groups;
 }
-
-const LENS_TABLE_HEAD = `<tr><th>Lens</th><th>Index</th><th>Stock / grind</th>
-    <th>Blank</th><th>Sphere</th><th>Cyl</th><th>Cost / lens</th></tr>`;
 
 function lensCatalogHTML(cat) {
     if (cat.message) {
@@ -1665,44 +1731,31 @@ async function renderLenses() {
             (supWord ? ` against ${esc(supWord)}` : "") +
             (data.rx.tint ? `, tinted` : "") +
             (data.rx.transposed ? ` <span class="chip chip-amber">plus cyl — transposed to minus form first</span>` : "") +
-            (data.min_blank != null ? `, needing a blank of at least ${esc(fmtMM(data.min_blank))}` : "") +
-            (data.rec_index ? ` · sensible index for this power: <strong>${esc(fmtIndex(data.rec_index))}</strong>` : "");
+            (data.min_blank != null ? `, blank ≥ ${esc(fmtMM(data.min_blank))}` : "") +
+            (data.rec_index ? ` · ideal index <strong>${esc(fmtIndex(data.rec_index))}</strong>` : "");
         const options = data.options || [];
         const misses = data.misses || [];
-        const live = groupOptions(options.filter((o) => o.orderable));
+        const best = options.find((o) => o.best) || null;
+        const live = groupOptions(options.filter((o) => o.orderable && !(best && sameLens(o, best))));
         const retired = groupOptions(options.filter((o) => !o.orderable));
-        const SHOW = 8;
+        const SHOW = 5;
         const shown = live.slice(0, SHOW);
         const rest = live.slice(SHOW);
-        const v = data.verdict || "";
-        const verdictCls = (/STOCK covers/.test(v) ? "verdict verdict-stock"
-            : /GRIND/.test(v) ? "verdict verdict-grind"
-            : options.length ? "verdict verdict-mto" : "verdict verdict-none")
-            + (data.supplier === "hoya" ? " verdict-hoya" : "");
-        const sellFor = (g) => sells[[g.lead.supplier, g.lead.name, fmtIndex(g.lead.index), g.lead.type].join("|")];
         resultsEl.innerHTML = `
-            <div class="updated-line" style="margin-top:18px">${rxLine}</div>
-            <div class="${verdictCls}">${esc(v)}</div>
-            ${shown.length ? `<div class="table-scroll"><table class="stock-table">
-                <thead>${LENS_TABLE_HEAD}</thead>
-                <tbody>${shown.map((g) => lensRowHTML(g, sellFor(g))).join("")}</tbody>
-            </table></div>` : ""}
+            <div class="rx-line">${rxLine}</div>
+            ${answerCardHTML(data, sells)}
+            ${shown.length ? `<div class="opts-head">Other options, in the order we'd reach for them</div>
+                <ul class="opts">${shown.map((g) => optionLineHTML(g, best, sells)).join("")}</ul>` : ""}
             ${rest.length ? `<details class="miss-details">
-                <summary>Show the other ${rest.length} dearer option${rest.length === 1 ? "" : "s"}</summary>
-                <div class="table-scroll"><table class="stock-table">
-                    <thead>${LENS_TABLE_HEAD}</thead>
-                    <tbody>${rest.map((g) => lensRowHTML(g, sellFor(g))).join("")}</tbody>
-                </table></div>
+                <summary>${rest.length} more, dearer</summary>
+                <ul class="opts">${rest.map((g) => optionLineHTML(g, best, sells)).join("")}</ul>
             </details>` : ""}
             ${retired.length ? `<details class="miss-details">
                 <summary>${retired.length} lens${retired.length === 1 ? "" : "es"} we no longer order would also fit</summary>
-                <div class="table-scroll"><table class="stock-table">
-                    <thead>${LENS_TABLE_HEAD}</thead>
-                    <tbody>${retired.slice(0, 20).map((g) => lensRowHTML(g, sellFor(g))).join("")}</tbody>
-                </table></div>
+                <ul class="opts">${retired.slice(0, 20).map((g) => optionLineHTML(g, best, sells)).join("")}</ul>
             </details>` : ""}
             ${misses.length ? `<details class="miss-details">
-                <summary>Why the other ${misses.length} row${misses.length === 1 ? " doesn't" : "s don't"} fit</summary>
+                <summary>Why ${misses.length} other row${misses.length === 1 ? " doesn't" : "s don't"} fit</summary>
                 ${groupOptions(misses).slice(0, 60).map((g) => `<div class="miss-item">
                     ${supplierChip(g.lead.supplier)} <strong>${esc(g.lead.name)}</strong>
                     <span class="cell-sub">${esc(coatShort(g.lead.coating))}${g.lead.blank_mm ? " · " + esc(fmtMM(g.lead.blank_mm)) : ""}</span> —
