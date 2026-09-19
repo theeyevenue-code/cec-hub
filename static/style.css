@@ -1292,3 +1292,57 @@ main {
 .lens-page .retired-row td { background: #fff; color: #999; }
 body.lens-mono { background: #fafafa; }
 body.lens-mono main { background: #fafafa; }
+
+/* --- Lens Finder: colour with one job each (Mark, 20 Sep) ----------------------
+   green = stock · amber = grind / thickness caution · navy = ZEISS · teal = synchrony ·
+   brown = Hoya (old) · violet = a price note (deal / promo). Nothing else is coloured. */
+.lens-page { --c-stock: #1b6b47; --c-stock-bg: #e6f4ec; --c-grind: #9a5b00; --c-grind-bg: #fff3d9;
+    --c-zeiss: #1f3f7a; --c-zeiss-bg: #e7edf8; --c-sync: #0f6a73; --c-sync-bg: #e3f2f3;
+    --c-hoya: #6b4b2a; --c-hoya-bg: #f3ece4; --c-price: #5a3d8f; --c-price-bg: #efe9f8; }
+
+/* Stock / grind */
+.lens-page .answer-stock { border-color: var(--c-stock); border-width: 2px; background: #fff; }
+.lens-page .answer-grind { border-color: var(--c-grind); border-width: 2px; background: #fff; }
+.lens-page .answer-stock .ans-word { color: var(--c-stock); }
+.lens-page .answer-grind .ans-word { color: var(--c-grind); }
+.lens-page .answer-stock .ans-word small, .lens-page .answer-grind .ans-word small { color: inherit; opacity: .8; }
+.lens-page .opt { border-left: 5px solid transparent; padding-left: 10px; }
+.lens-page .opt-stock { border-left-color: var(--c-stock); }
+.lens-page .opt-grind { border-left-color: var(--c-grind); }
+.lens-page .opt-stock .opt-type { color: var(--c-stock); }
+.lens-page .opt-grind .opt-type { color: var(--c-grind); }
+.lens-page .type-chip.type-stock { color: var(--c-stock); }
+.lens-page .type-chip.type-grind { color: var(--c-grind); }
+.lens-page .ans-alt strong { color: var(--lp-ink); }
+.lens-page .answer-stock .ans-alt strong { color: var(--c-grind); }   /* "Grind instead" */
+.lens-page .answer-grind .ans-alt strong { color: var(--c-stock); }   /* "Stock instead" */
+
+/* Thickness caution + warnings: amber ink, no fill */
+.lens-page .chip-amber { border-color: var(--c-grind); color: var(--c-grind); background: #fff; }
+.lens-page .warn-note { color: var(--c-grind); }
+.lens-page .warn-note::before { content: "⚠ "; }
+.lens-page .ans-diff-more { color: var(--c-grind); }
+
+/* Supplier */
+.lens-page .chip-zeiss { background: var(--c-zeiss-bg); border-color: var(--c-zeiss-bg); color: var(--c-zeiss); }
+.lens-page .chip-sync  { background: var(--c-sync-bg);  border-color: var(--c-sync-bg);  color: var(--c-sync); }
+.lens-page .chip-other { background: var(--c-hoya-bg);  border-color: var(--c-hoya-bg);  color: var(--c-hoya); }
+.lens-page .answer-hoya { border-color: var(--c-hoya); border-style: dashed; background: #fbf8f4; }
+.lens-page .answer-hoya .ans-tag { color: var(--c-hoya); }
+.lens-page .lf-radio:has(input[value="hoya"]:checked) { background: var(--c-hoya); }
+
+/* Price notes */
+.lens-page .chip-deal, .lens-page .chip-promo, .lens-page .ans-basis, .lens-page .ans-basis-promo {
+    background: var(--c-price-bg); border-color: var(--c-price-bg); color: var(--c-price); }
+.lens-page .ans-sell .v, .lens-page .opt-sell, .lens-page .lib-table .cec-price { color: var(--c-stock); }
+.lens-page .ans-sell .k, .lens-page .opt-sell { color: var(--c-stock); }
+
+/* Key under the results so the colours explain themselves */
+.lens-page .colour-key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--lp-mute); margin: 8px 0 0; }
+.lens-page .colour-key span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.lens-page .key-stock::before { background: var(--c-stock); }
+.lens-page .key-grind::before { background: var(--c-grind); }
+.lens-page .key-zeiss::before { background: var(--c-zeiss); }
+.lens-page .key-sync::before  { background: var(--c-sync); }
+.lens-page .key-hoya::before  { background: var(--c-hoya); }
+.lens-page .key-price::before { background: var(--c-price); }

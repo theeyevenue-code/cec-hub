@@ -1757,6 +1757,7 @@ async function renderLenses() {
                 <summary>${retired.length} lens${retired.length === 1 ? "" : "es"} we no longer order would also fit</summary>
                 <ul class="opts">${retired.slice(0, 20).map((g) => optionLineHTML(g, best, sells)).join("")}</ul>
             </details>` : ""}
+            <div class="colour-key"><span class="key-stock">stock</span><span class="key-grind">grind, or thicker than ideal</span><span class="key-zeiss">ZEISS</span><span class="key-sync">Synchrony</span><span class="key-hoya">Hoya (old)</span><span class="key-price">price note</span></div>
             ${misses.length ? `<details class="miss-details">
                 <summary>Why ${misses.length} other row${misses.length === 1 ? " doesn't" : "s don't"} fit</summary>
                 ${groupOptions(misses).slice(0, 60).map((g) => `<div class="miss-item">
