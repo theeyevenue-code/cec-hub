@@ -1182,33 +1182,82 @@ function repeatChip(t) {
         ? `<span class="todo-repeat">🔁 ${esc(REPEAT_LABEL[t.repeat.kind] || "repeats")}</span>` : "";
 }
 
-function lensRowHTML(l, extraCellHTML) {
+// Supplier chip + price-basis chip, shared by the finder and the library.
+function supplierChip(s) {
+    if (!s) return "";
+    const cls = /zeiss$/i.test(s) ? "chip-zeiss" : /synchrony/i.test(s) ? "chip-sync" : "chip-other";
+    return `<span class="chip chip-sup ${cls}">${esc(s)}</span>`;
+}
+let PROMO_UNTIL = "";   // filled from /api/lenses
+function fmtDateLong(iso) {
+    // "2027-03-11" -> "11 Mar 2027"
+    const p = String(iso || "").split("-").map(Number);
+    if (p.length !== 3 || !p[0]) return iso || "";
+    return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+}
+function basisChip(basis) {
+    if (!basis) return "";
+    if (basis === "deal") return `<span class="chip chip-basis chip-deal">deal price</span>`;
+    if (basis === "promo") return `<span class="chip chip-basis chip-promo">promo${PROMO_UNTIL ? " to " + esc(fmtDateLong(PROMO_UNTIL)) : ""}</span>`;
+    return `<span class="chip chip-basis">${esc(basis)} book</span>`;
+}
+function tierBadge(t) {
+    return t ? `<span class="chip chip-tier">${esc(t)}</span>` : "";
+}
+
+// One finder row = one lens as it would be ordered (its standard coating),
+// with any other coatings of the same lens folded in underneath.
+function lensRowHTML(g, sell) {
+    const l = g.lead;
     const warnings = (l.warnings || []).map((w) =>
         `<div class="warn-note">⚠ ${esc(w)}</div>`).join("");
-    const meta = (l.category && l.category !== "Single vision") ? l.category : "";
-    return `<tr class="${l.best ? "best-row" : ""} ${l.under_index ? "thin-row" : ""}">
-        <td><strong>${esc((l.brand + " " + l.name).trim())}</strong>
-            ${l.best ? `<span class="badge-best">★ Best value</span>` : ""}
+    const others = g.others.map((o) =>
+        `<div class="cell-sub coat-alt">${esc(coatShort(o.coating))}: ${o.price_now != null ? esc(fmtMoney(o.price_now)) : "no price"}${o.basis === "promo" ? " promo" : ""}</div>`).join("");
+    const tier = sell ? sell.tier : "";
+    const sellPrice = sell && sell.byCoating[l.coating] != null ? sell.byCoating[l.coating] : (sell ? sell.any : null);
+    const rowCls = [l.best ? "best-row" : "", l.under_index ? "thin-row" : "", !l.orderable ? "retired-row" : ""].join(" ");
+    return `<tr class="${rowCls}">
+        <td>${supplierChip(l.supplier)} <strong>${esc(l.name)}</strong>
+            ${l.best ? `<span class="badge-best">★ Use this</span>` : ""}
+            ${tierBadge(tier)}
             ${l.under_index ? `<span class="chip chip-amber">thick at this power</span>` : ""}
-            ${meta ? `<div class="cell-sub design-sub">${esc(meta)}</div>` : ""}
+            ${!l.orderable ? `<span class="chip chip-off">not ordered any more</span>` : ""}
+            ${l.material && !/^clear$/i.test(l.material) ? `<div class="cell-sub">${esc(l.material)}</div>` : ""}
             ${l.add_range ? `<div class="cell-sub">${esc(l.add_range)}</div>` : ""}
-            ${l.code ? `<div class="cell-sub code-sub">${esc(l.code)}</div>` : ""}
-            ${l.coating ? `<div class="cell-sub" title="${esc(l.coating)}">${esc(coatShort(l.coating))}</div>` : ""}
-            ${l.notes ? `<div class="cell-sub">${esc(l.notes)}</div>` : ""}
+            ${l.code ? `<div class="cell-sub code-sub">order code ${esc(l.code)}</div>` : ""}
+            <div class="cell-sub" title="${esc(l.coating)}">${esc(coatShort(l.coating))}</div>
+            ${others}
+            ${l.notes && /RANGE DIFFERS/.test(l.notes) ? `<div class="warn-note">⚠ ${esc(l.notes.replace(/^.*RANGE DIFFERS — /, "").replace(/;.*$/, ""))}</div>` : ""}
             ${warnings}</td>
-        <td>${l.index != null ? esc(l.index) : "—"}</td>
-        <td><span class="chip ${l.type === "stock" ? "chip-on" : ""}">${l.type === "stock" ? "Stock" : "Grind"}</span></td>
+        <td>${l.index != null ? esc(fmtIndex(l.index)) : "—"}</td>
+        <td>${typeChip(l.type)}</td>
         <td>${l.blank_mm != null ? esc(fmtMM(l.blank_mm)) : (l.type === "grind" ? "made to size" : "—")}</td>
-        <td>${l.sph_min != null ? `${esc(fmtPower(l.sph_min))} to ${esc(fmtPower(l.sph_max))}` : "not in file"}</td>
+        <td>${l.sph_min != null ? `${esc(fmtPower(l.sph_min))} to ${esc(fmtPower(l.sph_max))}` : "not in file"}
+            ${l.combined_max != null ? `<div class="cell-sub">combined to −${Number(l.combined_max).toFixed(2)}</div>` : ""}</td>
         <td>${l.cyl_max != null ? "to −" + Number(l.cyl_max).toFixed(2) : "—"}</td>
-        <td>${l.price != null ? esc(fmtMoney(l.price)) : "no price yet"}
-            ${l.dearer_by > 0 ? `<div class="cell-sub">+${esc(fmtMoney(l.dearer_by))} vs best</div>` : ""}</td>
-        ${extraCellHTML || ""}
+        <td>${l.price_now != null ? `<strong>${esc(fmtMoney(l.price_now))}</strong>` : "no price yet"}
+            ${basisChip(l.basis)}
+            ${l.dearer_by > 0 ? `<div class="cell-sub">+${esc(fmtMoney(l.dearer_by))} vs the pick</div>` : ""}
+            ${sellPrice != null ? `<div class="cell-sub sell-sub">sells $${esc(sellPrice)} /pr</div>` : ""}</td>
     </tr>`;
 }
 
-const LENS_TABLE_HEAD = `<tr><th>Lens</th><th>Index</th><th>Type</th>
-    <th>Blank</th><th>Sphere</th><th>Cyl</th><th>Price / lens</th></tr>`;
+// Fold the flat option rows into one per lens-as-ordered: same supplier,
+// name, type, material and blank; the first row (already sorted: standard
+// coating first) leads, the rest are "other coatings".
+function groupOptions(options) {
+    const groups = [], byKey = {};
+    for (const o of options) {
+        const key = [o.supplier, o.name, o.type, o.material || "", o.blank_mm || ""].join("|");
+        let g = byKey[key];
+        if (!g) { g = byKey[key] = { lead: o, others: [] }; groups.push(g); }
+        else g.others.push(o);
+    }
+    return groups;
+}
+
+const LENS_TABLE_HEAD = `<tr><th>Lens</th><th>Index</th><th>Stock / grind</th>
+    <th>Blank</th><th>Sphere</th><th>Cyl</th><th>Cost / lens</th></tr>`;
 
 function lensCatalogHTML(cat) {
     if (cat.message) {
@@ -1219,19 +1268,21 @@ function lensCatalogHTML(cat) {
         <span class="chip">${esc(f.filename)} · ${esc(f.count)} price line${f.count === 1 ? "" : "s"}</span>`).join(" ");
     const errors = (cat.files || []).flatMap((f) => f.errors || []);
     return `<div class="card"><h2>📚 Lens library</h2>
-        <p>One row per lens — pick a coating to see its price. Narrow by type, index or
-        coating, or just type a name or index (e.g. <strong>nulux 1.6</strong>).</p>
-        <p class="lens-note"><strong>/pr sell</strong> = Concord's price per pair · <strong>/lens
-        cost</strong> = Hoya cost. Photochromic is included where a sell price shows; not counted:
-        tint +$50 (grind only), polarised varies.</p>
+        <p>One row per lens — pick a coating to see its price. Narrow by supplier, type, index or
+        coating, or just type a name, code or index (e.g. <strong>clearview 1.67</strong>).</p>
+        <p class="lens-note"><strong>/pr sell</strong> = Concord's price per pair (coating included) ·
+        <strong>/lens cost</strong> = what the lab charges us. <em>deal price</em> is fixed for the
+        ZEISS term; <em>promo</em> is the launch level on unquoted lines${PROMO_UNTIL ? ` until ${esc(fmtDateLong(PROMO_UNTIL))}` : ""},
+        then the book. Greyed lenses are ones we no longer order.</p>
         <div class="lens-filters">
+            <select id="lf-sup" class="lens-select" aria-label="Supplier"></select>
             <select id="lf-cat" class="lens-select" aria-label="Lens type"></select>
             <select id="lf-index" class="lens-select" aria-label="Index"></select>
             <select id="lf-stock" class="lens-select" aria-label="Stock or grind"></select>
             <select id="lf-coat" class="lens-select" aria-label="Coating"></select>
         </div>
         <input class="search-box" id="lens-lookup" type="search" autocomplete="off"
-            placeholder="…or type a name, code or index (e.g. nulux · 1.60 · myself)"
+            placeholder="…or type a name, code or index (e.g. clearview · 1.67 · superb)"
             aria-label="Search lenses">
         <div id="lens-lookup-results"></div>
         <div class="sop-card-meta" style="margin:14px 0 0">${files}</div>
@@ -1245,8 +1296,19 @@ const LIB_TABLE_HEAD = `<tr><th>Lens</th><th>Index</th><th>Type</th><th>Power</t
     <th>Blank</th><th>Coating</th><th>Price</th></tr>`;
 
 // Staff shorthand for the coatings, front and centre. Anything not listed
-// keeps its name minus the "Hi-Vision" tier prefix (so Sun Pro, Meiryo…).
+// keeps its name minus the brand-tier prefix.
 const COATING_SHORT = {
+    "DuraVision Plus Platinum UV": "Platinum",
+    "DuraVision Platinum UV": "Platinum",
+    "DuraVision Plus Gold UV": "Gold",
+    "DuraVision Gold UV": "Gold",
+    "DuraVision Plus Chrome UV": "Chrome",
+    "DuraVision Chrome UV": "Chrome",
+    "DuraVision Plus Sun UV": "Sun (tinted only)",
+    "DSHC hard coat": "hard coat (DSHC)",
+    "HC hard coat": "hard coat (HC)",
+    "Hardcoat UV": "hard coat",
+    "HMC+ Back Surface Multi-Coat": "HMC+ back (polarised)",
     "Hi-Vision ViewProtect": "VP",
     "ViewProtect BlueControl": "VP BlueControl",
     "Diamond Finish": "DF",
@@ -1259,14 +1321,14 @@ const COATING_SHORT = {
 };
 function coatShort(c) {
     if (!c) return "";
-    return COATING_SHORT[c] || c.replace(/^Hi-Vision\s+/, "");
+    return COATING_SHORT[c] || c.replace(/^Hi-Vision\s+/, "").replace(/^DuraVision (Plus )?/, "");
 }
 
 function fmtIndex(v) { return v != null ? Number(v).toFixed(2) : "—"; }
 
 // Power + Blank for a chosen coating, as aligned per-band lines so you can
-// read off which blank a given power comes on. Progressives have no sphere
-// grid — show the ADD range and whatever diameter(s) the file lists.
+// read off which blank a given power comes on. Made-to-order designs show
+// the ADD range beside their one power line.
 function bandCells(p, coat) {
     const bands = (coat && coat.bands) ? coat.bands : [];
     const hasSph = bands.some((b) => b.sph_min != null);
@@ -1274,9 +1336,9 @@ function bandCells(p, coat) {
         const power = bands.map((b) =>
             `<div class="band">${esc(fmtPower(b.sph_min))} to ${esc(fmtPower(b.sph_max))}${
                 b.cyl_max != null ? ` <span class="cell-sub">cyl −${Number(b.cyl_max).toFixed(2)}</span>` : ""
-            }</div>`).join("");
+            }</div>`).join("") + (p.add_range ? `<div class="band"><span class="add-tag">ADD</span> ${esc(p.add_range.replace(/^Add\s+/i, ""))}</div>` : "");
         const blank = bands.map((b) =>
-            `<div class="band">${b.blank != null ? esc(fmtMM(b.blank)) : "—"}</div>`).join("");
+            `<div class="band">${b.blank != null ? esc(fmtMM(b.blank)) : (p.type === "grind" ? "made to size" : "—")}</div>`).join("");
         return { power, blank };
     }
     const power = p.add_range
@@ -1300,6 +1362,10 @@ function cecHTML(coat) {
     return coat && coat.cec_price != null
         ? `$${esc(coat.cec_price)}<span class="unit"> /pr sell</span>` : "";
 }
+function costHTML(coat) {
+    if (!coat || coat.price_now == null) return "no price yet";
+    return `${esc(fmtMoney(coat.price_now))} ${basisChip(coat.basis)}`;
+}
 
 function productRowHTML(p, preCoat, idx) {
     const coats = p.coatings || [];
@@ -1309,7 +1375,7 @@ function productRowHTML(p, preCoat, idx) {
         const i = coats.findIndex((c) => c.coating === preCoat);
         if (i >= 0) sel = i;
     }
-    const priceTxt = (c) => c && c.price != null ? fmtMoney(c.price) : "no price yet";
+    const priceTxt = (c) => c && c.price_now != null ? fmtMoney(c.price_now) : "no price yet";
     const catWord = (p.category && p.category !== "Single vision")
         ? ` <span class="cell-sub">${esc(p.category)}</span>` : "";
     const cells = bandCells(p, coats[sel]);
@@ -1323,18 +1389,22 @@ function productRowHTML(p, preCoat, idx) {
                 ${i === sel ? "selected" : ""}>${esc(coatShort(c.coating))} — ${esc(priceTxt(c))}</option>`).join("")}
         </select>`;
     }
+    const code = (coats[sel] && coats[sel].code) || p.code;
 
-    return `<tr data-pidx="${idx}" class="${p.preferred ? "pref-row" : ""}">
-        <td><strong>${esc((p.brand + " " + p.name).trim())}</strong>
-            ${p.preferred ? `<span class="chip chip-pref">★ we use</span>` : ""}${catWord}
-            ${p.code ? `<div class="cell-sub code-sub">${esc(p.code)}</div>` : ""}</td>
+    return `<tr data-pidx="${idx}" class="${p.preferred ? "pref-row" : ""} ${p.orderable === false ? "retired-row" : ""}">
+        <td>${supplierChip(p.supplier)} <strong>${esc(p.name)}</strong>
+            ${p.preferred ? `<span class="chip chip-pref">★ we use</span>` : ""}${tierBadge(p.tier)}
+            ${p.orderable === false ? `<span class="chip chip-off">not ordered any more</span>` : ""}${catWord}
+            ${p.material && !/^clear$/i.test(p.material) ? `<div class="cell-sub">${esc(p.material)}</div>` : ""}
+            ${p.min_fh_mm ? `<div class="cell-sub">min fitting height ${esc(p.min_fh_mm)}mm</div>` : ""}
+            <div class="cell-sub code-sub">${code ? "order code " + esc(code) : ""}</div></td>
         <td><span class="idx-cell">${esc(fmtIndex(p.index))}</span></td>
         <td>${typeChip(p.type)}</td>
         <td class="power-cell">${cells.power}</td>
         <td class="blank-cell">${cells.blank}</td>
         <td>${coatCell}</td>
         <td><strong class="cec-price">${cecHTML(coats[sel])}</strong>
-            <div class="hoya-cost"><span class="price-now">${esc(priceTxt(coats[sel]))}</span><span class="unit"> /lens cost</span></div></td>
+            <div class="hoya-cost"><span class="price-now">${costHTML(coats[sel])}</span><span class="unit"> /lens cost</span></div></td>
     </tr>`;
 }
 
@@ -1386,11 +1456,20 @@ async function renderLensJobs() {
 }
 
 const LOOKUP_LIMIT = 80;
-const CAT_ORDER = ["Single vision", "Progressive", "Occupational", "Bifocal"];
+const CAT_ORDER = ["Single vision", "Progressive", "Anti-fatigue", "Occupational", "Bifocal"];
+// What the finder's "lens kind" picker offers, in staff words.
+const KIND_OPTIONS = [
+    ["Single vision", "Single vision (distance or reading)"],
+    ["Progressive", "Multifocal"],
+    ["Anti-fatigue", "Screen relief (anti-fatigue)"],
+    ["Occupational", "Desk / office pair"],
+    ["Bifocal", "Bifocal"],
+];
 
 function wireLensLookup(cat) {
     const box = document.getElementById("lens-lookup");
     const out = document.getElementById("lens-lookup-results");
+    const supEl = document.getElementById("lf-sup");
     const catEl = document.getElementById("lf-cat");
     const idxEl = document.getElementById("lf-index");
     const stockEl = document.getElementById("lf-stock");
@@ -1400,12 +1479,14 @@ function wireLensLookup(cat) {
 
     const rows = (cat.products || []).map((p) => ({
         prod: p,
-        // Search hay: name/code/category/notes, the index in both "1.6" and
-        // "1.60" forms, plain-word type, and every coating name — so "nulux
-        // 1.6", "myself vp" or "grind 1.67" all narrow the way you'd expect.
-        hay: [p.brand, p.name, p.code, p.category, p.notes,
+        // Search hay: supplier/name/code/category/tier/material/notes, the
+        // index in both "1.6" and "1.60" forms, plain-word type, and every
+        // coating name — so "clearview 1.67", "superb bluepro" or "grind
+        // 1.60" all narrow the way you'd expect.
+        hay: [p.supplier, p.brand, p.name, p.code, p.category, p.tier, p.material, p.notes,
               p.index, fmtIndex(p.index), (p.type === "stock" ? "stock" : "grind"),
-              ...(p.coatings || []).flatMap((c) => [c.coating, coatShort(c.coating)]),
+              (p.orderable === false ? "retired" : ""),
+              ...(p.coatings || []).flatMap((c) => [c.coating, coatShort(c.coating), c.code]),
              ].join(" ").toLowerCase(),
     }));
 
@@ -1414,6 +1495,8 @@ function wireLensLookup(cat) {
             values.map(([v, label]) =>
                 `<option value="${esc(v)}">${esc(label)}</option>`).join("");
     }
+    fill(supEl, "All suppliers",
+         [...new Set(rows.map((r) => r.prod.supplier).filter(Boolean))].sort().map((s) => [s, s]));
     fill(catEl, "All lens types",
          CAT_ORDER.filter((c) => rows.some((r) => r.prod.category === c))
              .map((c) => [c, c]));
@@ -1424,19 +1507,20 @@ function wireLensLookup(cat) {
          [["stock", "Stock only"], ["grind", "Grind only"]]);
     fill(coatEl, "Any coating",
          [...new Set(rows.flatMap((r) => (r.prod.coatings || [])
-             .map((c) => c.coating)).filter(Boolean))].sort().map((c) => [c, c]));
+             .map((c) => c.coating)).filter(Boolean))].sort().map((c) => [c, coatShort(c)]));
 
     function apply() {
-        const cCat = catEl.value, cIdx = idxEl.value,
+        const cSup = supEl.value, cCat = catEl.value, cIdx = idxEl.value,
               cStock = stockEl.value, cCoat = coatEl.value;
         const words = box.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-        if (!(cCat || cIdx || cStock || cCoat || words.length)) {
-            out.innerHTML = `<div class="empty-panel">Pick a type, index, stock/grind or
+        if (!(cSup || cCat || cIdx || cStock || cCoat || words.length)) {
+            out.innerHTML = `<div class="empty-panel">Pick a supplier, type, index, stock/grind or
                 coating above, or start typing a lens name or index.</div>`;
             return;
         }
         lastHits = rows.filter((r) => {
             const p = r.prod;
+            if (cSup && p.supplier !== cSup) return false;
             if (cCat && p.category !== cCat) return false;
             if (cIdx && String(p.index) !== cIdx) return false;
             if (cStock && p.type !== cStock) return false;
@@ -1468,18 +1552,32 @@ function wireLensLookup(cat) {
         if (!p) return;
         const coat = (p.coatings || [])[+pick.value];
         const cells = bandCells(p, coat);
-        tr.querySelector(".price-now").textContent =
-            coat && coat.price != null ? fmtMoney(coat.price) : "no price yet";
+        tr.querySelector(".price-now").innerHTML = costHTML(coat);
         tr.querySelector(".cec-price").innerHTML = cecHTML(coat);
         tr.querySelector(".power-cell").innerHTML = cells.power;
         tr.querySelector(".blank-cell").innerHTML = cells.blank;
+        const codeEl = tr.querySelector(".code-sub");
+        if (codeEl) codeEl.textContent = (coat && coat.code) || p.code ? "order code " + ((coat && coat.code) || p.code) : "";
     });
-    [catEl, idxEl, stockEl, coatEl].forEach((el) => el.addEventListener("change", apply));
+    [supEl, catEl, idxEl, stockEl, coatEl].forEach((el) => el.addEventListener("change", apply));
     let timer = null;
     box.addEventListener("input", () => {
         clearTimeout(timer);
         timer = setTimeout(apply, 150);
     });
+}
+
+// Sell prices + tier per product, so finder rows can show what a lens sells
+// for beside what it costs. Keyed on supplier|name|index|type.
+function sellIndex(cat) {
+    const idx = {};
+    for (const p of cat.products || []) {
+        const byCoating = {};
+        for (const c of p.coatings || []) if (c.cec_price != null) byCoating[c.coating] = c.cec_price;
+        idx[[p.supplier, p.name, fmtIndex(p.index), p.type].join("|")] =
+            { tier: p.tier || "", byCoating, any: p.cec_price };
+    }
+    return idx;
 }
 
 async function renderLenses() {
@@ -1491,22 +1589,32 @@ async function renderLenses() {
         view.innerHTML = errorPanel(e.message);
         return;
     }
+    PROMO_UNTIL = (cat.pricing || {}).promo_until || "";
+    const sells = sellIndex(cat);
 
     view.innerHTML = `
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Lens Finder</h1>
-        <p class="page-sub">Type the Rx (one eye at a time) and see every lens that can make the
-        job — cheapest first. A dearer-index stock lens often beats a grind on price.</p>
+        <p class="page-sub">Type the Rx (one eye at a time) and the Finder says whether a
+        <strong>stock</strong> lens covers it or it's a <strong>grind</strong>, which lens to order,
+        and what the other route would cost. ZEISS and Synchrony ranges, with our deal prices.</p>
 
         <div class="card">
-            <h2>🔍 Find the best lens for a job</h2>
+            <h2>🔍 Find the lens for a job</h2>
             <div class="lens-form">
+                <div class="field"><label for="lf-kind">Lens kind</label>
+                    <select id="lf-kind" class="lens-select">${KIND_OPTIONS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select></div>
                 <div class="field"><label for="lf-sph">Sphere</label>
                     <input id="lf-sph" inputmode="text" placeholder="-2.75" autocomplete="off"></div>
                 <div class="field"><label for="lf-cyl">Cyl (optional)</label>
                     <input id="lf-cyl" inputmode="text" placeholder="-1.25" autocomplete="off"></div>
-                <div class="field"><label for="lf-blank">Smallest blank that fits the frame (optional)</label>
+                <div class="field" id="lf-add-field" hidden><label for="lf-add">Add</label>
+                    <input id="lf-add" inputmode="text" placeholder="2.00" autocomplete="off"></div>
+                <div class="field"><label for="lf-blank">Smallest blank for the frame (optional)</label>
                     <input id="lf-blank" inputmode="numeric" placeholder="e.g. 68" autocomplete="off"></div>
+                <div class="field" id="lf-fh-field" hidden><label for="lf-fh">Fitting height (optional)</label>
+                    <input id="lf-fh" inputmode="numeric" placeholder="e.g. 18" autocomplete="off"></div>
+                <label class="lf-check"><input type="checkbox" id="lf-tint"> Tinted job</label>
                 <button class="btn" id="lf-go">Find lenses</button>
             </div>
             <details class="blank-helper">
@@ -1533,16 +1641,32 @@ async function renderLenses() {
     wireLensLookup(cat);
     renderLensJobs();  // fills #lens-jobs only when the agent file exists
 
+    const kindEl = document.getElementById("lf-kind");
     const sphEl = document.getElementById("lf-sph");
     const cylEl = document.getElementById("lf-cyl");
+    const addEl = document.getElementById("lf-add");
     const blankEl = document.getElementById("lf-blank");
+    const fhEl = document.getElementById("lf-fh");
+    const tintEl = document.getElementById("lf-tint");
     const resultsEl = document.getElementById("lens-results");
+
+    function syncKind() {
+        const mto = kindEl.value !== "Single vision";
+        document.getElementById("lf-add-field").style.display = mto ? "" : "none";
+        document.getElementById("lf-fh-field").style.display = mto ? "" : "none";
+    }
+    kindEl.addEventListener("change", syncKind);
+    syncKind();
 
     async function runFind() {
         const params = new URLSearchParams();
         params.set("sph", sphEl.value.trim());
+        params.set("kind", kindEl.value);
         if (cylEl.value.trim()) params.set("cyl", cylEl.value.trim());
+        if (kindEl.value !== "Single vision" && addEl.value.trim()) params.set("add", addEl.value.trim());
         if (blankEl.value.trim()) params.set("blank", blankEl.value.trim());
+        if (kindEl.value !== "Single vision" && fhEl.value.trim()) params.set("fh", fhEl.value.trim());
+        if (tintEl.checked) params.set("tint", "1");
         resultsEl.innerHTML = `<div class="loading-panel">Checking the catalogue…</div>`;
         let data;
         try {
@@ -1555,39 +1679,56 @@ async function renderLenses() {
             resultsEl.innerHTML = `<div class="empty-panel">${esc(data.catalog_message)}</div>`;
             return;
         }
-        const rxLine = `Checked for <strong>${esc(data.rx.display)}</strong>` +
+        const rxLine = `Checked <strong>${esc(data.rx.display)}</strong>` +
+            (data.kind ? ` as ${esc(data.kind.toLowerCase())}` : "") +
+            (data.rx.tint ? `, tinted` : "") +
             (data.rx.transposed ? ` <span class="chip chip-amber">plus cyl — transposed to minus form first</span>` : "") +
-            (data.min_blank != null ? `, needing a blank of at least ${esc(fmtMM(data.min_blank))}` : "");
+            (data.min_blank != null ? `, needing a blank of at least ${esc(fmtMM(data.min_blank))}` : "") +
+            (data.rec_index ? ` · sensible index for this power: <strong>${esc(fmtIndex(data.rec_index))}</strong>` : "");
         const options = data.options || [];
         const misses = data.misses || [];
-        const SHOW = 15;
-        const shown = options.slice(0, SHOW);
-        const rest = options.slice(SHOW);
+        const live = groupOptions(options.filter((o) => o.orderable));
+        const retired = groupOptions(options.filter((o) => !o.orderable));
+        const SHOW = 8;
+        const shown = live.slice(0, SHOW);
+        const rest = live.slice(SHOW);
+        const v = data.verdict || "";
+        const verdictCls = /^STOCK/.test(v) ? "verdict verdict-stock"
+            : /^GRIND/.test(v) ? "verdict verdict-grind"
+            : options.length ? "verdict verdict-mto" : "verdict verdict-none";
+        const sellFor = (g) => sells[[g.lead.supplier, g.lead.name, fmtIndex(g.lead.index), g.lead.type].join("|")];
         resultsEl.innerHTML = `
             <div class="updated-line" style="margin-top:18px">${rxLine}</div>
-            <div class="${options.length && options[0].best ? "approved-banner" : "empty-panel"}"
-                 style="margin-bottom:16px">${esc(data.verdict)}</div>
+            <div class="${verdictCls}">${esc(v)}</div>
             ${shown.length ? `<div class="table-scroll"><table class="stock-table">
                 <thead>${LENS_TABLE_HEAD}</thead>
-                <tbody>${shown.map((l) => lensRowHTML(l)).join("")}</tbody>
+                <tbody>${shown.map((g) => lensRowHTML(g, sellFor(g))).join("")}</tbody>
             </table></div>` : ""}
             ${rest.length ? `<details class="miss-details">
-                <summary>Show the other ${rest.length} dearer options</summary>
+                <summary>Show the other ${rest.length} dearer option${rest.length === 1 ? "" : "s"}</summary>
                 <div class="table-scroll"><table class="stock-table">
                     <thead>${LENS_TABLE_HEAD}</thead>
-                    <tbody>${rest.map((l) => lensRowHTML(l)).join("")}</tbody>
+                    <tbody>${rest.map((g) => lensRowHTML(g, sellFor(g))).join("")}</tbody>
+                </table></div>
+            </details>` : ""}
+            ${retired.length ? `<details class="miss-details">
+                <summary>${retired.length} lens${retired.length === 1 ? "" : "es"} we no longer order would also fit (Hoya)</summary>
+                <div class="table-scroll"><table class="stock-table">
+                    <thead>${LENS_TABLE_HEAD}</thead>
+                    <tbody>${retired.slice(0, 20).map((g) => lensRowHTML(g, sellFor(g))).join("")}</tbody>
                 </table></div>
             </details>` : ""}
             ${misses.length ? `<details class="miss-details">
-                <summary>Why the other ${misses.length} lens${misses.length === 1 ? " doesn't" : "es don't"} fit</summary>
-                ${misses.map((m) => `<div class="miss-item">
-                    <strong>${esc((m.brand + " " + m.name).trim())}</strong> —
-                    ${esc(m.reasons.join("; "))}</div>`).join("")}
+                <summary>Why the other ${misses.length} row${misses.length === 1 ? " doesn't" : "s don't"} fit</summary>
+                ${groupOptions(misses).slice(0, 60).map((g) => `<div class="miss-item">
+                    ${supplierChip(g.lead.supplier)} <strong>${esc(g.lead.name)}</strong>
+                    <span class="cell-sub">${esc(coatShort(g.lead.coating))}${g.lead.blank_mm ? " · " + esc(fmtMM(g.lead.blank_mm)) : ""}</span> —
+                    ${esc((g.lead.reasons || []).join("; "))}</div>`).join("")}
             </details>` : ""}`;
     }
 
     document.getElementById("lf-go").addEventListener("click", runFind);
-    [sphEl, cylEl, blankEl].forEach((el) => el.addEventListener("keydown", (e) => {
+    [sphEl, cylEl, addEl, blankEl, fhEl].forEach((el) => el.addEventListener("keydown", (e) => {
         if (e.key === "Enter") runFind();
     }));
 

@@ -1046,3 +1046,30 @@ main {
 /* Recalls tile — un-ticked rows stay visible but clearly out of the batch */
 .rc-off td { color: #9aa5ad; text-decoration: line-through; }
 .rc-off td:first-child { text-decoration: none; }
+
+/* --- Lens Finder, ZEISS era (Sep 2026) --------------------------------------- */
+/* The verdict line: green = stock covers it, amber = grind, mint = made to order. */
+.verdict {
+    border-radius: 12px; padding: 14px 20px; font-size: 20px; font-weight: 700;
+    margin: 16px 0; line-height: 1.4;
+}
+.verdict-stock { background: #dff0e8; border: 2px solid var(--green); color: #1d5741; }
+.verdict-grind { background: var(--amber-bg); border: 2px solid var(--amber-line); color: var(--amber-ink); }
+.verdict-mto   { background: var(--mint); border: 2px solid var(--line); color: var(--ink); }
+.verdict-none  { background: #eee; border: 2px solid #bbb; color: #444; }
+/* Supplier / price-basis / tier chips — small, so the lens name still leads. */
+.chip-sup, .chip-basis, .chip-tier { font-size: 13px; padding: 2px 9px; vertical-align: middle; }
+.chip-zeiss { background: #e8eef7; border-color: #9fb3d6; color: #1f3a6b; }
+.chip-sync  { background: #eef3f8; border-color: #b9c8dc; color: #2e4a70; }
+.chip-other { background: #eee; border-color: #bbb; color: #444; }
+.chip-deal  { background: #dff0e8; border-color: var(--green); color: #1d5741; }
+.chip-promo { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber-ink); }
+.chip-tier  { background: #fff; border-color: var(--green); color: var(--green-dark); }
+/* Lenses we no longer order: still readable, clearly greyed. */
+.retired-row td { color: #666; background: #f6f6f6; }
+.retired-row strong { color: #555; }
+.coat-alt { padding-left: 6px; border-left: 2px solid var(--line); margin-top: 2px; }
+.sell-sub { color: var(--green-dark); font-weight: 600; }
+.lf-check { display: flex; align-items: center; gap: 8px; font-size: 17px; padding-bottom: 12px; }
+.lf-check input { width: 22px; height: 22px; }
+.lens-form select.lens-select { height: 52px; }

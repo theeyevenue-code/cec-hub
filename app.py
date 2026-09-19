@@ -97,8 +97,12 @@ def _catalog() -> dict:
 
 
 def _pricing() -> dict:
-    """Promo date, stock-first rule, level multipliers (config/lens_pricing.json)."""
-    return _config_json("lens_pricing.json", {}) or {}
+    """Promo date, stock-first rule, level multipliers (config/lens_pricing.json),
+    plus the everyday-lens names from lens_filter.json as the finder's tie-breaker."""
+    pricing = dict(_config_json("lens_pricing.json", {}) or {})
+    pref = (_config_json("lens_filter.json", {}) or {}).get("preferred") or {}
+    pricing.setdefault("preferred_names", pref.get("match") or [])
+    return pricing
 
 
 # --- Pages -------------------------------------------------------------------
@@ -397,10 +401,12 @@ def lenses_find():
         return jsonify({"error": "Fitting height should be in millimetres, "
                                  "e.g. 18 (or leave it empty)."}), 400
     kind = (request.args.get("kind") or "Single vision").strip()
+    tint = (request.args.get("tint") or "").strip().lower() in ("1", "true", "yes", "on")
 
     catalog = _catalog()
     result = lenses.find_options(catalog["lenses"], sph, cyl or 0.0, min_blank,
-                                 add=add, kind=kind, fh=fh, pricing=_pricing())
+                                 add=add, kind=kind, fh=fh, tint=tint,
+                                 pricing=_pricing())
     result["catalog_message"] = catalog["message"]
     return jsonify(result)
 
@@ -504,4 +510,6 @@ def lenses_upload():
 if __name__ == "__main__":
     # 0.0.0.0 = reachable from other practice PCs (http://<this-machine>:5680).
     # Set CEC_HUB_HOST=127.0.0.1 in the environment to go back to this-machine-only.
-    app.run(host=os.environ.get("CEC_HUB_HOST", "0.0.0.0"), port=5680, debug=False)
+    # CEC_HUB_PORT lets a second copy run for testing without touching the live Hub.
+    app.run(host=os.environ.get("CEC_HUB_HOST", "0.0.0.0"),
+            port=int(os.environ.get("CEC_HUB_PORT", "5680")), debug=False)

@@ -689,6 +689,17 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
     prefer_stock = bool(pricing.get("prefer_stock", True))
     preferred = [str(c).lower() for c in
                  pricing.get("preferred_coatings") or DEFAULT_PREFERRED_COATINGS]
+    # Lenses on the practice's own sheet (lens_filter "preferred" names) win
+    # ties on price — the order of that list is the priority.
+    pref_names = [str(n).strip().lower() for n in pricing.get("preferred_names") or []
+                  if str(n).strip()]
+
+    def pref_rank(lens):
+        label = f"{lens.get('supplier', '')} {lens.get('brand', '')} {lens.get('name', '')}".lower()
+        for i, n in enumerate(pref_names):
+            if n in label:
+                return i
+        return len(pref_names)
     cyl = cyl or 0.0
     transposed = False
     if cyl > 0:
@@ -784,7 +795,8 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
         return (not o["orderable"], o["under_index"],
                 (o["type"] != "stock") if prefer_stock else False,
                 not o["standard_coating"], not o["plain"],
-                o["price_now"] is None, o["price_now"] or 0, o["index"] or 0)
+                o["price_now"] is None, o["price_now"] or 0, pref_rank(o),
+                o["index"] or 0)
 
     options.sort(key=sort_key)
     appropriate = [o for o in options
@@ -851,7 +863,9 @@ def _verdict(options, best, rec_index=None, prefer_stock=True, made_to_order=Fal
 
     if made_to_order:
         line = f"{_label(best)} — {_price_tag(best)} (made to order)."
-        runner = next((o for o in std if o is not best and o["name"] != best["name"]), None)
+        base = best["name"].replace(" Short", "")
+        runner = next((o for o in std if o is not best
+                       and o["name"].replace(" Short", "") != base), None)
         if runner:
             line += f" Next: {_label(runner)}, {_price_tag(runner)}."
     elif best["type"] == "stock":
