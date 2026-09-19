@@ -961,7 +961,7 @@ def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
 
     # A product covers the job when EVERY eye matches one of its rows.
     covering = None
-    details, warnings = {}, {}
+    details, warnings, thick = {}, {}, {}
     for result in eyes.values():
         keys = set()
         for option in result["options"]:
@@ -971,6 +971,8 @@ def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
             keys.add(key)
             details.setdefault(key, option)
             warnings.setdefault(key, []).extend(option.get("warnings") or [])
+            # too thick for either eye = too thick for the job
+            thick[key] = thick.get(key, False) or bool(option.get("under_index"))
         covering = keys if covering is None else covering & keys
 
     per_lens = len(eyes)
@@ -985,10 +987,16 @@ def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
             "price": o["price_now"], "basis": o.get("basis", ""),
             "price_job": round(o["price_now"] * per_lens, 2)
                          if o["price_now"] is not None else None,
-            "warnings": seen,
+            "warnings": seen, "under_index": thick.get(key, False),
+            "standard_coating": bool(o.get("standard_coating", True)),
+            "plain": bool(o.get("plain", True)),
         })
-    products.sort(key=lambda p: (p["price"] is None, p["price"] or 0,
-                                 p["index"] or 0))
+    # Same order as the finder: right thickness first (a 1.50 that only
+    # technically covers a -5.00 job is not the answer), the coating we
+    # actually order, a clear lens before a polarised one, then price.
+    products.sort(key=lambda p: (p["under_index"], not p["standard_coating"],
+                                 not p["plain"], p["price"] is None,
+                                 p["price"] or 0, p["index"] or 0))
     best = next((p for p in products if p["price"] is not None), None)
     best_stock = next((p for p in products
                        if p["type"] == "stock" and p["price"] is not None), None)

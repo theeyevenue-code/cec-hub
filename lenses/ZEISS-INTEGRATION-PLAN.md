@@ -5,7 +5,9 @@
 availability … goal is full integration to Zeiss as I'm switching supplier."*
 
 Everything below was verified against the code and the second-brain documents on 19 Sep.
-Nothing has been built yet. Read this whole file before touching code.
+**Built 19 Sep 2026 (Opus) on branch `session/zeiss-lens-finder` — phases A–E done, F not started.**
+The plan is kept as the design record; `lenses/README.md` is the operating doc. Findings from
+the build that Mark should know are at the end (§8).
 
 ---
 
@@ -284,3 +286,22 @@ independent guide to cross-check against.
   ZEISS invoice needed).
 - Patient price lists and the website — marketing lane (second-brain).
 - MyoCare / kids portfolio — Mark declined on clinical grounds (4 Aug).
+
+---
+
+## 8. Findings from the build (19 Sep 2026)
+
+1. **Schedule gap — ClearView FSV 1.60, 75 mm blank.** The negotiated schedule quotes the 1.60
+   ClearView stock lens in 65 and 70 mm only (codes 343865/343867). The **75 mm** band is the
+   one that carries the minus powers 0.00 to −6.00 with cyl to −3.00 — i.e. most 1.60 stock
+   jobs. Unquoted, it bills at book: $17.72 now (L50), **$26.58 after 11 Mar 2027 vs the $22.50
+   deal price.** 1.67 and 1.74 are quoted "70/75". Worth one line to Eoin.
+2. **The ZEISS book and the ZEISS product guide disagree on 133 made-to-order rows** (of ~1,200
+   compared), e.g. SmartLife SV 1.67 Clear: book −17.00 to +10.00, guide −12.00 to +8.00. The
+   catalogue keeps the book range and shows the guide's on the row. Nothing to decide unless a
+   job lands in the gap — then it's a VISUSTORE check.
+3. **Deal-price rows never change with the promo date;** all other rows flip from L50 to L25 on
+   11 Mar 2027 automatically. Diary entry is in NEXT-SESSION.md.
+4. Live-machine step still to do at merge: copy the three `config/*.example.json` over the
+   machine's own `lens_filter.json` / `cec_prices.json` (and create `lens_pricing.json`), then
+   `RESTART-HUB.bat`. The examples are the ZEISS-era truth; the machine copies are still Hoya.

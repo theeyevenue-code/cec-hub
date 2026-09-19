@@ -1,7 +1,5 @@
-brand,lens,code,category,index,form,type,blank_mm,sph_min,sph_max,cyl_max,combined_max,add_range,price,coating,notes
-Hoya,EXAMPLE Nulux 1.50,S-NULUX,Single vision,1.50,Aspheric,stock,70,-4.00,+4.00,-2.00,,,18.50,Hi-Vision LongLife,EXAMPLE ROW — replace with the real guide
-Hoya,EXAMPLE Stellify 1.55,HLSY-1.55,Single vision,1.55,Spherical,stock,65,+0.25,+4.00,-2.00,,,24.00,,EXAMPLE — 65mm blank in plus powers
-Hoya,EXAMPLE Stellify 1.50,HLSY-1.50-70,Single vision,1.50,Spherical,stock,75,-6.00,+4.00,-2.00,,,21.00,,EXAMPLE — 75mm blank
-Hoya,EXAMPLE Nulux 1.60,S-NULUX-EYAS,Single vision,1.60,Aspheric,stock,70,-8.00,+6.00,-2.00,,,32.00,,EXAMPLE
-Hoya,EXAMPLE SV Grind 1.50,RX-EXAMPLE,Single vision,1.50,Aspheric,grind,,-10.00,+8.00,-4.00,,,45.00,,EXAMPLE — surfaced to any size
-Hoya,EXAMPLE MySelf 1.50,MYSELF-1.50,Progressive,1.50,Freeform,grind,,,,,,Add +0.75 to +3.50,89.10,Hi-Vision ViewProtect,EXAMPLE progressive — reference only (no sphere range needed)
+supplier,brand,lens,code,category,index,material,form,type,blank_mm,sph_min,sph_max,cyl_max,combined_max,add_min,add_max,add_range,price,price_promo,price_basis,coating,min_fh_mm,notes
+ZEISS,ZEISS,EXAMPLE ClearView FSV 1.67,343817,Single vision,1.67,Clear,ClearView,stock,75,0.00,-6.00,-4.00,6.00,,,,35.00,,deal,DuraVision Platinum UV,,EXAMPLE ROW — deal price fixed for the term
+ZEISS,ZEISS,EXAMPLE ClearView FSV 1.60,,Single vision,1.60,Clear,ClearView,stock,75,0.00,-6.00,-3.00,6.00,,,,26.58,17.72,L25,DuraVision Platinum UV,,EXAMPLE — book line: promo price until promo_until then price
+Synchrony,ZEISS Synchrony,EXAMPLE Single Vision Grind 1.50,,Single vision,1.50,Clear,Spherical,grind,,-10.75,+10.50,-5.00,10.75,,,,40.97,27.31,L25,HMC+,,EXAMPLE — surfaced to any size
+ZEISS,ZEISS,EXAMPLE SmartLife Progressive Superb 1.50,25593,Progressive,1.50,Clear,Freeform,grind,,-7.00,+6.00,-4.00,7.00,0.75,3.50,Add 0.75 to 3.50,85.00,,deal,DuraVision Plus Platinum UV,13,EXAMPLE progressive — add range checked; min fitting height 13mm

@@ -573,3 +573,194 @@ def test_group_products_splits_by_index_and_type():
     assert keys == [("Nulux", "1.50", "grind"),
                     ("Nulux", "1.50", "stock"),
                     ("Nulux", "1.60", "stock")]
+
+
+# --- ZEISS era: supplier, price basis, add ranges, orderable, coatings -------
+
+ZEISS_CSV = (
+    "supplier,brand,lens,code,category,index,material,type,blank_mm,sph_min,sph_max,"
+    "cyl_max,combined_max,add_min,add_max,price,price_promo,price_basis,coating,min_fh_mm\n"
+    # stock 1.67 at deal price (no promo), cyl to -4
+    "ZEISS,ZEISS,ClearView FSV 1.67,343817,Single vision,1.67,Clear,stock,75,-6.00,0.00,-4.00,6.00,,,35.00,,deal,DuraVision Platinum UV,\n"
+    # stock 1.60 at book level: L25 ongoing, L50 promo, cyl to -3
+    "ZEISS,ZEISS,ClearView FSV 1.60,,Single vision,1.60,Clear,stock,75,-6.00,0.00,-3.00,6.00,,,26.58,17.72,L25,DuraVision Platinum UV,\n"
+    # grind 1.67, two coatings: hard coat cheaper than the standard HMC+
+    "Synchrony,ZEISS Synchrony,Single Vision Grind 1.67,,Single vision,1.67,Clear,grind,,-13.00,+10.00,-6.00,13.00,,,85.13,56.75,L25,HMC+,\n"
+    "Synchrony,ZEISS Synchrony,Single Vision Grind 1.67,,Single vision,1.67,Clear,grind,,-13.00,+10.00,-6.00,13.00,,,60.00,40.00,L25,HC hard coat,\n"
+    # polarised variant of the same grind: plain lenses should rank first
+    "Synchrony,ZEISS Synchrony,Single Vision Grind 1.67,,Single vision,1.67,Polarised,grind,,-12.00,+8.00,-6.00,12.00,,,50.00,30.00,L25,HMC+ Back Surface Multi-Coat,\n"
+    # progressive with an add range and a minimum fitting height
+    "ZEISS,ZEISS,SmartLife Progressive Superb 1.50,25593,Progressive,1.50,Clear,grind,,-7.00,+6.00,-4.00,7.00,0.75,3.50,85.00,,deal,DuraVision Plus Platinum UV,13\n"
+    # a retired Hoya stock lens that would otherwise be the cheapest fit
+    "Hoya,Hoya,Nulux 1.67,S-NULUX-167,Single vision,1.67,,stock,75,-8.00,+6.00,-4.00,,,,20.00,,T3,Diamond Finish,\n"
+)
+
+
+def _zeiss(retire_hoya=True):
+    parsed, errors = lenses.parse_csv_text(ZEISS_CSV, "zeiss.csv")
+    assert errors == []
+    if retire_hoya:
+        cat = lenses.apply_lens_filter({"lenses": parsed, "files": []},
+                                       {"orderable_suppliers": ["ZEISS", "Synchrony"]})
+        return cat["lenses"]
+    return parsed
+
+
+def test_parse_zeiss_columns():
+    rows = _zeiss(retire_hoya=False)
+    fsv = rows[0]
+    assert fsv["supplier"] == "ZEISS" and fsv["code"] == "343817"
+    assert fsv["price_basis"] == "deal" and fsv["price_promo"] is None
+    assert rows[1]["price_promo"] == 17.72
+    sup = next(r for r in rows if r["name"].startswith("SmartLife"))
+    assert sup["add_min"] == 0.75 and sup["add_max"] == 3.50 and sup["min_fh_mm"] == 13
+    assert all(r["orderable"] for r in rows)          # no filter yet
+
+
+def test_filter_retires_other_suppliers_but_keeps_named_lenses():
+    parsed, _ = lenses.parse_csv_text(ZEISS_CSV, "z.csv")
+    parsed.append({**parsed[-1], "name": "MiyoSmart 1.59", "brand": "Hoya", "supplier": "Hoya"})
+    cat = lenses.apply_lens_filter({"lenses": parsed, "files": []},
+                                   {"orderable_suppliers": ["ZEISS", "Synchrony"],
+                                    "orderable_extra": ["MiyoSmart"]})
+    by = {l["name"]: l["orderable"] for l in cat["lenses"]}
+    assert by["Nulux 1.67"] is False
+    assert by["MiyoSmart 1.59"] is True
+    assert by["ClearView FSV 1.67"] is True
+
+
+def test_price_now_uses_promo_before_the_date_and_book_after():
+    import datetime as dt
+    row = {"price": 26.58, "price_promo": 17.72, "price_basis": "L25"}
+    cfg = {"promo_until": "2027-03-11"}
+    assert lenses.price_now(row, dt.date(2026, 12, 1), cfg) == (17.72, "promo")
+    assert lenses.price_now(row, dt.date(2027, 3, 11), cfg) == (26.58, "L25")
+    deal = {"price": 35.0, "price_promo": None, "price_basis": "deal"}
+    assert lenses.price_now(deal, dt.date(2026, 12, 1), cfg) == (35.0, "deal")
+
+
+def test_find_stock_167_beats_grind_for_moderate_cyl_and_retired_never_wins():
+    # -2.00/-2.50: strongest meridian 4.50 -> 1.67. The retired Hoya 1.67 stock
+    # is cheaper but never the pick; ClearView 1.67 stock leads; the verdict
+    # says STOCK and quotes the standard-coating grind, not the hard coat.
+    import datetime as dt
+    r = lenses.find_options(_zeiss(), sph=-2.0, cyl=-2.5, kind="Single vision",
+                            today=dt.date(2026, 10, 1), pricing={"promo_until": "2027-03-11"})
+    assert r["rec_index"] == 1.67
+    best = r["options"][0]
+    assert best["name"] == "ClearView FSV 1.67" and best["best"] is True
+    assert best["price_now"] == 35.0 and best["basis"] == "deal"
+    assert r["verdict"].startswith("STOCK covers this")
+    assert "$56.75" in r["verdict"] and "promo price" in r["verdict"]
+    assert "stock saves $21.75" in r["verdict"]
+    hoya = next(o for o in r["options"] if o["name"] == "Nulux 1.67")
+    assert hoya["orderable"] is False and not hoya.get("best")
+    assert r["options"][-1]["name"] == "Nulux 1.67"          # retired sinks to the bottom
+    # standard coating (HMC+) ranks ahead of the cheaper hard coat and the polarised variant
+    grinds = [o for o in r["options"] if o["type"] == "grind"]
+    assert grinds[0]["coating"] == "HMC+" and grinds[0]["material"] == "Clear"
+    assert grinds[0]["standard_coating"] is True
+
+
+def test_find_combined_power_only_limits_minus_prescriptions():
+    rows = ("lens,type,blank_mm,sph_min,sph_max,cyl_max,combined_max,price\n"
+            "Plus Lens,stock,70,-6.00,+6.00,-4.00,6.00,20.00\n")
+    parsed, _ = lenses.parse_csv_text(rows, "x.csv")
+    # +5.00/-1.00 -> combined +4.00: never limited by the (minus) combined maximum
+    assert len(lenses.find_options(parsed, sph=5.0, cyl=-1.0)["options"]) == 1
+    # -5.00/-2.00 -> combined -7.00: beyond -6.00
+    assert lenses.find_options(parsed, sph=-5.0, cyl=-2.0)["options"] == []
+
+
+def test_find_progressive_checks_add_and_fitting_height():
+    rows = _zeiss()
+    ok = lenses.find_options(rows, sph=-2.0, cyl=-1.0, add=2.0, kind="Progressive")
+    assert [o["name"] for o in ok["options"]] == ["SmartLife Progressive Superb 1.50"]
+    assert "made to order" in ok["verdict"] and "$85.00" in ok["verdict"]
+    assert not ok["options"][0]["warnings"]
+    too_much = lenses.find_options(rows, sph=-2.0, add=3.75, kind="Progressive")
+    assert too_much["options"] == []
+    assert "add +3.75 is outside" in too_much["misses"][0]["reasons"][0]
+    no_add = lenses.find_options(rows, sph=-2.0, kind="Progressive")
+    assert any("type the add" in w for w in no_add["options"][0]["warnings"])
+    low_fh = lenses.find_options(rows, sph=-2.0, add=2.0, fh=11, kind="Progressive")
+    assert any("fitting height 11mm is under" in w for w in low_fh["options"][0]["warnings"])
+
+
+def test_find_tinted_job_needs_a_clear_hard_coat_lens():
+    r = lenses.find_options(_zeiss(), sph=-2.0, cyl=-2.5, kind="Single vision", tint=True)
+    names = [(o["name"], o["coating"]) for o in r["options"] if o["orderable"]]
+    assert names == [("Single Vision Grind 1.67", "HC hard coat")]
+    reasons = " ".join(sum((m["reasons"] for m in r["misses"]), []))
+    assert "needs a hard-coat lens" in reasons and "a tint goes on a clear lens" in reasons
+    assert r["verdict"].startswith("GRIND")
+
+
+def test_find_preferred_names_break_price_ties():
+    rows = ("supplier,lens,category,type,sph_min,sph_max,add_min,add_max,price,coating\n"
+            "Synchrony,Progressive Performance HD 1.50,Progressive,grind,-10,+6,0.75,3.50,45.00,HMC+\n"
+            "Synchrony,Progressive Ultra HDV 1.50,Progressive,grind,-10,+6,0.75,3.50,45.00,HMC+\n")
+    parsed, _ = lenses.parse_csv_text(rows, "s.csv")
+    r = lenses.find_options(parsed, sph=-2.0, add=2.0, kind="Progressive",
+                            pricing={"preferred_names": ["Ultra HDV"]})
+    assert r["options"][0]["name"] == "Progressive Ultra HDV 1.50"
+
+
+def test_check_job_flags_a_retired_code():
+    r = lenses.check_job(_zeiss(), {"sph": -2.0, "cyl": -2.5}, {"sph": -2.25, "cyl": -2.0},
+                         chosen={"code": "S-NULUX-167", "type": "Stk"})
+    assert r["status"] == "check"
+    assert any("no longer order" in n for n in r["chosen"]["notes"])
+    assert r["best"]["name"] == "ClearView FSV 1.67" and r["best"]["price_job"] == 70.0
+
+
+def test_attach_cec_price_tiers_and_addons():
+    parsed, _ = lenses.parse_csv_text(ZEISS_CSV, "z.csv")
+    prods = lenses.group_products(parsed)
+    cfg = {
+        "tiers": [
+            {"name": "Everyday", "category": "Progressive", "match": ["Superb"],
+             "by_index": {"1.50": 560}},
+            {"name": "SV Premium", "category": "Single vision", "match": ["ClearView FSV"],
+             "by_index": {"1.60": 250, "1.67": 300}},
+            {"name": "SV Standard", "category": "Single vision", "match": ["Synchrony Single Vision Grind"],
+             "by_index": {"1.67": 250}},
+        ],
+        "addons": {"BluePro|HMC Blue": 50, "grind": 100},
+        "blank_names": ["Polarised"],
+    }
+    out = {(p["name"], p["type"], p["material"]): p for p in lenses.attach_cec_price(prods, cfg)}
+    assert out[("ClearView FSV 1.67", "stock", "Clear")]["cec_price"] == 300
+    assert out[("ClearView FSV 1.67", "stock", "Clear")]["tier"] == "SV Premium"
+    assert out[("SmartLife Progressive Superb 1.50", "grind", "Clear")]["cec_price"] == 560
+    grind = out[("Single Vision Grind 1.67", "grind", "Clear")]
+    assert grind["cec_price"] == 350                      # 250 + $100 grind surcharge
+    assert grind["tier"] == "SV Standard"
+    assert out[("Nulux 1.67", "stock", "")]["cec_price"] is None   # no tier matches Hoya
+
+
+def test_group_products_carries_supplier_basis_and_promo():
+    import datetime as dt
+    parsed, _ = lenses.parse_csv_text(ZEISS_CSV, "z.csv")
+    prods = lenses.group_products(parsed, today=dt.date(2026, 10, 1),
+                                  pricing={"promo_until": "2027-03-11"})
+    fsv160 = next(p for p in prods if p["name"] == "ClearView FSV 1.60")
+    assert fsv160["supplier"] == "ZEISS"
+    assert fsv160["coatings"][0]["price_now"] == 17.72 and fsv160["coatings"][0]["basis"] == "promo"
+    assert fsv160["price_from"] == 17.72
+    later = lenses.group_products(parsed, today=dt.date(2027, 4, 1),
+                                  pricing={"promo_until": "2027-03-11"})
+    assert next(p for p in later if p["name"] == "ClearView FSV 1.60")["price_from"] == 26.58
+
+
+def test_api_find_accepts_kind_add_and_tint(hub_client_lenses):
+    client, lenses_dir = hub_client_lenses
+    (lenses_dir / "zeiss.csv").write_text(ZEISS_CSV, encoding="utf-8")
+    data = client.get("/api/lenses/find?sph=-2.00&cyl=-1.00&add=2.00&kind=Progressive").get_json()
+    assert data["kind"] == "Progressive"
+    assert data["options"][0]["name"] == "SmartLife Progressive Superb 1.50"
+    assert client.get("/api/lenses/find?sph=-2.00&add=9&kind=Progressive").status_code == 400
+    data = client.get("/api/lenses/find?sph=-2.00&cyl=-2.50&tint=1").get_json()
+    assert data["rx"]["tint"] is True
+    cat = client.get("/api/lenses").get_json()
+    assert "pricing" in cat and "prefer_stock" in cat["pricing"]
