@@ -251,7 +251,9 @@ data today, and it is enough for the finder to say "stock or grind, and which".
 
 It is **not** ZEISS's real availability, which is a stair-stepped grid by sphere × cyl × base curve
 per diameter. **Mark to ask Eoin for the ZEISS AU Product Availability tables (PDF or export) and the
-Synchrony equivalent.** When they arrive: the converter gains a `RANGES` overlay exactly like
+Synchrony equivalent.** (Google Drive checked 19 Sep: it holds the ZEISS and Synchrony L20 price
+books, the two Carl Zeiss spreadsheets and the Hoya "Product Guide 2025.pdf" — nothing from ZEISS
+on availability. Don't search Drive again; ask Eoin.) When they arrive: the converter gains a `RANGES` overlay exactly like
 `convert_provision_t3.py` does from the Hoya Product Guide, one conservative band per diameter, and the
 amber "book range — confirm in VISUSTORE" note comes off those rows. Until then the note stays on
 every ZEISS/Synchrony row, and the practice truth is VISUSTORE.
