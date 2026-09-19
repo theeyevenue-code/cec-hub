@@ -721,9 +721,22 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
     rec_index = recommended_index(sph, cyl)
     combined = sph + cyl          # the minus meridian in minus-cyl form
 
+    rows = of_kind(lenses, kind)
+    # A stock lens comes in several diameter bands. The starred number on a
+    # band is where the SUPPLIER CHANGES BLANK, not where the lens stops: a
+    # -6.50/-2.00 in ClearView 1.74 is inside the 75mm band's sphere range but
+    # over its -8.00 combined mark, so ZEISS supplies it as the 70mm blank
+    # (which is listed for -8.25 and beyond). Group the bands so that case
+    # can be recognised.
+    bands = {}
+    for l in rows:
+        if l["type"] == "stock" and l.get("blank_mm") is not None:
+            bands.setdefault(_product_key(l), []).append(l)
+
     options, misses = [], []
-    for lens in of_kind(lenses, kind):
+    for lens in rows:
         reasons, warnings = [], []
+        supplied_as = None
         cat = normalise_category(lens.get("category", ""))
         needs_add = cat in ADD_CATEGORIES
 
@@ -750,17 +763,36 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
         # plus prescription.
         if (lens["combined_max"] is not None and combined < 0
                 and abs(combined) > lens["combined_max"]):
-            reasons.append(
-                f"sphere and cyl combined ({_fmt_power(combined)}) is beyond "
-                f"its limit (-{lens['combined_max']:.2f})")
+            # Over this band's combined mark: does a stronger band of the same
+            # lens carry this combined power? Then it is stocked — on that
+            # band's blank.
+            other = None
+            if not reasons and lens["type"] == "stock":
+                other = next((b for b in sorted(bands.get(_product_key(lens), []),
+                                               key=lambda b: b["blank_mm"])
+                              if b is not lens
+                              and (b["combined_max"] is None or abs(combined) <= b["combined_max"])
+                              and (b["cyl_max"] is None or abs(cyl) <= b["cyl_max"])
+                              and b["sph_min"] is not None and b["sph_min"] <= lens["sph_min"]),
+                             None)
+            if other is not None:
+                supplied_as = other["blank_mm"]
+                warnings.append(
+                    f"comes as the {_fmt_mm(supplied_as)} blank at this combined power "
+                    f"(the {_fmt_mm(lens['blank_mm'])} band stops at -{lens['combined_max']:.2f})")
+            else:
+                reasons.append(
+                    f"sphere and cyl combined ({_fmt_power(combined)}) is beyond "
+                    f"its limit (-{lens['combined_max']:.2f})")
+        blank_now = supplied_as if supplied_as is not None else lens["blank_mm"]
         if min_blank is not None:
-            if lens["blank_mm"] is None:
+            if blank_now is None:
                 if lens["type"] == "stock":
                     warnings.append("blank size isn't in the file — check it "
                                     "covers the frame")
-            elif lens["blank_mm"] < min_blank:
+            elif blank_now < min_blank:
                 reasons.append(
-                    f"its {_fmt_mm(lens['blank_mm'])} blank is smaller than "
+                    f"its {_fmt_mm(blank_now)} blank is smaller than "
                     f"the {_fmt_mm(min_blank)} this frame needs")
         if needs_add:
             if add is None:
@@ -805,6 +837,7 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
         hard_under = steps_under >= 2 or (steps_under == 1 and lens["type"] != "stock")
         price, basis = price_now(lens, today, pricing)
         entry = {**lens, "warnings": warnings, "under_index": under,
+                 "blank_mm": blank_now,
                  "hard_under": hard_under, "steps_under": max(steps_under, 0),
                  "price_now": price, "basis": basis, "orderable": orderable,
                  "standard_coating": standard, "plain": plain}
@@ -935,7 +968,10 @@ def _verdict(options, best, rec_index=None, prefer_stock=True, made_to_order=Fal
             line += (f" ({_label(cheaper_thin)} at {_fmt_index(cheaper_thin['index'])} "
                      f"fits for ${cheaper_thin['price_now']:.2f} but would be too thick — "
                      f"{_fmt_index(rec_index)} is the sensible minimum for this power.)")
-    if best["warnings"]:
+    swap = next((w for w in best["warnings"] if w.startswith("comes as the")), None)
+    if swap:
+        line += f" It {swap}."
+    if [w for w in best["warnings"] if w is not swap]:
         line += " Check its amber notes first."
     return line
 

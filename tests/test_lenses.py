@@ -778,3 +778,27 @@ def test_api_find_supplier_switch(hub_client_lenses):
     assert hoya["options"][0]["orderable"] is True          # ranked as if still ordered
     both = client.get("/api/lenses/find?sph=-2.00&cyl=-2.50&supplier=all").get_json()
     assert {o["supplier"] for o in both["options"]} >= {"Hoya", "ZEISS"}
+
+
+def test_find_stock_band_swap_when_combined_power_crosses_into_the_next_band():
+    # ClearView 1.74 stock: 75mm carries -3.00 to -8.00 (combined to -8.00),
+    # 70mm carries -8.25 to -12.00 (combined to -12.00). -6.50/-2.00 is
+    # -8.50 combined: still stocked, supplied as the 70mm blank.
+    rows = ("supplier,lens,type,blank_mm,sph_min,sph_max,cyl_max,combined_max,price,coating\n"
+            "ZEISS,ClearView FSV 1.74,stock,75,-8.00,-3.00,-2.00,8.00,40.00,Platinum\n"
+            "ZEISS,ClearView FSV 1.74,stock,70,-12.00,-8.25,-2.00,12.00,40.00,Platinum\n")
+    parsed, _ = lenses.parse_csv_text(rows, "z.csv")
+    r = lenses.find_options(parsed, sph=-6.5, cyl=-2.0)
+    assert len(r["options"]) == 1
+    o = r["options"][0]
+    assert o["blank_mm"] == 70 and o["best"] is True
+    assert any(w.startswith("comes as the 70mm blank") for w in o["warnings"])
+    assert "STOCK covers this" in r["verdict"] and "70mm blank" in r["verdict"]
+    assert "amber notes" not in r["verdict"]
+    # a frame needing a 72mm blank: the 70mm supply is now too small
+    assert lenses.find_options(parsed, sph=-6.5, cyl=-2.0, min_blank=72)["options"] == []
+    # beyond the strongest band's combined limit it is still a miss
+    assert lenses.find_options(parsed, sph=-11.0, cyl=-2.0)["options"] == []
+    # -6.50/-1.50 (-8.00) sits inside the 75mm band: no swap
+    plain = lenses.find_options(parsed, sph=-6.5, cyl=-1.5)["options"][0]
+    assert plain["blank_mm"] == 75 and not plain["warnings"]
