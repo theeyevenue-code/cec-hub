@@ -243,22 +243,35 @@ patient details cross into the Hub. Needs Mark's separate OK because it adds a s
 
 ---
 
-## 6. Power availability — what the book gives and what it doesn't
+## 6. Power availability — the ZEISS product guide IS on Drive (found 19 Sep, after the first draft)
 
-The price books give one availability rectangle per product/index/material/coating (plus per-diameter
-bands for stock), with cyl and combined limits and add ranges. That is the same resolution as the Hoya
-data today, and it is enough for the finder to say "stock or grind, and which".
+`G:\My Drive\CEC-Reference and Images\ZEISS Product Portfolio .pdf` (84 pp, ZEISS AU). Its Rx
+Range pages are extracted to **`lenses/zeiss-portfolio-rx-ranges.txt`** in this repo — build from
+that, not from the PDF. What it gives, per product family × index × material variant:
 
-It is **not** ZEISS's real availability, which is a stair-stepped grid by sphere × cyl × base curve
-per diameter. **Mark to ask Eoin for the ZEISS AU Product Availability tables (PDF or export) and the
-Synchrony equivalent.** (Google Drive checked 19 Sep: it holds the ZEISS and Synchrony L20 price
-books, the two Carl Zeiss spreadsheets and the Hoya "Product Guide 2025.pdf" — nothing from ZEISS
-on availability. Don't search Drive again; ask Eoin.) When they arrive: the converter gains a `RANGES` overlay exactly like
-`convert_provision_t3.py` does from the Hoya Product Guide, one conservative band per diameter, and the
-amber "book range — confirm in VISUSTORE" note comes off those rows. Until then the note stays on
-every ZEISS/Synchrony row, and the practice truth is VISUSTORE.
+- Sphere range, cyl limit, max minus combined power (`*`) — **the same numbers as the price book**,
+  so the book ranges are confirmed, not guessed. The converter should still take ranges from the
+  *guide* text and use the book only for prices, and assert the two agree (fail loudly on a mismatch).
+- **FSV per-diameter bands** (p29, p31) incl. variants the book folds together (1.60 BluePro and
+  PhotoFusion X have their own bands). ⚠ p31 carries the ClearView FSV table **twice** (a second
+  "With UVProtect" copy with two cells differing: 1.60 Clear 65 mm `+6.00` vs `+6.25`). Parse the
+  second (UVProtect) table as current; note the discrepancy in the row's notes.
+- **Add range per material** for Digital (p36/38), Progressive Individual 3 / Superb / Pure
+  (p44–46), Office (p55–56), Bifocal D28 (p60: add 1.00–3.00, 1.50 only).
+- **Minimum fitting height** per design (p47): Pure 18/16/14 mm (three fixed corridors);
+  Plus / Superb / Individual 3 13 mm (FrameFit −1 to 6). Office and Digital on their pages.
+  → new optional CSV column `min_fh_mm`; the finder warns when the frame's B/fitting height is
+  below it (only when a fitting height is typed — never a hard miss).
+- **Coating rules** (p66) to encode as warnings: 1.67 and 1.74 **must** have an AR coat (no
+  DSHC/hard-coat rows at those indices — matches the book); BluePro not on tinted/polarised;
+  Sun UV and Mirror only on tinted/polarised.
+- Design/material codes (p35, p39, p59) for `code` on made-to-order rows where the V2 schedule
+  has no ZEISS order number.
+- Not in the guide: Synchrony (still book-only — ask Eoin for the Synchrony equivalent), and
+  MyoCare/Sport/Safety (skip).
 
----
+**So the amber "confirm in VISUSTORE" note is NOT needed for ZEISS rows** whose range comes from the
+guide. Keep it only on Synchrony rows and on any ZEISS row the guide doesn't cover.
 
 ## 7. Out of scope (say so if asked)
 
