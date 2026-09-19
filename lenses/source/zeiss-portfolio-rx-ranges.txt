@@ -1,0 +1,1250 @@
+# Text extraction (pypdf) of the Rx Range / availability pages of "ZEISS Product Portfolio .pdf"
+# (ZEISS AU product guide, 84pp, on Google Drive: CEC-Reference and Images, 19 Sep 2026).
+# Pages kept: 29, 31, 32, 33, 34, 36, 38, 44, 45, 46, 55, 56, 59, 60, 66. Marketing pages dropped. * = maximum combined power.
+
+
+--- PAGE 29 ---
+ZEISS Spherical FSV with UVProtect
+Rx Range
+Index  Colour Design Diameter Power Range Cyl
+1.50 FSV Clear Hardcoat UV Spherical
+65 mm +6.00 to +2.00 (-2.00)
+70 mm +4.00 to -6.00* (-2.00)
+1.60 FSV Clear DuraVision® Chrome UV Spherical
+65 mm  +6.00 to +0.25 (-2.00)
+70 mm +4.00 to +0.25 (-2.00)
+75 mm 0.00 to -6.00 (-2.00)
+*Maximum combined power.
+ZEISS ClearView FSV Lenses
+Finished single vision lenses - in particular branded FSV - have distinct advantages for 
+optical retailers and patients
+conventional FSV lenses typically
+do not provide great optics 
+away from the lens center.
+BUT
+The demand for flatter and thinner FSV lenses has compromised the peripheral optical 
+performance of standard stock.
+ZEISS ClearView FSV Lenses, thanks to freeform technology provide excellent optical 
+performance from the lens centre to the periphery.
+conventional FSV lenses 
+ZEISS ClearView  
+Single Vision Lenses
+ZEISS ClearView  
+Single Vision Lenses
+Conventional  
+single vision lenses
+NOW
+E
+E
+Conventional  
+single vision lenses
+E
+
+--- PAGE 31 ---
+ZEISS ClearView FSV Lenses
+Rx Range
+Index  Colour Design Diameter Power Range Cyl
+1.50
+FSV Clear Hardcoat UV Spherical
+65 mm +6.00 to +2.00 (-2.00)
+70 mm +4.00 to -6.00* (-2.00)
+FSV Clear DuraVision® Platinum UV ClearView
+65 mm +6.00 to +2.00 (-2.00)
+70 mm +4.00 to -6.00* (-2.00)
+FSV BluePro DuraVision® Platinum UV ClearView
+65 mm +6.00 to +2.00 (-2.00)
+70 mm +4.00 to -6.00* (-2.00)
+FSV PhotoFusion X Extra Grey 
+DuraVision® Platinum UV ClearView
+65 mm +4.00 to +0.25 (-2.00)
+70 mm 0.00 to -6.00* (-2.00)
+1.60
+FSV Clear DuraVision®  Chrome UV Spherical
+65 mm  +6.00 to +2.00 (-2.00)
+70 mm +4.00 to +0.25 (-2.00)
+75 mm 0.00 to -6.00 (-2.00)
+FSV Clear DuraVision® Platinum UV Aspheric
+65 mm  +6.00 to +2.00 (-2.00)
+70 mm +4.00 to +0.25* (-2.00)
+70 mm  -6.25 to -8.00* (-2.00)
+75 mm 0.00 to -6.00 (-3.00)
+FSV BluePro DuraVision® Platinum UV ClearView
+65 mm  -6.25 to +2.00 (-2.00)
+70 mm +4.00 to 0.25* (-2.00)
+70 mm  -6.25 to -8.00 (-3.00)
+75 mm  0.00 to -6.00 (-3.00)
+FSV PhotoFusion X Extra Grey 
+DuraVision® Platinum UV ClearView
+65 mm +0.25 to +4.00 (-2.00)
+70 mm  -6.25 to -8.00* (-2.00)
+75 mm 0.00 to -6.00* (-2.00)
+1.67 FSV Clear DuraVision® Platinum UV ClearView
+65 mm +6.00 to +2.25 (-2.00)
+70 mm  +2.00 to +0.25* (-2.00)
+70 mm  -6.25 to -10.00* (-4.00)
+75 mm 0.00 to -6.00 (-4.00)
+1.74 FSV Clear DuraVision® Platinum UV ClearView
+70 mm  -8.25 to -12.00* (-2.00)
+75 mm -3.00 to -8.00 (-2.00)
+With UVProtect 
+Index  Colour Design Diameter Power Range Cyl
+1.50
+FSV Clear DuraVision® Gold / Platinum UV ClearView
+65 mm +6.00 to +2.00 (-2.00)
+70 mm +4.00 to -6.00* (-2.00)
+FSV BluePro DuraVision® Platinum UV ClearView
+65 mm +6.00 to +2.00 (-2.00)
+70 mm +4.00 to -6.00* (-2.00)
+FSV PhotoFusion X Extra Grey 
+DuraVision® Platinum UV ClearView
+65 mm +4.00 to +0.25 (-2.00)
+70 mm 0.00 to -6.00* (-2.00)
+1.60
+FSV Clear DuraVision® Gold / Platinum UV ClearView 
+65 mm  +6.25 to +2.00 (-2.00)
+70 mm +4.00 to +0.25 (-2.00)
+70 mm  -6.25 to -8.00* (-2.00)
+75 mm 0.00 to -6.00 (-3.00)
+FSV BluePro DuraVision® Platinum UV ClearView
+65 mm  +6.25 to +2.00 (-2.00)
+70 mm +4.00 to 0.25 (-2.00)
+70 mm  -6.25 to -8.00* (-3.00)
+75 mm  0.00 to -6.00* (-3.00)
+FSV PhotoFusion X Extra Grey 
+DuraVision® Platinum UV ClearView
+65 mm +0.25 to +4.00 (-2.00)
+70 mm  -6.25 to -8.00* (-2.00)
+75 mm 0.00 to -6.00* (-2.00)
+1.67 FSV Clear DuraVision® Platinum UV ClearView
+65 mm +6.00 to +2.25 (-2.00)
+70 mm  +2.00 to +0.25 (-2.00)
+70 mm  -6.25 to -10.00* (-4.00)
+75 mm 0.00 to -6.00* (-4.00)
+1.74 FSV Clear DuraVision® Platinum UV ClearView
+70 mm  -8.25 to -12.00* (-2.00)
+75 mm -3.00 to -8.00* (-2.00)
+*Maximum combined power.
+ZEISS ClearView Lens Fitting 
+• Align head until lenses are 
+vertical to the floor
+• Mark pupil center and 
+measure the height
+• Mark pupil center and apply             
+“Rule of Tilt” formula
+• To lower the height: 2o of 
+pantoscopic angle means 
+1mm down of the optical 
+center (max. 5mm)
+OR
+Option 1: 
+ Option 2: 
+
+
+--- PAGE 32 ---
+ZEISS ClearView Single Vision Grind
+With UVProtect
+Rx Range
+Material Colour  Power Range Cyl
+1.50
+Clear -8.00* 0 +8.00 (-4.00)
+Clear BluePro -8.00* 0 +8.00 (-4.00)
+PhotoFusion X** -6.00* 0 +6.00 (-4.00)
+Polarised (Grey, Brown, Pioneer) -8.00* 0 +8.00 (-4.00)
+1.53
+Clear -7.00* 0 +7.00 (-4.00)
+Polarised (Grey, Brown) -7.00* 0 +5.00 (-4.00)
+1.59
+Clear -10.00* 0 +8.00 (-6.00)
+PhotoFusion X** -10.00* 0 +8.00 (-6.00)
+Polarised (Grey, Brown) -10.00* 0 +8.00 (-4.00)
+1.60
+Clear -11.00* 0 +10.00 (-6.00)
+Clear BluePro -11.00* 0 +10.00 (-6.00)
+PhotoFusion X** -11.00* 0 +10.00 (-6.00)
+Polarised (Grey, Brown, Pioneer) -11.50* 0 +8.00 (-6.00)
+1.67
+Clear -12.00* 0 +11.00 (-6.00)
+Clear BluePro -12.00* 0 +11.00 (-6.00)
+PhotoFusion X** -12.00* 0 +8.00 (-6.00)
+Polarised (Grey, Brown, Pioneer) -12.00* 0 +11.00 (-6.00)
+1.74
+Clear -20.00* 0 +12.50 (-6.00)
+Clear BluePro -20.00* 0 +12.50 (-6.00)
+PhotoFusion X (Extra Grey, Brown) -14.00* 0 +11.25 (-6.00)
+*Maximum combined power.
+**ZEISS PhotoFusion X available in Grey, Extra Grey, Brown, Pioneer, Blue, Burgundy and Black
+ZEISS SmartLife Single Vision Lenses
+ZEISS SmartLife Single Vision Lenses are optimised for sharp vision in all distances, especially 
+when lowering the gaze while focusing on near objects.
+ZEISS SmartLife Single Vision Individual 3 
+Optimised to the individual position of wear parameters for full potential of lens zones.
+Features:
+Luminance Design™ Technology 2
+• Optimised based on average 
+light conditions & age related 
+pupil diameter
+SmartView™ Technology 2.0 
+• Optimised based on today’s 
+connected & on the move 
+lifestyle
+Benefits: 
+• Wide field of comfortable vision 
+for both intermediate and near 
+tasks
+• Relaxed vision at all distances
+• Easy viewing in all directions
+Large distance zone
+Compressed corridor
+Comfortable near power zone
+Gear to ZEISS SmartLife Progressive Lenses
+Progressive
+wearers near point
+Single vision 
+wearers near point
+Based on reading 
+behaviour, the near point 
+location for people 
+coming from single 
+vision  lenses is located 
+higher than for 
+progressive lens wearers
+Because of higher addition 
+powers, the near point for 
+experienced progressive 
+lens wearers is lower to 
+allow more comfort in the 
+intermediate zone.
+Stardard Progressive Lens ZEISS SmartLife Progressive Lens
+Smoother transition into 
+areas with more blur. 
+Overall lower blur level compared to 
+current ZEISS Precision Progressive Lenses 
+lenses.
+Stardard Single Vision Lens ZEISS SmartLife Single Vision Lens
+Large distance zone
+Compressed corridor
+Comfortable near power zone
+Gear to ZEISS SmartLife Progressive Lenses
+Progressive
+wearers near point
+Single vision 
+wearers near point
+Based on reading 
+behaviour, the near point 
+location for people 
+coming from single 
+vision  lenses is located 
+higher than for 
+progressive lens wearers
+Because of higher addition 
+powers, the near point for 
+experienced progressive 
+lens wearers is lower to 
+allow more comfort in the 
+intermediate zone.
+Stardard Progressive Lens ZEISS SmartLife Progressive Lens
+Smoother transition into 
+areas with more blur. 
+Overall lower blur level compared to 
+current ZEISS Precision Progressive Lenses 
+lenses.
+Stardard Single Vision Lens ZEISS SmartLife Single Vision Lens
+Large distance zone
+Compressed corridor
+Comfortable near power zone
+Gear to ZEISS SmartLife Progressive Lenses
+Progressive
+wearers near point
+Single vision 
+wearers near point
+Based on reading 
+behaviour, the near point 
+location for people 
+coming from single 
+vision  lenses is located 
+higher than for 
+progressive lens wearers
+Because of higher addition 
+powers, the near point for 
+experienced progressive 
+lens wearers is lower to 
+allow more comfort in the 
+intermediate zone.
+Stardard Progressive Lens ZEISS SmartLife Progressive Lens
+Smoother transition into 
+areas with more blur. 
+Overall lower blur level compared to 
+current ZEISS Precision Progressive Lenses 
+lenses.
+Stardard Single Vision Lens ZEISS SmartLife Single Vision Lens
+Large distance zone
+Compressed corridor
+Comfortable near power zone
+Gear to ZEISS SmartLife Progressive Lenses
+Progressive
+wearers near point
+Single vision 
+wearers near point
+Based on reading 
+behaviour, the near point 
+location for people 
+coming from single 
+vision  lenses is located 
+higher than for 
+progressive lens wearers
+Because of higher addition 
+powers, the near point for 
+experienced progressive 
+lens wearers is lower to 
+allow more comfort in the 
+intermediate zone.
+Stardard Progressive Lens ZEISS SmartLife Progressive Lens
+Smoother transition into 
+areas with more blur. 
+Overall lower blur level compared to 
+current ZEISS Precision Progressive Lenses 
+lenses.
+Stardard Single Vision Lens ZEISS SmartLife Single Vision Lens
+Not optimised for near vision Optimised for near vision
+Standard Single Vision Lens ZEISS SmartLife Single Vision Lens 
+
+
+--- PAGE 33 ---
+ZEISS SmartLife Single Vision    
+Rx Range
+ZEISS SmartLife Single Vision Individual 3  / Single Vision with UVProtect  
+Material Colour  Power Range Cyl
+1.50
+Clear / Tinted -6.00* 0 +6.00 (-4.00)
+Clear BluePro -6.00* 0 +6.00 (-4.00)
+PhotoFusion X** -6.00* 0 +6.00 (-4.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) -6.00* 0 +6.00 (-4.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) -8.00* 0 +8.00 (-4.00)
+1.53
+Clear -7.00* 0 +7.00 (-4.00)
+Polarised (Grey, Brown) -7.00* 0 +5.00 (-4.00)
+1.59
+Clear -10.00* 0 +8.00 (-6.00)
+PhotoFusion X** -10.00* 0 +8.00 (-6.00)
+Polarised (Grey, Brown) -10.00* 0 +8.00 (-4.00)
+1.60
+Clear / Tinted -10.00* 0 +8.00 (-6.00)
+Clear BluePro -10.00* 0 +8.00 (-6.00)
+PhotoFusion X** -10.00* 0 +8.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) -10.00* 0 +8.00 (-6.00)
+Polarised / AdaptiveSun  
+(Grey, Brown, Pioneer) -11.00* 0 +10.00 (-6.00)
+1.67
+Clear / Tinted -12.00* 0 +8.00 (-6.00)
+Clear BluePro -12.00* 0 +8.00 (-6.00)
+PhotoFusion X** -12.00* 0 +8.00 (-6.00)
+AdaptiveSun  
+(Grey, Brown, Pioneer) -12.00* 0 +8.00 (-6.00)
+Polarised (Grey, Brown, Pioneer) -12.00* 0 +11.00 (-6.00)
+1.74
+Clear -20.00* 0 +16.00 (-6.00)
+Clear BluePro -20.00* 0 +16.00 (-6.00)
+PhotoFusion X - Individual 3 only
+(Extra Grey, Brown) -14.00* 0 +9.00 (-6.00)
+*Maximum combined power.
+**ZEISS PhotoFusion X available in Grey, Extra Grey, Brown, Pioneer, Blue, Burgundy and Black
+*Please note: Date of Birth (DOB) is required to optimise average pupil size. If this is not provided, then a default value of 3.6 mm will be used for the calculations. 
+*All Position of Wear (POW) values are required for ZEISS SmartLife Single Vision Individual 3. 
+*Pantoscopic tilt is required for ZEISS SmartLife Single Vision. If not provided, a default value will be used. 
+
+--- PAGE 34 ---
+ZEISS ClearMind Single Vision Lenses ZEISS ClearMind Single Vision    
+Rx Range
+ZEISS ClearMind Single Vision Individual 3  / Single Vision with UVProtect  
+Material Colour  Power Range Cyl
+1.50
+Clear / Tinted -6.00* 0 +6.00 (-4.00)
+Clear BluePro -6.00* 0 +6.00 (-4.00)
+PhotoFusion X** -6.00* 0 +6.00 (-4.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) -6.00* 0 +6.00 (-4.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) -8.00* 0 +8.00 (-4.00)
+1.53
+Clear -7.00* 0 +7.00 (-4.00)
+Polarised (Grey, Brown) -7.00* 0 +5.00 (-4.00)
+1.59
+Clear -10.00* 0 +8.00 (-6.00)
+PhotoFusion X** -10.00* 0 +8.00 (-6.00)
+Polarised (Grey, Brown) -10.00* 0 +8.00 (-4.00)
+1.60
+Clear / Tinted -10.00* 0 +8.00 (-6.00)
+Clear BluePro -10.00* 0 +8.00 (-6.00)
+PhotoFusion X** -10.00* 0 +8.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) -10.00* 0 +8.00 (-6.00)
+Polarised / AdaptiveSun  
+(Grey, Brown, Pioneer) -11.00* 0 +10.00 (-6.00)
+1.67
+Clear / Tinted -12.00* 0 +8.00 (-6.00)
+Clear BluePro -12.00* 0 +8.00 (-6.00)
+PhotoFusion X** -12.00* 0 +8.00 (-6.00)
+AdaptiveSun  
+(Grey, Brown, Pioneer) -12.00* 0 +8.00 (-6.00)
+Polarised (Grey, Brown, Pioneer) -12.00* 0 +11.00 (-6.00)
+1.74
+Clear -20.00* 0 +16.00 (-6.00)
+Clear BluePro -20.00* 0 +16.00 (-6.00)
+PhotoFusion X - Individual 3 only
+(Extra Grey, Brown) -14.00* 0 +9.00 (-6.00)
+*Maximum combined power.
+**ZEISS PhotoFusion X available in Grey, Extra Grey, Brown, Pioneer, Blue, Burgundy and Black
+*Please note: Date of Birth (DOB) is required to optimise average pupil size. If this is not provided, then a default value of 3.6 mm will be used for the calculations. 
+*All Position of Wear (POW) values are required for ZEISS SmartLife Single Vision Individual 3. 
+*Pantoscopic tilt is required for ZEISS ClearMind Single Vision. If not provided, a default value will be used. 
+ZEISS Single Vision ClearMind lenses are designed to 
+meet the vision needs of spectacle lens wearers who 
+experience blurry vision near or far (people with 
+myopia, hyperopia, and/or astigmatism).
+Benefits
+• Extremely clear vision
+• Vitalised eyes
+• May alleviate mental effort which can result 
+in an increased ability to concentrate and stay 
+focused
+• Contributes to overall well being
+1 Calculation & Analysis by Technology & Innovation, Carl Zeiss Vision International GmbH, DE 2025 (unpublished, data on file)
+Optimised for temporary blur 
+perception.
+Low and optimised peripheral blur 
+towards the edges.
+Advantages 
+ZEISS Single Vision ClearMind lenses are engineered to expand the effective visual field 
+compared to conventional ZEISS SV lens by minimising peripheral blur. This design aims to 
+enhance visual processing efficiency, reducing cognitive load through uninterrupted visual 
+clarity.
+Large zone of clear vision.
+Up to 48%  
+larger zones of clear vision with 
+no visible blur than ZEISS standard 
+single vision lenses. 1
+
+--- PAGE 36 ---
+ZEISS SmartLife Digital Lenses
+ZEISS SmartLife Digital Lenses - are designed for connected and on-the-move single vision 
+or non-lens wearers with perceived eye strain.
+Compressed
+corridor 
+Large distance zone 
+Comfortable near 
+power zone 
+The horizontal eye movements of single-vision wearers 
+or emmetropes are accustomed to unrestricted distance 
+vision that is free from blur and distortion. Therefore 
+ZEISS SmartLife Digital Lenses have a large distance zone.
+The prescription of each wearer is different, as well as 
+the amplitude of accommodation capability. So ZEISS 
+SmartLife Digital Lens design can be customised with   
+0.5 to 1.25 D addition power.
+Wearers still have sufficient accommodation available for 
+clear mid-range vision and usually tilt their head for near 
+vision tasks. Therefore the lens design has a compressed 
+corridor.
+ZEISS SmartLife Digital Individual 3 
+Optimisation to the individual position of wear parameters for full potential of lens zones 
+and customisation of the corridor for fast adaptation. 
+Comfortable 
+near power zone 
+Large distance zone
+Compressed corridor
+Comfortable near power zone
+Gear to ZEISS SmartLife Progressive Lenses
+Progressive 
+wearers near point
+Single vision 
+wearers near point
+ZEISS SmartLife Digital     
+Rx Range
+ZEISS SmartLife Digital Individual 3  / Digital with UVProtect  
+*Please note: Date of Birth (DOB) is required to optimise average pupil size. If this is not provided, the add power will be used for the calculations. 
+*All Position of Wear (POW) values are required for ZEISS SmartLife Digitial Individual 3. If not provided, default values will be used. 
+*For ZEISS SmartLife Digital a variable corridor is used based on fitting height. 
+**FrameFit® value and Base curve will only appear on ZEISS SmartLife Digital Individual 3. 
+Material Colour Add Power  Power Range Cyl
+1.50
+Clear / Tinted 0.50 to 1.25 -7.00* 0 +6.00 (-4.00)
+Clear BluePro 0.50 to 1.25 -7.00* 0 +6.00 (-4.00)
+PhotoFusion X** 0.50 to 1.25 -7.00* 0 +5.00 (-4.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.50 to 1.25 -8.00* 0 +5.00 (-4.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) 0.50 to 1.25 -8.00* 0 +5.00 (-4.00)
+1.53
+Clear 0.50 to 1.25 -7.00* 0 +5.00 (-4.00)
+Polarised  
+(Grey, Brown) 0.50 to 1.25 -7.00* 0 +5.00 (-4.00)
+1.59
+Clear 0.50 to 1.25 -10.00* 0 +6.00 (-6.00)
+PhotoFusion X** 0.50 to 1.25 -10.00* 0 +6.00 (-6.00)
+Polarised (Grey, Brown, Pioneer) 0.50 to 1.25 -10.00* 0 +6.00 (-4.00)
+1.60
+Clear / Tinted 0.50 to 1.25 -10.00* 0 +6.00 (-6.00)
+Clear BluePro 0.50 to 1.25 -10.00* 0 +6.00 (-6.00)
+PhotoFusion X** 0.50 to 1.25 -10.00* 0 +6.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.50 to 1.25 -10.00* 0 +6.00 (-6.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) 0.50 to 1.25 -11.00* 0 +6.00 (-6.00)
+1.67
+Clear / Tinted 0.50 to 1.25 -12.00* 0 +8.00 (-6.00)
+Clear BluePro 0.50 to 1.25 -12.00* 0 +8.00 (-6.00)
+PhotoFusion X** 0.50 to 1.25 -12.00* 0 +8.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.50 to 1.25 -12.00* 0 +8.00 (-6.00)
+Polarised  
+(Grey, Brown, Pioneer) 0.50 to 1.25 -12.00* 0 +8.00 (-6.00)
+1.74
+Clear 0.50 to 1.25 -20.00* 0 +16.00 (-6.00)
+Clear BluePro 0.50 to 1.25 -20.00* 0 +16.00 (-6.00)
+PhotoFusion X - Individual 3 only
+(Extra Grey, Brown) 0.50 to 1.25 -14.00* 0 +9.00 (-6.00)
+*Maximum combined power.
+**ZEISS PhotoFusion X available in Grey, Extra Grey, Brown, Pioneer, Blue, Burgundy and Black
+
+--- PAGE 38 ---
+ZEISS ClearMind Digital Lenses ZEISS ClearMind Digital     
+Rx Range
+ZEISS ClearMind Digital Individual 3  / Digital with UVProtect  
+*Please note: Date of Birth (DOB) is required to optimise average pupil size. If this is not provided, the add power will be used for the calculations. 
+*All Position of Wear (POW) values are required for ZEISS SmartLife Digitial Individual 3. If not provided, default values will be used. 
+*For ZEISS SmartLife Digital a variable corridor is used based on fitting height. 
+**FrameFit® value and Base curve will only appear on ZEISS SmartLife Digital Individual 3. 
+Material Colour Add Power  Power Range Cyl
+1.50
+Clear / Tinted 0.50 to 1.25 -7.00* 0 +6.00 (-4.00)
+Clear BluePro 0.50 to 1.25 -7.00* 0 +6.00 (-4.00)
+PhotoFusion X** 0.50 to 1.25 -7.00* 0 +5.00 (-4.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.50 to 1.25 -8.00* 0 +5.00 (-4.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) 0.50 to 1.25 -8.00* 0 +5.00 (-4.00)
+1.53
+Clear 0.50 to 1.25 -7.00* 0 +5.00 (-4.00)
+Polarised  
+(Grey, Brown) 0.50 to 1.25 -7.00* 0 +5.00 (-4.00)
+1.59
+Clear 0.50 to 1.25 -10.00* 0 +6.00 (-6.00)
+PhotoFusion X** 0.50 to 1.25 -10.00* 0 +6.00 (-6.00)
+Polarised (Grey, Brown, Pioneer) 0.50 to 1.25 -10.00* 0 +6.00 (-4.00)
+1.60
+Clear / Tinted 0.50 to 1.25 -10.00* 0 +6.00 (-6.00)
+Clear BluePro 0.50 to 1.25 -10.00* 0 +6.00 (-6.00)
+PhotoFusion X** 0.50 to 1.25 -10.00* 0 +6.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.50 to 1.25 -10.00* 0 +6.00 (-6.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) 0.50 to 1.25 -11.00* 0 +6.00 (-6.00)
+1.67
+Clear / Tinted 0.50 to 1.25 -12.00* 0 +8.00 (-6.00)
+Clear BluePro 0.50 to 1.25 -12.00* 0 +8.00 (-6.00)
+PhotoFusion X** 0.50 to 1.25 -12.00* 0 +8.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.50 to 1.25 -12.00* 0 +8.00 (-6.00)
+Polarised  
+(Grey, Brown, Pioneer) 0.50 to 1.25 -12.00* 0 +8.00 (-6.00)
+1.74
+Clear 0.50 to 1.25 -20.00* 0 +16.00 (-6.00)
+Clear BluePro 0.50 to 1.25 -20.00* 0 +16.00 (-6.00)
+PhotoFusion X - Individual 3 only
+(Extra Grey, Brown) 0.50 to 1.25 -14.00* 0 +9.00 (-6.00)
+*Maximum combined power.
+**ZEISS PhotoFusion X available in Grey, Extra Grey, Brown, Pioneer, Blue, Burgundy and Black
+Benefits
+• Extremely clear vision
+• Vitalises eyes
+• Alleviates mental effort which can result in an increased ability to concentrate and 
+stay focused
+• Contributing to overall well being
+Advantages 
+• ZEISS Digital ClearMind lenses are engineered to minimise peripheral blur, thereby 
+expanding the effective visual field compared to ZEISS‘s top-tier Digital lenses. This 
+design aims to reduce cognitive load by optimising visual processing efficiency.
+• It also includes design optimisations tailored for non-lens wearers and single vision 
+lens users, such as viewing zones adjusted to the visual habits of emmetropes and 
+single vision lens wearers, and a compressed corridor for a quick transition into 
+the near power zone. This design helps to ensure a smoother transition to ZEISS 
+progressive lenses in the future.
+• Additionally, the lower part of the lens provides accommodative support ranging from 
++0.50D to 1.25D.
+ZEISS standard digital lenses
+Hybrid design
+Good
+Large zone of 
+clear vision.
+Good
+Low and optimised  
+peripheral blur.
+Extremely good
+Large zone of clear 
+vision.
+Extremely good
+Low and optimised  
+peripheral blur.
+ZEISS Digital ClearMind lenses 
+Optimised hybrid design
+Provide a boost of 
+focus to support 
+near vision.
+Provide a boost of 
+focus to support 
+near vision.
+
+--- PAGE 44 ---
+ZEISS Progressive Individual 3     
+Rx Range
+ZEISS SmartLife / ClearMind with UVProtect  
+*Please note: Date of Birth (DOB) is required to optimise average pupil size. If not provided, the add power will be used for the calculations. 
+*Available in three lens designs: Near, Intermediate or Balanced. If not provided, the Balanced design will be used. 
+*All Position of Wear (POW) values are required. If not provided, default values will be used. 
+Material Colour Add Power  Power Range Cyl
+1.50
+Clear / Tinted 0.75 to 3.50 -7.00* 0 +6.00 (-4.00)
+Clear BluePro 0.75 to 3.50 -7.00* 0 +6.00 (-4.00)
+PhotoFusion X** 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -8.00* 0 +5.00 (-4.00)
+1.53
+Clear 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+Polarised  
+(Grey, Brown) 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+1.59
+Clear 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+PhotoFusion X** 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Polarised (Grey, Brown) 0.75 to 3.50 -10.00* 0 +6.00 (-4.00)
+1.60
+Clear / Tinted 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Clear BluePro 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+PhotoFusion X** 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -11.00* 0 +6.00 (-6.00)
+1.67
+Clear / Tinted 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+Clear BluePro 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+PhotoFusion X** 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+Polarised  
+(Grey, Brown, Pioneer) 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+1.74
+Clear 0.75 to 3.50 -20.00* 0 +16.00 (-6.00)
+Clear BluePro 0.75 to 3.50 -20.00* 0 +16.00 (-6.00)
+PhotoFusion X (Extra Grey, Brown) 0.75 to 3.50 -14.00 0 +9.00 (-6.00)
+*Maximum combined power.
+**ZEISS PhotoFusion X available in Grey, Extra Grey, Brown, Pioneer, Blue, Burgundy and Black
+Balanced
+ZEISS IndividualFit Technology
+Optimised to your individual main daily activities
+• For most wearers, with a diverse range 
+of visual demands at far, mid-range, 
+and up-close distances.
+• Candidates for this lens design include 
+presbyopes who do not express a 
+particular need for additional dynamic, 
+mid-range, or up-close utility or 
+presbyopes who have been completely 
+satisfied with general-purpose lenses.
++1.75
+This lens design offers a balance between equally generous 
+distance, intermediate, and near zones.
+No person is alike – individuals differ not only in their anatomy 
+but also in their main daily activities. 
+ZEISS identified three types of main daily activities: BALANCED
+
+--- PAGE 45 ---
+ZEISS Progressive Superb    
+Rx Range
+ZEISS SmartLife / ClearMind with UVProtect
+*Please note: Date of Birth (DOB) is required to optimise average pupil size. If this is not provided, the add power will be used for the calculations.
+*All Position of Wear (POW) values are required. If not provided, default values will be used. 
+Material Colour Add Power  Power Range Cyl
+1.50
+Clear / Tinted 0.75 to 3.50 -7.00* 0 +6.00 (-4.00)
+Clear BluePro 0.75 to 3.50 -7.00* 0 +6.00 (-4.00)
+PhotoFusion X** 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -8.00* 0 +5.00 (-4.00)
+1.53
+Clear 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+Polarised  
+(Grey, Brown) 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+1.59
+Clear 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+PhotoFusion X** 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Polarised (Grey, Brown) 0.75 to 3.50 -10.00* 0 +6.00 (-4.00)
+1.60
+Clear / Tinted 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Clear BluePro 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+PhotoFusion X** 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -11.00* 0 +6.00 (-6.00)
+1.67
+Clear / Tinted 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+Clear BluePro 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+PhotoFusion X** 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+Polarised  
+(Grey, Brown, Pioneer) 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+1.74
+Clear 0.75 to 3.50 -20.00* 0 +16.00 (-6.00)
+Clear BluePro 0.75 to 3.50 -20.00* 0 +16.00 (-6.00)
+*Maximum combined power.
+**ZEISS PhotoFusion X available in Grey, Extra Grey, Brown, Pioneer, Blue, Burgundy and Black
+ZEISS Progressive Plus     
+Rx Range
+ZEISS SmartLife / ClearMind with UVProtect  
+*Please note: Date of Birth (DOB) is required to optimise average pupil size. If this is not provided, the add power will be used for the calculations.  
+*FrameFit is required. If not provided, a default value will be used. 
+Material Colour Add Power  Power Range Cyl
+1.50
+Clear / Tinted 0.75 to 3.50 -7.00* 0 +6.00 (-4.00)
+Clear BluePro 0.75 to 3.50 -7.00* 0 +6.00 (-4.00)
+PhotoFusion X** 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -8.00* 0 +5.00 (-4.00)
+1.53
+Clear 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+Polarised  
+(Grey, Brown) 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+1.59
+Clear 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+PhotoFusion X** 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Polarised (Grey, Brown) 0.75 to 3.50 -10.00* 0 +6.00 (-4.00)
+1.60
+Clear / Tinted 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Clear BluePro 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+PhotoFusion X** 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -11.00* 0 +6.00 (-6.00)
+1.67
+Clear / Tinted 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+Clear BluePro 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+PhotoFusion X** 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+Polarised  
+(Grey, Brown, Pioneer) 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+1.74
+Clear 0.75 to 3.50 -20.00* 0 +16.00 (-6.00)
+Clear BluePro 0.75 to 3.50 -20.00* 0 +16.00 (-6.00)
+*Maximum combined power.
+**ZEISS PhotoFusion X available in Grey, Extra Grey, Brown, Pioneer, Blue, Burgundy and Black
+
+--- PAGE 46 ---
+ZEISS Progressive Pure     
+Rx Range
+ZEISS SmartLife / ClearMind with UVProtect  
+*ZEISS SmartLife Progressive Pure is available in: Short, Medium and Regular corridor. 
+*Please note: Date of Birth (DOB) is required to optimise average pupil size. If this is not provided, the add power will be used for the calculations. 
+Material Colour Add Power  Power Range Cyl
+1.50
+Clear / Tinted 0.75 to 3.50 -7.00* 0 +6.00 (-4.00)
+Clear BluePro 0.75 to 3.50 -7.00* 0 +6.00 (-4.00)
+PhotoFusion X (Grey, Extra Grey, 
+Brown, Pioneer, Blue, Burgundy) 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -8.00* 0 +5.00 (-4.00)
+1.53
+Clear 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+Polarised  
+(Grey, Brown) 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+1.59
+Clear 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+PhotoFusion X (Grey, Extra Grey, 
+Brown, Pioneer, Blue, Burgundy) 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Polarised (Grey, Brown) 0.75 to 3.50 -10.00* 0 +6.00 (4.00)
+1.60
+Clear / Tinted 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Clear BluePro 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+PhotoFusion X (Grey, Extra Grey, 
+Brown, Pioneer, Blue, Burgundy) 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Polarised / AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -11.00* 0 +6.00 (-6.00)
+1.67
+Clear / Tinted 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+Clear BluePro 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+PhotoFusion X (Grey, Extra Grey, 
+Brown, Pioneer, Blue, Burgundy) 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+AdaptiveSun 
+(Grey, Brown, Pioneer) 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+Polarised  
+(Grey, Brown, Pioneer) 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+1.74
+Clear 0.75 to 3.50 -20.00* 0 +16.00 (-6.00)
+Clear BluePro 0.75 to 3.50 -20.00* 0 +16.00 (-6.00)
+*Maximum combined power.
+Design Code 
+CMI - ClearMind Progressive Indv 3
+SI3 - SmartLife Progressive Indv 3
+ 
+Material Index Code
+50 = 1.50
+53 = 1.53 
+59 = 1.59
+60 = 1.60 
+67 = 1.67  
+74 = 1.74
+Engravings
+SI360 Material index
+(2 digits)
+Design code  
+(3 digits)
+Location of prism 
+reference point (PRP)
+Fitting cross
+   ABCDE
+Individual engraving 
+(5 digits)
+Reference mark 
+0 
+3 
+6 
+Reference mark 
+225
+Addition
+(3 digits)
+Location of distance 
+reference point (DRP)
+Location of near
+reference point (NRP)
+40b4
+FrameFit ® value
+(2 digits)
+Base curve
+(1 digit)
+Vision profile
+(1 digit)
+ZEISS Progressive Individual 3  with UVProtect  
+Design Code 
+CMS - ClearMind Progressive Superb
+CMP - ClearMind Progressive Plus
+SSB - SmartLife Progressive Superb
+SPL - SmartLife Progressive Plus
+Material Index Code
+50 = 1.50
+53 = 1.53 
+59 = 1.59
+60 = 1.60 
+67 = 1.67  
+74 = 1.74
+Engravings
+SSB50 Material index
+(2 digits)
+Design code  
+(3 digits)
+Location of prism 
+reference point (PRP)
+Fitting cross
+   ABCDE
+Individual engraving 
+(5 digits)
+Reference mark 
+0 
+3 
+6 
+Reference mark 
+225Addition
+(3 digits)
+Location of distance 
+reference point (DRP)
+Location of near
+reference point (NRP)
+404
+FrameFit ® value
+(2 digits)
+Base curve
+(1 digit)
+ZEISS Progressive Superb / Plus with UVProtect  
+Engravings
+Design Code 
+CPU - ClearMind Progressive Pure
+SPU - SmartLife Progressive Pure
+Material Index Code
+50 = 1.50
+53 = 1.53 
+59 = 1.59
+60 = 1.60 
+67 = 1.67  
+74 = 1.74
+SPU50
+Material index
+(2 digits)
+Design code  
+(3 digits)
+Location of prism 
+reference point (PRP)
+Fitting cross
+   ABCDE
+Individual engraving 
+(5 digits)
+Reference mark 
+14 
+16 
+18 
+Reference mark 
+225
+Addition
+(3 digits) Location of near
+reference point (NRP)
+Location of distance 
+reference point (DRP)
+16
+Fitting height
+(2 digits)
+ZEISS Progressive Pure with UVProtect  
+ZEISS Progressive Engravings    
+
+--- PAGE 55 ---
+ZEISS Office Lens Superb 
+A maximum intermediate 
+distance of 100 cm.
+A maximum intermediate 
+distance of 200 cm.
+A maximum intermediate 
+distance of 400 cm.
+ZEISS OFFICE LENS BOOK  ZEISS OFFICE LENS NEAR  ZEISS OFFICE LENS ROOM  
+ZEISS Office Lens
+The ideal compliment for near and intermediate usage
+The lens design is optimised for a dynamic, multitasking digital lifestyle 
+– ensuring a more natural body posture while working long hours and 
+frequently using digital devices.
+ZEISS Office Lenses with Digital Inside® Technology
+Precision optics with            
+any frame
+ZEISS Office Lens Superb
+Tailor-made to fit any face and 
+individual near/ intermediate vision 
+requirements
+ZEISS Office Lens Individual
+ZEISS Office Lenses feature M.I.D Technology
+Patient Benefits:
+• Clear vision from near to intermediate distance
+• Wide fields of view
+• Relaxed and natural vision at near and intermediate
+• Comfortable head and body posture
+• Variable corridor design to suit all frame choices
+Maximum Intermediate Distance (M.I.D) Technology converts the upper part of the 
+progressive lens into an intermediate functional area.
+Rx Range
+Material Colour Add Power           Power Range Cyl
+1.50
+Clear / Tinted 0.75 to 3.50 -6.00* 0 +5.00 (-4.00)
+Clear BluePro 0.75 to 4.00 -6.00* 0 +5.00 (-4.00)
+1.53 Clear 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+1.59 Clear 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+1.60
+Clear / Tinted 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Clear BluePro 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+1.67
+Clear / Tinted 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+Clear BluePro 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+1.74
+Clear 0.75 to 3.50 -14.00* 0 +9.00 (-6.00)
+Clear BluePro 0.75 to 3.50 -14.00* 0 +9.00 (-6.00)
+Available in Book, Near or Room profile.
+*Maximum combined power.
+
+--- PAGE 56 ---
+The ZEISS Office Lens Individual is completely customised to give your patient a more 
+natural posture during intermediate and near vision, regardless of frame choice.
+• BVD (Back Vertex Distance)
+• Pantoscopic Tilt
+• Wrap Angle
+• Reading Distance
+• The M.I.D. can be specified anywhere from 100 cm to 400 cm
+• Variable corridor design to suit all frame choices
+• Individual position of wear parameters optimise optics and visual zone sizes
+How to Prescribe:
+Dispense exactly like a progressive lens
+• Normal distance prescription 
+• Normal addition power
+• Distance monocular PD
+• Fitting height at pupil centre
+Material Colour Add Power           Power Range Cyl
+1.50
+Clear / Tinted 0.75 to 3.50 -6.00* 0 +5.00 (-4.00)
+Clear BluePro 0.75 to 4.00 -6.00* 0 +5.00 (-4.00)
+1.53 Clear 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+1.59 Clear 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+1.60
+Clear / Tinted 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Clear BluePro 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+1.67
+Clear / Tinted 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+Clear BluePro 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+1.74
+Clear 0.75 to 3.50 -14.00* 0 +9.00 (-6.00)
+Clear BluePro 0.75 to 3.50 -14.00* 0 +9.00 (-6.00)
+*Maximum combined power.
+Rx Range
+ZEISS Office Lens Individual 
+The following parameters can be fully customised:
+Office Lens Superb  
+Office Lens Individual
+20100
+OI60275
+Location of near  
+reference point (NRP)
+Material index
+(2 digits)
+Design code  
+(2 digits)
+Location of distance  
+reference point (DRP)
+Location of prism 
+reference point (PRP)
+Fitting cross
+Addition power
+(3 digits)
+FrameFit ® value
+(2 digits)
+M.I.D 
+(3 digits)
+Design Code 
+OI
+Material Index Code
+50 = 1.50
+53 = 1.53
+59 = 1.59 
+60 = 1.60 
+67 = 1.67  
+74 = 1.74
+20100
+OS60070
+Location of near  
+reference point (NRP)
+Material index
+(2 digits)
+Design code  
+(2 digits)
+Location of distance  
+reference point (DRP)
+Location of prism 
+reference point (PRP)
+Fitting cross
+Addition power
+(3 digits)
+FrameFit ® value
+(2 digits)
+M.I.D
+(3 digits)
+Design Code 
+OS
+Material Index Code
+50 = 1.50
+53 = 1.53
+59 = 1.59 
+60 = 1.60 
+67 = 1.67  
+74 = 1.74
+M.I.D Code
+100 = Book 
+200 = Near 
+400 = Room
+ZEISS Office Lens Engravings 
+
+--- PAGE 59 ---
+ZEISS DriveSafe Lens
+Design Code 
+VDI- Single Vision Indv
+VD- Single Vision
+Material Index Code
+50 = 1.50  
+60 = 1.60 
+67 = 1.67  
+74 = 1.74
+Rx Range*
+Material Colour     Power Range Cyl
+1.50
+Clear / Tinted -6.00* 0 +6.00 (-4.00)
+PhotoFusion X** -6.00* 0 +6.00 (-4.00)
+Polarised 
+(Grey, Brown, Pioneer) -8.00* 0 +8.00 (-4.00)
+1.60
+Clear / Tinted -10.00* 0 +10.00 (-6.00)
+PhotoFusion X** -10.00* 0 +8.00 (-6.00)
+Polarised  
+(Grey, Brown, Pioneer) -11.00* 0 +10.00 (-6.00)
+1.67
+Clear / Tinted -17.00* 0 +10.00 (-6.00)
+PhotoFusion X** -12.00* 0 +8.00 (-6.00)
+Polarised 
+(Grey, Brown, Pioneer) -12.00* 0 +8.00 (-4.00)
+1.74 Clear -20.00* 0 +16.00 (-6.00)
+*Maximum combined power.
+**ZEISS PhotoFusion X available in Grey, Extra Grey, Brown, Pioneer, Blue, Burgundy and Black
+Single Vision DriveSafe Individual/ Single Vision DriveSafe with UVProtect  
+VD60
+Material index
+(2 digits)
+Design code  
+(2 digits)
+Location of prism 
+reference point (PRP)
+Fitting cross
+(   ) 
+* ZEISS mirror coatings are not available on ZEISS DriveSafe lenses
+* Standard with DuraVision Plus Drivesafe UV Coating
+Engravings:
+Rx Range*
+Progressive DriveSafe Individual/ Progressive Drivesafe with UVProtect  
+Material Colour Add Power        Power Range Cyl
+1.50
+Clear / Tinted 0.75 to 3.50 -7.00* 0 +6.00 (-6.00)
+PhotoFusion X** 0.75 to 3.50 -7.00* 0 +5.00 (-4.00)
+Polarised  
+(Grey, Brown Pioneer) 0.75 to 3.50 -8.00* 0 +5.00 (-4.00)
+1.60
+Clear / Tinted 0.75 to 4.00 -10.00* 0 +10.00 (-6.00)
+PhotoFusion X** 0.75 to 4.00 -10.00* 0 +6.00 (-6.00)
+Polarised X   
+(Grey, Brown, Pioneer) 0.75 to 3.50 -11.00* 0 +6.00 (-6.00)
+1.67
+Clear / Tinted 0.75 to 3.50 -17.00* 0 +8.00 (-6.00)
+PhotoFusion X** 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+Polarised 
+(Grey, Brown Pioneer) 0.75 to 3.50 -12.00* 0 +8.00 (-6.00)
+1.74 Clear 0.75 to 3.50  -20.00* 0 +16.00 (-6.00)
+*Maximum combined power
+**ZEISS PhotoFusion X available in Grey, Extra Grey, Brown, Pioneer, Blue, Burgundy and Black
+Design Code 
+DSI- Progressive Indv
+DS- Progressive
+Material Index Code
+50 = 1.50  
+60 = 1.60 
+67 = 1.67  
+74 = 1.74
+404
+DSI60275
+Location of near  
+reference point (NRP)
+Material index
+(2 digits)
+Design code  
+(3 digits)
+Location of distance  
+reference point (DRP)
+Location of prism 
+reference point (PRP)
+Fitting cross
+Addition power
+(3 digits)
+FrameFit ® value
+(2 digits)
+Base curve
+(1 digit)
+*  ZEISS mirror coatings are not available on ZEISS DriveSafe lenses
+*  Standard with DuraVision Plus Drivesafe UV Coating
+ZEISS DriveSafe Lens 
+Engravings:
+
+--- PAGE 60 ---
+ZEISS Bifocals   
+  Design Flat Top 28 Bifocal
+  Treatments Clear 
+PhotoFusion
+  Coatings 1
+DuraVision ® Plus BlueProtect UV  
+DuraVision ® Plus Platinum UV  
+DuraVision ® Plus Sun UV
+Double Side Hardcoat (DSHC)
+1DuraVision ® Plus Sun UV only available on tinted materials.   
+ DuraVision ® Plus Mirror UV is not available.  
+ DuraVision ® Plus BlueProtect UV is not available on tinted materials.
+Material Colour Add Power         Power Range Cyl
+1.50
+Clear D28 1.00 to 3.00 -10.00* 0 +8.00 (-4.00)
+PhotoFusion  
+(Grey, Brown)
+1.00 to 3.00 -6.00* 0 +6.00 (-4.00)
+*Maximum combined power.
+Rx Range
+ZEISS Bifocals 
+
+--- PAGE 66 ---
+General Dispensing & Fitting 
+• 1.67 and 1.74 materials require          
+Anti-Reflection (AR) coatings
+• ZEISS DuraVision® Plus BlueProtect UV 
+is not available on tinted or polarised 
+materials
+• ZEISS DuraVision® Plus Sun UV & 
+ZEISS DuraVision® Plus Mirror UV 
+only available on tinted or polarised 
+materials
+• All ZEISS DuraVision® Plus Mirror UV 
+come standard with DuraVision® Plus 
+Sun UV
+Back 
+surface  
+UV 
+protection 
+• Measure the monocular pupillary 
+distance and fitting height based on 
+pupil centre
+• Measure position of wear parameters 
+for optimisation
+For greater accuracy, we recommend the use of a digital centration 
+device, alternatively:
+FrameFit Value is automatically based on provided fitting height, but can be customised 
+on certain products.
+Corridor length/ Frame Fit value: 10 mm to 16 mm (FF 0 to 6)
+Short Medium Long
+FrameFit ® Value 0 2 4
+Corridor Length 10 mm 12 mm 14 mm
+Min Fit Height 14 mm 16 mm 18 mm
+General Dispensing & Fitting 
+For: 
+• General ZEISS Rx Lenses 
+For: 
+• ZEISS Sport Lenses 
+Note:
+*i.Scription is available on all ZEISS Rx lenses except ZEISS Office Lens
+*Personalised engraving is possible on selected ZEISS grind products 
+Position of Wear 
+(POW) 
+Panto
+-10o to 30o
+Default 12o
+Wrap
+-5o to 25o
+Default 15o
+BVD
+5 mm to 30 mm 
+Default 10 mm
+Position of Wear 
+(POW) 
+Panto
+-20o to 30o
+Default 9o
+Wrap
+-5o to 15o
+Default 6.5o
+BVD
+5 mm to 30 mm 
+Default 12 mm

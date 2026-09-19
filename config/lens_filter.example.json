@@ -1,5 +1,19 @@
 {
-  "_readme": "Per-machine lens declutter + ordering. Copy this file to config/lens_filter.json and edit that one (it is git-ignored, so a price-list update pulled from GitHub never overwrites your choices, and the shared price files stay complete). TWO independent settings: (1) 'keep_only' maps a lens category to the ranges to keep — within that category only lenses whose brand+name contains one of the snippets survive; any category you leave out is shown in full, so an empty keep_only changes nothing. (2) 'preferred' floats your everyday lenses (the ones on your own price list) to the top of the library with a ★ — 'match' is a list of name snippets to boost, 'exclude' is snippets that veto a match. All matching is case-insensitive substring on brand+name, so 'Dynamic Prime' catches every index/coating/photochromic variant but not 'Dynamic Premium'. Example: \"keep_only\": { \"Progressive\": [\"Dynamic Prime\"] }, \"preferred\": { \"match\": [\"Nulux\", \"Hilux\"], \"exclude\": [\"Sportive\"] }. Categories in the price file: Single vision, Progressive, Occupational, Bifocal.",
-  "keep_only": {},
-  "preferred": { "match": [], "exclude": [] }
+  "_readme": "Per-machine lens declutter + ordering. Copy this file to config/lens_filter.json and edit that one (git-ignored, so a price-list update pulled from GitHub never overwrites your choices). FOUR settings: (1) 'keep_only' maps a lens category to the ranges to keep — within that category only lenses whose brand+name contains one of the snippets survive; a category you leave out is shown in full. (2) 'orderable_suppliers' + 'orderable_extra': lenses from other suppliers stay visible but greyed as 'no longer ordered' and are never the pick — 'orderable_extra' name snippets stay orderable regardless of supplier (MiyoSmart is still Hoya). (3) 'preferred' floats your everyday lenses to the top of the library with a star — 'match' order = priority, 'exclude' vetoes. All matching is case-insensitive substring on brand+name. Categories: Single vision, Progressive, Anti-fatigue, Occupational, Bifocal.",
+  "keep_only": {
+    "Progressive":  ["SmartLife Progressive Individual 3", "SmartLife Progressive Superb", "Ultra HDV", "Performance HD", "iD LifeStyle 4", "iD MySelf Profile", "Dynamic Prime"],
+    "Anti-fatigue": ["SmartLife Digital", "Sync III"],
+    "Occupational": ["Work & Office HD", "Office Lens Superb", "WorkStyle"]
+  },
+  "orderable_suppliers": ["ZEISS", "Synchrony", "Tokai"],
+  "orderable_extra": ["MiyoSmart"],
+  "preferred": {
+    "match": [
+      "ClearView FSV", "Synchrony FSV Clear",
+      "SmartLife Progressive Superb", "SmartLife Progressive Individual 3", "Ultra HDV",
+      "SmartLife Digital", "Work & Office HD",
+      "ClearView Single Vision", "Synchrony Single Vision Grind", "Synchrony Bifocal"
+    ],
+    "exclude": ["Individual 3 Digital", "Digital Individual 3"]
+  }
 }

@@ -30,7 +30,8 @@ logger = logging.getLogger("cec-hub")
 app = Flask(__name__, static_folder="static", static_url_path="/")
 
 BASE_DIR = Path(__file__).parent
-CONFIG_DIR = BASE_DIR / "config"
+EXAMPLE_CONFIG_DIR = BASE_DIR / "config"          # the committed *.example.json templates
+CONFIG_DIR = Path(os.getenv("CEC_HUB_CONFIG_DIR", str(EXAMPLE_CONFIG_DIR)))
 
 # Tests (and unusual machines) can repoint these with environment variables.
 SOPS_DIR = Path(os.getenv("CEC_HUB_SOPS_DIR", str(BASE_DIR / "sops")))
@@ -56,7 +57,7 @@ def _config_json(filename: str, fallback):
     if real.is_file():
         return _load_json(real, fallback)
     stem, _, ext = filename.rpartition(".")
-    return _load_json(CONFIG_DIR / f"{stem}.example.{ext}", fallback)
+    return _load_json(EXAMPLE_CONFIG_DIR / f"{stem}.example.{ext}", fallback)
 
 
 def merge_tiles(real, example):
@@ -93,6 +94,15 @@ def _catalog() -> dict:
     config is per-machine and git-ignored — see config/lens_filter.example.json."""
     catalog = lenses.load_catalog(LENSES_DIR)
     return lenses.apply_lens_filter(catalog, _config_json("lens_filter.json", {}))
+
+
+def _pricing() -> dict:
+    """Promo date, stock-first rule, level multipliers (config/lens_pricing.json),
+    plus the everyday-lens names from lens_filter.json as the finder's tie-breaker."""
+    pricing = dict(_config_json("lens_pricing.json", {}) or {})
+    pref = (_config_json("lens_filter.json", {}) or {}).get("preferred") or {}
+    pricing.setdefault("preferred_names", pref.get("match") or [])
+    return pricing
 
 
 # --- Pages -------------------------------------------------------------------
@@ -350,11 +360,14 @@ def lenses_catalog():
     # blanks folded in), with the practice's day-to-day lenses floated to the
     # top. The finder keeps using the flat rows via /find.
     cat = _catalog()
-    products = lenses.group_products(cat["lenses"])
+    pricing = _pricing()
+    products = lenses.group_products(cat["lenses"], pricing=pricing)
     products = lenses.mark_preferred(products, _config_json("lens_filter.json", {}))
     products = lenses.attach_cec_price(products, _config_json("cec_prices.json", {}))
     return jsonify({"products": products,
-                    "files": cat["files"], "message": cat["message"]})
+                    "files": cat["files"], "message": cat["message"],
+                    "pricing": {"promo_until": pricing.get("promo_until", ""),
+                                "prefer_stock": bool(pricing.get("prefer_stock", True))}})
 
 
 @app.route("/api/lenses/find")
@@ -379,10 +392,35 @@ def lenses_find():
             min_blank is None or not 40 <= min_blank <= 90):
         return jsonify({"error": "Blank size should be in millimetres, "
                                  "e.g. 68 (or leave it empty)."}), 400
+    add = _arg("add")
+    if (request.args.get("add") or "").strip() and (add is None or not 0 < add <= 6):
+        return jsonify({"error": "That add doesn't look right — e.g. 2.00 "
+                                 "(or leave it empty for single vision)."}), 400
+    fh = _arg("fh")
+    if (request.args.get("fh") or "").strip() and (fh is None or not 8 <= fh <= 40):
+        return jsonify({"error": "Fitting height should be in millimetres, "
+                                 "e.g. 18 (or leave it empty)."}), 400
+    kind = (request.args.get("kind") or "Single vision").strip()
+    tint = (request.args.get("tint") or "").strip().lower() in ("1", "true", "yes", "on")
 
+    # Which supplier's range to search. "current" = what we order now (the
+    # orderable suppliers in lens_filter.json); "hoya" = the old range, ranked
+    # as if it were still ordered, for a side-by-side; "all" = everything,
+    # retired lenses greyed.
+    which = (request.args.get("supplier") or "current").strip().lower()
     catalog = _catalog()
-    result = lenses.find_options(lenses.sv_only(catalog["lenses"]), sph,
-                                 cyl or 0.0, min_blank)
+    rows = catalog["lenses"]
+    if which == "hoya":
+        rows = [{**l, "orderable": True} for l in rows
+                if str(l.get("supplier") or l.get("brand") or "").lower() == "hoya"]
+    elif which != "all":
+        rows = [l for l in rows if l.get("orderable", True)]
+    result = lenses.find_options(rows, sph, cyl or 0.0, min_blank,
+                                 add=add, kind=kind, fh=fh, tint=tint,
+                                 pricing=_pricing())
+    result["supplier"] = which
+    if which == "hoya" and result.get("verdict"):
+        result["verdict"] = "HOYA (old supplier, for comparison) — " + result["verdict"]
     result["catalog_message"] = catalog["message"]
     return jsonify(result)
 
@@ -405,8 +443,11 @@ def lenses_check():
         min_blank = None
 
     catalog = _catalog()
-    result = lenses.check_job(lenses.sv_only(catalog["lenses"]), right, left,
-                              min_blank, data.get("chosen") or {})
+    result = lenses.check_job(catalog["lenses"], right, left, min_blank,
+                              data.get("chosen") or {},
+                              add=lenses.parse_number(data.get("add")),
+                              kind=(data.get("kind") or "").strip() or None,
+                              pricing=_pricing())
     result["catalog_message"] = catalog["message"]
     return jsonify(result)
 
@@ -425,10 +466,11 @@ def lenses_jobs():
         if min_blank is None:
             min_blank = lenses.min_blank_from_frame(job.get("frame") or {})
         check = lenses.check_job(
-            lenses.sv_only(catalog["lenses"]),
+            catalog["lenses"],
             job.get("right") or {}, job.get("left") or {},
             min_blank,
             {"code": job.get("code"), "type": job.get("stk_grd")},
+            pricing=_pricing(),
         )
         jobs.append({
             "job": str(job.get("job") or ""),
@@ -482,4 +524,6 @@ def lenses_upload():
 if __name__ == "__main__":
     # 0.0.0.0 = reachable from other practice PCs (http://<this-machine>:5680).
     # Set CEC_HUB_HOST=127.0.0.1 in the environment to go back to this-machine-only.
-    app.run(host=os.environ.get("CEC_HUB_HOST", "0.0.0.0"), port=5680, debug=False)
+    # CEC_HUB_PORT lets a second copy run for testing without touching the live Hub.
+    app.run(host=os.environ.get("CEC_HUB_HOST", "0.0.0.0"),
+            port=int(os.environ.get("CEC_HUB_PORT", "5680")), debug=False)

@@ -123,6 +123,17 @@ SAMPLE_LENSES_CSV = (
 )
 
 
+def _neutral_lens_config(tmp_path):
+    """A config folder whose lens_filter retires nothing, so the small Hoya
+    sample stays orderable (the shipped example retires Hoya for the practice).
+    Other configs fall back to the committed examples."""
+    cfg = tmp_path / "config"
+    cfg.mkdir(exist_ok=True)
+    (cfg / "lens_filter.json").write_text('{"keep_only": {}, "preferred": {"match": [], "exclude": []}}',
+                                          encoding="utf-8")
+    return cfg
+
+
 @pytest.fixture
 def hub_client_lenses(tmp_path, monkeypatch):
     """Test client pointed at a tmp lenses folder with a small Hoya file."""
@@ -132,6 +143,7 @@ def hub_client_lenses(tmp_path, monkeypatch):
     (lenses_dir / "_template.csv").write_text(
         "lens,sph_min,sph_max\nIGNORED EXAMPLE,-1.00,+1.00\n", encoding="utf-8")
     monkeypatch.setenv("CEC_HUB_LENSES_DIR", str(lenses_dir))
+    monkeypatch.setenv("CEC_HUB_CONFIG_DIR", str(_neutral_lens_config(tmp_path)))
     monkeypatch.delenv("CEC_HUB_INTEGRATIONS", raising=False)
     monkeypatch.delenv("CEC_HUB_SOPS_DIR", raising=False)
     app_module = _reload_app()
@@ -161,6 +173,7 @@ def hub_client_lens_jobs(tmp_path, monkeypatch):
         "optomate_agent": {"lens_jobs": str(jobs_path)},
     })
     monkeypatch.setenv("CEC_HUB_LENSES_DIR", str(lenses_dir))
+    monkeypatch.setenv("CEC_HUB_CONFIG_DIR", str(_neutral_lens_config(tmp_path)))
     monkeypatch.setenv("CEC_HUB_INTEGRATIONS", str(cfg))
     monkeypatch.delenv("CEC_HUB_SOPS_DIR", raising=False)
     app_module = _reload_app()
