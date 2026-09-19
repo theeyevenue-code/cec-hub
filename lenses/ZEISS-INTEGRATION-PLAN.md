@@ -305,3 +305,19 @@ independent guide to cross-check against.
 4. Live-machine step still to do at merge: copy the three `config/*.example.json` over the
    machine's own `lens_filter.json` / `cec_prices.json` (and create `lens_pricing.json`), then
    `RESTART-HUB.bat`. The examples are the ZEISS-era truth; the machine copies are still Hoya.
+
+## 9. Range-reading audit (19 Sep, after Mark caught −6.50/−2.00 being called a grind)
+
+Every place the code turns a printed range into a yes/no, and the reading applied:
+
+| Where | Reading | Status |
+|---|---|---|
+| ZEISS + synchrony **stock** bands (`range_basis=combined`) | band = strongest-meridian power; diameter changes with it | **Changed 19 Sep.** Was sphere-in-band + combined cap, which put −6.50/−2.00 in a hole. Evidence: bands tile the axis in 0.25 steps. Interpretation — confirm in VISUSTORE (README) |
+| ZEISS + synchrony **made-to-order** tables (`-8.00* 0 +8.00 (-4.00)`) | sphere range + cyl cap + combined cap | Unchanged; the two readings coincide here (minus meridian ≥ −8.00, plus meridian ≤ +8.00) |
+| Hoya rows (`convert_provision_t3.py`) | sphere rectangle + cyl + optional combined, transcribed from Hoya's stair-step charts | Unchanged; `range_basis` defaults to `sphere` |
+| Plus cyl typed | transposed to minus-cyl form first | Unchanged |
+| Combined cap on plus scripts | never applied (it is a minus-side limit) | Fixed 19 Sep (was abs()) |
+| Cyl sign | stored as magnitude; ZEISS prints `(-4.00)`, synchrony `5.00` | Unchanged |
+| Guide vs book disagreements (133 ZEISS rows) | book range kept, guide's quoted on the row | Unchanged; visible on the card |
+| Thickness table (`INDEX_BY_POWER`) | Mark's July table; a stock lens one step under it may lead (19 Sep) | Mark's rule to revisit if wanted |
+| FSV 1.60 75 mm blank not on the schedule | bills at book | Question for Eoin |

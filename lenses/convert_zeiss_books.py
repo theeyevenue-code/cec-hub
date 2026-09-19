@@ -52,7 +52,7 @@ ONGOING, PROMO = "L25", "L50"
 
 COLUMNS = ["supplier", "brand", "lens", "code", "category", "index", "material",
            "form", "type", "blank_mm", "sph_min", "sph_max", "cyl_max",
-           "combined_max", "add_min", "add_max", "add_range", "price",
+           "combined_max", "range_basis", "add_min", "add_max", "add_range", "price",
            "price_promo", "price_basis", "coating", "min_fh_mm", "notes"]
 
 NUM = r"[-+]?\d+(?:\.\d+)?"
@@ -689,6 +689,10 @@ def to_csv_rows(rows):
             "sph_min": fmt_power(r["sph_min"]), "sph_max": fmt_power(r["sph_max"]),
             "cyl_max": f"-{r['cyl_max']:.2f}" if r["cyl_max"] is not None else "",
             "combined_max": f"{r['combined_max']:.2f}" if r["combined_max"] is not None else "",
+            # Stock bands are ranges of the lens's strongest-meridian power
+            # (they tile that axis in 0.25 steps); made-to-order tables are
+            # sphere ranges with a separate combined cap.
+            "range_basis": "combined" if r["type"] == "stock" else "sphere",
             "add_min": f"{add[0]:.2f}" if add else "", "add_max": f"{add[1]:.2f}" if add else "",
             "add_range": f"Add {add[0]:.2f} to {add[1]:.2f}" if add else "",
             "price": money(price), "price_promo": money(promo), "price_basis": basis,

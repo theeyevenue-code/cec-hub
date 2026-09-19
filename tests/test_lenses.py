@@ -780,25 +780,52 @@ def test_api_find_supplier_switch(hub_client_lenses):
     assert {o["supplier"] for o in both["options"]} >= {"Hoya", "ZEISS"}
 
 
-def test_find_stock_band_swap_when_combined_power_crosses_into_the_next_band():
-    # ClearView 1.74 stock: 75mm carries -3.00 to -8.00 (combined to -8.00),
-    # 70mm carries -8.25 to -12.00 (combined to -12.00). -6.50/-2.00 is
-    # -8.50 combined: still stocked, supplied as the 70mm blank.
-    rows = ("supplier,lens,type,blank_mm,sph_min,sph_max,cyl_max,combined_max,price,coating\n"
-            "ZEISS,ClearView FSV 1.74,stock,75,-8.00,-3.00,-2.00,8.00,40.00,Platinum\n"
-            "ZEISS,ClearView FSV 1.74,stock,70,-12.00,-8.25,-2.00,12.00,40.00,Platinum\n")
+def test_find_stock_bands_read_as_strongest_meridian_power():
+    # ClearView 1.74 stock, as the book prints it: 75mm -3.00 to -8.00*, 70mm
+    # -8.25 to -12.00*, cyl to -2.00. With range_basis=combined the band is
+    # the lens's strongest-meridian power, so -6.50/-2.00 is a -8.50 lens on
+    # the 70mm blank; -12.00 plain is the top; -10.25/-2.00 is a grind.
+    rows = ("supplier,lens,type,blank_mm,sph_min,sph_max,cyl_max,combined_max,range_basis,price,coating\n"
+            "ZEISS,ClearView FSV 1.74,stock,75,-8.00,-3.00,-2.00,8.00,combined,40.00,Platinum\n"
+            "ZEISS,ClearView FSV 1.74,stock,70,-12.00,-8.25,-2.00,12.00,combined,40.00,Platinum\n")
     parsed, _ = lenses.parse_csv_text(rows, "z.csv")
+    assert parsed[0]["range_basis"] == "combined"
     r = lenses.find_options(parsed, sph=-6.5, cyl=-2.0)
-    assert len(r["options"]) == 1
-    o = r["options"][0]
-    assert o["blank_mm"] == 70 and o["best"] is True
-    assert any(w.startswith("comes as the 70mm blank") for w in o["warnings"])
-    assert "STOCK covers this" in r["verdict"] and "70mm blank" in r["verdict"]
-    assert "amber notes" not in r["verdict"]
-    # a frame needing a 72mm blank: the 70mm supply is now too small
+    assert [o["blank_mm"] for o in r["options"]] == [70]
+    assert r["verdict"].startswith("STOCK covers this") and "70mm blank" in r["verdict"]
+    assert [o["blank_mm"] for o in lenses.find_options(parsed, sph=-6.5, cyl=-1.5)["options"]] == [75]
+    assert [o["blank_mm"] for o in lenses.find_options(parsed, sph=-12.0)["options"]] == [70]
+    assert [o["blank_mm"] for o in lenses.find_options(parsed, sph=-10.0, cyl=-2.0)["options"]] == [70]
+    assert lenses.find_options(parsed, sph=-10.25, cyl=-2.0)["options"] == []
+    assert lenses.find_options(parsed, sph=-2.0, cyl=-0.5)["options"] == []      # -2.50: under the range
     assert lenses.find_options(parsed, sph=-6.5, cyl=-2.0, min_blank=72)["options"] == []
-    # beyond the strongest band's combined limit it is still a miss
-    assert lenses.find_options(parsed, sph=-11.0, cyl=-2.0)["options"] == []
-    # -6.50/-1.50 (-8.00) sits inside the 75mm band: no swap
-    plain = lenses.find_options(parsed, sph=-6.5, cyl=-1.5)["options"][0]
-    assert plain["blank_mm"] == 75 and not plain["warnings"]
+    assert lenses.find_options(parsed, sph=-6.5, cyl=-2.5)["options"] == []      # cyl over the cap
+
+
+def test_find_plus_and_crossed_scripts_against_combined_bands():
+    # ClearView 1.60 as printed: 65mm +2.00 to +6.00, 70mm +0.25 to +4.00,
+    # 75mm 0.00 to -6.00 (cyl -3), 70mm -6.25 to -8.00.
+    rows = ("supplier,lens,type,blank_mm,sph_min,sph_max,cyl_max,range_basis,price\n"
+            "ZEISS,ClearView FSV 1.60,stock,65,+2.00,+6.00,-2.00,combined,20\n"
+            "ZEISS,ClearView FSV 1.60,stock,70,+0.25,+4.00,-2.00,combined,20\n"
+            "ZEISS,ClearView FSV 1.60,stock,75,-6.00,0.00,-3.00,combined,20\n"
+            "ZEISS,ClearView FSV 1.60,stock,70,-8.00,-6.25,-2.00,combined,20\n")
+    parsed, _ = lenses.parse_csv_text(rows, "z.csv")
+    blanks = lambda **kw: sorted(o["blank_mm"] for o in lenses.find_options(parsed, **kw)["options"])
+    assert blanks(sph=6.0, cyl=-2.0) == [65]          # plus lens: judged on its +6.00 sphere
+    assert blanks(sph=7.0) == []                       # over the top of the plus range
+    assert blanks(sph=1.0, cyl=-2.0) == [75]           # crossed cyl: -1.00 in the strongest meridian
+    assert blanks(sph=3.0, cyl=-3.0) == []             # plus lens (+3.00 meridian) with a -3 cyl: no plus band takes -3
+    assert blanks(sph=1.0, cyl=-3.0) == [75]           # -2.00 in the strongest meridian, cyl -3 on the 75mm band
+    assert blanks(sph=-5.0, cyl=-2.0) == [70]          # -7.00: the 70mm minus band
+    assert blanks(sph=-3.0, cyl=-1.0) == [75]
+
+
+def test_sphere_basis_rows_keep_the_hoya_reading():
+    # Hoya rows carry no range_basis: sphere in range + cyl cap + combined cap.
+    rows = ("lens,type,blank_mm,sph_min,sph_max,cyl_max,combined_max,price\n"
+            "Nulux 1.60,stock,70,-8.00,+6.00,-2.00,8.00,20\n")
+    parsed, _ = lenses.parse_csv_text(rows, "h.csv")
+    assert parsed[0]["range_basis"] == "sphere"
+    assert len(lenses.find_options(parsed, sph=-6.0, cyl=-2.0)["options"]) == 1   # -8.00 combined ok
+    assert lenses.find_options(parsed, sph=-6.5, cyl=-2.0)["options"] == []        # -8.50 over the cap

@@ -75,7 +75,8 @@ aliases work — e.g. `diameter` for `blank_mm`, `cost` for `price`).
 | `sph_min` / `sph_max` | no | sphere range, signed. Leave blank and the Finder flags "range not in file" instead of guessing |
 | `sph_range` | *alt* | *instead of the two above*: one cell like `+4.00 to -4.00` |
 | `cyl_max` | no | biggest cyl it can do, e.g. `-2.00` (sign doesn't matter) |
-| `combined_max` | no | the supplier's **maximum minus combined power** (the starred number in the books): sphere + cyl in minus-cyl form. Only ever limits a minus prescription |
+| `combined_max` | no | the supplier's **maximum minus combined power** (the starred number in the books): sphere + cyl in minus-cyl form. Only ever limits a minus prescription, and only on `sphere`-basis rows |
+| `range_basis` | no | `sphere` (default) or `combined` — see "How ranges are read" |
 | `add_min` / `add_max` | no | add range for multifocal-type lenses, e.g. `0.75` / `3.50` — the Finder checks the typed add against it |
 | `add_range` | no | free text shown on the card (`Add 0.75 to 3.50`); parsed into the two above when they are blank |
 | `min_fh_mm` | no | minimum fitting height for the design (Superb / Individual 3 = 13, Pure = 14) — a warning when the typed fitting height is under it |
@@ -89,13 +90,38 @@ aliases work — e.g. `diameter` for `blank_mm`, `cost` for `price`).
 Numbers shrug off `$`, `mm` and `+` signs, so `$18.50`, `65mm`, `+4.00`
 are all fine.
 
+## How ranges are read — two readings, one flag
+
+The supplier books print a power range, a cyl limit and a starred number
+("*maximum combined power"). They never say whether the range is the
+**sphere** or the **whole lens**. The catalogue carries the reading per row
+in `range_basis`:
+
+| `range_basis` | Used for | A row fits when |
+|---|---|---|
+| `sphere` (default; Hoya, every made-to-order table) | sphere range + separate cyl cap + starred combined cap | sphere inside the range, \|cyl\| ≤ cyl_max, and sphere+cyl not beyond the combined cap |
+| `combined` (ZEISS and synchrony **stock** bands, set by the converter) | the band is a range of the lens's **strongest-meridian power** — sphere+cyl for a minus lens, the sphere for a plus lens; the diameter changes as that power grows | that power inside the band and \|cyl\| ≤ the band's cyl_max |
+
+Why the stock bands are read as `combined`: ClearView 1.60/1.67/1.74 bands
+tile one axis in 0.25 steps with no gaps (−8.00 to −6.25 on 70 mm, −6.00 to
+0.00 on 75 mm, +0.25 to +4.00 on 70 mm …). Under a sphere-only reading every
+cyl script near a band edge would fall into a hole ZEISS does not have.
+Worked examples, ClearView 1.74 (75 mm −3.00 to −8.00, 70 mm −8.25 to −12.00,
+cyl to −2.00): −6.50/−2.00 is a −8.50 lens → **stock, 70 mm blank**;
+−10.00/−2.00 (−12.00) → stock, 70 mm; −10.25/−2.00 → grind; −12.00 plain →
+stock. **So "1.74 stock to −12.00" means −12.00 in the strongest meridian:
+−12.00 sphere with no cyl, or −10.00 with −2.00 cyl.**
+
+⚠ This is an interpretation, not a printed rule. The one-line check that
+settles it: key −6.50/−2.00 in ClearView FSV 174 into VISUSTORE. If it is
+refused, change the converter to write `sphere` for stock rows and rebuild.
+
 ## How the Finder decides (so the data means what you think)
 
 - Cyl is checked in **minus-cyl form**. A plus cyl is transposed first.
-- A row fits when: sphere is inside `sph_min`–`sph_max`, |cyl| ≤ `cyl_max`,
-  the minus combined power is within `combined_max`, `blank_mm` covers the
-  frame's blank (when typed), and for multifocal kinds the add is inside
-  `add_min`–`add_max`.
+- A row fits when its power is inside the range (see "How ranges are
+  read"), |cyl| ≤ `cyl_max`, `blank_mm` covers the frame's blank (when
+  typed), and for multifocal kinds the add is inside `add_min`–`add_max`.
 - Order of the results: still-ordered lenses → the **right thickness** for
   the power (`INDEX_BY_POWER` in `hub/lenses.py`: ≤2.00 → 1.50, ≤4.00 →
   1.60, ≤6.00 → 1.67, above → 1.74; a thinner-index lens that only
