@@ -165,7 +165,7 @@ def test_find_grind_only_job():
     result = lenses.find_options(_sample(), sph=-9.0)
     assert [o["name"] for o in result["options"]] == ["SV Grind 1.50"]
     assert result["options"][0]["best"] is True
-    assert "as a grind" in result["verdict"]
+    assert result["verdict"].startswith("GRIND")
 
 
 def test_find_grind_cheaper_than_stock():
@@ -184,7 +184,7 @@ def test_find_grind_cheaper_than_stock():
     assert "practice rule" in result["verdict"]
     cheapest = lenses.find_options(parsed, sph=-2.0, pricing={"prefer_stock": False})
     assert cheapest["options"][0]["name"] == "Cheap Grind"
-    assert "Cheap Grind" in cheapest["verdict"] and "as a grind" in cheapest["verdict"]
+    assert cheapest["verdict"].startswith("GRIND") and "Cheap Grind" in cheapest["verdict"]
 
 
 def test_find_nothing_fits():
@@ -318,7 +318,7 @@ def test_api_find_best_option(hub_client_lenses):
     # -3.00/-1.00 wants 1.60, so the 1.60 leads (not the cheaper 1.50).
     assert data["options"][0]["name"] == "Nulux 1.60"
     assert data["rec_index"] == 1.60
-    assert "Best value" in data["verdict"]
+    assert data["verdict"].startswith("STOCK covers this")
 
 
 def test_api_find_requires_sphere(hub_client_lenses):

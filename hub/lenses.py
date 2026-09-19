@@ -646,10 +646,20 @@ def _fmt_index(v):
     return f"{v:.2f}"
 
 
+DEFAULT_PREFERRED_COATINGS = ["Platinum", "HMC+"]
+HARD_COAT_WORDS = ("hard coat", "hardcoat", "dshc", " hc")
+
+
+def is_hard_coat(coating: str) -> bool:
+    c = f" {coating or ''}".lower()
+    return any(w in c for w in HARD_COAT_WORDS) and "hmc" not in c
+
+
 def find_options(lenses: list, sph: float, cyl: float = 0.0,
                  min_blank: float | None = None, add: float | None = None,
                  kind: str | None = None, fh: float | None = None,
-                 today=None, pricing: dict | None = None) -> dict:
+                 tint: bool = False, today=None,
+                 pricing: dict | None = None) -> dict:
     """Which lenses can make this Rx, in the order the practice would reach
     for them, and in plain words why.
 
@@ -665,10 +675,20 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
     written. min_blank is the smallest blank diameter the frame needs. add
     is checked against the add range of multifocal-type rows. fh is the
     fitting height, checked against a design's minimum (warning only).
-    kind narrows to one category (None = the rows as given).
+    kind narrows to one category (None = the rows as given). tint: the job
+    is being tinted, so a hard-coat row is the standard and coloured
+    materials (BluePro, photochromic, polarised) are out.
+
+    Coatings: every coating column in the price file is a row, but the
+    practice orders one as standard (pricing["preferred_coatings"], default
+    Platinum / HMC+). Those rows rank ahead of the others at the same
+    product, so the pick is the lens as it would actually be ordered; the
+    cheaper hard-coat row is still listed underneath.
     """
     pricing = pricing or {}
     prefer_stock = bool(pricing.get("prefer_stock", True))
+    preferred = [str(c).lower() for c in
+                 pricing.get("preferred_coatings") or DEFAULT_PREFERRED_COATINGS]
     cyl = cyl or 0.0
     transposed = False
     if cyl > 0:
@@ -735,11 +755,26 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
         orderable = bool(lens.get("orderable", True))
         if not orderable:
             warnings.append("no longer ordered — reference only")
+        material = str(lens.get("material") or "Clear")
+        plain = material.lower() in ("", "clear", "clear / tinted", "tinted")
+        coating = str(lens.get("coating") or "")
+        c = coating.lower()
+        if tint:
+            if not plain:
+                reasons.append(f"a tint goes on a clear lens, not {material}")
+            standard = is_hard_coat(coating)
+            if not standard:
+                reasons.append("a tint needs a hard-coat lens — this is an AR "
+                               "coating (can't be tinted after coating)")
+        else:
+            standard = (not coating or
+                        any(p in c for p in preferred) and "back surface" not in c)
 
         under = lens["index"] is not None and lens["index"] < rec_index
         price, basis = price_now(lens, today, pricing)
         entry = {**lens, "warnings": warnings, "under_index": under,
-                 "price_now": price, "basis": basis, "orderable": orderable}
+                 "price_now": price, "basis": basis, "orderable": orderable,
+                 "standard_coating": standard, "plain": plain}
         if reasons:
             misses.append({**entry, "reasons": reasons})
         else:
@@ -748,6 +783,7 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
     def sort_key(o):
         return (not o["orderable"], o["under_index"],
                 (o["type"] != "stock") if prefer_stock else False,
+                not o["standard_coating"], not o["plain"],
                 o["price_now"] is None, o["price_now"] or 0, o["index"] or 0)
 
     options.sort(key=sort_key)
@@ -764,7 +800,7 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
                 o["dearer_by"] = round(o["price_now"] - best["price_now"], 2)
 
     return {
-        "rx": {"sph": sph, "cyl": cyl, "add": add, "transposed": transposed,
+        "rx": {"sph": sph, "cyl": cyl, "add": add, "tint": tint, "transposed": transposed,
                "display": (f"{_fmt_power(sph)} / {_fmt_power(cyl)}" if cyl
                            else _fmt_power(sph))
                           + (f" add {add:+.2f}" if add is not None else "")},
@@ -773,7 +809,9 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
         "min_blank": min_blank,
         "options": options,
         "misses": misses,
-        "verdict": _verdict(options, best, rec_index, prefer_stock),
+        "verdict": _verdict(options, best, rec_index, prefer_stock,
+                            made_to_order=(normalise_category(kind) != "Single vision")
+                            if kind else False),
     }
 
 
@@ -786,8 +824,16 @@ def _label(lens):
     return f"{lead} {lens['name']}".strip()
 
 
-def _verdict(options, best, rec_index=None, prefer_stock=True):
-    """One plain-words sentence for the top of the results."""
+def _price_tag(o):
+    b = o.get("basis") or ""
+    tag = {"deal": "deal price", "promo": "promo price"}.get(b, "")
+    return f"${o['price_now']:.2f} a lens" + (f", {tag}" if tag else "")
+
+
+def _verdict(options, best, rec_index=None, prefer_stock=True, made_to_order=False):
+    """The plain-words line at the top of the results: STOCK or GRIND first,
+    then the lens, then what the other route would have cost. Multifocal-type
+    lenses are always made to order, so they skip the stock/grind framing."""
     if not options:
         return ("Nothing in the catalogue covers this job. Check the Rx, or "
                 "it may need a lens that isn't loaded yet — ask Mark.")
@@ -798,41 +844,51 @@ def _verdict(options, best, rec_index=None, prefer_stock=True):
         return ("Some lenses fit, but none of them have a price loaded, so "
                 "there's no cheapest to point at yet.")
 
-    where = "off the shelf" if best["type"] == "stock" else "as a grind"
-    line = (f"Best value: {_label(best)} — ${best['price_now']:.2f} a lens, {where}"
-            f"{' (promo price)' if best.get('basis') == 'promo' else ''}.")
+    live = [o for o in options if o["orderable"] and o["price_now"] is not None]
+    right_index = [o for o in live if not o.get("under_index")]
+    std = [o for o in right_index if o.get("standard_coating")] or right_index
+    grind = next((o for o in std if o["type"] == "grind"), None)
 
-    # Index appropriateness — the whole point of leading with this lens.
+    if made_to_order:
+        line = f"{_label(best)} — {_price_tag(best)} (made to order)."
+        runner = next((o for o in std if o is not best and o["name"] != best["name"]), None)
+        if runner:
+            line += f" Next: {_label(runner)}, {_price_tag(runner)}."
+    elif best["type"] == "stock":
+        line = f"STOCK covers this — {_label(best)}, {_price_tag(best)}."
+        if rec_index is not None and best["index"] and best["index"] > rec_index + 0.001:
+            line += (f" No {_fmt_index(rec_index)} stock lens covers this cyl, so it "
+                     f"goes up to {_fmt_index(best['index'])} stock rather than a grind.")
+        if grind and grind is not best:
+            diff = grind["price_now"] - best["price_now"]
+            if diff >= 0:
+                line += (f" A grind would cost {_price_tag(grind)} "
+                         f"({_label(grind)}) — stock saves ${diff:.2f} a lens.")
+            elif prefer_stock:
+                line += (f" The cheapest grind ({_label(grind)}, {_price_tag(grind)}) "
+                         f"is ${-diff:.2f} a lens less, but stock comes first by practice rule.")
+    else:
+        line = "GRIND — no stock lens covers this"
+        if rec_index is not None:
+            line += f" at {_fmt_index(rec_index)} or higher"
+        thin_stock = next((o for o in live if o["type"] == "stock" and o.get("under_index")), None)
+        if thin_stock:
+            line += f" ({_label(thin_stock)} stock fits but would be too thick at this power)"
+        line += f". Cheapest: {_label(best)}, {_price_tag(best)}."
+
     if rec_index is not None and best.get("under_index"):
         line += (f" ⚠ Nothing at {_fmt_index(rec_index)} (what we'd use for this "
                  "power) is loaded and priced for this Rx, so this is the thinnest "
                  "that fits — expect it thick and double-check.")
     elif rec_index is not None:
-        cheaper_thin = next((o for o in options
-                             if o["orderable"] and o["price_now"] is not None
-                             and o.get("under_index")
+        cheaper_thin = next((o for o in live if o.get("under_index")
                              and o["price_now"] < best["price_now"]), None)
         if cheaper_thin:
             line += (f" ({_label(cheaper_thin)} at {_fmt_index(cheaper_thin['index'])} "
                      f"fits for ${cheaper_thin['price_now']:.2f} but would be too thick — "
                      f"{_fmt_index(rec_index)} is the sensible minimum for this power.)")
-
-    # Stock-vs-grind: say what the other route costs, whichever way it went.
-    if best["type"] == "stock":
-        priced_grind = next((o for o in options if o["type"] == "grind"
-                             and o["orderable"] and not o.get("under_index")
-                             and o["price_now"] is not None), None)
-        if priced_grind and priced_grind is not best:
-            diff = priced_grind["price_now"] - best["price_now"]
-            if diff > 0:
-                line += (f" Saves ${diff:.2f} a lens vs grinding "
-                         f"({_label(priced_grind)} at ${priced_grind['price_now']:.2f}).")
-            elif diff < 0 and prefer_stock:
-                line += (f" The cheapest grind ({_label(priced_grind)}, "
-                         f"${priced_grind['price_now']:.2f}) is ${-diff:.2f} a lens less, "
-                         "but stock comes first by practice rule.")
     if best["warnings"]:
-        line += " Check its amber notes first — not all of its limits are in the file."
+        line += " Check its amber notes first."
     return line
 
 

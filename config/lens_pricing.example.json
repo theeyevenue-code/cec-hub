@@ -1,0 +1,7 @@
+{
+  "_readme": "How the Lens Finder prices ZEISS/synchrony rows and orders its results. Copy to config/lens_pricing.json to change per machine (git-ignored); the example is used when no copy exists. promo_until: the launch level (price_promo column, L50) applies while today is BEFORE this date, then the ongoing price (deal price, or book at L25). prefer_stock: put a stock lens that fits ahead of a cheaper grind (practice rule, Sep 2026 — stock keeps the job in the finished range and off the surfacing bench); false = cheapest first. zeiss_mix_suppliers: which suppliers count toward the ZEISS-brand purchase mix in the bundle agreement (synchrony assumed to count — unconfirmed).",
+  "promo_until": "2027-03-11",
+  "prefer_stock": true,
+  "levels": { "L50": 0.625, "L25": 0.9375, "_note": "multipliers on the L20 book; L25 after the promo is verbal (Trisha), not in writing" },
+  "zeiss_mix_suppliers": ["ZEISS", "Synchrony"]
+}

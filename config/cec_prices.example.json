@@ -1,7 +1,14 @@
 {
-  "_readme": "Concord's SELLING prices (per pair) shown in the Lens Finder next to the Hoya cost. Copy this file to config/cec_prices.json (git-ignored) and fill it in. Rules: 'design_prices' price progressives/occupationals by name snippet + index (coating doesn't change the base). 'sv_tiers' price single vision by COATING tier + index, so the sell price tracks the coating dropdown. 'surcharge' adds to any base when the name contains the snippet (e.g. photochromic). 'blank_names' suppress a price for variants that vary. Index keys are strings like \"1.60\". Empty lists (like this template) show no CEC prices. Example: {\"surcharge\": {\"Sensity\": 120}, \"blank_names\": [\"Polarised\"], \"design_prices\": [{\"match\": \"Dynamic Prime\", \"by_index\": {\"1.60\": 530}}], \"sv_tiers\": [{\"coating\": \"Diamond Finish\", \"by_index\": {\"1.67\": 290}}, {\"coating\": \"ViewProtect\", \"by_index\": {\"1.67\": 240}}]}.",
-  "surcharge": {},
-  "blank_names": [],
-  "design_prices": [],
-  "sv_tiers": []
+  "_readme": "Concord's SELLING prices per pair (GST incl., coating included) shown in the Lens Finder beside the supplier cost — the 15 Sep 2026 staff sheet. 'tiers': the first tier whose 'match' snippet appears in supplier+brand+lens name gives the base price by index (category limits a tier to one lens kind). 'addons' add to the base when the snippet appears in the lens name, material or coating — BluePro +$50, photochromic +$130 — and the special 'grind' key adds the made-to-order surcharge on single-vision GRIND rows only (multifocal tiers already include it). 'blank_names' suppress a price (polarised is priced off the sunglasses list; MiyoSmart has its own). Tint +$50 (grind only) is not modelled. Index keys are strings like \"1.60\". The old Hoya keys (design_prices / sv_tiers / surcharge) still work if you ever need them.",
+  "tiers": [
+    { "name": "Signature",     "category": "Progressive",   "match": ["SmartLife Progressive Individual 3"],  "by_index": { "1.50": 750, "1.53": 790, "1.60": 850, "1.67": 950, "1.74": 1050 } },
+    { "name": "Everyday",      "category": "Progressive",   "match": ["SmartLife Progressive Superb"],        "by_index": { "1.50": 560, "1.53": 610, "1.60": 660, "1.67": 760, "1.74": 860 } },
+    { "name": "Essential",     "category": "Progressive",   "match": ["Ultra HDV"],                           "by_index": { "1.50": 420, "1.53": 490, "1.60": 540, "1.67": 640, "1.74": 760 } },
+    { "name": "Screen Relief", "category": "Anti-fatigue",  "match": ["SmartLife Digital"],                   "by_index": { "1.50": 350, "1.53": 400, "1.60": 450, "1.67": 560, "1.74": 740 } },
+    { "name": "Desk Pair",     "category": "Occupational",  "match": ["Work & Office HD"],                    "by_index": { "1.50": 420, "1.53": 480, "1.60": 520, "1.67": 630 } },
+    { "name": "SV Premium",    "category": "Single vision", "match": ["ClearView FSV", "ClearView Single Vision"], "by_index": { "1.50": 200, "1.60": 250, "1.67": 300, "1.74": 460 } },
+    { "name": "SV Standard",   "category": "Single vision", "match": ["Synchrony FSV", "Synchrony Single Vision Grind"], "by_index": { "1.50": 140, "1.56": 140, "1.60": 220, "1.67": 250, "1.74": 460 } }
+  ],
+  "addons": { "BluePro|HMC Blue": 50, "PhotoFusion|Photochromic|Transitions|Sensity": 130, "grind": 100 },
+  "blank_names": ["Polarised", "AdaptiveSun", "MiyoSmart", "Sportive", "EnRoute"]
 }
