@@ -646,6 +646,20 @@ def _fmt_index(v):
     return f"{v:.2f}"
 
 
+# Index "steps" as the practice thinks of them: 1.50 → 1.60 → 1.67 → 1.74.
+# 1.53 (Trivex) sits with 1.50, 1.59 (poly) with 1.60, 1.76 with 1.74.
+def index_step(idx) -> int:
+    if idx is None:
+        return 0
+    if idx < 1.57:
+        return 0
+    if idx < 1.64:
+        return 1
+    if idx < 1.71:
+        return 2
+    return 3
+
+
 DEFAULT_PREFERRED_COATINGS = ["Platinum", "HMC+"]
 HARD_COAT_WORDS = ("hard coat", "hardcoat", "dshc", " hc")
 
@@ -781,9 +795,17 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
             standard = (not coating or
                         any(p in c for p in preferred) and "back surface" not in c)
 
-        under = lens["index"] is not None and lens["index"] < rec_index
+        # How many index steps thinner than the table's pick. One step under
+        # on a STOCK lens is a live option (the practice would rather a 1.67
+        # off the shelf than a 1.74 grind); two steps, or any grind that is
+        # thinner than the table, is "too thick" and sinks.
+        steps_under = (index_step(rec_index) - index_step(lens["index"])
+                       if lens["index"] is not None else 0)
+        under = steps_under >= 1
+        hard_under = steps_under >= 2 or (steps_under == 1 and lens["type"] != "stock")
         price, basis = price_now(lens, today, pricing)
         entry = {**lens, "warnings": warnings, "under_index": under,
+                 "hard_under": hard_under, "steps_under": max(steps_under, 0),
                  "price_now": price, "basis": basis, "orderable": orderable,
                  "standard_coating": standard, "plain": plain}
         if reasons:
@@ -792,15 +814,16 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
             options.append(entry)
 
     def sort_key(o):
-        return (not o["orderable"], o["under_index"],
+        return (not o["orderable"], o["hard_under"],
                 (o["type"] != "stock") if prefer_stock else False,
+                o["under_index"],
                 not o["standard_coating"], not o["plain"],
                 o["price_now"] is None, o["price_now"] or 0, pref_rank(o),
                 o["index"] or 0)
 
     options.sort(key=sort_key)
     appropriate = [o for o in options
-                   if o["orderable"] and not o["under_index"]
+                   if o["orderable"] and not o["hard_under"]
                    and o["price_now"] is not None]
     best = (appropriate[0] if appropriate
             else next((o for o in options
@@ -857,9 +880,11 @@ def _verdict(options, best, rec_index=None, prefer_stock=True, made_to_order=Fal
                 "there's no cheapest to point at yet.")
 
     live = [o for o in options if o["orderable"] and o["price_now"] is not None]
-    right_index = [o for o in live if not o.get("under_index")]
+    right_index = [o for o in live if not o.get("hard_under")]
     std = [o for o in right_index if o.get("standard_coating")] or right_index
     grind = next((o for o in std if o["type"] == "grind"), None)
+    # the grind at the table's own index, for the thickness trade-off line
+    grind_full = next((o for o in std if o["type"] == "grind" and not o.get("under_index")), None)
 
     if made_to_order:
         line = f"{_label(best)} — {_price_tag(best)} (made to order)."
@@ -873,6 +898,15 @@ def _verdict(options, best, rec_index=None, prefer_stock=True, made_to_order=Fal
         if rec_index is not None and best["index"] and best["index"] > rec_index + 0.001:
             line += (f" No {_fmt_index(rec_index)} stock lens covers this cyl, so it "
                      f"goes up to {_fmt_index(best['index'])} stock rather than a grind.")
+        elif rec_index is not None and best.get("under_index"):
+            line += (f" That is one step thicker than the table's {_fmt_index(rec_index)} "
+                     f"for this power — no {_fmt_index(rec_index)} stock lens covers it")
+            if grind_full:
+                line += (f", and the {_fmt_index(rec_index)} route is a grind at "
+                         f"{_price_tag(grind_full)} ({_label(grind_full)}).")
+            else:
+                line += "."
+            grind = None if grind is grind_full else grind   # already quoted
         if grind and grind is not best:
             diff = grind["price_now"] - best["price_now"]
             if diff >= 0:
@@ -890,7 +924,7 @@ def _verdict(options, best, rec_index=None, prefer_stock=True, made_to_order=Fal
             line += f" ({_label(thin_stock)} stock fits but would be too thick at this power)"
         line += f". Cheapest: {_label(best)}, {_price_tag(best)}."
 
-    if rec_index is not None and best.get("under_index"):
+    if rec_index is not None and best.get("hard_under"):
         line += (f" ⚠ Nothing at {_fmt_index(rec_index)} (what we'd use for this "
                  "power) is loaded and priced for this Rx, so this is the thinnest "
                  "that fits — expect it thick and double-check.")
