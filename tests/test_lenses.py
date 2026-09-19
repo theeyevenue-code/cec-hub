@@ -169,14 +169,22 @@ def test_find_grind_only_job():
 
 
 def test_find_grind_cheaper_than_stock():
-    # No index column -> nothing is flagged thick, so the cheapest fit wins.
+    # No index column -> nothing is flagged thick. By practice rule (D1, Sep
+    # 2026) a stock lens that fits leads even when a grind is cheaper, and the
+    # verdict says what the grind would have saved. prefer_stock=False gives
+    # the old cheapest-wins order.
     rows = ("lens,type,blank_mm,sph_min,sph_max,price\n"
             "Dear Stock,stock,70,-4,+4,50.00\n"
             "Cheap Grind,grind,,-10,+8,30.00\n")
     parsed, _ = lenses.parse_csv_text(rows, "x.csv")
     result = lenses.find_options(parsed, sph=-2.0)
-    assert result["options"][0]["name"] == "Cheap Grind"
-    assert "Cheap Grind" in result["verdict"] and "as a grind" in result["verdict"]
+    assert result["options"][0]["name"] == "Dear Stock"
+    assert result["options"][0]["best"] is True
+    assert "Cheap Grind" in result["verdict"] and "$20.00 a lens less" in result["verdict"]
+    assert "practice rule" in result["verdict"]
+    cheapest = lenses.find_options(parsed, sph=-2.0, pricing={"prefer_stock": False})
+    assert cheapest["options"][0]["name"] == "Cheap Grind"
+    assert "Cheap Grind" in cheapest["verdict"] and "as a grind" in cheapest["verdict"]
 
 
 def test_find_nothing_fits():

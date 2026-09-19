@@ -1,21 +1,26 @@
 """Lens catalogue + best-option finder.
 
 The catalogue is plain CSV files in the Hub's own lenses\\ folder — one file
-per supplier price guide (e.g. hoya.csv). Files are read fresh on every
-request, so dropping in a new CSV (or uploading one from the Lens Finder
-page) takes effect on the next page load. Files whose name starts with an
-underscore (like _template.csv) are ignored.
+per supplier (zeiss.csv, synchrony.csv, hoya.csv). Files are read fresh on
+every request, so dropping in a new CSV (or uploading one from the Lens
+Finder page) takes effect on the next page load. Files whose name starts
+with an underscore (like _template.csv) are ignored.
 
 Column contract lives in lenses\\README.md. Headers are matched loosely
 (case, spaces, a handful of aliases) and numbers shrug off "$", "mm" and
 stray "+" signs, because these files get hand-edited from supplier PDFs.
 
 find_options() answers the real question at the bench: for this Rx (and
-this frame's blank size), which lenses can make the job, and which is the
-cheapest — including when a dearer-index STOCK lens beats a 1.50 GRIND.
+this frame), which lenses can make the job, which one the practice's own
+rules say to reach for, and what the alternatives cost.
+
+Since the ZEISS switch (Sep 2026) every row also knows WHO supplies it,
+WHICH price applies (the negotiated deal price, the six-month promo level,
+or the book) and whether the practice still orders it at all.
 """
 
 import csv
+import datetime as _dt
 import io
 import math
 import re
@@ -26,22 +31,27 @@ MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 
 # Loose header matching: lowercase, spaces/dashes -> underscore, then alias.
 HEADER_ALIASES = {
-    "brand": "brand", "supplier": "brand", "manufacturer": "brand",
+    "brand": "brand", "manufacturer": "brand",
+    "supplier": "supplier", "lab": "supplier", "ordered_from": "supplier",
     "lens": "name", "name": "name", "lens_name": "name", "product": "name",
     "code": "code", "product_code": "code", "lens_type": "code",
     "lenstype": "code", "barcode": "code", "order_code": "code",
     "index": "index", "material_index": "index", "refractive_index": "index",
+    "material": "material", "colour": "material", "color": "material",
+    "variant": "material", "treatment": "material",
     "type": "type", "stock_or_grind": "type", "stock_grind": "type",
     "category": "category", "lens_category": "category", "vision": "category",
     "form": "form", "spherical_aspherical": "form", "spheric_aspheric": "form",
     "add_range": "add_range", "add": "add_range", "add_power": "add_range",
     "addition": "add_range", "adds": "add_range",
+    "add_min": "add_min", "min_add": "add_min",
+    "add_max": "add_max", "max_add": "add_max",
     "design": "design", "vision_type": "design",
     "blank_mm": "blank_mm", "blank": "blank_mm", "blank_size": "blank_mm",
     "diameter": "blank_mm", "dia": "blank_mm", "size": "blank_mm",
     "sph_min": "sph_min", "sphere_min": "sph_min", "min_sph": "sph_min",
     "sph_max": "sph_max", "sphere_max": "sph_max", "max_sph": "sph_max",
-    "sph_range": "sph_range", "sphere_range": "sph_range",
+    "sph_range": "sph_range", "sphere_range": "sph_range", "range": "sph_range",
     "power_range": "sph_range",
     "cyl_max": "cyl_max", "cyl": "cyl_max", "max_cyl": "cyl_max",
     "cyl_to": "cyl_max", "cyl_range": "cyl_max",
@@ -49,6 +59,11 @@ HEADER_ALIASES = {
     "total_power_max": "combined_max", "sph_plus_cyl_max": "combined_max",
     "price": "price", "cost": "price", "price_per_lens": "price",
     "cost_per_lens": "price",
+    "price_promo": "price_promo", "promo_price": "price_promo", "promo": "price_promo",
+    "price_basis": "price_basis", "basis": "price_basis", "pricing": "price_basis",
+    "orderable": "orderable", "ordered": "orderable", "active": "orderable",
+    "min_fh_mm": "min_fh_mm", "min_fh": "min_fh_mm",
+    "min_fitting_height": "min_fh_mm", "fitting_height_min": "min_fh_mm",
     "coating": "coating", "coat": "coating",
     "notes": "notes", "note": "notes", "comments": "notes",
 }
@@ -56,6 +71,23 @@ HEADER_ALIASES = {
 STOCK_WORDS = {"stock", "finished", "uncut", "fsv"}
 GRIND_WORDS = {"grind", "grinding", "surfaced", "rx", "lab", "freeform",
                "made_to_order", "made to order", "mto"}
+NO_WORDS = {"no", "n", "false", "0", "off", "retired", "discontinued"}
+
+# Canonical categories. Anything else is kept verbatim (browse-only).
+CATEGORY_WORDS = {
+    "": "Single vision", "sv": "Single vision", "single vision": "Single vision",
+    "single": "Single vision", "fsv": "Single vision",
+    "progressive": "Progressive", "progressives": "Progressive",
+    "multifocal": "Progressive", "prog": "Progressive", "pal": "Progressive",
+    "occupational": "Occupational", "office": "Occupational",
+    "workplace": "Occupational", "desk": "Occupational",
+    "bifocal": "Bifocal", "bifocals": "Bifocal", "trifocal": "Bifocal",
+    "anti-fatigue": "Anti-fatigue", "antifatigue": "Anti-fatigue",
+    "anti fatigue": "Anti-fatigue", "digital": "Anti-fatigue",
+    "screen": "Anti-fatigue", "sync": "Anti-fatigue",
+}
+# Categories that are chosen by an add power as well as the distance Rx.
+ADD_CATEGORIES = {"Progressive", "Occupational", "Bifocal", "Anti-fatigue"}
 
 NUM_RE = re.compile(r"[-+]?\d+(?:\.\d+)?")
 
@@ -109,6 +141,19 @@ def _lens_type(raw, blank_mm):
     # No usable type column: a blank diameter suggests a stock lens,
     # no diameter suggests it's ground/surfaced to size.
     return "stock" if blank_mm is not None else "grind"
+
+
+def normalise_category(raw) -> str:
+    s = str(raw or "").strip().lower()
+    return CATEGORY_WORDS.get(s, str(raw or "").strip())
+
+
+def parse_date(value):
+    """'2027-03-11' -> date, else None."""
+    try:
+        return _dt.date.fromisoformat(str(value or "").strip()[:10])
+    except ValueError:
+        return None
 
 
 def parse_csv_text(text: str, source: str):
@@ -166,25 +211,45 @@ def parse_csv_text(text: str, source: str):
         if sph_min is not None and sph_min > sph_max:
             sph_min, sph_max = sph_max, sph_min
 
+        # Add range: explicit add_min/add_max, else read off the free text
+        # ('Add +0.75 to +3.50', '0.75 to 4.00').
+        add_min, add_max = _num(cells.get("add_min")), _num(cells.get("add_max"))
+        if add_min is None and add_max is None:
+            rng = _range(cells.get("add_range"))
+            if rng:
+                add_min, add_max = rng
+        if add_min is not None and add_max is not None and add_min > add_max:
+            add_min, add_max = add_max, add_min
+
         blank_mm = _blank(cells.get("blank_mm"))
         cyl_max = _num(cells.get("cyl_max"))
         combined_max = _num(cells.get("combined_max"))
+        brand = cells.get("brand", "")
+        orderable_raw = str(cells.get("orderable", "")).strip().lower()
         lenses.append({
-            "brand": cells.get("brand", ""),
+            "brand": brand,
+            "supplier": cells.get("supplier", "") or brand,
             "name": name,
             "code": cells.get("code", ""),
-            "category": cells.get("category", ""),
+            "category": normalise_category(cells.get("category", "")),
             "index": _num(cells.get("index")),
+            "material": cells.get("material", ""),
             "type": _lens_type(cells.get("type"), blank_mm),
             "form": cells.get("form", ""),
             "add_range": cells.get("add_range", ""),
+            "add_min": add_min,
+            "add_max": add_max,
             "design": cells.get("design", ""),
             "blank_mm": blank_mm,
             "sph_min": sph_min,
             "sph_max": sph_max,
             "cyl_max": abs(cyl_max) if cyl_max is not None else None,
             "combined_max": abs(combined_max) if combined_max is not None else None,
+            "min_fh_mm": _num(cells.get("min_fh_mm")),
             "price": _num(cells.get("price")),
+            "price_promo": _num(cells.get("price_promo")),
+            "price_basis": cells.get("price_basis", ""),
+            "orderable": orderable_raw not in NO_WORDS,
             "coating": cells.get("coating", ""),
             "notes": cells.get("notes", ""),
             "source": source,
@@ -226,34 +291,48 @@ def load_catalog(lenses_dir: Path) -> dict:
     return {"lenses": lenses, "files": files, "message": message}
 
 
+# --- Per-machine config: what's dispensed, what's still ordered --------------
+
 def apply_lens_filter(catalog: dict, cfg: dict | None) -> dict:
-    """Narrow the catalogue to what THIS machine actually dispenses.
+    """Narrow the catalogue to what THIS machine actually dispenses, and mark
+    what it still orders.
 
     cfg["keep_only"] maps a lens category (e.g. "Progressive") to the ranges
     that machine uses; within that category only lenses whose brand+name
     contains one of those snippets (case-insensitive) survive. Categories not
     named are left whole, so an empty/absent config changes nothing.
 
+    cfg["orderable_suppliers"] (list) + cfg["orderable_extra"] (name snippets):
+    when the supplier list is non-empty, a lens is "orderable" only if its
+    supplier is listed or its name matches a snippet (MiyoSmart stays on Hoya).
+    Retired lenses stay in the catalogue — greyed, never the pick — so a
+    Hoya code on an old job can still be looked up. A CSV row that says
+    orderable=no is retired regardless.
+
     This runs after load_catalog, so the shared price files stay complete —
     a git pull that refreshes the price list never fights a machine's own
     choices, which live in the git-ignored config/lens_filter.json.
     """
-    keep_only = (cfg or {}).get("keep_only") or {}
+    cfg = cfg or {}
+    keep_only = cfg.get("keep_only") or {}
     rules = {str(cat).strip().lower():
              [str(p).strip().lower() for p in pats if str(p).strip()]
              for cat, pats in keep_only.items() if pats}
-    if not rules:
-        return catalog
+    suppliers = [str(s).strip().lower() for s in cfg.get("orderable_suppliers") or []
+                 if str(s).strip()]
+    extra = [str(s).strip().lower() for s in cfg.get("orderable_extra") or []
+             if str(s).strip()]
 
     kept = []
     for l in catalog.get("lenses", []):
         pats = rules.get(str(l.get("category", "")).strip().lower())
-        if pats is None:
-            kept.append(l)
-            continue
         label = f"{l.get('brand', '')} {l.get('name', '')}".lower()
-        if any(p in label for p in pats):
-            kept.append(l)
+        if pats is not None and not any(p in label for p in pats):
+            continue
+        if suppliers and l.get("orderable", True):
+            sup = str(l.get("supplier") or l.get("brand") or "").lower()
+            l = {**l, "orderable": sup in suppliers or any(x in label for x in extra)}
+        kept.append(l)
 
     # Re-count each file from what survived, so the library's "x lenses"
     # chip matches what's actually shown.
@@ -266,37 +345,62 @@ def apply_lens_filter(catalog: dict, cfg: dict | None) -> dict:
     return {**catalog, "lenses": kept, "files": files}
 
 
-def group_products(lenses: list) -> list:
-    """Collapse the flat rows into one product per lens + index + type, for
-    BROWSING. In the price files a lens repeats once per coating and once per
-    power band (each band carries the blank it needs), so a single lens can be
-    30-40 rows. Price only ever moves with coating — it's identical across the
-    blank/power bands of a coating — so folding the coatings into a list and
-    the blanks into a range is lossless for price and far easier to skim.
+# --- Pricing: which price applies today --------------------------------------
+
+def price_now(lens: dict, today=None, pricing: dict | None = None):
+    """(price, basis) that applies on `today`.
+
+    A row can carry two prices: `price` (the ongoing one) and `price_promo`
+    (the launch-level one). The promo applies while today < promo_until
+    (config/lens_pricing.json). Deal-price rows have no promo — they are
+    fixed for the term. Returns (None, basis) when nothing is priced.
+    """
+    basis = str(lens.get("price_basis") or "").strip()
+    promo = lens.get("price_promo")
+    if promo is not None:
+        until = parse_date((pricing or {}).get("promo_until"))
+        today = today or _dt.date.today()
+        if until is None or today < until:
+            return promo, "promo"
+    return lens.get("price"), basis
+
+
+def group_products(lenses: list, today=None, pricing: dict | None = None) -> list:
+    """Collapse the flat rows into one product per supplier + lens + index +
+    type, for BROWSING. In the price files a lens repeats once per coating and
+    once per power band (each band carries the blank it needs), so a single
+    lens can be 30-40 rows. Price only ever moves with coating — it's
+    identical across the blank/power bands of a coating — so folding the
+    coatings into a list and the blanks into a range is lossless for price
+    and far easier to skim.
 
     The finder still matches on the flat rows (which keep the per-band power
     and blank limits); this view is only for the library.
 
-    Each product: brand, name, index, type, category, code, notes, source,
-    add_range, sph_min/sph_max (widest across bands), cyl_max (largest),
-    blanks (sorted list), price_from (cheapest), and coatings — cheapest
-    first, each {coating, price, bands}. A band is {sph_min, sph_max,
-    cyl_max, blank}: which blank a given power comes on. Bands can differ
-    slightly by coating (the plus-power split moves), so the row shows the
-    selected coating's bands, not one flattened range.
+    Each product: supplier, brand, name, index, type, category, code, notes,
+    source, add_range, orderable, min_fh_mm, sph_min/sph_max (widest across
+    bands), cyl_max (largest), blanks (sorted list), price_from (cheapest
+    price that applies today), and coatings — cheapest first, each
+    {coating, price, price_promo, price_now, basis, bands}. A band is
+    {sph_min, sph_max, cyl_max, blank}: which blank a given power comes on.
     """
     groups, order = {}, []
     for l in lenses:
-        key = (l.get("brand", ""), l.get("name", ""), l.get("index"),
-               l.get("type", ""))
+        key = (l.get("supplier") or l.get("brand", ""), l.get("name", ""),
+               l.get("index"), l.get("type", ""))
         g = groups.get(key)
         if g is None:
             g = groups[key] = {
+                "supplier": l.get("supplier") or l.get("brand", ""),
                 "brand": l.get("brand", ""), "name": l.get("name", ""),
                 "index": l.get("index"), "type": l.get("type", ""),
                 "category": l.get("category", ""), "code": l.get("code", ""),
+                "material": l.get("material", ""),
                 "notes": l.get("notes", ""), "source": l.get("source", ""),
                 "add_range": l.get("add_range", ""),
+                "add_min": l.get("add_min"), "add_max": l.get("add_max"),
+                "min_fh_mm": l.get("min_fh_mm"),
+                "orderable": bool(l.get("orderable", True)),
                 "sph_min": None, "sph_max": None, "cyl_max": None,
                 "blanks": set(), "_coats": {},
             }
@@ -316,7 +420,10 @@ def group_products(lenses: list) -> list:
             g["blanks"].add(l["blank_mm"])
         coat = l.get("coating", "") or ""
         price = l.get("price")
-        entry = g["_coats"].setdefault(coat, {"price": None, "bands": []})
+        entry = g["_coats"].setdefault(coat, {
+            "price": None, "price_promo": l.get("price_promo"),
+            "basis": l.get("price_basis", ""), "code": l.get("code", ""),
+            "bands": []})
         # Price is constant per coating; keep the lowest just in case a file
         # ever disagrees, and don't let a rowless None wipe a real price.
         if price is not None and (entry["price"] is None or price < entry["price"]):
@@ -334,17 +441,23 @@ def group_products(lenses: list) -> list:
             bands = entry["bands"]
             bands.sort(key=lambda b: (b["sph_min"] is None,
                                       b["sph_min"] if b["sph_min"] is not None else 0))
-            coatings.append({"coating": c, "price": entry["price"], "bands": bands})
-        coatings.sort(key=lambda c: (c["price"] is None, c["price"] or 0,
+            now, basis = price_now({"price": entry["price"],
+                                    "price_promo": entry["price_promo"],
+                                    "price_basis": entry["basis"]}, today, pricing)
+            coatings.append({"coating": c, "price": entry["price"],
+                             "price_promo": entry["price_promo"],
+                             "price_now": now, "basis": basis,
+                             "code": entry["code"], "bands": bands})
+        coatings.sort(key=lambda c: (c["price_now"] is None, c["price_now"] or 0,
                                      c["coating"].lower()))
         g["blanks"] = sorted(g["blanks"])
         g["coatings"] = coatings
-        g["price_from"] = next((c["price"] for c in coatings
-                                if c["price"] is not None), None)
+        g["price_from"] = next((c["price_now"] for c in coatings
+                                if c["price_now"] is not None), None)
         products.append(g)
 
-    products.sort(key=lambda p: (p["brand"].lower(), p["index"] or 0,
-                                 p["name"].lower()))
+    products.sort(key=lambda p: (not p["orderable"], p["supplier"].lower(),
+                                 p["index"] or 0, p["name"].lower()))
     return products
 
 
@@ -355,7 +468,7 @@ def mark_preferred(products: list, cfg: dict | None) -> list:
     and optional "exclude" (snippets that veto a match), both case-insensitive
     substring checks against brand+name. Order within the preferred and the
     rest is preserved (a stable sort), and every product gets a "preferred"
-    flag either way."""
+    flag either way. Retired lenses never float."""
     pref = (cfg or {}).get("preferred") or {}
     match = [m.strip().lower() for m in pref.get("match", []) if str(m).strip()]
     exclude = [x.strip().lower() for x in pref.get("exclude", []) if str(x).strip()]
@@ -364,6 +477,8 @@ def mark_preferred(products: list, cfg: dict | None) -> list:
         """First matching 'match' snippet's position = display priority, so the
         ORDER of the match list decides what sits highest. len(match) means not
         preferred (sinks below everything preferred)."""
+        if not p.get("orderable", True):
+            return len(match) + 1
         label = f"{p.get('brand', '')} {p.get('name', '')}".lower()
         if any(x in label for x in exclude):
             return len(match)
@@ -379,22 +494,50 @@ def mark_preferred(products: list, cfg: dict | None) -> list:
     return sorted(products, key=lambda p: ranks[id(p)])
 
 
+def _idx_key(p):
+    try:
+        return f"{float(p.get('index')):.2f}" if p.get("index") is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def attach_cec_price(products: list, cfg: dict | None) -> list:
     """Tag each coating of each product with Concord's own selling price (per
-    pair) from the price list, so the library can show it beside the Hoya cost.
+    pair) and the practice's tier name, so the library can show them beside
+    the supplier cost.
 
-    Progressives/occupationals price by design name + index ('design_prices',
-    coating doesn't move the base). Single vision prices by COATING tier + index
-    ('sv_tiers' — VP=Standard, Diamond Finish=Premium), so the sell price tracks
-    the coating dropdown. 'surcharge' adds to any base when the name contains the
-    snippet (photochromic Sensity +$120). 'blank_names' suppress a price (things
-    that vary — polarised, Sensity Colours, specialty lines). Sets each coating's
-    cec_price (number per pair, or None) and the product's cec_price to the
-    cheapest coating that has one."""
+    Current scheme — 'tiers': a list of {name, match, by_index, category?}.
+    A product belongs to the first tier whose snippet appears in
+    supplier+brand+name (case-insensitive); its base price is by_index[index].
+    'addons' then add to the base when the snippet appears in the product name,
+    material or coating (BluePro +$50, PhotoFusion +$130), and the special key
+    'grind' adds the made-to-order surcharge on single-vision grind rows.
+    'blank_names' suppress a price entirely (polarised is priced off the
+    sunglasses list).
+
+    Legacy scheme (still honoured, for the Hoya file): 'design_prices'
+    (name snippet + index), 'sv_tiers' (coating snippet + index) and
+    'surcharge' (name snippet -> +$).
+
+    Sets each coating's cec_price (per pair, or None), the product's
+    cec_price (cheapest coating that has one) and the product's tier.
+    """
     cfg = cfg or {}
+    blank = [b.strip().lower() for b in cfg.get("blank_names", []) if str(b).strip()]
+    tiers = []
+    for e in cfg.get("tiers", []) or []:
+        snippets = e.get("match", [])
+        if isinstance(snippets, str):
+            snippets = [snippets]
+        snippets = [str(m).strip().lower() for m in snippets if str(m).strip()]
+        by = {str(k).strip(): v for k, v in (e.get("by_index") or {}).items()}
+        if snippets and by:
+            tiers.append((str(e.get("name", "")).strip(), snippets, by,
+                          normalise_category(e.get("category")) if e.get("category") else None))
+    addons = {str(k).strip().lower(): v for k, v in (cfg.get("addons") or {}).items()}
+    grind_addon = addons.pop("grind", 0) or 0
     surcharge = {str(k).strip().lower(): v
                  for k, v in (cfg.get("surcharge") or {}).items()}
-    blank = [b.strip().lower() for b in cfg.get("blank_names", []) if str(b).strip()]
     design = []
     for e in cfg.get("design_prices", []) or []:
         m = str(e.get("match", "")).strip().lower()
@@ -409,32 +552,44 @@ def attach_cec_price(products: list, cfg: dict | None) -> list:
             sv_tiers.append((c, by))
 
     for p in products:
-        name = f"{p.get('brand', '')} {p.get('name', '')}".lower()
-        try:
-            idx = f"{float(p.get('index')):.2f}" if p.get("index") is not None else None
-        except (TypeError, ValueError):
-            idx = None
-        is_sv = str(p.get("category", "")).strip().lower() in ("", "single vision", "sv")
-        blanked = idx is None or any(b in name for b in blank)
-        add = sum(v for k, v in surcharge.items() if k in name)
-        design_base = None
+        label = f"{p.get('supplier', '')} {p.get('brand', '')} {p.get('name', '')}".lower()
+        idx = _idx_key(p)
+        cat = normalise_category(p.get("category", ""))
+        is_sv = cat == "Single vision"
+        blanked = idx is None or any(b in label for b in blank)
+        p["tier"] = ""
+        base = None
         if not blanked:
-            for m, by in design:
-                if m in name and idx in by:
-                    design_base = by[idx]
+            for name, snippets, by, tcat in tiers:
+                if tcat and tcat != cat:
+                    continue
+                if any(m in label for m in snippets):
+                    p["tier"] = name
+                    base = by.get(idx)
                     break
+            if base is None and not p["tier"]:
+                for m, by in design:
+                    if m in label and idx in by:
+                        base = by[idx]
+                        break
+        legacy_add = sum(v for k, v in surcharge.items() if k in label)
         for coat in p.get("coatings", []):
             price = None
             if not blanked:
-                if design_base is not None:
-                    price = design_base
-                elif is_sv:
-                    cl = (coat.get("coating") or "").lower()
+                cl = (coat.get("coating") or "").lower()
+                if base is not None:
+                    hay = f"{label} {p.get('material', '')} {cl}".lower()
+                    price = base + sum(v for k, v in addons.items()
+                                       if any(part.strip() and part.strip() in hay
+                                              for part in k.split("|")))
+                    if is_sv and p.get("type") == "grind":
+                        price += grind_addon
+                elif is_sv and sv_tiers:
                     for csnip, by in sv_tiers:
                         if csnip in cl and idx in by:
                             price = by[idx]
                             break
-            coat["cec_price"] = (price + add) if price is not None else None
+            coat["cec_price"] = (price + legacy_add) if price is not None else None
         priced = [c["cec_price"] for c in p.get("coatings", [])
                   if c.get("cec_price") is not None]
         p["cec_price"] = min(priced) if priced else None
@@ -442,13 +597,18 @@ def attach_cec_price(products: list, cfg: dict | None) -> list:
 
 
 def sv_only(lenses: list) -> list:
-    """Just the single-vision lenses — what the cost engine matches on.
-    Progressives/bifocals/occupationals are browse-only (made to order,
-    chosen by add power, and Hoyalog rejects out-of-range jobs anyway).
-    A file with no category column (other suppliers) is treated as all SV."""
+    """Just the single-vision lenses. Kept for callers that only want the
+    stock-vs-grind question; find_options() takes a `kind` instead."""
     return [l for l in lenses
-            if str(l.get("category", "")).strip().lower()
-            in ("", "single vision", "sv")]
+            if normalise_category(l.get("category", "")) == "Single vision"]
+
+
+def of_kind(lenses: list, kind: str | None) -> list:
+    """Rows of one category (canonical name); None/'' means everything."""
+    if not kind:
+        return list(lenses)
+    want = normalise_category(kind)
+    return [l for l in lenses if normalise_category(l.get("category", "")) == want]
 
 
 # Minimum lens index we'd want for a given power, so the finder leads with a
@@ -463,6 +623,9 @@ INDEX_BY_POWER = [
     (6.00, 1.67),
 ]
 INDEX_ABOVE = 1.74
+
+# Beyond this cyl the labs bill a surcharge (ZEISS/synchrony: 4.25D+).
+CYL_SURCHARGE_FROM = 4.25
 
 
 def strongest_meridian(sph: float, cyl: float = 0.0) -> float:
@@ -484,24 +647,40 @@ def _fmt_index(v):
 
 
 def find_options(lenses: list, sph: float, cyl: float = 0.0,
-                 min_blank: float | None = None) -> dict:
-    """Which lenses can make this Rx — the cheapest INDEX-APPROPRIATE one first
-    (a thinner-index lens that only technically fits is flagged, not led with),
-    and in plain words why.
+                 min_blank: float | None = None, add: float | None = None,
+                 kind: str | None = None, fh: float | None = None,
+                 today=None, pricing: dict | None = None) -> dict:
+    """Which lenses can make this Rx, in the order the practice would reach
+    for them, and in plain words why.
+
+    Order: still-ordered lenses first; then the right thickness (a thinner-
+    index lens that only technically fits is flagged, not led with); then —
+    when pricing["prefer_stock"] is on, the default — a stock lens ahead of a
+    grind even if the grind is cheaper (the practice's own rule: stock keeps
+    the job in the supplier's finished range and off the surfacing bench);
+    then price.
 
     cyl is taken in minus-cyl form; a plus cyl is transposed automatically
     (sph + cyl, cyl sign flipped) so it's checked the way stock ranges are
-    written. min_blank is the smallest blank diameter the frame needs.
+    written. min_blank is the smallest blank diameter the frame needs. add
+    is checked against the add range of multifocal-type rows. fh is the
+    fitting height, checked against a design's minimum (warning only).
+    kind narrows to one category (None = the rows as given).
     """
+    pricing = pricing or {}
+    prefer_stock = bool(pricing.get("prefer_stock", True))
     cyl = cyl or 0.0
     transposed = False
     if cyl > 0:
         sph, cyl, transposed = sph + cyl, -cyl, True
     rec_index = recommended_index(sph, cyl)
+    combined = sph + cyl          # the minus meridian in minus-cyl form
 
     options, misses = [], []
-    for lens in lenses:
+    for lens in of_kind(lenses, kind):
         reasons, warnings = [], []
+        cat = normalise_category(lens.get("category", ""))
+        needs_add = cat in ADD_CATEGORIES
 
         if lens["sph_min"] is None:
             warnings.append("power range isn't in the file — check the "
@@ -518,10 +697,17 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
                 reasons.append(
                     f"cyl {_fmt_power(cyl)} is beyond its limit "
                     f"(-{lens['cyl_max']:.2f})")
-        if lens["combined_max"] is not None and abs(sph + cyl) > lens["combined_max"]:
+            elif abs(cyl) >= CYL_SURCHARGE_FROM and lens["type"] == "grind":
+                warnings.append(f"cyl {_fmt_power(cyl)} — the lab's high-cyl "
+                                "surcharge applies")
+        # The starred number in the supplier books is the maximum MINUS
+        # combined power (sphere + cyl, minus-cyl form). It never limits a
+        # plus prescription.
+        if (lens["combined_max"] is not None and combined < 0
+                and abs(combined) > lens["combined_max"]):
             reasons.append(
-                f"sphere and cyl combined ({_fmt_power(sph + cyl)}) is beyond "
-                f"its limit ({lens['combined_max']:.2f})")
+                f"sphere and cyl combined ({_fmt_power(combined)}) is beyond "
+                f"its limit (-{lens['combined_max']:.2f})")
         if min_blank is not None:
             if lens["blank_mm"] is None:
                 if lens["type"] == "stock":
@@ -531,55 +717,90 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
                 reasons.append(
                     f"its {_fmt_mm(lens['blank_mm'])} blank is smaller than "
                     f"the {_fmt_mm(min_blank)} this frame needs")
+        if needs_add:
+            if add is None:
+                warnings.append("type the add to check it against this "
+                                "design's add range")
+            elif lens.get("add_min") is None:
+                warnings.append("add range isn't in the file — check the "
+                                "supplier guide before ordering")
+            elif not (lens["add_min"] <= add <= lens["add_max"]):
+                reasons.append(
+                    f"add {_fmt_power(add)} is outside its range "
+                    f"({lens['add_min']:.2f} to {lens['add_max']:.2f})")
+        if fh is not None and lens.get("min_fh_mm") and fh < lens["min_fh_mm"]:
+            warnings.append(f"fitting height {fh:g}mm is under this design's "
+                            f"minimum ({lens['min_fh_mm']:g}mm) — pick a "
+                            "shorter corridor or a deeper frame")
+        orderable = bool(lens.get("orderable", True))
+        if not orderable:
+            warnings.append("no longer ordered — reference only")
 
         under = lens["index"] is not None and lens["index"] < rec_index
-        entry = {**lens, "warnings": warnings, "under_index": under}
+        price, basis = price_now(lens, today, pricing)
+        entry = {**lens, "warnings": warnings, "under_index": under,
+                 "price_now": price, "basis": basis, "orderable": orderable}
         if reasons:
             misses.append({**entry, "reasons": reasons})
         else:
             options.append(entry)
 
-    # Index-appropriate lenses first, then by price; so the cheapest lens that
-    # is the right thickness leads, and thinner-index bargains sit below it.
-    options.sort(key=lambda o: (o["under_index"], o["price"] is None,
-                                o["price"] or 0, o["index"] or 0))
+    def sort_key(o):
+        return (not o["orderable"], o["under_index"],
+                (o["type"] != "stock") if prefer_stock else False,
+                o["price_now"] is None, o["price_now"] or 0, o["index"] or 0)
+
+    options.sort(key=sort_key)
     appropriate = [o for o in options
-                   if not o["under_index"] and o["price"] is not None]
+                   if o["orderable"] and not o["under_index"]
+                   and o["price_now"] is not None]
     best = (appropriate[0] if appropriate
-            else next((o for o in options if o["price"] is not None), None))
+            else next((o for o in options
+                       if o["orderable"] and o["price_now"] is not None), None))
     if best:
         best["best"] = True
         for o in options:
-            if o is not best and o["price"] is not None:
-                o["dearer_by"] = round(o["price"] - best["price"], 2)
+            if o is not best and o["price_now"] is not None:
+                o["dearer_by"] = round(o["price_now"] - best["price_now"], 2)
 
     return {
-        "rx": {"sph": sph, "cyl": cyl, "transposed": transposed,
-               "display": f"{_fmt_power(sph)} / {_fmt_power(cyl)}" if cyl
-                          else _fmt_power(sph)},
+        "rx": {"sph": sph, "cyl": cyl, "add": add, "transposed": transposed,
+               "display": (f"{_fmt_power(sph)} / {_fmt_power(cyl)}" if cyl
+                           else _fmt_power(sph))
+                          + (f" add {add:+.2f}" if add is not None else "")},
+        "kind": normalise_category(kind) if kind else "",
         "rec_index": rec_index,
         "min_blank": min_blank,
         "options": options,
         "misses": misses,
-        "verdict": _verdict(options, best, rec_index),
+        "verdict": _verdict(options, best, rec_index, prefer_stock),
     }
 
 
 def _label(lens):
-    return f"{lens['brand']} {lens['name']}".strip()
+    sup = str(lens.get("supplier") or "")
+    brand = str(lens.get("brand") or "")
+    lead = brand or sup
+    if sup and brand and sup.lower() not in brand.lower() and brand.lower() not in sup.lower():
+        lead = f"{sup} {brand}"
+    return f"{lead} {lens['name']}".strip()
 
 
-def _verdict(options, best, rec_index=None):
+def _verdict(options, best, rec_index=None, prefer_stock=True):
     """One plain-words sentence for the top of the results."""
     if not options:
         return ("Nothing in the catalogue covers this job. Check the Rx, or "
                 "it may need a lens that isn't loaded yet — ask Mark.")
     if best is None:
+        if all(not o["orderable"] for o in options):
+            return ("Only lenses we no longer order fit this — nothing in the "
+                    "current range covers it. Check with Mark.")
         return ("Some lenses fit, but none of them have a price loaded, so "
                 "there's no cheapest to point at yet.")
 
     where = "off the shelf" if best["type"] == "stock" else "as a grind"
-    line = f"Best value: {_label(best)} — ${best['price']:.2f} a lens, {where}."
+    line = (f"Best value: {_label(best)} — ${best['price_now']:.2f} a lens, {where}"
+            f"{' (promo price)' if best.get('basis') == 'promo' else ''}.")
 
     # Index appropriateness — the whole point of leading with this lens.
     if rec_index is not None and best.get("under_index"):
@@ -588,22 +809,28 @@ def _verdict(options, best, rec_index=None):
                  "that fits — expect it thick and double-check.")
     elif rec_index is not None:
         cheaper_thin = next((o for o in options
-                             if o["price"] is not None and o.get("under_index")
-                             and o["price"] < best["price"]), None)
+                             if o["orderable"] and o["price_now"] is not None
+                             and o.get("under_index")
+                             and o["price_now"] < best["price_now"]), None)
         if cheaper_thin:
             line += (f" ({_label(cheaper_thin)} at {_fmt_index(cheaper_thin['index'])} "
-                     f"fits for ${cheaper_thin['price']:.2f} but would be too thick — "
+                     f"fits for ${cheaper_thin['price_now']:.2f} but would be too thick — "
                      f"{_fmt_index(rec_index)} is the sensible minimum for this power.)")
 
-    # Stock-vs-grind saving, only meaningful when the pick is a stock lens.
+    # Stock-vs-grind: say what the other route costs, whichever way it went.
     if best["type"] == "stock":
         priced_grind = next((o for o in options if o["type"] == "grind"
-                             and not o.get("under_index") and o["price"] is not None), None)
+                             and o["orderable"] and not o.get("under_index")
+                             and o["price_now"] is not None), None)
         if priced_grind and priced_grind is not best:
-            saving = priced_grind["price"] - best["price"]
-            if saving > 0:
-                line += (f" Saves ${saving:.2f} a lens vs grinding "
-                         f"({_label(priced_grind)} at ${priced_grind['price']:.2f}).")
+            diff = priced_grind["price_now"] - best["price_now"]
+            if diff > 0:
+                line += (f" Saves ${diff:.2f} a lens vs grinding "
+                         f"({_label(priced_grind)} at ${priced_grind['price_now']:.2f}).")
+            elif diff < 0 and prefer_stock:
+                line += (f" The cheapest grind ({_label(priced_grind)}, "
+                         f"${priced_grind['price_now']:.2f}) is ${-diff:.2f} a lens less, "
+                         "but stock comes first by practice rule.")
     if best["warnings"]:
         line += " Check its amber notes first — not all of its limits are in the file."
     return line
@@ -630,26 +857,32 @@ def min_blank_from_frame(frame: dict):
 
 
 def _product_key(option: dict):
-    return (option["brand"], option["name"], option["code"],
-            option["coating"], option["type"])
+    return (option.get("supplier") or option["brand"], option["name"],
+            option["code"], option["coating"], option["type"])
 
 
 def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
-              min_blank: float | None = None, chosen: dict | None = None) -> dict:
+              min_blank: float | None = None, chosen: dict | None = None,
+              add: float | None = None, kind: str | None = None,
+              today=None, pricing: dict | None = None) -> dict:
     """The order-screen question: for this pair of eyes (and blank size),
     which products cover the WHOLE job, what's the cheapest, and does the
     stock/grind call that was made look right.
 
     right/left: {"sph": -0.75, "cyl": -1.00} (either may be omitted for a
     single-lens job). chosen (optional): {"code": ..., "type": "Stk"/"Grd"}
-    — what was actually put on the order.
+    — what was actually put on the order. kind defaults to single vision,
+    the only category with a stock-vs-grind question.
     """
+    kind = kind or "Single vision"
+    pricing = pricing or {}
     eyes = {}
     for label, rx in (("right", right), ("left", left)):
         sph = _num((rx or {}).get("sph"))
         if sph is not None:
             cyl = _num((rx or {}).get("cyl")) or 0.0
-            eyes[label] = find_options(lenses, sph, cyl, min_blank)
+            eyes[label] = find_options(lenses, sph, cyl, min_blank, add=add,
+                                       kind=kind, today=today, pricing=pricing)
     if not eyes:
         return {"status": "no_rx", "headline":
                 "No Rx on this job yet — nothing to check.",
@@ -662,6 +895,8 @@ def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
     for result in eyes.values():
         keys = set()
         for option in result["options"]:
+            if not option["orderable"]:
+                continue
             key = _product_key(option)
             keys.add(key)
             details.setdefault(key, option)
@@ -674,11 +909,12 @@ def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
         o = details[key]
         seen = list(dict.fromkeys(warnings[key]))
         products.append({
+            "supplier": o.get("supplier") or o["brand"],
             "brand": o["brand"], "name": o["name"], "code": o["code"],
             "coating": o["coating"], "type": o["type"], "index": o["index"],
-            "price": o["price"],
-            "price_job": round(o["price"] * per_lens, 2)
-                         if o["price"] is not None else None,
+            "price": o["price_now"], "basis": o.get("basis", ""),
+            "price_job": round(o["price_now"] * per_lens, 2)
+                         if o["price_now"] is not None else None,
             "warnings": seen,
         })
     products.sort(key=lambda p: (p["price"] is None, p["price"] or 0,
@@ -721,11 +957,17 @@ def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
         chosen_type = ("stock" if raw_type in ("stk", "stock") else
                        "grind" if raw_type in ("grd", "grind") else "")
         code = str(chosen.get("code") or "").strip()
-        code_known = bool(code) and code.lower() in {
-            (l["code"] or "").lower() for l in lenses if l["code"]}
+        by_code = {(l["code"] or "").lower(): l for l in lenses if l["code"]}
+        hit = by_code.get(code.lower()) if code else None
+        code_known = hit is not None
+        retired = hit is not None and not hit.get("orderable", True)
         if code and not code_known:
             notes.append(f"code {code} isn't in the loaded price files — "
                          "the chosen lens itself wasn't range-checked")
+        elif retired:
+            notes.append(f"code {code} is a lens we no longer order "
+                         f"({hit.get('supplier') or hit['brand']}) — "
+                         "use the current range")
         mismatch = False
         if chosen_type == "grind" and best_stock:
             notes.append(f"marked Grind, but a stock lens covers this Rx: "
@@ -738,7 +980,7 @@ def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
             mismatch = True
         chosen_out = {"code": code, "type": chosen_type,
                       "code_known": code_known, "notes": notes}
-        if mismatch:
+        if mismatch or retired:
             status = "check"
 
     return {
@@ -746,7 +988,7 @@ def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
         "headline": headline,
         "min_blank": min_blank,
         "eyes": {label: {"rx": result["rx"]["display"],
-                         "fits": len(result["options"])}
+                         "fits": len([o for o in result["options"] if o["orderable"]])}
                  for label, result in eyes.items()},
         "options": products[:10],
         "best": best,
