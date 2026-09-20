@@ -1085,3 +1085,373 @@ main {
 .lf-radio-hoya:has(input:checked) { border-color: #b8860b; background: #fff3d6; }
 .verdict-hoya { border-style: dashed; border-color: #b8860b; background: #fff3d6; color: #5a4200; }
 .chip-other { background: #fff3d6; border-color: #d9b45c; color: #5a4200; }
+
+
+/* --- Lens Finder design pass (Sep 2026): readable from a metre ------------------ */
+/* Order of size: STOCK/GRIND word > lens name > the facts (cost, blank, sells) >
+   everything else. Colour says only one thing: green = stock, amber = grind. */
+.rx-line { font-size: 16px; color: var(--muted); margin: 18px 0 10px; }
+
+.answer {
+    display: grid; grid-template-columns: 200px 1fr; gap: 8px 28px; align-items: start;
+    border-radius: 18px; border: 3px solid var(--line); padding: 22px 26px 20px;
+    margin-bottom: 18px; background: #fff;
+}
+.answer-stock { border-color: var(--green); background: #eaf6f0; }
+.answer-grind { border-color: var(--amber-line); background: #fff8e6; }
+.answer-none  { border-color: #bbb; background: #f3f3f3; }
+.answer-hoya  { border-style: dashed; border-color: #b8860b; background: #fff3d6; }
+.ans-tag {
+    grid-column: 1 / -1; font-size: 14px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: #5a4200;
+}
+.ans-word {
+    font-family: 'Urbanist', 'Work Sans', sans-serif; font-size: 58px; font-weight: 800;
+    line-height: 1; letter-spacing: .02em; display: flex; flex-direction: column; gap: 6px;
+    padding-top: 4px;
+}
+.answer-stock .ans-word { color: #1d5741; }
+.answer-grind .ans-word { color: #7a5a00; }
+.answer-none  .ans-word { color: #555; font-size: 40px; }
+.ans-word small { font-family: 'Work Sans', sans-serif; font-size: 15px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.ans-body { min-width: 0; }
+.ans-name { font-size: 28px; font-weight: 800; color: var(--ink); line-height: 1.25; margin: 2px 0 12px; }
+.ans-name .chip-sup { font-size: 14px; vertical-align: middle; position: relative; top: -3px; }
+.ans-facts { display: flex; flex-wrap: wrap; gap: 8px 30px; margin-bottom: 12px; }
+.ans-fact { display: flex; flex-direction: column; gap: 0; }
+.ans-fact .k { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.ans-fact .v { font-size: 24px; font-weight: 700; color: var(--ink); line-height: 1.2; white-space: nowrap; }
+.ans-fact .u { font-size: 14px; font-weight: 600; color: var(--muted); margin-left: 3px; }
+.ans-cost .v { font-size: 34px; }
+.ans-sell .v { color: var(--green-deep); }
+.ans-basis {
+    display: inline-block; vertical-align: middle; margin-left: 8px; font-size: 13px; font-weight: 700;
+    padding: 2px 9px; border-radius: 999px; background: #dff0e8; color: #1d5741; border: 1px solid var(--green);
+    position: relative; top: -4px;
+}
+.ans-basis-promo { background: var(--amber-bg); color: var(--amber-ink); border-color: var(--amber-line); }
+.ans-alt { font-size: 17px; color: var(--body); margin-bottom: 8px; }
+.ans-diff-more { color: var(--amber-ink); font-weight: 700; }
+.ans-diff-less { color: var(--muted); }
+.ans-why { font-size: 15px; line-height: 1.5; color: var(--muted); border-top: 1px solid rgba(0,0,0,.08); padding-top: 8px; margin-top: 4px; }
+.answer .warn-note { font-size: 15px; }
+
+.opts-head { font-size: 14px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; }
+.opts { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }
+.opt {
+    display: grid; grid-template-columns: 72px 1fr auto; gap: 14px; align-items: center;
+    padding: 10px 14px 10px 10px; border-bottom: 1px solid var(--line); border-left: 6px solid var(--line);
+}
+.opt:last-child { border-bottom: none; }
+.opt-stock { border-left-color: var(--green); }
+.opt-grind { border-left-color: var(--amber-line); }
+.opt-type { font-size: 14px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; text-align: center;
+    padding: 5px 0; border-radius: 8px; }
+.opt-stock .opt-type { background: #dff0e8; color: #1d5741; }
+.opt-grind .opt-type { background: var(--amber-bg); color: var(--amber-ink); }
+.opt-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.opt-name { font-size: 19px; font-weight: 700; color: var(--ink); }
+.opt-name .chip { vertical-align: middle; position: relative; top: -2px; }
+.opt-meta, .opt-others { font-size: 14px; color: var(--muted); }
+.opt-main .warn-note { font-size: 14px; }
+.opt-price { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; white-space: nowrap; }
+.opt-cost { font-size: 22px; font-weight: 800; color: var(--ink); }
+.opt-nocost { font-size: 16px; color: var(--muted); font-weight: 600; }
+.opt-diff { font-size: 14px; color: var(--muted); }
+.opt-sell { font-size: 14px; font-weight: 700; color: var(--green-deep); }
+.opt-thick .opt-name, .opt-thick .opt-cost { color: #5b6b62; }
+.opt-retired { background: #f6f6f6; }
+.opt-retired .opt-name, .opt-retired .opt-cost { color: #666; }
+.opt-retired .opt-type { background: #e6e6e6; color: #555; }
+
+@media (max-width: 760px) {
+    .answer { grid-template-columns: 1fr; gap: 10px; padding: 18px 18px 16px; }
+    .ans-word { font-size: 46px; flex-direction: row; align-items: baseline; gap: 12px; }
+    .ans-name { font-size: 24px; }
+    .ans-cost .v { font-size: 28px; }
+    .opt { grid-template-columns: 62px 1fr; }
+    .opt-price { grid-column: 2; flex-direction: row; gap: 10px; align-items: baseline; justify-content: flex-start; }
+}
+.ans-sibs { font-size: 15px; color: var(--muted); margin-bottom: 8px; }
+/* Collapsed sections under the results read as something you can open. */
+.miss-details > summary { font-size: 17px; font-weight: 600; color: var(--green-deep); cursor: pointer; list-style: none; padding: 8px 0; }
+.miss-details > summary::before { content: "▸ "; }
+.miss-details[open] > summary::before { content: "▾ "; }
+.miss-details .opts { margin-top: 6px; }
+
+
+/* --- Lens Finder: monochrome, legibility-first (Mark, 20 Sep 2026) ---------------
+   Principles borrowed, not invented: Tufte (ink carries information or goes),
+   Swiss typography (hierarchy by size, weight and space, one left axis, a fixed
+   type scale), GOV.UK (black on white, one accent, generous line-height).
+   Scoped to .lens-page so the rest of the Hub keeps its look.
+   Type scale: 13 · 15 · 17 · 20 · 24 · 30 · 60.  Colour = meaning only. */
+.lens-page { --lp-ink: #111; --lp-text: #222; --lp-mute: #5f5f5f; --lp-rule: #d9d9d9; --lp-rule-soft: #ececec; --lp-bg: #fff; }
+.lens-page, .lens-page .card { color: var(--lp-text); font-variant-numeric: tabular-nums; }
+.lens-page .card { background: var(--lp-bg); border: 1px solid var(--lp-rule); box-shadow: none; border-radius: 6px; padding: 28px 32px; }
+.lens-page .page-title { font-family: 'Work Sans', sans-serif; font-size: 30px; font-weight: 700; color: var(--lp-ink); letter-spacing: -.01em; }
+.lens-page .page-sub { font-size: 17px; color: var(--lp-mute); margin-bottom: 20px; }
+.lens-page .card h2 { font-size: 20px; font-weight: 700; color: var(--lp-ink); margin-bottom: 16px; }
+.lens-page .btn-back { border-color: var(--lp-rule); color: var(--lp-ink); background: #fff; }
+
+/* Form: one row, one axis, black button. */
+.lens-page .field label { font-size: 15px; font-weight: 600; color: var(--lp-ink); }
+.lens-page .field input { border: 1px solid #999; border-radius: 6px; font-size: 22px; min-height: 52px; color: var(--lp-ink); }
+.lens-page .field input:focus { border-color: var(--lp-ink); box-shadow: 0 0 0 3px #ddd; }
+.lens-page .btn { background: var(--lp-ink); border-color: var(--lp-ink); color: #fff; border-radius: 6px; font-size: 18px; }
+.lens-page .btn:hover { background: #000; }
+.lens-page .btn-quiet { background: #fff; color: var(--lp-ink); border: 1px solid #999; }
+.lens-page .lf-check { font-size: 16px; color: var(--lp-text); }
+.lens-page .lf-check input { accent-color: var(--lp-ink); }
+.lens-page .lf-supplier { gap: 0; margin: 14px 0 4px; border: 1px solid #999; border-radius: 6px; overflow: hidden; width: max-content; max-width: 100%; }
+.lens-page .lf-radio { border: none; border-radius: 0; border-right: 1px solid #999; background: #fff; padding: 8px 16px; gap: 10px; }
+.lens-page .lf-radio:last-child { border-right: none; }
+.lens-page .lf-radio input { accent-color: var(--lp-ink); }
+.lens-page .lf-radio span { display: flex; flex-direction: column; line-height: 1.2; font-weight: 600; color: var(--lp-ink); font-size: 16px; }
+.lens-page .lf-radio span small { font-size: 13px; font-weight: 400; color: var(--lp-mute); }
+.lens-page .lf-radio:has(input:checked) { background: var(--lp-ink); }
+.lens-page .lf-radio:has(input:checked) span, .lens-page .lf-radio:has(input:checked) span small { color: #fff; }
+.lens-page .blank-helper summary { color: var(--lp-mute); font-weight: 500; font-size: 15px; }
+.lens-page .helper-note { font-size: 14px; color: var(--lp-mute); }
+.lens-page .rx-line { font-size: 15px; color: var(--lp-mute); }
+.lens-page .rx-line strong { color: var(--lp-ink); }
+
+/* Chips: text, not badges. A hairline outline is the most they get. */
+.lens-page .chip { background: #fff; border: 1px solid var(--lp-rule); color: var(--lp-mute); font-weight: 600; }
+.lens-page .chip-sup, .lens-page .chip-basis, .lens-page .chip-tier { font-size: 12px; padding: 1px 7px; letter-spacing: .02em; }
+.lens-page .chip-amber { background: #fff; border-color: #999; color: var(--lp-ink); }
+.lens-page .chip-off { background: #fff; border-color: var(--lp-rule); color: var(--lp-mute); }
+.lens-page .chip-deal, .lens-page .chip-promo { background: #fff; border-color: var(--lp-rule); color: var(--lp-mute); }
+.lens-page .warn-note { color: var(--lp-ink); font-size: 14px; }
+.lens-page .warn-note::before { content: ""; }
+
+/* The answer: white card, hairline, the word does the work. */
+.lens-page .answer { background: #fff; border: 1px solid var(--lp-ink); border-radius: 6px; padding: 24px 28px 20px; gap: 6px 36px; }
+.lens-page .answer-stock, .lens-page .answer-grind, .lens-page .answer-none { background: #fff; border-color: var(--lp-ink); }
+.lens-page .answer-none { border-color: #999; }
+.lens-page .answer-hoya { border-style: dashed; border-color: #666; background: #fff; }
+.lens-page .ans-tag { color: var(--lp-mute); }
+.lens-page .ans-word { font-family: 'Work Sans', sans-serif; font-size: 60px; font-weight: 700; letter-spacing: -.02em; color: var(--lp-ink); }
+.lens-page .answer-stock .ans-word, .lens-page .answer-grind .ans-word, .lens-page .answer-none .ans-word { color: var(--lp-ink); }
+.lens-page .ans-word small { color: var(--lp-mute); letter-spacing: .08em; font-size: 13px; }
+.lens-page .ans-name { font-size: 24px; font-weight: 700; color: var(--lp-ink); margin: 6px 0 14px; }
+.lens-page .ans-facts { gap: 6px 32px; margin-bottom: 14px; }
+.lens-page .ans-fact .k { font-size: 12px; letter-spacing: .08em; color: var(--lp-mute); font-weight: 600; }
+.lens-page .ans-fact .v { font-size: 24px; font-weight: 600; color: var(--lp-ink); }
+.lens-page .ans-cost .v { font-size: 30px; font-weight: 700; }
+.lens-page .ans-sell .v { color: var(--lp-ink); }
+.lens-page .ans-fact .u { color: var(--lp-mute); font-weight: 500; }
+.lens-page .ans-basis, .lens-page .ans-basis-promo { background: #fff; border: 1px solid var(--lp-rule); color: var(--lp-mute); font-weight: 600; }
+.lens-page .ans-alt { font-size: 16px; color: var(--lp-text); }
+.lens-page .ans-alt strong { color: var(--lp-ink); font-weight: 700; }
+.lens-page .ans-alt strong::after { content: ": "; }
+.lens-page .ans-diff-more { color: var(--lp-ink); font-weight: 700; }
+.lens-page .ans-diff-less { color: var(--lp-mute); font-weight: 400; }
+.lens-page .ans-sibs { color: var(--lp-mute); font-size: 14px; }
+.lens-page .ans-why { border-top: 1px solid var(--lp-rule-soft); color: var(--lp-mute); font-size: 14px; max-width: 72ch; }
+
+/* Options: a list with hairlines. Type is a word in small caps, not a coloured bar. */
+.lens-page .opts-head { color: var(--lp-mute); letter-spacing: .08em; font-size: 12px; font-weight: 600; margin: 22px 0 4px; }
+.lens-page .opts { border: none; border-top: 1px solid var(--lp-rule); border-radius: 0; background: transparent; }
+.lens-page .opt { border-left: none; border-bottom: 1px solid var(--lp-rule-soft); padding: 12px 4px; grid-template-columns: 64px 1fr auto; }
+.lens-page .opt-type { background: none; color: var(--lp-mute); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-align: left; padding: 0; }
+.lens-page .opt-stock .opt-type, .lens-page .opt-grind .opt-type { background: none; color: var(--lp-ink); }
+.lens-page .opt-name { font-size: 18px; font-weight: 600; color: var(--lp-ink); }
+.lens-page .opt-meta, .lens-page .opt-others { font-size: 14px; color: var(--lp-mute); }
+.lens-page .opt-cost { font-size: 20px; font-weight: 700; color: var(--lp-ink); }
+.lens-page .opt-diff, .lens-page .opt-sell { font-size: 13px; color: var(--lp-mute); font-weight: 500; }
+.lens-page .opt-thick .opt-name, .lens-page .opt-thick .opt-cost { color: var(--lp-mute); }
+.lens-page .opt-retired { background: #fff; }
+.lens-page .opt-retired .opt-name, .lens-page .opt-retired .opt-cost, .lens-page .opt-retired .opt-type { color: #999; }
+.lens-page .miss-details > summary { color: var(--lp-ink); font-weight: 500; font-size: 15px; }
+.lens-page .miss-item { font-size: 15px; border-bottom-color: var(--lp-rule-soft); }
+.lens-page .miss-item strong { color: var(--lp-ink); }
+
+/* Library: same treatment. */
+.lens-page .lens-note { font-size: 15px; color: var(--lp-mute); max-width: 80ch; }
+.lens-page .lens-select { border: 1px solid #999; border-radius: 6px; font-size: 16px; color: var(--lp-ink); background: #fff; }
+.lens-page .lens-select:focus { border-color: var(--lp-ink); box-shadow: 0 0 0 3px #ddd; }
+.lens-page .search-box { border: 1px solid #999; border-radius: 6px; font-size: 17px; }
+.lens-page .search-box:focus { border-color: var(--lp-ink); box-shadow: 0 0 0 3px #ddd; }
+.lens-page .table-scroll { border: none; border-top: 1px solid var(--lp-rule); border-radius: 0; }
+.lens-page .stock-table { font-size: 16px; }
+.lens-page .stock-table th { background: #fff; color: var(--lp-mute); font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; border-bottom: 1px solid var(--lp-rule); padding: 10px 12px; }
+.lens-page .stock-table td { padding: 10px 12px; border-bottom: 1px solid var(--lp-rule-soft); vertical-align: top; }
+.lens-page .pref-row td { background: #fff; }
+.lens-page .chip-pref { background: #fff; border-color: var(--lp-rule); color: var(--lp-mute); }
+.lens-page .type-chip { background: none; border: none; padding: 0; color: var(--lp-ink); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.lens-page .idx-cell { font-weight: 600; color: var(--lp-ink); }
+.lens-page .lib-table .cec-price { color: var(--lp-ink); font-size: 18px; }
+.lens-page .lib-table .hoya-cost .price-now { color: var(--lp-mute); }
+.lens-page .lib-table .band + .band { border-top-color: var(--lp-rule-soft); }
+.lens-page .add-tag { background: none; border: 1px solid var(--lp-rule); color: var(--lp-mute); }
+.lens-page .cell-sub, .lens-page .code-sub { color: var(--lp-mute); font-size: 14px; }
+.lens-page .updated-line, .lens-page .empty-panel { color: var(--lp-mute); }
+.lens-page .sop-card-meta .chip { font-size: 12px; }
+.lens-page .retired-row td { background: #fff; color: #999; }
+body.lens-mono { background: #fafafa; }
+body.lens-mono main { background: #fafafa; }
+
+/* --- Lens Finder: colour with one job each (Mark, 20 Sep) ----------------------
+   green = stock · amber = grind / thickness caution · navy = ZEISS · teal = synchrony ·
+   brown = Hoya (old) · violet = a price note (deal / promo). Nothing else is coloured. */
+.lens-page { --c-stock: #1b6b47; --c-stock-bg: #e6f4ec; --c-grind: #9a5b00; --c-grind-bg: #fff3d9;
+    --c-zeiss: #1f3f7a; --c-zeiss-bg: #e7edf8; --c-sync: #0f6a73; --c-sync-bg: #e3f2f3;
+    --c-hoya: #6b4b2a; --c-hoya-bg: #f3ece4; --c-price: #5a3d8f; --c-price-bg: #efe9f8; }
+
+/* Stock / grind */
+.lens-page .answer-stock { border-color: var(--c-stock); border-width: 2px; background: #fff; }
+.lens-page .answer-grind { border-color: var(--c-grind); border-width: 2px; background: #fff; }
+.lens-page .answer-stock .ans-word { color: var(--c-stock); }
+.lens-page .answer-grind .ans-word { color: var(--c-grind); }
+.lens-page .answer-stock .ans-word small, .lens-page .answer-grind .ans-word small { color: inherit; opacity: .8; }
+.lens-page .opt { border-left: 5px solid transparent; padding-left: 10px; }
+.lens-page .opt-stock { border-left-color: var(--c-stock); }
+.lens-page .opt-grind { border-left-color: var(--c-grind); }
+.lens-page .opt-stock .opt-type { color: var(--c-stock); }
+.lens-page .opt-grind .opt-type { color: var(--c-grind); }
+.lens-page .type-chip.type-stock { color: var(--c-stock); }
+.lens-page .type-chip.type-grind { color: var(--c-grind); }
+.lens-page .ans-alt strong { color: var(--lp-ink); }
+.lens-page .answer-stock .ans-alt strong { color: var(--c-grind); }   /* "Grind instead" */
+.lens-page .answer-grind .ans-alt strong { color: var(--c-stock); }   /* "Stock instead" */
+
+/* Thickness caution + warnings: amber ink, no fill */
+.lens-page .chip-amber { border-color: var(--c-grind); color: var(--c-grind); background: #fff; }
+.lens-page .warn-note { color: var(--c-grind); }
+.lens-page .warn-note::before { content: "⚠ "; }
+.lens-page .ans-diff-more { color: var(--c-grind); }
+
+/* Supplier */
+.lens-page .chip-zeiss { background: var(--c-zeiss-bg); border-color: var(--c-zeiss-bg); color: var(--c-zeiss); }
+.lens-page .chip-sync  { background: var(--c-sync-bg);  border-color: var(--c-sync-bg);  color: var(--c-sync); }
+.lens-page .chip-other { background: var(--c-hoya-bg);  border-color: var(--c-hoya-bg);  color: var(--c-hoya); }
+.lens-page .answer-hoya { border-color: var(--c-hoya); border-style: dashed; background: #fbf8f4; }
+.lens-page .answer-hoya .ans-tag { color: var(--c-hoya); }
+.lens-page .lf-radio:has(input[value="hoya"]:checked) { background: var(--c-hoya); }
+
+/* Price notes */
+.lens-page .chip-deal, .lens-page .chip-promo, .lens-page .ans-basis, .lens-page .ans-basis-promo {
+    background: var(--c-price-bg); border-color: var(--c-price-bg); color: var(--c-price); }
+.lens-page .ans-sell .v, .lens-page .opt-sell, .lens-page .lib-table .cec-price { color: var(--c-stock); }
+.lens-page .ans-sell .k, .lens-page .opt-sell { color: var(--c-stock); }
+
+/* Key under the results so the colours explain themselves */
+.lens-page .colour-key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--lp-mute); margin: 8px 0 0; }
+.lens-page .colour-key span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.lens-page .key-stock::before { background: var(--c-stock); }
+.lens-page .key-grind::before { background: var(--c-grind); }
+.lens-page .key-zeiss::before { background: var(--c-zeiss); }
+.lens-page .key-sync::before  { background: var(--c-sync); }
+.lens-page .key-hoya::before  { background: var(--c-hoya); }
+.lens-page .key-price::before { background: var(--c-price); }
+
+
+/* --- Lens Finder: the options as a real table (Mark, 20 Sep) ---------------------
+   Index first and biggest, then supplier, lens, stock/grind, blank, range, cost, sell.
+   Straight columns, hairlines, numbers right-aligned in tabular figures. */
+.lens-page .opt-scroll { border: 1px solid var(--lp-rule); border-radius: 6px; margin-top: 6px; }
+.lens-page .opt-table { border-collapse: collapse; width: 100%; font-size: 16px; font-variant-numeric: tabular-nums; }
+.lens-page .opt-table th { background: #f5f5f5; color: var(--lp-mute); font-size: 12px; font-weight: 600;
+    letter-spacing: .06em; text-transform: uppercase; padding: 9px 12px; border-bottom: 1px solid var(--lp-rule);
+    text-align: left; white-space: nowrap; }
+.lens-page .opt-table td { padding: 10px 12px; border-bottom: 1px solid var(--lp-rule-soft); vertical-align: top; }
+.lens-page .opt-table tr:last-child td { border-bottom: none; }
+.lens-page .opt-table .c-idx { font-size: 22px; font-weight: 700; color: var(--lp-ink); width: 76px; padding-left: 14px; }
+.lens-page .opt-table .c-sup { font-weight: 700; font-size: 14px; letter-spacing: .02em; white-space: nowrap; }
+.lens-page .sup-zeiss { color: var(--c-zeiss); }
+.lens-page .sup-sync  { color: var(--c-sync); }
+.lens-page .sup-other { color: var(--c-hoya); }
+.lens-page .opt-table .c-lens { min-width: 240px; }
+.lens-page .opt-table .lens-name { font-size: 17px; font-weight: 700; color: var(--lp-ink); }
+.lens-page .opt-table .lens-sub { display: block; font-size: 13px; color: var(--lp-mute); margin-top: 2px; }
+.lens-page .opt-table .c-lens .chip { font-size: 11px; padding: 1px 7px; vertical-align: middle; margin-left: 4px; }
+.lens-page .chip-pick { background: var(--c-stock-bg); border-color: var(--c-stock); color: var(--c-stock); }
+.lens-page .opt-grind .chip-pick { background: var(--c-grind-bg); border-color: var(--c-grind); color: var(--c-grind); }
+.lens-page .opt-table .c-type { font-weight: 700; white-space: nowrap; }
+.lens-page .opt-stock .c-type { color: var(--c-stock); }
+.lens-page .opt-grind .c-type { color: var(--c-grind); }
+.lens-page .opt-table .c-blank, .lens-page .opt-table .c-range, .lens-page .opt-table .c-cyl { white-space: nowrap; color: var(--lp-text); }
+.lens-page .opt-table .c-cost { text-align: right; white-space: nowrap; font-weight: 700; font-size: 18px; color: var(--lp-ink); }
+.lens-page .opt-table .c-cost .chip-basis { display: block; margin: 2px 0 0 auto; width: max-content; font-weight: 600; }
+.lens-page .opt-table .cost-diff { display: block; font-size: 12px; font-weight: 500; color: var(--lp-mute); }
+.lens-page .opt-table .c-sell { text-align: right; white-space: nowrap; font-weight: 700; color: var(--c-stock); font-size: 17px; }
+.lens-page .opt-table th.c-cost, .lens-page .opt-table th.c-sell { text-align: right; }
+/* Row tint: the pick, and stock vs grind, by a coloured left edge — nothing else. */
+.lens-page .opt-row td:first-child { border-left: 5px solid transparent; }
+.lens-page .opt-stock td:first-child { border-left-color: var(--c-stock); }
+.lens-page .opt-grind td:first-child { border-left-color: var(--c-grind); }
+.lens-page .opt-best td { background: #f4faf6; }
+.lens-page .opt-best.opt-grind td { background: #fffaf0; }
+.lens-page .opt-thick .c-idx, .lens-page .opt-thick .lens-name { color: var(--lp-mute); }
+.lens-page .opt-retired td { color: #999; }
+.lens-page .opt-retired .c-idx, .lens-page .opt-retired .lens-name, .lens-page .opt-retired .c-sup, .lens-page .opt-retired .c-type, .lens-page .opt-retired .c-sell { color: #999; }
+.lens-page .opt-table .warn-note { font-size: 13px; margin-top: 2px; }
+
+/* --- Lens label + answer-in-table-form (Mark, 20 Sep) ---------------------------- */
+.lens-page .lbl { display: inline-flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.lens-page .lbl-idx { font-size: 22px; font-weight: 700; color: var(--lp-ink); font-variant-numeric: tabular-nums; }
+.lens-page .lbl-cat { font-size: 13px; color: var(--lp-mute); text-transform: uppercase; letter-spacing: .05em; }
+.lens-page .lbl-name { font-size: 17px; font-weight: 700; color: var(--lp-ink); }
+.lens-page .lbl-big .lbl-idx { font-size: 34px; }
+.lens-page .lbl-big .lbl-cat { font-size: 14px; }
+.lens-page .lbl-big .lbl-name { font-size: 26px; }
+.lens-page .opt-thick .lbl-idx, .lens-page .opt-thick .lbl-name { color: var(--lp-mute); }
+.lens-page .opt-retired .lbl-idx, .lens-page .opt-retired .lbl-name { color: #999; }
+.lens-page .opt-table .c-lens { min-width: 300px; }
+/* Answer card: word left, one-row table right */
+.lens-page .answer { grid-template-columns: 170px 1fr; padding: 18px 22px 14px; }
+.lens-page .ans-word { font-size: 56px; padding-top: 10px; }
+.lens-page .ans-table { border: none; margin: 0; }
+.lens-page .ans-table th { background: transparent; border-bottom: 1px solid var(--lp-rule); padding: 4px 10px; }
+.lens-page .ans-table td { padding: 8px 10px; border-bottom: none; vertical-align: baseline; }
+.lens-page .ans-table .ans-pick .c-type { font-size: 18px; }
+.lens-page .ans-table .ans-pick .c-blank { font-size: 22px; font-weight: 700; color: var(--lp-ink); }
+.lens-page .ans-table .ans-pick .c-cost { font-size: 30px; }
+.lens-page .ans-table .ans-pick .c-sell { font-size: 24px; }
+.lens-page .ans-table .ans-pick .c-sup { font-size: 15px; }
+.lens-page .ans-table .ans-alt-row td { border-top: 1px solid var(--lp-rule-soft); color: var(--lp-mute); }
+.lens-page .ans-table .ans-alt-row .lbl-idx, .lens-page .ans-table .ans-alt-row .lbl-name, .lens-page .ans-table .ans-alt-row .c-cost { color: var(--lp-text); }
+.lens-page .ans-table .ans-alt-row .c-cost { font-size: 18px; }
+.lens-page .ans-table .ans-alt-row .c-sell { font-size: 16px; }
+.lens-page .ans-table tr td:first-child { border-left: none; }
+.lens-page .ans-more { margin-top: 6px; }
+.lens-page .ans-more summary { font-size: 13px; color: var(--lp-mute); cursor: pointer; list-style: none; }
+.lens-page .ans-more summary::before { content: "▸ "; }
+.lens-page .ans-more[open] summary::before { content: "▾ "; }
+.lens-page .ans-why { border-top: none; padding-top: 4px; }
+@media (max-width: 760px) { .lens-page .answer { grid-template-columns: 1fr; } .lens-page .ans-word { padding-top: 0; } }
+
+/* --- v5 (Mark, 20 Sep): logo for ZEISS, tabular answer, bullets for why, RRP a touch louder --- */
+.zeiss-logo { height: 28px; width: auto; vertical-align: middle; position: relative; top: -1px; border-radius: 2px; }
+.lens-page .c-sup .zeiss-logo { height: 32px; }
+.lens-page .ans-pick .c-sup .zeiss-logo { height: 40px; }
+.lens-page .lf-sup-name { display: inline-flex; align-items: center; gap: 6px; }
+.lens-page .lf-radio .zeiss-logo { height: 26px; }
+.lens-page .colour-key .key-zeiss::before { display: none; }
+.lens-page .colour-key .zeiss-logo { height: 20px; }
+.lens-page .rx-line .zeiss-logo { height: 22px; }
+/* Answer card: no giant word — the verdict is the first column of the table */
+.lens-page .answer { display: block; padding: 10px 16px 12px; }
+.lens-page .ans-table .c-verdict { width: 92px; font-size: 26px; font-weight: 700; letter-spacing: -.01em; vertical-align: middle; }
+.lens-page .answer-stock .ans-pick .c-verdict { color: var(--c-stock); }
+.lens-page .answer-grind .ans-pick .c-verdict { color: var(--c-grind); }
+.lens-page .ans-table .ans-alt-row .c-verdict small { font-size: 13px; font-weight: 600; color: var(--lp-mute); text-transform: uppercase; letter-spacing: .04em; }
+.lens-page .ans-table th.c-verdict { padding: 4px 10px; }
+.lens-page .ans-table .ans-pick td { vertical-align: middle; }
+.lens-page .ans-table .ans-pick .c-cost { font-size: 26px; }
+.lens-page .lbl-big .lbl-idx { font-size: 28px; }
+.lens-page .lbl-big .lbl-name { font-size: 22px; }
+.lens-page .ans-line { font-size: 18px; padding: 8px 4px; }
+.lens-page .ans-verdict { font-size: 22px; font-weight: 700; margin-right: 10px; }
+.lens-page .ans-notes, .lens-page .ans-why { margin: 6px 0 0 0; padding-left: 20px; font-size: 14px; line-height: 1.5; }
+.lens-page .ans-notes li { color: var(--c-grind); }
+.lens-page .ans-why li { color: var(--lp-mute); margin: 2px 0; }
+.lens-page .ans-more { margin: 6px 0 0 4px; }
+/* RRP: one step louder, still green */
+.lens-page .opt-table .c-sell { font-size: 19px; font-weight: 800; }
+.lens-page .ans-table .ans-pick .c-sell { font-size: 28px; font-weight: 800; }
+.lens-page .ans-table .ans-alt-row .c-sell { font-size: 17px; }
+.lens-page .opt-table th.c-sell { color: var(--c-stock); }
+@media (max-width: 760px) { .lens-page .ans-table .c-verdict { width: 70px; font-size: 20px; } }
