@@ -1422,3 +1422,36 @@ body.lens-mono main { background: #fafafa; }
 .lens-page .ans-more[open] summary::before { content: "▾ "; }
 .lens-page .ans-why { border-top: none; padding-top: 4px; }
 @media (max-width: 760px) { .lens-page .answer { grid-template-columns: 1fr; } .lens-page .ans-word { padding-top: 0; } }
+
+/* --- v5 (Mark, 20 Sep): logo for ZEISS, tabular answer, bullets for why, RRP a touch louder --- */
+.zeiss-logo { height: 28px; width: auto; vertical-align: middle; position: relative; top: -1px; border-radius: 2px; }
+.lens-page .c-sup .zeiss-logo { height: 32px; }
+.lens-page .ans-pick .c-sup .zeiss-logo { height: 40px; }
+.lens-page .lf-sup-name { display: inline-flex; align-items: center; gap: 6px; }
+.lens-page .lf-radio .zeiss-logo { height: 26px; }
+.lens-page .colour-key .key-zeiss::before { display: none; }
+.lens-page .colour-key .zeiss-logo { height: 20px; }
+.lens-page .rx-line .zeiss-logo { height: 22px; }
+/* Answer card: no giant word — the verdict is the first column of the table */
+.lens-page .answer { display: block; padding: 10px 16px 12px; }
+.lens-page .ans-table .c-verdict { width: 92px; font-size: 26px; font-weight: 700; letter-spacing: -.01em; vertical-align: middle; }
+.lens-page .answer-stock .ans-pick .c-verdict { color: var(--c-stock); }
+.lens-page .answer-grind .ans-pick .c-verdict { color: var(--c-grind); }
+.lens-page .ans-table .ans-alt-row .c-verdict small { font-size: 13px; font-weight: 600; color: var(--lp-mute); text-transform: uppercase; letter-spacing: .04em; }
+.lens-page .ans-table th.c-verdict { padding: 4px 10px; }
+.lens-page .ans-table .ans-pick td { vertical-align: middle; }
+.lens-page .ans-table .ans-pick .c-cost { font-size: 26px; }
+.lens-page .lbl-big .lbl-idx { font-size: 28px; }
+.lens-page .lbl-big .lbl-name { font-size: 22px; }
+.lens-page .ans-line { font-size: 18px; padding: 8px 4px; }
+.lens-page .ans-verdict { font-size: 22px; font-weight: 700; margin-right: 10px; }
+.lens-page .ans-notes, .lens-page .ans-why { margin: 6px 0 0 0; padding-left: 20px; font-size: 14px; line-height: 1.5; }
+.lens-page .ans-notes li { color: var(--c-grind); }
+.lens-page .ans-why li { color: var(--lp-mute); margin: 2px 0; }
+.lens-page .ans-more { margin: 6px 0 0 4px; }
+/* RRP: one step louder, still green */
+.lens-page .opt-table .c-sell { font-size: 19px; font-weight: 800; }
+.lens-page .ans-table .ans-pick .c-sell { font-size: 28px; font-weight: 800; }
+.lens-page .ans-table .ans-alt-row .c-sell { font-size: 17px; }
+.lens-page .opt-table th.c-sell { color: var(--c-stock); }
+@media (max-width: 760px) { .lens-page .ans-table .c-verdict { width: 70px; font-size: 20px; } }

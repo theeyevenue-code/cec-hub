@@ -1185,10 +1185,17 @@ function repeatChip(t) {
 }
 
 // Supplier chip + price-basis chip, shared by the finder and the library.
+const ZEISS_LOGO = `<img class="zeiss-logo" src="/img/zeiss-logo.svg" alt="ZEISS">`;
 function supplierChip(s) {
     if (!s) return "";
-    const cls = /zeiss$/i.test(s) ? "chip-zeiss" : /synchrony/i.test(s) ? "chip-sync" : "chip-other";
+    if (/^zeiss$/i.test(s)) return ZEISS_LOGO;
+    const cls = /synchrony/i.test(s) ? "chip-sync" : "chip-other";
     return `<span class="chip chip-sup ${cls}">${esc(s)}</span>`;
+}
+// The supplier cell of a table row: the logo for ZEISS, the word for the rest.
+function supplierCell(s) {
+    if (/^zeiss$/i.test(s || "")) return ZEISS_LOGO;
+    return esc(s || "");
 }
 let PROMO_UNTIL = "";   // filled from /api/lenses
 function fmtDateLong(iso) {
@@ -1211,6 +1218,13 @@ function tierBadge(t) {
 // Built from the pick itself (options[0] with best=true) so the facts staff need
 // at the bench are big: STOCK or GRIND, the lens, its blank, cost and sell price.
 // The engine's verdict sentence — the reasoning — sits underneath in small type.
+// The engine's verdict sentence, as bullets: one per sentence, brackets unwrapped.
+function whyBullets(text) {
+    return String(text || "").replace(/\s+/g, " ").split(/(?<=[.!?)])\s+(?=[A-Z⚠(])/)
+        .map((t) => t.trim().replace(/^\((.*)\)$/, "$1").replace(/[.]$/, ""))
+        .filter(Boolean).map((t) => `<li>${esc(t)}</li>`).join("");
+}
+
 function answerCardHTML(data, sells) {
     const options = data.options || [];
     const best = options.find((o) => o.best);
@@ -1218,8 +1232,8 @@ function answerCardHTML(data, sells) {
     const tag = hoya ? `<div class="ans-tag">Hoya · old supplier · comparison only</div>` : "";
     if (!best) {
         return `<div class="answer answer-none ${hoya ? "answer-hoya" : ""}">${tag}
-            <div class="ans-word">NO FIT</div>
-            <div class="ans-body"><div class="ans-why">${esc(data.verdict || "")}</div></div></div>`;
+            <div class="ans-line"><span class="ans-verdict">No fit</span> nothing loaded covers this Rx</div>
+            <ul class="ans-why">${whyBullets(data.verdict)}</ul></div>`;
     }
     const stock = best.type === "stock";
     const alt = options.find((o) => o !== best && o.orderable && o.type !== best.type
@@ -1230,27 +1244,25 @@ function answerCardHTML(data, sells) {
         const supCls = /zeiss$/i.test(l.supplier) ? "sup-zeiss" : /synchrony/i.test(l.supplier) ? "sup-sync" : "sup-other";
         const diff = l !== best && best.price_now != null && l.price_now != null ? l.price_now - best.price_now : null;
         return `<tr class="${cls} opt-${l.type}">
+            <td class="c-verdict">${l === best ? (stock ? "Stock" : "Grind") : `<small>or ${l.type}</small>`}</td>
             <td class="c-lens">${lensLabelHTML(l, l === best)}<span class="lens-sub">${esc([coatShort(l.coating), l.code ? "code " + l.code : ""].filter(Boolean).join(" · "))}</span></td>
-            <td class="c-sup ${supCls}">${esc(l.supplier || "")}</td>
-            <td class="c-type">${l.type === "stock" ? "Stock" : "Grind"}</td>
+            <td class="c-sup ${supCls}">${supplierCell(l.supplier)}</td>
             <td class="c-blank">${l.blank_mm != null ? esc(fmtMM(l.blank_mm)) : "to size"}</td>
             <td class="c-cost">${l.price_now != null ? esc(fmtMoney(l.price_now)) : "—"}${basisChip(l.basis)}${diff != null ? `<span class="cost-diff">${diff > 0 ? "+" : "−"}${esc(fmtMoney(Math.abs(diff)))}</span>` : ""}</td>
             <td class="c-sell">${sellPrice != null ? "$" + esc(sellPrice) : "—"}</td>
         </tr>`;
     };
-    const notes = (best.warnings || []).map((w) => `<div class="warn-note">${esc(w)}</div>`).join("");
+    const notes = (best.warnings || []).map((w) => `<li>${esc(w)}</li>`).join("")
+        + (best.under_index ? `<li>One step thicker than ideal for this power</li>` : "");
     return `<div class="answer ${stock ? "answer-stock" : "answer-grind"} ${hoya ? "answer-hoya" : ""}">
         ${tag}
-        <div class="ans-word">${stock ? "STOCK" : "GRIND"}</div>
-        <div class="ans-body">
-            <table class="opt-table ans-table"><thead><tr>
-                <th class="c-lens">Lens</th><th class="c-sup">Supplier</th><th class="c-type"></th>
-                <th class="c-blank">Blank</th><th class="c-cost">Cost / lens</th><th class="c-sell">Sells / pair</th></tr></thead>
-            <tbody>${row(best, "ans-pick")}${alt ? row(alt, "ans-alt-row") : ""}</tbody></table>
-            ${best.under_index ? `<div class="warn-note">One step thicker than ideal for this power</div>` : ""}
-            ${notes}
-            <details class="ans-more"><summary>Why</summary><div class="ans-why">${esc(data.verdict || "")}</div></details>
-        </div></div>`;
+        <table class="opt-table ans-table"><thead><tr>
+            <th class="c-verdict"></th><th class="c-lens">Lens</th><th class="c-sup">Supplier</th>
+            <th class="c-blank">Blank</th><th class="c-cost">Cost / lens</th><th class="c-sell">Sells / pair</th></tr></thead>
+        <tbody>${row(best, "ans-pick")}${alt ? row(alt, "ans-alt-row") : ""}</tbody></table>
+        ${notes ? `<ul class="ans-notes">${notes}</ul>` : ""}
+        <details class="ans-more"><summary>Why</summary><ul class="ans-why">${whyBullets(data.verdict)}</ul></details>
+    </div>`;
 }
 
 // A lens as staff say it: "1.74 · Single vision · ClearView FSV". The index leads
@@ -1296,7 +1308,7 @@ function optionRowHTML(g, best, sells) {
     const supCls = /zeiss$/i.test(l.supplier) ? "sup-zeiss" : /synchrony/i.test(l.supplier) ? "sup-sync" : "sup-other";
     return `<tr class="opt-row opt-${l.type} ${l.best ? "opt-best" : ""} ${l.under_index ? "opt-thick" : ""} ${!l.orderable ? "opt-retired" : ""}">
         <td class="c-lens">${lensLabelHTML(l)} ${flags}<span class="lens-sub">${esc(sub)}</span>${warn}</td>
-        <td class="c-sup ${supCls}">${esc(l.supplier || "")}</td>
+        <td class="c-sup ${supCls}">${supplierCell(l.supplier)}</td>
         <td class="c-type">${l.type === "stock" ? "Stock" : "Grind"}</td>
         <td class="c-blank">${esc(blanks)}</td>
         <td class="c-range">${l.sph_min != null ? `${esc(fmtPower(l.sph_min))} to ${esc(fmtPower(l.sph_max))}` : "not in file"}</td>
@@ -1675,7 +1687,7 @@ async function renderLenses() {
                 <button class="btn" id="lf-go">Find</button>
             </div>
             <div class="lf-supplier" role="radiogroup" aria-label="Which supplier">
-                <label class="lf-radio"><input type="radio" name="lf-sup" value="current" checked><span>ZEISS + Synchrony<small>current</small></span></label>
+                <label class="lf-radio"><input type="radio" name="lf-sup" value="current" checked><span><span class="lf-sup-name">${ZEISS_LOGO} + Synchrony</span><small>current</small></span></label>
                 <label class="lf-radio"><input type="radio" name="lf-sup" value="hoya"><span>Hoya<small>old, to compare</small></span></label>
                 <label class="lf-radio"><input type="radio" name="lf-sup" value="all"><span>Both</span></label>
             </div>
@@ -1730,9 +1742,9 @@ async function renderLenses() {
             resultsEl.innerHTML = `<div class="empty-panel">${esc(data.catalog_message)}</div>`;
             return;
         }
-        const supWord = { current: "ZEISS + Synchrony", hoya: "Hoya", all: "all suppliers" }[data.supplier] || "";
+        const supWord = { current: `${ZEISS_LOGO} + Synchrony`, hoya: "Hoya", all: "all suppliers" }[data.supplier] || "";
         const rxLine = `<strong>${esc(data.rx.display)}</strong>` +
-            (supWord ? ` · ${esc(supWord)}` : "") +
+            (supWord ? ` · ${supWord}` : "") +
             (data.rx.tint ? ` · tinted` : "") +
             (data.rx.transposed ? ` <span class="chip chip-amber">plus cyl transposed</span>` : "") +
             (data.min_blank != null ? ` · blank ≥ ${esc(fmtMM(data.min_blank))}` : "") +
@@ -1760,7 +1772,7 @@ async function renderLenses() {
                 <summary>${retired.length} no longer ordered</summary>
                 ${optionTableHTML(retired.slice(0, 20), best, sells)}
             </details>` : ""}
-            <div class="colour-key"><span class="key-stock">stock</span><span class="key-grind">grind · thicker than ideal</span><span class="key-zeiss">ZEISS</span><span class="key-sync">Synchrony</span><span class="key-hoya">Hoya</span><span class="key-price">price note</span></div>
+            <div class="colour-key"><span class="key-stock">stock</span><span class="key-grind">grind · thicker than ideal</span><span class="key-zeiss">${ZEISS_LOGO}</span><span class="key-sync">Synchrony</span><span class="key-hoya">Hoya</span><span class="key-price">price note</span></div>
             ${misses.length ? `<details class="miss-details">
                 <summary>${misses.length} don't fit — why</summary>
                 ${groupOptions(misses).slice(0, 60).map((g) => `<div class="miss-item">
