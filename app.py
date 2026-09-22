@@ -352,6 +352,19 @@ def stock_approve():
     })
 
 
+# --- Scanner card (read live from the Second Brain clone) -------------------
+
+@app.route("/api/scanner-card")
+def scanner_card():
+    """The staff scanner card. Read from the Second Brain clone on EVERY request
+    and sent no-store, so a `git pull` in that clone shows on the next refresh —
+    no Hub restart, no copied file to drift (Mark: "make it so I can pull it
+    from master")."""
+    resp = jsonify(integrations.scanner_card(_integrations()))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 # --- Lenses ----------------------------------------------------------------
 
 @app.route("/api/lenses")

@@ -10,5 +10,9 @@
     "lens_jobs": "C:\\CEC\\CEC-Optomate-Agent\\logs\\lens-jobs.jsonl",
     "logs_dir": "C:\\CEC\\CEC-Optomate-Agent\\logs"
   },
+  "second_brain": {
+    "dir": "C:\\Claude\\Claude Code\\Claude Second Brain",
+    "_dir_note": "Root of the Second Brain clone on this machine. The Scanner page reads tools\\scanner-card\\scanner-card.partial.html out of it on every page load, so `git pull` there is the whole update: no copy, no restart. On the practice server the clone is at C:\\Users\\ConcordeyecareServer\\Claude\\cec-second-brain."
+  },
   "scorecard_drop": "C:\\Claude\\Claude Code\\Claude Second Brain\\scorecard-drop"
 }

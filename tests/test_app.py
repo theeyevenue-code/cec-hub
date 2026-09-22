@@ -232,3 +232,75 @@ class TestStockPage:
         res = hub_client_disconnected.post("/api/stock/approve",
                                            json={"filename": "x.csv"})
         assert res.status_code == 400
+
+
+class TestScannerCard:
+    """The Scanner page reads the staff card out of the Second Brain clone on
+    this machine — per request, so `git pull` there IS the update."""
+
+    @staticmethod
+    def _brain(tmp_path, html):
+        clone = tmp_path / "brain"
+        card_dir = clone / "tools" / "scanner-card"
+        card_dir.mkdir(parents=True)
+        (card_dir / "scanner-card.partial.html").write_text(html, encoding="utf-8")
+        return clone
+
+    @staticmethod
+    def _client(tmp_path, monkeypatch, clone_dir):
+        import json
+        import importlib
+        cfg = tmp_path / "integrations.json"
+        cfg.write_text(json.dumps({"second_brain": {"dir": str(clone_dir)}}),
+                       encoding="utf-8")
+        monkeypatch.setenv("CEC_HUB_INTEGRATIONS", str(cfg))
+        import app as app_module
+        importlib.reload(app_module)
+        app_module.app.config["TESTING"] = True
+        return app_module.app.test_client()
+
+    def test_card_is_served_from_the_clone(self, tmp_path, monkeypatch):
+        clone = self._brain(tmp_path, '<style>.cec-scanner-card{}</style>\n'
+                                      '<div class="cec-scanner-card"><h2>Scanner quick fixes</h2></div>\n')
+        client = self._client(tmp_path, monkeypatch, clone)
+        res = client.get("/api/scanner-card")
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data["connected"] is True
+        assert "Scanner quick fixes" in data["html"]
+        assert data["updated"]
+
+    def test_card_is_read_fresh_on_every_request(self, tmp_path, monkeypatch):
+        # The whole point of the design: a `git pull` in the clone must show on
+        # the next refresh — no restart, no in-memory copy from boot.
+        clone = self._brain(tmp_path, '<div class="cec-scanner-card">version one</div>')
+        client = self._client(tmp_path, monkeypatch, clone)
+        assert "version one" in client.get("/api/scanner-card").get_json()["html"]
+        (clone / "tools" / "scanner-card" / "scanner-card.partial.html").write_text(
+            '<div class="cec-scanner-card">version two</div>', encoding="utf-8")
+        assert "version two" in client.get("/api/scanner-card").get_json()["html"]
+
+    def test_card_is_never_browser_cached(self, tmp_path, monkeypatch):
+        clone = self._brain(tmp_path, '<div class="cec-scanner-card">x</div>')
+        client = self._client(tmp_path, monkeypatch, clone)
+        assert client.get("/api/scanner-card").headers.get("Cache-Control") == "no-store"
+
+    def test_not_connected_is_calm_and_200(self, tmp_path, monkeypatch):
+        client = self._client(tmp_path, monkeypatch, tmp_path / "no-such-clone")
+        res = client.get("/api/scanner-card")
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data["connected"] is False
+        assert data["html"] == ""
+        assert "Tell Mark" in data["message"]
+
+    def test_no_second_brain_section_is_not_connected(self, hub_client_disconnected):
+        data = hub_client_disconnected.get("/api/scanner-card").get_json()
+        assert data["connected"] is False
+
+    def test_scanner_tile_is_in_the_template(self):
+        import json
+        tiles = json.loads(Path("config/tiles.example.json").read_text(encoding="utf-8"))
+        scanner = next(t for t in tiles["tiles"] if t["id"] == "scanner")
+        assert scanner["link"] == "#/scanner"
+        assert scanner["name"] == "Scanner"
