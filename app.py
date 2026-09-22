@@ -355,12 +355,17 @@ def stock_approve():
 # --- Scanner card (read live from the Second Brain clone) -------------------
 
 @app.route("/api/scanner-card")
-def scanner_card():
-    """The staff scanner card. Read from the Second Brain clone on EVERY request
-    and sent no-store, so a `git pull` in that clone shows on the next refresh —
-    no Hub restart, no copied file to drift (Mark: "make it so I can pull it
-    from master")."""
-    resp = jsonify(integrations.scanner_card(_integrations()))
+@app.route("/api/scanner-card/<which>")
+def scanner_card(which="card"):
+    """The scanner pages ("card" = staff fixes, "settings" = Mark's setting
+    barcodes). Read from the Second Brain clone on EVERY request and sent
+    no-store, so a `git pull` in that clone shows on the next refresh — no Hub
+    restart, no copied file to drift (Mark: "make it so I can pull it from
+    master")."""
+    if which not in integrations.SCANNER_PAGES:
+        return jsonify({"error": "There's no scanner page by that name. Go back "
+                                 "to the Scanner page and try again."}), 404
+    resp = jsonify(integrations.scanner_card(_integrations(), which))
     resp.headers["Cache-Control"] = "no-store"
     return resp
 

@@ -505,9 +505,14 @@ def lens_jobs(cfg: dict) -> dict:
 
 # --- Second Brain clone (Mark's documentation repo, pulled onto this machine) ----
 
-# Where the staff scanner card lives inside that repo. Fixed by the repo itself
+# Where the scanner pages live inside that repo. Fixed by the repo itself
 # (tools\scanner-card\README.md); only the clone's location is per-machine.
-SCANNER_CARD_REL = Path("tools") / "scanner-card" / "scanner-card.partial.html"
+# "card" = the five staff fixes; "settings" = Mark's page of the maker's own
+# setting barcodes (scan mode, Enter after scan, ...), scanned off the screen.
+SCANNER_PAGES = {
+    "card": Path("tools") / "scanner-card" / "scanner-card.partial.html",
+    "settings": Path("tools") / "scanner-card" / "scanner-settings.partial.html",
+}
 
 SCANNER_NOT_CONNECTED = (
     "The scanner help card isn't on this computer (it comes from Mark's "
@@ -516,16 +521,18 @@ SCANNER_NOT_CONNECTED = (
 )
 
 
-def scanner_card(cfg: dict) -> dict:
-    """The staff scanner card, read straight out of the Second Brain clone on
-    every request — never cached. Mark's rule ("make it so I can pull it from
-    master"): the card is updated by `git pull` in that clone, so it has to
-    show on the very next refresh with no restart and no copied file to drift."""
+def scanner_card(cfg: dict, which: str = "card") -> dict:
+    """A scanner page, read straight out of the Second Brain clone on every
+    request — never cached. Mark's rule ("make it so I can pull it from
+    master"): the pages are updated by `git pull` in that clone, so they have
+    to show on the very next refresh with no restart and no copied file to
+    drift. Unknown `which` -> not connected (the caller 404s on it)."""
     brain = cfg.get("second_brain", {}) or {}
     clone = brain.get("dir", "")
-    if not clone:
+    rel = SCANNER_PAGES.get(which)
+    if not clone or rel is None:
         return {"connected": False, "html": "", "message": SCANNER_NOT_CONNECTED}
-    path_str = str(Path(clone) / SCANNER_CARD_REL)
+    path_str = str(Path(clone) / rel)
     raw = _read_text(path_str)
     if raw is None:
         return {"connected": False, "html": "", "message": SCANNER_NOT_CONNECTED}

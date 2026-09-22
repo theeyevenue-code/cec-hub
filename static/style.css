@@ -184,6 +184,8 @@ main {
     margin: 0 auto 14px;
 }
 .scanner-card-foot { max-width: 800px; margin: 0 auto; font-size: 15px; color: var(--muted); text-align: center; }
+.scanner-card-host.wide, .scanner-card-foot.wide { max-width: 1040px; }
+.scanner-head { display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
 
 /* --- Home tiles ------------------------------------------------------- */
 
