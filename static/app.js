@@ -72,7 +72,8 @@ const routes = [
     { re: /^#\/lenses$/, fn: renderLenses },
     { re: /^#\/recalls$/, fn: renderRecalls },
     { re: /^#\/scanner$/, fn: renderScanner },
-    { re: /^#\/scanner-settings$/, fn: renderScannerSettings },
+    { re: /^#\/scanner-settings$/, fn: renderScanner },   // old link, same page
+    { re: /^#\/scanner-help$/, fn: renderScannerHelp },
 ];
 
 function route() {
@@ -486,19 +487,21 @@ async function renderScannerPage(which, head, foot, wide) {
         <p class="scanner-card-foot${wide ? " wide" : ""}">Updated ${esc(data.updated)} · ${foot}</p>`;
 }
 
+// The Scanner page IS the setting codes (Mark, 22 Sep: "the point of the page is to
+// list key settings in an easy-to-reach area"); the five quick fixes are one button away.
 function renderScanner() {
-    return renderScannerPage("card",
+    return renderScannerPage("settings",
         `<div class="scanner-head">
             <a class="btn btn-quiet btn-back" href="#/">← Home</a>
-            <a class="btn btn-quiet btn-back" href="#/scanner-settings">⚙ Settings</a>
+            <a class="btn btn-quiet btn-back" href="#/scanner-help">Not working? Quick fixes</a>
         </div>`,
-        "this card comes from Mark's notes, so it changes when they do", false);
+        "every code is the maker's own, from the NETUM manual", true);
 }
 
-function renderScannerSettings() {
-    return renderScannerPage("settings",
-        `<a class="btn btn-quiet btn-back" href="#/scanner">← Scanner</a>`,
-        "every code is the maker's own, from the NETUM manual", true);
+function renderScannerHelp() {
+    return renderScannerPage("card",
+        `<a class="btn btn-quiet btn-back" href="#/scanner">← Scanner codes</a>`,
+        "this card comes from Mark's notes, so it changes when they do", false);
 }
 
 /* --- Invoices (the supplier-invoice helper) ------------------------------------ */
