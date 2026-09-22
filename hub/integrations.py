@@ -507,8 +507,8 @@ def lens_jobs(cfg: dict) -> dict:
 
 # Where the scanner pages live inside that repo. Fixed by the repo itself
 # (tools\scanner-card\README.md); only the clone's location is per-machine.
-# "card" = the five staff fixes; "settings" = Mark's page of the maker's own
-# setting barcodes (scan mode, Enter after scan, ...), scanned off the screen.
+# "card" = the five staff fixes; "settings" = the maker's own setting barcodes
+# (scan mode, Enter after scan, ...), scanned off the screen. Both open to all staff.
 SCANNER_PAGES = {
     "card": Path("tools") / "scanner-card" / "scanner-card.partial.html",
     "settings": Path("tools") / "scanner-card" / "scanner-settings.partial.html",

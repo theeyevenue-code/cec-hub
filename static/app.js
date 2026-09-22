@@ -461,8 +461,8 @@ async function renderReviews() {
 // Both pages are ready-made HTML (their own <style> + one scoped <div>) from files in
 // Mark's Second Brain repo — trusted the same way the SOP files on disk are. Their CSS
 // is scoped in both directions, so they neither restyle the Hub nor pick up its
-// heading colours. `which` = "card" (the five staff fixes) or "settings" (Mark's
-// setting barcodes, scanned off the screen).
+// heading colours. `which` = "card" (the five staff fixes) or "settings" (the
+// scanner's setting barcodes, scanned off the screen - open to everyone, Mark 22 Sep).
 async function renderScannerPage(which, head, foot, wide) {
     view.innerHTML = `<div class="loading-panel">Opening the scanner page…</div>`;
     let data;
@@ -490,7 +490,7 @@ function renderScanner() {
     return renderScannerPage("card",
         `<div class="scanner-head">
             <a class="btn btn-quiet btn-back" href="#/">← Home</a>
-            <a class="btn btn-quiet btn-back" href="#/scanner-settings">⚙ Settings (Mark)</a>
+            <a class="btn btn-quiet btn-back" href="#/scanner-settings">⚙ Settings</a>
         </div>`,
         "this card comes from Mark's notes, so it changes when they do", false);
 }

@@ -357,8 +357,8 @@ def stock_approve():
 @app.route("/api/scanner-card")
 @app.route("/api/scanner-card/<which>")
 def scanner_card(which="card"):
-    """The scanner pages ("card" = staff fixes, "settings" = Mark's setting
-    barcodes). Read from the Second Brain clone on EVERY request and sent
+    """The scanner pages ("card" = staff fixes, "settings" = the setting
+    barcodes, open to everyone). Read from the Second Brain clone on EVERY request and sent
     no-store, so a `git pull` in that clone shows on the next refresh — no Hub
     restart, no copied file to drift (Mark: "make it so I can pull it from
     master")."""
