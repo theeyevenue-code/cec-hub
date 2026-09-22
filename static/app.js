@@ -485,6 +485,10 @@ async function renderScannerPage(which, head, foot, wide) {
     view.innerHTML = head + `
         <div class="scanner-card-host${wide ? " wide" : ""}">${data.html}</div>
         <p class="scanner-card-foot${wide ? " wide" : ""}">Updated ${esc(data.updated)} · ${foot}</p>`;
+    // Click a setting code to toggle full size (for a code the scanner won't read at
+    // table size). The page's own script is stripped from the partial; this is it.
+    view.querySelectorAll(".cec-scanner-settings img").forEach((img) =>
+        img.addEventListener("click", () => img.classList.toggle("zoom")));
 }
 
 // The Scanner page IS the setting codes (Mark, 22 Sep: "the point of the page is to
