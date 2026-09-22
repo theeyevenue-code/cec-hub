@@ -72,6 +72,7 @@ const routes = [
     { re: /^#\/lenses$/, fn: renderLenses },
     { re: /^#\/recalls$/, fn: renderRecalls },
     { re: /^#\/scanner$/, fn: renderScanner },
+    { re: /^#\/scanner-settings$/, fn: renderScannerSettings },
 ];
 
 function route() {
@@ -455,34 +456,49 @@ async function renderReviews() {
         </div>`;
 }
 
-/* --- Scanner (the staff card, read live from the Second Brain clone) --------- */
+/* --- Scanner (pages read live from the Second Brain clone) -------------------- */
 
-async function renderScanner() {
-    view.innerHTML = `<div class="loading-panel">Opening the scanner card…</div>`;
+// Both pages are ready-made HTML (their own <style> + one scoped <div>) from files in
+// Mark's Second Brain repo — trusted the same way the SOP files on disk are. Their CSS
+// is scoped in both directions, so they neither restyle the Hub nor pick up its
+// heading colours. `which` = "card" (the five staff fixes) or "settings" (Mark's
+// setting barcodes, scanned off the screen).
+async function renderScannerPage(which, head, foot, wide) {
+    view.innerHTML = `<div class="loading-panel">Opening the scanner page…</div>`;
     let data;
     try {
-        data = await getJSON("/api/scanner-card");
+        data = await getJSON("/api/scanner-card/" + which);
     } catch (e) {
         // A Hub backend from before this page (not restarted yet) has no
         // /api/scanner-card: fail soft with the standard panel, not a blank page.
         view.innerHTML = errorPanel(e.message);
         return;
     }
-    const head = `<a class="btn btn-quiet btn-back" href="#/">← Home</a>`;
     if (!data.connected) {
         view.innerHTML = head + `<div class="empty-panel">${esc(data.message)}</div>`;
         return;
     }
-    // The card follows the PC's dark-mode setting unless the page says otherwise;
-    // the Hub is always light, and pale card text on the white panel would vanish.
+    // The pages follow the PC's dark-mode setting unless the page says otherwise;
+    // the Hub is always light, and pale text on the white panel would vanish.
     document.documentElement.dataset.theme = "light";
-    // The card is ready-made HTML (its own <style> + one <div class="cec-scanner-card">)
-    // from a file in Mark's Second Brain repo — trusted the same way the SOP files on
-    // disk are. Its CSS is scoped to that class in both directions, so it neither
-    // restyles the Hub nor picks up the Hub's heading colours.
     view.innerHTML = head + `
-        <div class="scanner-card-host">${data.html}</div>
-        <p class="scanner-card-foot">Updated ${esc(data.updated)} · this card comes from Mark's notes, so it changes when they do</p>`;
+        <div class="scanner-card-host${wide ? " wide" : ""}">${data.html}</div>
+        <p class="scanner-card-foot${wide ? " wide" : ""}">Updated ${esc(data.updated)} · ${foot}</p>`;
+}
+
+function renderScanner() {
+    return renderScannerPage("card",
+        `<div class="scanner-head">
+            <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+            <a class="btn btn-quiet btn-back" href="#/scanner-settings">⚙ Settings (Mark)</a>
+        </div>`,
+        "this card comes from Mark's notes, so it changes when they do", false);
+}
+
+function renderScannerSettings() {
+    return renderScannerPage("settings",
+        `<a class="btn btn-quiet btn-back" href="#/scanner">← Scanner</a>`,
+        "every code is the maker's own, from the NETUM manual", true);
 }
 
 /* --- Invoices (the supplier-invoice helper) ------------------------------------ */

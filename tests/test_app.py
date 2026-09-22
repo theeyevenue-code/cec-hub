@@ -298,6 +298,34 @@ class TestScannerCard:
         data = hub_client_disconnected.get("/api/scanner-card").get_json()
         assert data["connected"] is False
 
+    def test_settings_page_is_served_from_the_clone(self, tmp_path, monkeypatch):
+        # Mark's setting-barcode page sits beside the staff card in the same folder.
+        clone = self._brain(tmp_path, '<div class="cec-scanner-card">staff</div>')
+        (clone / "tools" / "scanner-card" / "scanner-settings.partial.html").write_text(
+            '<div class="cec-scanner-settings"><img src="data:image/png;base64,AAAA"></div>',
+            encoding="utf-8")
+        client = self._client(tmp_path, monkeypatch, clone)
+        card = client.get("/api/scanner-card/card").get_json()
+        settings = client.get("/api/scanner-card/settings").get_json()
+        assert "staff" in card["html"] and "cec-scanner-settings" in settings["html"]
+        assert client.get("/api/scanner-card").get_json()["html"] == card["html"]
+
+    def test_unknown_scanner_page_is_a_friendly_404(self, tmp_path, monkeypatch):
+        clone = self._brain(tmp_path, '<div class="cec-scanner-card">x</div>')
+        client = self._client(tmp_path, monkeypatch, clone)
+        res = client.get("/api/scanner-card/manual")
+        assert res.status_code == 404
+        assert "Scanner page" in res.get_json()["error"]
+
+    def test_settings_missing_but_card_present_is_calm(self, tmp_path, monkeypatch):
+        # An older clone that predates the settings page: the card still works,
+        # the settings page says so instead of erroring.
+        clone = self._brain(tmp_path, '<div class="cec-scanner-card">x</div>')
+        client = self._client(tmp_path, monkeypatch, clone)
+        assert client.get("/api/scanner-card/card").get_json()["connected"] is True
+        data = client.get("/api/scanner-card/settings").get_json()
+        assert data["connected"] is False and "Tell Mark" in data["message"]
+
     def test_scanner_tile_is_in_the_template(self):
         import json
         tiles = json.loads(Path("config/tiles.example.json").read_text(encoding="utf-8"))
