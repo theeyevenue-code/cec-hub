@@ -66,6 +66,13 @@
       "link": "#/stock"
     },
     {
+      "id": "scanner",
+      "icon": "🏷️",
+      "name": "Scanner",
+      "description": "Scanner playing up? Five quick fixes before you call Mark",
+      "link": "#/scanner"
+    },
+    {
       "id": "lenses",
       "icon": "👓",
       "name": "Lens Finder",

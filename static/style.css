@@ -172,6 +172,19 @@ main {
 }
 .card h2 { font-size: 24px; margin-bottom: 12px; }
 
+/* --- Scanner page: the paper the Second Brain card sits on ---------------- */
+/* Not .card on purpose: the card pads and styles itself, and .card h2 would
+   compete with its own heading. This only gives it a white panel. */
+.scanner-card-host {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    max-width: 800px;
+    margin: 0 auto 14px;
+}
+.scanner-card-foot { max-width: 800px; margin: 0 auto; font-size: 15px; color: var(--muted); text-align: center; }
+
 /* --- Home tiles ------------------------------------------------------- */
 
 .greeting { font-size: 26px; font-weight: 700; color: var(--ink); margin-bottom: 20px; }

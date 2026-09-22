@@ -503,6 +503,36 @@ def lens_jobs(cfg: dict) -> dict:
             "updated": _mtime_display(path_str), "message": ""}
 
 
+# --- Second Brain clone (Mark's documentation repo, pulled onto this machine) ----
+
+# Where the staff scanner card lives inside that repo. Fixed by the repo itself
+# (tools\scanner-card\README.md); only the clone's location is per-machine.
+SCANNER_CARD_REL = Path("tools") / "scanner-card" / "scanner-card.partial.html"
+
+SCANNER_NOT_CONNECTED = (
+    "The scanner help card isn't on this computer (it comes from Mark's "
+    "Second Brain folder). Tell Mark. Meanwhile: check the red aiming light, "
+    "check the USB dongle is in, or just type the number instead of scanning."
+)
+
+
+def scanner_card(cfg: dict) -> dict:
+    """The staff scanner card, read straight out of the Second Brain clone on
+    every request — never cached. Mark's rule ("make it so I can pull it from
+    master"): the card is updated by `git pull` in that clone, so it has to
+    show on the very next refresh with no restart and no copied file to drift."""
+    brain = cfg.get("second_brain", {}) or {}
+    clone = brain.get("dir", "")
+    if not clone:
+        return {"connected": False, "html": "", "message": SCANNER_NOT_CONNECTED}
+    path_str = str(Path(clone) / SCANNER_CARD_REL)
+    raw = _read_text(path_str)
+    if raw is None:
+        return {"connected": False, "html": "", "message": SCANNER_NOT_CONNECTED}
+    return {"connected": True, "html": raw,
+            "updated": _mtime_display(path_str), "message": ""}
+
+
 # --- Stock proposals ---------------------------------------------------------
 
 def _parse_csv(path: Path) -> dict:

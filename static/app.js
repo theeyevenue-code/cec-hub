@@ -71,6 +71,7 @@ const routes = [
     { re: /^#\/stock$/, fn: renderStock },
     { re: /^#\/lenses$/, fn: renderLenses },
     { re: /^#\/recalls$/, fn: renderRecalls },
+    { re: /^#\/scanner$/, fn: renderScanner },
 ];
 
 function route() {
@@ -452,6 +453,36 @@ async function renderReviews() {
             switched off, or hits errors, this page says so in amber at the top. If you
             see that, tell Mark — otherwise it's working.</p>
         </div>`;
+}
+
+/* --- Scanner (the staff card, read live from the Second Brain clone) --------- */
+
+async function renderScanner() {
+    view.innerHTML = `<div class="loading-panel">Opening the scanner card…</div>`;
+    let data;
+    try {
+        data = await getJSON("/api/scanner-card");
+    } catch (e) {
+        // A Hub backend from before this page (not restarted yet) has no
+        // /api/scanner-card: fail soft with the standard panel, not a blank page.
+        view.innerHTML = errorPanel(e.message);
+        return;
+    }
+    const head = `<a class="btn btn-quiet btn-back" href="#/">← Home</a>`;
+    if (!data.connected) {
+        view.innerHTML = head + `<div class="empty-panel">${esc(data.message)}</div>`;
+        return;
+    }
+    // The card follows the PC's dark-mode setting unless the page says otherwise;
+    // the Hub is always light, and pale card text on the white panel would vanish.
+    document.documentElement.dataset.theme = "light";
+    // The card is ready-made HTML (its own <style> + one <div class="cec-scanner-card">)
+    // from a file in Mark's Second Brain repo — trusted the same way the SOP files on
+    // disk are. Its CSS is scoped to that class in both directions, so it neither
+    // restyles the Hub nor picks up the Hub's heading colours.
+    view.innerHTML = head + `
+        <div class="scanner-card-host">${data.html}</div>
+        <p class="scanner-card-foot">Updated ${esc(data.updated)} · this card comes from Mark's notes, so it changes when they do</p>`;
 }
 
 /* --- Invoices (the supplier-invoice helper) ------------------------------------ */
