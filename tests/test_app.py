@@ -299,7 +299,7 @@ class TestScannerCard:
         assert data["connected"] is False
 
     def test_settings_page_is_served_from_the_clone(self, tmp_path, monkeypatch):
-        # Mark's setting-barcode page sits beside the staff card in the same folder.
+        # The setting-barcode page sits beside the staff card in the same folder.
         clone = self._brain(tmp_path, '<div class="cec-scanner-card">staff</div>')
         (clone / "tools" / "scanner-card" / "scanner-settings.partial.html").write_text(
             '<div class="cec-scanner-settings"><img src="data:image/png;base64,AAAA"></div>',

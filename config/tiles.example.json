@@ -69,7 +69,7 @@
       "id": "scanner",
       "icon": "🏷️",
       "name": "Scanner",
-      "description": "Scanner playing up? Five quick fixes before you call Mark",
+      "description": "Scan a code off the screen: manual or auto mode, Enter after scan, beep, sleep",
       "link": "#/scanner"
     },
     {

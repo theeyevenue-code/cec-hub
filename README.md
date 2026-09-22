@@ -61,7 +61,7 @@ Open `config\integrations.json` in Notepad and check the paths:
 | `review_bot` | the review bot's `sent_log.json`, `review_bot.log`, `config.json` | Reviews page |
 | `optomate_agent` | the agent's `inventory\proposals\`, `logs\lens-jobs.jsonl` | Stock page + Lens Finder's "Recent lens jobs" |
 | `scorecard_drop` | the folder Karen saves the Friday scorecard photo into | referenced by the scorecard guide |
-| `second_brain` | `dir` = the Second Brain clone on this machine | Scanner page — reads `tools\scanner-card\scanner-card.partial.html` out of it on every page load, so `git pull` in that clone is the whole update (no copy, no restart) |
+| `second_brain` | `dir` = the Second Brain clone on this machine | Scanner page (`#/scanner` = the setting barcodes, `#/scanner-help` = the quick fixes) — reads `tools\scanner-card\*.partial.html` out of it on every page load, so `git pull` in that clone is the whole update (no copy, no restart) |
 
 If a path doesn't exist on this machine, the matching page simply says
 "not connected" — nothing breaks. The defaults assume the Optomate agent at
