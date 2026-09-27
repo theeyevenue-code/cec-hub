@@ -1877,7 +1877,9 @@ const RECALL_TOUCHES = [
 function recallMonthOptions(selected) {
     const now = new Date();
     const opts = [];
-    for (let d = -2; d <= 2; d++) {
+    // 12 months back so overdue patients can be caught up with a T+6 batch
+    // (Mark, 28 Sep 2026: online-booking patients switched off "Exclude").
+    for (let d = -12; d <= 2; d++) {
         const dt = new Date(now.getFullYear(), now.getMonth() + d, 1);
         const val = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
         const name = dt.toLocaleString("en-AU", { month: "long", year: "numeric" });
