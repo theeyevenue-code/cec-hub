@@ -2635,7 +2635,7 @@ async function renderCheckinCheck(token, flash) {
         <div class="card"><h2>Today's exam history</h2>${examHTML}</div>
         ${plan.notes_append ? `<div class="card"><h2>Patient notes - added to the end</h2>
             <div class="ci-box-text ci-notes">${esc(plan.notes_append)}</div></div>` : ""}
-        ${warnings.length ? `<div class="card"><h2>Check</h2><ul class="ci-warnings">${warnings.map((w) =>
+        ${warnings.length ? `<div class="card"><h2>Check these</h2><ul class="ci-warnings">${warnings.map((w) =>
             `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
         <p class="ci-pdf"><a href="/checkin/pdf/${esc(s.token)}" target="_blank" rel="noopener">Signed form (PDF)</a></p>
         <div class="ci-savebar">
@@ -2705,7 +2705,7 @@ async function renderCheckinCheck(token, flash) {
         }
         if (res.dry_run === false && res.saved) {
             view.innerHTML = `${back}<h1 class="page-title">Saved to Optomate.</h1>
-                ${(res.warnings || []).length ? `<div class="card"><h2>Check</h2><ul class="ci-warnings">${
+                ${(res.warnings || []).length ? `<div class="card"><h2>Check these</h2><ul class="ci-warnings">${
                     res.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
                 <p><a class="btn" href="#/checkin">Back to today</a></p>`;
             return;
