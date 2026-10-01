@@ -8,7 +8,12 @@ Built for everyone at the front desk — big text, big buttons, plain words, not
 ## What it is (and isn't)
 
 - A **local Flask app** on `http://localhost:5680`. No internet accounts, no logins.
-- **No patient data, ever.** Optomate stays the system of record — the Hub is the procedures-and-buttons layer on top.
+- **Optomate stays the system of record** — the Hub is the procedures-and-buttons layer on top.
+- **Patient data: only where a tile needs it, never kept by the Hub.** Most tiles show
+  none. The ones that do (Payments to mention, Recalls, Specialist letters, **Check-in**)
+  show it on screen on the practice network only. The Check-in tile is the one that
+  handles a whole registration form — see "Check-in (iPad form)" below for exactly what
+  is shown, where it is stored and what is never logged.
 - The only thing the Hub ever *writes* outside its own folder is renaming a stock
   proposal CSV to `*.approved.csv` when someone presses Approve (plus its own `hub.log`
   and the lens price CSVs saved into its own `lenses\` folder).
@@ -96,6 +101,58 @@ price files — in range? blank big enough? marked Grind when a stock lens
 would do? The same check is callable at `POST /api/lenses/check` for any
 future helper. It's a second pair of eyes only — it never changes an order.
 
+## Check-in (iPad form)
+
+A patient fills a registration form on the reception iPad; staff check it on the Hub
+against what Optomate holds; one button saves it. The Hub never talks to Optomate
+itself — it runs the Optomate agent's check-in engine (`python -m checkin.cli ...` in
+`optomate_agent.agent_dir`), which does every read and write and holds the live-write
+switch. Until Mark turns that on, the save button reads **"Test save (nothing is
+written)"** and every check-in screen says **Test mode - nothing is saved to Optomate**.
+
+**What is shown.** Staff screens: today's appointments, search results, and on the check
+screen the form's answers next to what Optomate holds, the four exam-history boxes and
+the note that will be added. The iPad: the question set, plus the patient's own details
+from Optomate on the "Your details" screen so they can check them.
+
+**Where it is stored.** Only in the agent's git-ignored folder on the server:
+`<agent_dir>\local-reports\checkin\sessions\<token>.json` (one file per form, answers and
+signature included). The engine keeps the signed PDF and a journal of each save under
+`local-reports\checkin\` too. A form file is deleted the moment it is discarded or saved
+for real; unsent and unfinished forms are deleted after 24 hours. Forms waiting to be
+checked stay until someone checks or discards them. While in test mode a checked form is
+kept so it can be checked again — press **Discard this form** when done.
+
+**What is never stored or logged.** `hub.log` gets the patient's Optomate ID and what
+happened (sent, submitted, saved), never a name or an answer. Names never go into a web
+address (search goes in the request body), and nothing goes into the browser's storage
+or cookies — on the iPad the form lives in memory and is wiped when it is sent.
+
+### iPad setup (once)
+
+1. Make a device key on the server:
+   `python -c "import secrets; print(secrets.token_urlsafe(24))"`
+2. Put it in `config\integrations.json` under `"checkin": {"ipad_key": "..."}` (see
+   `config\integrations.example.json`). Also check `optomate_agent.agent_dir` points at
+   the Optomate agent folder.
+3. On the iPad (staff Wi-Fi), open Safari at
+   `http://<server name>:5680/checkin/ipad#<the key>` — it should say
+   "Concord Eyecare - Please see reception". "Not set up yet" = the key is wrong.
+4. Share button -> **Add to Home Screen** -> name it "Check-in". Open it from the home
+   screen (full screen, no address bar).
+5. Lock the iPad to that page: Settings -> Accessibility -> **Guided Access** -> on, set a
+   passcode. Open Check-in, triple-click the top (or home) button -> Start. Patients can
+   then not leave the form. Triple-click + passcode to end it.
+6. Changing the key locks out the old iPad link — repeat steps 3-5.
+
+Using it: Hub -> **Check-in** -> **Send to iPad** on today's row (or Find a patient, or
+**New patient** -> Adult / Child). Hand over the iPad. When the row says **Ready to
+check**, press **Check**, look at the highlighted rows, then press the save button. If
+the iPad is in use, the Hub asks before replacing that form.
+
+To try it with fake patients: double-click `RUN-CHECKIN-TEST.bat` (port 5699, ZZTEST
+fixtures, nothing written anywhere near Optomate).
+
 ## The Stock approve button — what it actually does
 
 Pressing "Approved — mark for entry" renames the proposal file from
@@ -110,6 +167,9 @@ app.py                  Flask app (port 5680) — routes only, no business logic
 hub\sop_parser.py       SOP markdown -> structured blocks (the renderer contract)
 hub\integrations.py     read-only views of the other systems, all graceful
 hub\lenses.py           lens catalogue CSVs -> best-option finder (stock vs grind)
+hub\recall.py           Recalls tile -> the agent's recall engine (subprocess)
+hub\checkin.py          Check-in tile -> the agent's checkin engine; form store, iPad slot
+ipad\                   the iPad form page (own HTML/CSS/JS, no Hub links, served no-store)
 config\*.json           tiles, integration paths, staff names
 sops\                   the guides + README.md (authoring contract) + images\
 lenses\                 lens price CSVs + README.md (column contract) + _template.csv
@@ -127,6 +187,8 @@ Environment overrides (used by the tests, handy for odd setups):
 `CEC_HUB_INTEGRATIONS` (path to an integrations.json),
 `CEC_HUB_SOPS_DIR` (path to a sops folder) and
 `CEC_HUB_LENSES_DIR` (path to a lens CSV folder).
+`CHECKIN_FIXTURE=1` is passed through to the check-in engine (fake ZZTEST patients);
+the engine's live-write keys are never taken from the Hub's environment.
 
 Style rules baked into `static\style.css`: minimum 18px body text (19px used),
 1.6 line height, CEC greens (`#438F73` accents, `#0f2b21` headings, `#e8f2ee`

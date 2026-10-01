@@ -71,6 +71,8 @@ const routes = [
     { re: /^#\/stock$/, fn: renderStock },
     { re: /^#\/lenses$/, fn: renderLenses },
     { re: /^#\/recalls$/, fn: renderRecalls },
+    { re: /^#\/checkin$/, fn: renderCheckin },
+    { re: /^#\/checkin\/([0-9a-f]{32})$/, fn: (m) => renderCheckinCheck(m[1]) },
     { re: /^#\/scanner$/, fn: renderScanner },
     { re: /^#\/scanner-settings$/, fn: renderScanner },   // old link, same page
     { re: /^#\/scanner-help$/, fn: renderScannerHelp },
@@ -2266,6 +2268,453 @@ function wireRecallSendButton(out, d, month, touch) {
             note.textContent = e.message;
         }
         loadRecallBatch(out, true);
+    });
+}
+
+/* --- Check-in (iPad registration form) ---------------------------------------------- */
+/* Patient details show on these screens (practice network only, like the rest of
+   the Hub) but are never kept in the browser: no localStorage, no cookies, no
+   names in a URL. Searches go in a POST body. */
+
+async function ciCall(url, body) {
+    const res = await fetch(url, body === undefined ? { cache: "no-store" } : {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { status: res.status, data };
+}
+
+function ciBanner(d) {
+    if (d && d.dry_run === false) return "";
+    return `<div class="ci-banner">Test mode - nothing is saved to Optomate${
+        d && d.fixture ? " <span class=\"ci-banner-sub\">· fake ZZTEST patients</span>" : ""}</div>`;
+}
+
+const CI_CHIP = { "Not sent": "ci-chip-none", "On the iPad": "ci-chip-ipad",
+                  "Ready to check": "ci-chip-ready", "Saved": "ci-chip-saved" };
+
+function ciChip(status) {
+    return `<span class="ci-chip ${CI_CHIP[status] || "ci-chip-none"}">${esc(status)}</span>`;
+}
+
+function ciFormSelect(id, audience) {
+    return `<select class="ci-form" data-form-for="${esc(id)}" aria-label="Which form">
+        <option value="adult"${audience === "adult" ? " selected" : ""}>Adult</option>
+        <option value="child"${audience === "child" ? " selected" : ""}>Child</option></select>`;
+}
+
+let ciTimer = null;
+
+async function ciSend(payload, note) {
+    let r = await ciCall("/api/checkin/send", payload);
+    if (r.status === 409 && r.data.busy) {
+        const who = r.data.name || "someone";
+        const q = r.data.state === "filling"
+            ? `${who} is filling in the form on the iPad right now.\n\nReplace it? Their answers so far will be lost.`
+            : `The iPad is waiting for ${who}.\n\nReplace it?`;
+        if (!window.confirm(q)) return false;
+        r = await ciCall("/api/checkin/send", { ...payload, replace: true });
+    }
+    if (r.status !== 200 || r.data.error) {
+        note.innerHTML = errorPanel(r.data.error || "That didn't send.");
+        return false;
+    }
+    note.innerHTML = `<div class="ci-note">Sent to the iPad: <strong>${esc(r.data.name)}</strong></div>`;
+    return true;
+}
+
+function renderCheckin() {
+    view.innerHTML = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <div id="ci-banner"></div>
+        <h1 class="page-title">Check-in</h1>
+        <p class="page-sub">Send a patient's form to the iPad. When it comes back, check it and save.</p>
+        <div id="ci-slot"></div>
+        <div id="ci-note"></div>
+        <div class="card">
+            <form id="ci-find" class="ci-find">
+                <input id="ci-q" type="text" autocomplete="off" spellcheck="false"
+                       placeholder="Surname and first name" aria-label="Find a patient: surname and first name">
+                <button class="btn" type="submit">Find</button>
+                <button class="btn btn-quiet" type="button" id="ci-new">New patient</button>
+            </form>
+            <div id="ci-newpick" class="ci-newpick" hidden>
+                New patient - which form?
+                <button class="btn" data-new="adult">Adult</button>
+                <button class="btn" data-new="child">Child</button>
+            </div>
+            <div id="ci-found"></div>
+        </div>
+        <div class="card"><h2>Today</h2><div id="ci-today"><div class="loading-panel">Getting today's appointments…</div></div></div>
+        <div id="ci-waiting"></div>`;
+
+    const note = document.getElementById("ci-note");
+    const found = document.getElementById("ci-found");
+
+    document.getElementById("ci-find").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const q = document.getElementById("ci-q").value;
+        found.innerHTML = `<div class="ci-muted">Searching…</div>`;
+        const r = await ciCall("/api/checkin/search", { q });
+        if (r.status !== 200 || r.data.error) {
+            found.innerHTML = `<div class="ci-muted">${esc(r.data.error || "Search didn't work.")}</div>`;
+            return;
+        }
+        const ps = r.data.patients || [];
+        if (!ps.length) { found.innerHTML = `<div class="ci-muted">Nobody found. Check the spelling, or use New patient.</div>`; return; }
+        found.innerHTML = `<table class="ci-table">
+            <thead><tr><th>Patient</th><th>Born</th><th>Suburb</th><th>Form</th><th></th></tr></thead>
+            <tbody>${ps.map((p) => `<tr>
+                <td><strong>${esc(p.surname)}</strong>, ${esc(p.given)}</td>
+                <td class="ci-num">${esc(p.dob)}</td><td>${esc(p.suburb)}</td>
+                <td>${ciFormSelect("p" + p.id, ciIsChild(p.dob) ? "child" : "adult")}</td>
+                <td><button class="btn ci-send" data-pid="${esc(p.id)}">Send to iPad</button></td></tr>`).join("")}
+            </tbody></table>
+            ${r.data.more ? `<div class="ci-more">More matches - type more of the name</div>` : ""}`;
+        found.querySelectorAll("[data-pid]").forEach((b) => b.addEventListener("click", async () => {
+            const sel = found.querySelector(`[data-form-for="p${b.dataset.pid}"]`);
+            b.disabled = true;
+            if (await ciSend({ kind: "patient", patient_id: Number(b.dataset.pid), audience: sel.value }, note)) {
+                found.innerHTML = "";
+                document.getElementById("ci-q").value = "";
+                ciLoadToday();
+            }
+            b.disabled = false;
+        }));
+    });
+
+    const pick = document.getElementById("ci-newpick");
+    document.getElementById("ci-new").addEventListener("click", () => { pick.hidden = !pick.hidden; });
+    pick.querySelectorAll("[data-new]").forEach((b) => b.addEventListener("click", async () => {
+        if (await ciSend({ kind: "new", audience: b.dataset.new }, note)) {
+            pick.hidden = true;
+            ciLoadToday();
+        }
+    }));
+
+    ciLoadToday();
+    clearInterval(ciTimer);
+    ciTimer = setInterval(() => {
+        if (location.hash !== "#/checkin") { clearInterval(ciTimer); return; }
+        // don't redraw under someone choosing a form
+        if (document.activeElement && document.activeElement.tagName === "SELECT") return;
+        ciLoadToday(true);
+    }, 10000);
+}
+
+function ciIsChild(dob) {
+    const m = String(dob || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return false;
+    const now = new Date();
+    let age = now.getFullYear() - Number(m[3]);
+    if (now.getMonth() + 1 < Number(m[2]) || (now.getMonth() + 1 === Number(m[2]) && now.getDate() < Number(m[1]))) age--;
+    return age < 18;
+}
+
+async function ciLoadToday(quiet) {
+    const box = document.getElementById("ci-today");
+    if (!box) return;
+    let r;
+    try { r = await ciCall("/api/checkin/today"); } catch (e) {
+        if (!quiet) box.innerHTML = errorPanel("The Hub didn't answer.");
+        return;
+    }
+    const d = r.data || {};
+    document.getElementById("ci-banner").innerHTML = ciBanner(d);
+    if (d.connected === false) { box.innerHTML = `<div class="empty-panel">${esc(d.message || d.error)}</div>`; return; }
+    if (d.error) { box.innerHTML = `<div class="empty-panel">${esc(d.error)}</div>`; return; }
+
+    const slot = document.getElementById("ci-slot");
+    slot.innerHTML = !d.ipad_ready
+        ? `<div class="ci-slot ci-slot-warn">The iPad isn't set up yet: no device key in config\\integrations.json (README, "iPad setup").</div>`
+        : d.ipad
+            ? `<div class="ci-slot">On the iPad now: <strong>${esc(d.ipad.name)}</strong>
+                ${d.ipad.state === "filling" ? "- filling in the form" : "- waiting to start"}
+                <button class="btn btn-quiet ci-small" data-off="${esc(d.ipad.token)}">Take it off the iPad</button></div>`
+            : `<div class="ci-slot">The iPad is free.</div>`;
+
+    const rows = d.appointments || [];
+    box.innerHTML = rows.length ? `<table class="ci-table">
+        <thead><tr><th>Time</th><th>Patient</th><th>Form</th><th>Status</th><th></th></tr></thead>
+        <tbody>${rows.map((a) => {
+            const form = a.status === "Not sent" ? ciFormSelect("a" + a.appointment_id, a.audience)
+                : (a.audience === "child" ? "Child" : "Adult");
+            let btn = "";
+            if (a.status === "Not sent") btn = `<button class="btn ci-send" data-aid="${esc(a.appointment_id)}">Send to iPad</button>`;
+            else if (a.status === "Ready to check" && a.token) btn = `<a class="btn" href="#/checkin/${esc(a.token)}">Check</a>`;
+            else if (a.status === "On the iPad" && a.token) btn = `<button class="btn btn-quiet ci-small" data-off="${esc(a.token)}">Take it off</button>`;
+            return `<tr class="${a.status === "Saved" ? "ci-row-done" : ""}">
+                <td class="ci-num"><strong>${esc(a.time)}</strong></td>
+                <td>${esc(a.name)}${a.has_exam_today ? ` <span class="ci-muted">· exam open</span>` : ""}</td>
+                <td>${form}</td><td>${ciChip(a.status)}</td><td>${btn}</td></tr>`;
+        }).join("")}</tbody></table>`
+        : `<div class="ci-muted">No appointments today.</div>`;
+
+    const waiting = d.waiting || [];
+    document.getElementById("ci-waiting").innerHTML = waiting.length ? `<div class="card">
+        <h2>Also waiting to check (${waiting.length})</h2>
+        <table class="ci-table"><tbody>${waiting.map((w) => `<tr>
+            <td class="ci-num">${esc(ciWhen(w.submitted))}</td>
+            <td>${esc(w.name)}</td><td>${w.audience === "child" ? "Child" : "Adult"}</td>
+            <td>${ciChip("Ready to check")}</td>
+            <td><a class="btn" href="#/checkin/${esc(w.token)}">Check</a></td></tr>`).join("")}
+        </tbody></table></div>` : "";
+
+    const note = document.getElementById("ci-note");
+    box.querySelectorAll("[data-aid]").forEach((b) => b.addEventListener("click", async () => {
+        const sel = box.querySelector(`[data-form-for="a${b.dataset.aid}"]`);
+        b.disabled = true;
+        await ciSend({ kind: "appointment", appointment_id: Number(b.dataset.aid),
+                       audience: sel ? sel.value : "" }, note);
+        ciLoadToday(true);
+    }));
+    view.querySelectorAll("[data-off]").forEach((b) => b.addEventListener("click", async () => {
+        if (!window.confirm("Take this form off the iPad? Anything typed so far is lost.")) return;
+        await ciCall(`/api/checkin/session/${b.dataset.off}/discard`, {});
+        ciLoadToday(true);
+    }));
+}
+
+function ciWhen(iso) {
+    const t = iso ? new Date(iso) : null;
+    if (!t || isNaN(t)) return "";
+    const today = new Date().toDateString() === t.toDateString();
+    const hm = t.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+    return today ? hm : `${t.toLocaleDateString("en-AU")} ${hm}`;
+}
+
+/* --- Check screen ------------------------------------------------------------------ */
+
+const CI_BOXES = [["complaint", "Reason for visit"], ["general_health", "General health"],
+                  ["past_ocular", "Past ocular history"], ["family_ocular", "Family ocular history"]];
+
+let ciChooseOptom = false;
+
+function ciHeadline(plan) {
+    if (!plan.can_save) return "Can't save yet.";
+    const parts = [];
+    const n = (plan.patient_changes || []).filter((c) => c.accepted).length;
+    const ex = (plan.exam || {}).action;
+    if (!n && !plan.is_new_patient && ex === "none" && !plan.notes_append) return "Nothing to change.";
+    if (plan.is_new_patient) parts.push("A new patient record will be made.");
+    else if (n) parts.push(`${n} change${n === 1 ? "" : "s"} to the patient record.`);
+    else parts.push("No changes to the patient record.");
+    if (ex === "create") parts.push("Exam history will be added.");
+    if (ex === "exists") parts.push("Exam already open - copy the history in by hand.");
+    if (plan.notes_append) parts.push("A dated note is added.");
+    return parts.join(" ");
+}
+
+function ciCopy(text, btn) {
+    const done = () => { btn.textContent = "Copied"; setTimeout(() => { btn.textContent = "Copy"; }, 1500); };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done, () => ciCopyFallback(text, done));
+    } else {
+        ciCopyFallback(text, done);
+    }
+}
+
+function ciCopyFallback(text, done) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); done(); } catch (e) { window.alert("Select the text and copy it by hand."); }
+    ta.remove();
+}
+
+function ciWouldSave(plan) {
+    const w = plan.writes || {};
+    const labels = {};
+    (plan.patient_changes || []).forEach((c) => { labels[c.optomate_field] = c.label; });
+    const name = (f) => f === "GENERAL_NOTES" ? "Patient notes (dated block)" : (labels[f] || f);
+    const items = [];
+    if (w.post_patient) items.push(`Make a new patient record: ${Object.keys(w.post_patient)
+        .filter((f) => labels[f]).map(name).join(", ")}`);
+    if (w.patch_patient) items.push(`Update the patient record: ${Object.keys(w.patch_patient).map(name).join(", ")}`);
+    if (w.patch_untested) items.push(`Then, separately: ${Object.keys(w.patch_untested).map(name).join(", ")}`);
+    if (w.post_exam) items.push("Create today's exam with the history boxes shown above");
+    else if ((plan.exam || {}).action === "exists") items.push("Leave today's exam alone (already open)");
+    return items;
+}
+
+async function renderCheckinCheck(token, flash) {
+    if (flash === undefined) ciChooseOptom = false;     // fresh visit from the router
+    if (flash === undefined) view.innerHTML = `<div class="loading-panel">Getting the form…</div>`;
+    const y = window.scrollY;
+    const r = await ciCall(`/api/checkin/session/${token}`);
+    const d = r.data || {};
+    const back = `<a class="btn btn-quiet btn-back" href="#/checkin">← Check-in</a>`;
+    if (r.status !== 200 || d.connected === false) {
+        view.innerHTML = `${back}${errorPanel(d.error || d.message || "That form isn't here.")}`;
+        return;
+    }
+    const s = d.session || {};
+    if (s.state !== "submitted") {
+        view.innerHTML = `${back}${ciBanner(d)}<h1 class="page-title">${esc(s.name)}</h1>
+            <div class="empty-panel">This form is still on the iPad.</div>`;
+        return;
+    }
+    if (d.error || !d.plan) {
+        view.innerHTML = `${back}${ciBanner(d)}<h1 class="page-title">${esc(s.name)}</h1>${errorPanel(d.error || "No plan.")}`;
+        return;
+    }
+    const plan = d.plan;
+    const optoms = d.optometrists || [];
+    const optom = optoms.find((o) => o.id === s.optometrist_id);
+    const changes = plan.patient_changes || [];
+    const unchanged = plan.unchanged || [];
+    const exam = plan.exam || {};
+    const blockers = plan.blockers || [];
+    const warnings = (plan.warnings || []).filter((w) => !blockers.includes(w));
+    const live = d.dry_run === false;
+
+    const optomHTML = (!s.optometrist_id || ciChooseOptom)
+        ? `<div class="ci-optom">Optometrist
+            <select id="ci-optom"><option value="">Pick…</option>${optoms.map((o) =>
+                `<option value="${esc(o.id)}"${o.id === s.optometrist_id ? " selected" : ""}>${esc(o.name)}</option>`).join("")}
+            </select></div>`
+        : `<div class="ci-optom">Optometrist: <strong>${esc(optom ? optom.name : "#" + s.optometrist_id)}</strong>
+            <button class="btn btn-quiet ci-small" id="ci-optom-change">Change</button></div>`;
+
+    const dupes = plan.duplicates || [];
+    const confirmed = !!(s.overrides || {}).confirm_new_patient;
+    const dupHTML = dupes.length ? `<div class="card ci-dupes">
+        <h2>This person may already be in Optomate</h2>
+        <table class="ci-table"><tbody>${dupes.map((p) => `<tr>
+            <td class="ci-num"><strong>${esc(p.id)}</strong></td>
+            <td><strong>${esc(p.surname)}</strong>, ${esc(p.given)}</td>
+            <td class="ci-num">${esc(p.dob)}</td><td>${esc(p.suburb)}</td>
+            <td><button class="btn" data-use="${esc(p.id)}">Use this record</button></td></tr>`).join("")}
+        </tbody></table>
+        <p class="ci-dupe-new">${confirmed ? "You chose: make a new patient."
+            : `<button class="btn btn-quiet" id="ci-create-new">Create a new patient</button>`}</p></div>` : "";
+
+    const changeRows = changes.map((c) => `<tr class="ci-changed${c.accepted ? "" : " ci-kept"}">
+        <td><strong>${esc(c.label)}</strong>${c.untested_write ? ` <span class="ci-tag">untested</span>` : ""}</td>
+        <td>${esc(c.old) || `<span class="ci-muted">blank</span>`}</td>
+        <td><input class="ci-edit" data-field="${esc(c.field)}" value="${esc(c.new)}" aria-label="New ${esc(c.label)}"></td>
+        <td class="ci-tick"><input type="checkbox" data-accept="${esc(c.field)}"${c.accepted ? " checked" : ""}
+            aria-label="Save ${esc(c.label)}"></td></tr>`).join("");
+
+    const examHTML = exam.action === "none"
+        ? `<p class="ci-muted">Nothing for the exam history.</p>`
+        : `${exam.action === "exists"
+            ? `<p class="ci-warnline">An exam is already open for today, so the history will NOT be written. Copy each box in by hand.</p>`
+            : `<p class="ci-muted">Added to today's exam exactly like this:</p>`}
+           <div class="ci-boxes">${CI_BOXES.map(([k, label]) => {
+               const text = (exam.notes || {})[k] || "";
+               return `<div class="ci-box"><div class="ci-box-head">${esc(label)}
+                   ${exam.action === "exists" && text ? `<button class="btn btn-quiet ci-small" data-copy="${k}">Copy</button>` : ""}</div>
+                   <div class="ci-box-text">${text ? esc(text) : `<span class="ci-muted">nothing</span>`}</div></div>`;
+           }).join("")}</div>`;
+
+    view.innerHTML = `${back}${ciBanner(d)}
+        ${flash ? `<div class="ci-flash">${esc(flash)}</div>` : ""}
+        <h1 class="page-title">${esc(s.name)}${plan.is_new_patient ? ` <span class="ci-tag">new patient</span>` : ""}</h1>
+        <div class="ci-answer${plan.can_save ? "" : " ci-answer-stop"}">${esc(ciHeadline(plan))}</div>
+        ${blockers.length ? `<ul class="ci-blockers">${blockers.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
+        ${optomHTML}
+        ${dupHTML}
+        <div class="card">
+            <h2>Patient record</h2>
+            ${changes.length ? `<table class="ci-table ci-diff">
+                <thead><tr><th>Field</th><th>In Optomate now</th><th>From the form</th><th>Save?</th></tr></thead>
+                <tbody>${changeRows}</tbody></table>
+                <p class="ci-muted ci-hint">Untick to keep what Optomate has. Edit the new value if it's wrong.</p>`
+                : `<p class="ci-muted">No changes from the form.</p>`}
+            ${unchanged.length ? `<details class="ci-fold"><summary>No change (${unchanged.length})</summary>
+                <table class="ci-table"><tbody>${unchanged.map((u) => `<tr><td>${esc(u.label)}</td>
+                    <td>${esc(u.value) || `<span class="ci-muted">blank</span>`}</td></tr>`).join("")}</tbody></table>
+                </details>` : ""}
+        </div>
+        <div class="card"><h2>Today's exam history</h2>${examHTML}</div>
+        ${plan.notes_append ? `<div class="card"><h2>Patient notes - added to the end</h2>
+            <div class="ci-box-text ci-notes">${esc(plan.notes_append)}</div></div>` : ""}
+        ${warnings.length ? `<div class="card"><h2>Check</h2><ul class="ci-warnings">${warnings.map((w) =>
+            `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
+        <p class="ci-pdf"><a href="/checkin/pdf/${esc(s.token)}" target="_blank" rel="noopener">Signed form (PDF)</a></p>
+        <div class="ci-savebar">
+            <button class="btn ci-save" id="ci-save"${plan.can_save ? "" : " disabled"}>
+                ${live ? "Save to Optomate" : "Test save (nothing is written)"}</button>
+            <button class="btn btn-quiet" id="ci-discard">Discard this form</button>
+        </div>
+        <div id="ci-result">${s.test_saved && !live ? `<p class="ci-muted">Test-saved at ${esc(ciWhen(s.test_saved))}. Nothing was written.</p>` : ""}</div>`;
+    window.scrollTo(0, flash ? 0 : y);
+
+    const override = async (body) => {
+        const yy = window.scrollY;
+        const rr = await ciCall(`/api/checkin/session/${token}/override`, body);
+        if (rr.status !== 200 || rr.data.error) {
+            window.alert(rr.data.error || "That didn't work.");
+        }
+        await renderCheckinCheck(token, "");
+        window.scrollTo(0, yy);
+    };
+
+    view.querySelectorAll("[data-accept]").forEach((b) => b.addEventListener("change", () =>
+        override({ action: b.checked ? "accept" : "reject", field: b.dataset.accept })));
+    view.querySelectorAll(".ci-edit").forEach((inp) => inp.addEventListener("change", () =>
+        override({ action: "edit", field: inp.dataset.field, value: inp.value })));
+    const sel = document.getElementById("ci-optom");
+    if (sel) sel.addEventListener("change", () => {
+        if (!sel.value) return;
+        ciChooseOptom = false;
+        override({ action: "optometrist", optometrist_id: Number(sel.value) });
+    });
+    const ch = document.getElementById("ci-optom-change");
+    if (ch) ch.addEventListener("click", () => { ciChooseOptom = true; renderCheckinCheck(token, ""); });
+    view.querySelectorAll("[data-use]").forEach((b) => b.addEventListener("click", () =>
+        override({ action: "use_record", patient_id: Number(b.dataset.use) })));
+    const cn = document.getElementById("ci-create-new");
+    if (cn) cn.addEventListener("click", () => override({ action: "create_new" }));
+    view.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", () =>
+        ciCopy((exam.notes || {})[b.dataset.copy] || "", b)));
+
+    document.getElementById("ci-discard").addEventListener("click", async () => {
+        if (!window.confirm("Discard this form? The answers and signature are deleted. Nothing goes into Optomate.")) return;
+        await ciCall(`/api/checkin/session/${token}/discard`, {});
+        location.hash = "#/checkin";
+    });
+
+    const saveBtn = document.getElementById("ci-save");
+    saveBtn.addEventListener("click", async () => {
+        if (live && !window.confirm("Save this form into Optomate now? This writes to the patient's record.")) return;
+        saveBtn.disabled = true;
+        const out = document.getElementById("ci-result");
+        out.innerHTML = `<p class="ci-muted">${live ? "Saving…" : "Test saving…"}</p>`;
+        const rr = await ciCall(`/api/checkin/session/${token}/save`, { hash: plan.hash });
+        const res = rr.data || {};
+        if (rr.status === 409 && res.changed) {
+            renderCheckinCheck(token, "The record changed - check it again. The screen now shows what Optomate holds.");
+            return;
+        }
+        if (res.dry_run === true && res.would_save) {
+            const items = ciWouldSave(res.would_save);
+            out.innerHTML = `<div class="card ci-done">
+                <h2>Test save done - nothing was written to Optomate.</h2>
+                <p>A real save would:</p>
+                <ul>${items.map((i) => `<li>${esc(i)}</li>`).join("")}
+                    <li>Keep the signed form: ${esc(String(res.pdf || "").split(/[\\/]/).pop())}</li></ul></div>`;
+            saveBtn.disabled = false;
+            return;
+        }
+        if (res.dry_run === false && res.saved) {
+            view.innerHTML = `${back}<h1 class="page-title">Saved to Optomate.</h1>
+                ${(res.warnings || []).length ? `<div class="card"><h2>Check</h2><ul class="ci-warnings">${
+                    res.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
+                <p><a class="btn" href="#/checkin">Back to today</a></p>`;
+            return;
+        }
+        out.innerHTML = errorPanel(res.error || "The save didn't finish. Check the patient in Optomate.")
+            + (res.dry_run === false ? `<p style="margin-top:12px"><button class="btn" id="ci-recheck">Check it again</button></p>` : "");
+        const rc = document.getElementById("ci-recheck");
+        if (rc) rc.addEventListener("click", () => renderCheckinCheck(token, "Checked again against Optomate."));
+        saveBtn.disabled = !plan.can_save || res.dry_run === false;
     });
 }
 

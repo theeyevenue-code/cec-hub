@@ -2,6 +2,13 @@
   "_readme": "Home-screen tiles. Edit names/descriptions freely — the app reads this file fresh on every page load. 'link' starting with #/ opens a Hub page; a full http link opens in a new tab (external: true).",
   "tiles": [
     {
+      "id": "checkin",
+      "icon": "",
+      "name": "Check-in",
+      "description": "Send a patient's form to the iPad, then check it and save it to Optomate",
+      "link": "#/checkin"
+    },
+    {
       "id": "todo",
       "icon": "✅",
       "name": "To-do list",

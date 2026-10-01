@@ -6,13 +6,19 @@
     "config": "C:\\Claude\\Claude Code\\CEC-Review-Bot\\cec-review-bot\\config.json"
   },
   "optomate_agent": {
+    "agent_dir": "C:\\CEC\\CEC-Optomate-Agent",
     "proposals_dir": "C:\\CEC\\CEC-Optomate-Agent\\inventory\\proposals",
     "lens_jobs": "C:\\CEC\\CEC-Optomate-Agent\\logs\\lens-jobs.jsonl",
-    "logs_dir": "C:\\CEC\\CEC-Optomate-Agent\\logs"
+    "logs_dir": "C:\\CEC\\CEC-Optomate-Agent\\logs",
+    "_agent_dir_note": "Root of the Optomate agent. The Recalls and Check-in tiles run its engines from here (python -m recall... / python -m checkin.cli ...)."
   },
   "second_brain": {
     "dir": "C:\\Claude\\Claude Code\\Claude Second Brain",
     "_dir_note": "Root of the Second Brain clone on this machine. The Scanner page reads tools\\scanner-card\\scanner-card.partial.html out of it on every page load, so `git pull` there is the whole update: no copy, no restart. On the practice server the clone is at C:\\Users\\ConcordeyecareServer\\Claude\\cec-second-brain."
   },
-  "scorecard_drop": "C:\\Claude\\Claude Code\\Claude Second Brain\\scorecard-drop"
+  "scorecard_drop": "C:\\Claude\\Claude Code\\Claude Second Brain\\scorecard-drop",
+  "checkin": {
+    "ipad_key": "CHANGE-ME-to-a-long-random-string",
+    "_note": "The reception iPad's device key. Make one with:  python -c \"import secrets; print(secrets.token_urlsafe(24))\"  then open http://<server>:5680/checkin/ipad#<the key> on the iPad and Add to Home Screen (README, 'iPad setup'). Every iPad call must carry it; while this is the placeholder (or shorter than 16 characters) the iPad shows 'Not set up yet'. Changing it locks out the old iPad link."
+  }
 }

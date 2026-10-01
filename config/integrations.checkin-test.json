@@ -1,0 +1,9 @@
+{
+  "_readme": "TEST COPY ONLY (RUN-CHECKIN-TEST.bat, 127.0.0.1:5699, CHECKIN_FIXTURE=1 = fake ZZTEST patients). Points the Check-in tile at the engine worktree. The key below is a throw-away test key - never use it on the real iPad or in config/integrations.json.",
+  "optomate_agent": {
+    "agent_dir": "C:\\CEC\\wt-checkin"
+  },
+  "checkin": {
+    "ipad_key": "zztest-ipad-key-not-for-real-use"
+  }
+}
