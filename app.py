@@ -1,7 +1,10 @@
 """CEC Hub — Concord Eyecare's staff home screen. Flask app on port 5680.
 
-Big tiles, big text, plain words. No accounts, no patient data — Optomate
-stays the system of record; this is the procedures-and-buttons layer.
+Big tiles, big text, plain words. No accounts. Optomate stays the system of
+record; this is the procedures-and-buttons layer. The Check-in tile shows
+patient details on screen (and the reception iPad) but stores the form only in
+the Optomate agent's git-ignored local-reports\\checkin\\ folder and never
+logs it — see hub/checkin.py.
 
 Everything the Hub knows about OTHER systems comes from
 config\\integrations.json, and every one of those connections degrades
@@ -13,9 +16,9 @@ import logging
 import os
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_file, send_from_directory
 
-from hub import integrations, lenses, sop_parser
+from hub import checkin, integrations, lenses, sop_parser
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,8 +31,10 @@ logging.basicConfig(
 logger = logging.getLogger("cec-hub")
 
 app = Flask(__name__, static_folder="static", static_url_path="/")
+app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024   # a signed iPad form is well under this
 
 BASE_DIR = Path(__file__).parent
+IPAD_DIR = BASE_DIR / "ipad"                       # the iPad page's own files (no Hub links)
 EXAMPLE_CONFIG_DIR = BASE_DIR / "config"          # the committed *.example.json templates
 CONFIG_DIR = Path(os.getenv("CEC_HUB_CONFIG_DIR", str(EXAMPLE_CONFIG_DIR)))
 
@@ -321,6 +326,126 @@ def recall_preview_file(month, touch):
         return ("That preview hasn't been made yet — press "
                 "\"Show me who would get a text\" first.", 404)
     return send_from_directory(path.parent, path.name)
+
+
+# --- Check-in (iPad registration form) ---------------------------------------
+# Routes only; the logic is hub/checkin.py. Patient details pass through these
+# responses to staff screens and the iPad, never into hub.log: nothing below
+# logs a request body, and names travel in POST bodies, never in a URL.
+
+def _no_store(resp):
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+def _json(status_and_body):
+    status, body = status_and_body
+    return _no_store(jsonify(body)), status
+
+
+@app.route("/api/checkin/today")
+def checkin_today():
+    return _no_store(jsonify(checkin.today(_integrations())))
+
+
+@app.route("/api/checkin/search", methods=["POST"])
+def checkin_search():
+    data = request.get_json(silent=True) or {}
+    out = checkin.search(_integrations(), data.get("q", ""))
+    return _no_store(jsonify(out)), (400 if out.get("error") else 200)
+
+
+@app.route("/api/checkin/send", methods=["POST"])
+def checkin_send():
+    return _json(checkin.send(_integrations(), request.get_json(silent=True) or {}))
+
+
+@app.route("/api/checkin/session/<token>")
+def checkin_session(token):
+    return _json(checkin.detail(_integrations(), token))
+
+
+@app.route("/api/checkin/session/<token>/override", methods=["POST"])
+def checkin_override(token):
+    return _json(checkin.override(_integrations(), token, request.get_json(silent=True) or {}))
+
+
+@app.route("/api/checkin/session/<token>/save", methods=["POST"])
+def checkin_save(token):
+    data = request.get_json(silent=True) or {}
+    return _json(checkin.save(_integrations(), token, data.get("hash", ""), _staff_name()))
+
+
+@app.route("/api/checkin/session/<token>/discard", methods=["POST"])
+def checkin_discard(token):
+    return _json(checkin.discard(_integrations(), token))
+
+
+@app.route("/checkin/pdf/<token>")
+def checkin_pdf(token):
+    """The signed form as a PDF (built on request). Served only from inside the
+    engine's checkin folder."""
+    path, err = checkin.pdf_file(_integrations(), token)
+    if path is None:
+        return _no_store(app.response_class(err, status=404, mimetype="text/plain"))
+    return _no_store(send_file(path, mimetype="application/pdf", max_age=0))
+
+
+# iPad: its own page and files, every API call needs the device key header.
+
+@app.route("/checkin/ipad")
+def checkin_ipad_page():
+    return _no_store(send_from_directory(IPAD_DIR, "index.html", max_age=0))
+
+
+@app.route("/checkin/ipad/<name>")
+def checkin_ipad_file(name):
+    if name not in ("ipad.js", "ipad.css"):
+        return ("Not found", 404)
+    return _no_store(send_from_directory(IPAD_DIR, name, max_age=0))
+
+
+def _ipad_cfg():
+    """(cfg, None) when the request carries the right device key, else
+    (cfg, error response)."""
+    cfg = _integrations()
+    if not checkin.ipad_key(cfg):
+        return cfg, (_no_store(jsonify({"setup": False, "error": "Not set up yet"})), 503)
+    if not checkin.key_ok(cfg, request.headers.get("X-Checkin-Key", "")):
+        return cfg, (_no_store(jsonify({"setup": False, "error": "Wrong device key"})), 401)
+    return cfg, None
+
+
+@app.route("/api/checkin/ipad/current")
+def checkin_ipad_current():
+    cfg, bad = _ipad_cfg()
+    if bad:
+        return bad
+    return _no_store(jsonify(checkin.ipad_current(cfg)))
+
+
+@app.route("/api/checkin/ipad/session/<token>")
+def checkin_ipad_session(token):
+    cfg, bad = _ipad_cfg()
+    if bad:
+        return bad
+    return _json(checkin.ipad_session(cfg, token))
+
+
+@app.route("/api/checkin/ipad/session/<token>/filling", methods=["POST"])
+def checkin_ipad_filling(token):
+    cfg, bad = _ipad_cfg()
+    if bad:
+        return bad
+    return _json(checkin.ipad_filling(cfg, token))
+
+
+@app.route("/api/checkin/ipad/session/<token>/submit", methods=["POST"])
+def checkin_ipad_submit(token):
+    cfg, bad = _ipad_cfg()
+    if bad:
+        return bad
+    return _json(checkin.ipad_submit(cfg, token, request.get_json(silent=True) or {}))
 
 
 @app.route("/api/attention")
