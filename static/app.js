@@ -2542,6 +2542,10 @@ function ciWouldSave(plan) {
     return items;
 }
 
+// Mark, 4 Oct 2026: Touch starts a NEW exam when the optometrist opens one, even when
+// today's exam already exists. Staff rule: open the exam check-in created.
+const CI_EXAM_RULE = "Open today's exam in Touch - don't start a new one.";
+
 async function renderCheckinCheck(token, flash) {
     if (flash === undefined) ciChooseOptom = false;     // fresh visit from the router
     if (flash === undefined) view.innerHTML = `<div class="loading-panel">Getting the form…</div>`;
@@ -2699,12 +2703,17 @@ async function renderCheckinCheck(token, flash) {
                 <h2>Test save done - nothing was written to Optomate.</h2>
                 <p>A real save would:</p>
                 <ul>${items.map((i) => `<li>${esc(i)}</li>`).join("")}
-                    <li>Keep the signed form: ${esc(String(res.pdf || "").split(/[\\/]/).pop())}</li></ul></div>`;
+                    <li>Keep the signed form: ${esc(String(res.pdf || "").split(/[\\/]/).pop())}</li></ul>
+                ${(res.would_save.exam || {}).action === "create" ? `<p class="ci-exam-rule">${esc(CI_EXAM_RULE)}</p>` : ""}</div>`;
             saveBtn.disabled = false;
             return;
         }
         if (res.dry_run === false && res.saved) {
+            // Mark, 4 Oct 2026: Touch starts a NEW exam when the optometrist opens one, even
+            // when today's already exists - so staff open the exam this save created.
+            const examMade = (res.steps || []).some((st) => st.step === "post_exam" && st.ok);
             view.innerHTML = `${back}<h1 class="page-title">Saved to Optomate.</h1>
+                ${examMade ? `<p class="ci-exam-rule">${esc(CI_EXAM_RULE)}</p>` : ""}
                 ${(res.warnings || []).length ? `<div class="card"><h2>Check these</h2><ul class="ci-warnings">${
                     res.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
                 <p><a class="btn" href="#/checkin">Back to today</a></p>`;

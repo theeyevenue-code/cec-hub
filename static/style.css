@@ -1554,3 +1554,4 @@ body.lens-mono main { background: #fafafa; }
 .ci-dupe-new { margin-top: 12px; }
 .tile-icon:empty { min-height: 46px; }   /* a tile without an icon (Check-in) keeps the grid even */
 #ci-today, #ci-found, #ci-waiting .card { overflow-x: auto; }   /* a narrow screen scrolls the table, never the page */
+.ci-exam-rule { font-size: 19px; font-weight: 700; margin: 14px 0 0; }
