@@ -113,8 +113,8 @@ input.short { max-width: 220px; }
 .picks { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .picks .opt { text-align: left; }
 
-.info { font-size: 22px; line-height: 1.5; border-left: 6px solid var(--ink);
-        padding: 6px 0 6px 18px; margin-top: 30px; }
+.info { font-size: 22px; line-height: 1.5; font-weight: 600;
+        padding: 0; margin-top: 30px; }
 /* Small print under the consent sentence (the collection notice). */
 /* The one-tap None above a typed answer (Medications). */
 .none-chip { margin-bottom: 12px; }
