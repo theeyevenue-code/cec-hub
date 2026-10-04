@@ -72,6 +72,10 @@ DEFAULT_TIMEOUT = 60
 
 NOT_CONNECTED = "The check-in engine isn't connected on this computer yet."
 
+# Engine `today` row keys that are for the iPad prefill only, never the staff
+# list: the online booking's reason text goes into the local session file.
+_PREFILL_ONLY_KEYS = ("booking_reason",)
+
 _lock = threading.RLock()
 _lists_cache = {"at": 0.0, "dir": None, "data": None}
 
@@ -390,6 +394,7 @@ def today(cfg: dict) -> dict:
         if s:
             used.add(s["token"])
         audience = (s or {}).get("audience") or ("child" if a.get("is_child") else "adult")
+        a = {k: v for k, v in a.items() if k not in _PREFILL_ONLY_KEYS}
         rows.append({**a, "name": " ".join(x for x in (a.get("given"), a.get("surname")) if x),
                      "audience": audience, "state": state,
                      "status": STATUS_WORDS.get(state, "Not sent"),
@@ -427,6 +432,7 @@ def send(cfg: dict, body: dict) -> tuple[int, dict]:
         return 400, {"error": "Pick Adult or Child."}
     pid = aid = opt_id = None
     prefill: dict = {}
+    booking_reason = ""
     if kind == "appointment":
         aid = _int(body.get("appointment_id"))
         if aid is None:
@@ -439,6 +445,9 @@ def send(cfg: dict, body: dict) -> tuple[int, dict]:
             return 404, {"error": "That appointment isn't on today's list any more. Refresh."}
         pid, opt_id = _int(row.get("patient_id")), _int(row.get("optometrist_id"))
         audience = audience or ("child" if row.get("is_child") else "adult")
+        # The online booking's reason pre-fills "What would you like from today's
+        # visit?" for the patient to confirm or edit. Session file only.
+        booking_reason = str(row.get("booking_reason") or "").strip()[:MAX_EDIT]
     elif kind == "patient":
         pid = _int(body.get("patient_id"))
         if pid is None:
@@ -455,6 +464,8 @@ def send(cfg: dict, body: dict) -> tuple[int, dict]:
             return 200, {"error": p["error"]}
         prefill = p.get("details") or {}
         audience = audience or ("child" if p.get("is_child") else "adult")
+    if booking_reason:
+        prefill = {**prefill, "booking_reason": booking_reason}
 
     with _lock:
         purge(cfg)
@@ -654,13 +665,22 @@ def _slot_session(cfg: dict, token) -> dict | None:
     return s if s and s.get("state") in SLOT_STATES else None
 
 
+def _questions(cfg: dict, s: dict) -> dict:
+    """The question set for this form. A form linked to an Optomate record asks
+    the engine to leave out its new-patient-only questions (occupation)."""
+    args = ["questions", "--audience", s["audience"]]
+    if s.get("patient_id"):
+        args.append("--existing")
+    return run_engine(cfg, *args)
+
+
 def ipad_session(cfg: dict, token) -> tuple[int, dict]:
     """Everything the iPad needs to show one form: the question set for this
     audience (rendered generically), pick lists, and the prefill."""
     s = _slot_session(cfg, token)
     if s is None:
         return 409, {"gone": True}
-    qs = run_engine(cfg, "questions", "--audience", s["audience"])
+    qs = _questions(cfg, s)
     if qs.get("error") or not isinstance(qs.get("questions"), dict):
         return 200, {"error": qs.get("error") or "No questions."}
     needed = {q.get("list") for sc in qs["questions"].get("screens") or []
@@ -751,7 +771,7 @@ def ipad_submit(cfg: dict, token, body: dict) -> tuple[int, dict]:
     if s is None:
         return 409, {"gone": True}
     # Required questions (from questions.json), checked here as well as on the iPad.
-    qs = run_engine(cfg, "questions", "--audience", s["audience"])
+    qs = _questions(cfg, s)
     screens = (qs.get("questions") or {}).get("screens") or []
     index = {q["id"]: q for sc in screens for q in sc.get("questions") or [] if q.get("id")}
     for sc in screens:

@@ -179,13 +179,21 @@
 
     function labelOf(q) { return q.label || ""; }
 
-    /* Fill an unanswered question from what Optomate already holds, only on a
-       screen marked "prefilled" (the details screen). */
+    /* Fill an unanswered question from the session prefill: on a screen marked
+       "prefilled" (the details screen) from what Optomate holds for q.field; on
+       any screen from q.prefill_from (e.g. the online booking's reason).
+       prefill_from: false = never seed (How heard must be the patient's tap). */
+    function prefillKey(sc, q) {
+        if (q.prefill_from === false) return null;
+        if (q.prefill_from) return q.prefill_from;
+        return sc.prefilled && q.field ? q.field : null;
+    }
+
     function seedPrefill(sc) {
-        if (!sc.prefilled) return;
         (sc.questions || []).forEach((q) => {
             if (Object.prototype.hasOwnProperty.call(S.answers, q.id)) return;
-            const v = q.field ? S.prefill[q.field] : undefined;
+            const key = prefillKey(sc, q);
+            const v = key ? S.prefill[key] : undefined;
             if (v === undefined || v === null || v === "") return;
             if (q.type === "choice" && !q.allow_other && !(q.options || []).includes(v)) return;
             if (q.type === "yesno" && v !== "Yes" && v !== "No") return;
@@ -250,7 +258,7 @@
                 return `<div class="${cls}">${lab}<input id="${id}" type="text" data-q="${esc(q.id)}"
                     value="${esc(v || "")}" ${inputAttrs(q)}${q.type === "number" ? ` class="short"` : ""}></div>`;
             case "longtext":
-                return `<div class="${cls}">${lab}<textarea id="${id}" data-q="${esc(q.id)}"
+                return `<div class="${cls}">${lab}${noneChip(q, v)}<textarea id="${id}" data-q="${esc(q.id)}"
                     ${inputAttrs(q)}>${esc(v || "")}</textarea></div>`;
             case "date": {
                 const p = dateParts(q);
@@ -294,7 +302,7 @@
                     data-list="${esc(q.list || "")}" value="${esc(v || "")}" ${inputAttrs(q)}
                     placeholder="Start typing"><div class="picks" id="picks-${esc(q.id)}"></div></div>`;
             case "info":
-                return `<div class="info">${esc(q.text || "")}</div>`;
+                return `<div class="info${q.style === "small" ? " small" : ""}">${esc(q.text || "")}</div>`;
             case "signature":
                 return `<div class="${cls}">${plain}<div class="sig-wrap">
                     <canvas class="sig" id="sig" aria-label="Signature box"></canvas>
@@ -303,6 +311,15 @@
             default:
                 return "";
         }
+    }
+
+    /* A one-tap answer on a typed question (questions.json none_option, e.g.
+       Medications: "None"). Tapping it fills the box; tapping again clears it. */
+    function noneChip(q, v) {
+        if (!q.none_option) return "";
+        const on = v === q.none_option;
+        return `<div class="opts none-chip"><button type="button" class="opt${on ? " on" : ""}"
+            data-pick="${esc(q.id)}" data-v="${esc(q.none_option)}">${esc(q.none_option)}</button></div>`;
     }
 
     function renderScreen(keepScroll) {

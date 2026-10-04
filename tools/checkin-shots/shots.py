@@ -65,37 +65,32 @@ try:
         snap("details-full", full=True)
         if WHAT == "landscape":
             click(b, "Skip")
-            snap("source")
-            for _ in range(6):
+            snap("today")
+            for _ in range(3):
                 click(b, "Skip")
-            snap("lifestyle")
+            snap("family-lifestyle")
             click(b, "Skip")
             snap("consent")
             sys.exit(0)
-        click(b, "Next")
+        # 6 screens (Mark's cut-down set, 4 Oct 2026): Details (How heard at the
+        # bottom) - Today - Eyes - Health - Family & lifestyle - Consent.
         click(b, "Friend")
-        snap("source-friend")
+        snap("details-friend", full=True)
         click(b, "Next")
-        typ(b, "textarea", "ZZTEST reason: blurry when reading.")
+        if not b.js("document.querySelector('textarea').value"):
+            typ(b, "textarea", "ZZTEST reason: blurry when reading.")
+        click(b, "I wear glasses" if WHAT == "adult" else "Glasses")
+        snap("today", full=True)
         click(b, "Next")
-        if WHAT == "adult":
-            b.js("document.querySelectorAll('[data-pick=glasses]')[0].click()")
-        else:
-            b.js("document.querySelectorAll('[data-pick=glasses]')[0].click()")
+        b.js("document.querySelector('[data-pick]').click()")
+        b.js("document.querySelector('[data-tick]').click()")
         snap("eyes", full=True)
         click(b, "Next")
-        b.js("document.querySelector('[data-tick]').click()")
-        snap("eye-health", full=True)
+        click(b, "None")
+        snap("health", full=True)
         click(b, "Next")
-        snap("medical")
-        snap("medical-full", full=True)
+        snap("family-lifestyle", full=True)
         click(b, "Next")
-        click(b, "Next")
-        snap("lifestyle", full=True)
-        click(b, "Next")
-        if WHAT == "child":
-            snap("development", full=True)
-            click(b, "Next")
         snap("consent")
         click(b, "Finish")
         snap("consent-unsigned-error", full=True)

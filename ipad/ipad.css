@@ -115,6 +115,11 @@ input.short { max-width: 220px; }
 
 .info { font-size: 22px; line-height: 1.5; border-left: 6px solid var(--ink);
         padding: 6px 0 6px 18px; margin-top: 30px; }
+/* Small print under the consent sentence (the collection notice). */
+/* The one-tap None above a typed answer (Medications). */
+.none-chip { margin-bottom: 12px; }
+.info.small { font-size: 17px; color: var(--muted, #444); border-left: 0; padding: 0;
+              margin-top: 12px; }
 
 .sig-wrap { position: relative; }
 canvas.sig { display: block; width: 100%; height: 280px; border: 2px solid var(--line);

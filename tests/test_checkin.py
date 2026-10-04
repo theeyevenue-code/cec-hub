@@ -33,7 +33,9 @@ SIG = "data:image/png;base64," + base64.b64encode(_png()).decode()
 
 QUESTIONS = {"version": "test-v1", "screens": [
     {"id": "details", "title": "Your details", "skippable": True, "prefilled": True, "questions": [
-        {"id": "given_name", "label": "Given name", "type": "text", "field": "given_name"}]},
+        {"id": "given_name", "label": "Given name", "type": "text", "field": "given_name"},
+        {"id": "occupation", "label": "Occupation", "type": "picklist", "list": "occupations",
+         "field": "occupation", "audience": "adult", "new_patient_only": True}]},
     {"id": "consent", "title": "Consent", "skippable": False, "questions": [
         {"id": "guardian_name", "label": "Parent or guardian's name", "type": "text", "required": True,
          "audience": "child"},
@@ -61,10 +63,11 @@ class FakeEngine:
             out.update(date=checkin._now().date().isoformat(), appointments=[
                 {"appointment_id": 1001, "time": "9:00 am", "patient_id": 99001, "given": "Adultone",
                  "surname": "ZZTEST", "is_child": False, "type": "CU", "optometrist_id": 5,
-                 "has_exam_today": False, "session_state": None},
+                 "has_exam_today": False, "session_state": None,
+                 "booking_reason": "Eye Exam - Existing Patient"},
                 {"appointment_id": 1002, "time": "9:30 am", "patient_id": 99002, "given": "Childone",
                  "surname": "ZZTEST", "is_child": True, "type": "MC", "optometrist_id": 5,
-                 "has_exam_today": False, "session_state": None}])
+                 "has_exam_today": False, "session_state": None, "booking_reason": ""}])
         elif cmd == "patient":
             pid = int(args[2])
             out.update(patient_id=pid, is_child=pid == 99002,
@@ -73,9 +76,11 @@ class FakeEngine:
                                 "dob": "01/06/2017" if pid == 99002 else "15/03/1980"})
         elif cmd == "questions":
             aud = args[2] if len(args) > 2 else "adult"
+            existing = "--existing" in args
             qs = json.loads(json.dumps(QUESTIONS))
             for s in qs["screens"]:
-                s["questions"] = [q for q in s["questions"] if q.get("audience", "both") in ("both", aud)]
+                s["questions"] = [q for q in s["questions"] if q.get("audience", "both") in ("both", aud)
+                                  and not (existing and q.get("new_patient_only"))]
             out.update(version="test-v1", questions=qs)
         elif cmd == "lists":
             out.update(sources=["Google"], occupations=["TEACHER"],
@@ -209,6 +214,35 @@ def test_send_appointment_makes_a_sent_session_with_prefill(world):
     assert s["optometrist_id"] == 5 and s["audience"] == "adult"
     assert s["prefill"]["given_name"] == "Adultone"
     assert checkin.ipad_current(world["cfg"]) == {"token": out["token"], "state": "sent"}
+
+
+def test_booking_reason_goes_to_the_session_prefill_not_the_staff_list(world):
+    _st, out = _send(world)
+    s = checkin.load_session(world["cfg"], out["token"])
+    assert s["prefill"]["booking_reason"] == "Eye Exam - Existing Patient"
+    assert checkin.ipad_session(world["cfg"], out["token"])[1]["prefill"]["booking_reason"] == \
+        "Eye Exam - Existing Patient"
+    rows = checkin.today(world["cfg"])["appointments"]
+    assert all("booking_reason" not in r for r in rows)
+    # no booking comment -> no key; a patient picked by search has no appointment
+    _st, out = checkin.send(world["cfg"], {"kind": "appointment", "appointment_id": 1002, "replace": True})
+    assert "booking_reason" not in checkin.load_session(world["cfg"], out["token"])["prefill"]
+    _st, out = checkin.send(world["cfg"], {"kind": "patient", "patient_id": 99001, "replace": True})
+    assert "booking_reason" not in checkin.load_session(world["cfg"], out["token"])["prefill"]
+
+
+def test_new_patient_only_questions_hidden_for_an_existing_record(world):
+    def ids(form):
+        return {q["id"] for sc in form["questions"]["screens"] for q in sc["questions"]}
+    _st, out = _send(world)                                          # 99001, on file
+    form = checkin.ipad_session(world["cfg"], out["token"])[1]
+    assert "occupation" not in ids(form) and "given_name" in ids(form)
+    q_call = [c for c in world["eng"].calls if c[3] == "questions"][-1]
+    assert q_call[4:] == ["--audience", "adult", "--existing"]
+    _st, out = checkin.send(world["cfg"], {"kind": "new", "audience": "adult", "replace": True})
+    form = checkin.ipad_session(world["cfg"], out["token"])[1]
+    assert "occupation" in ids(form)
+    assert [c for c in world["eng"].calls if c[3] == "questions"][-1][4:] == ["--audience", "adult"]
 
 
 def test_child_appointment_defaults_to_child_form_staff_can_override(world):
