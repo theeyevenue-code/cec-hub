@@ -118,7 +118,7 @@ input.short { max-width: 220px; }
 /* Small print under the consent sentence (the collection notice). */
 /* The one-tap None above a typed answer (Medications). */
 .none-chip { margin-bottom: 12px; }
-.info.small { font-size: 17px; color: var(--muted, #444); border-left: 0; padding: 0;
+.info.small { font-size: 17px; color: var(--muted, #444); border-left: 0; font-weight: 400; padding: 0;
               margin-top: 12px; }
 
 .sig-wrap { position: relative; }
