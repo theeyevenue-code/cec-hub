@@ -1731,6 +1731,8 @@ async function renderLenses() {
 
         <div class="card">
             <h2>Find the lens</h2>
+            <div id="lf-today" class="lf-today" hidden></div>
+            <div id="lf-patient"></div>
             <div class="lens-form">
                 <div class="field"><label for="lf-sph">Sphere</label>
                     <input id="lf-sph" inputmode="text" placeholder="-2.75" autocomplete="off"></div>
@@ -1778,6 +1780,10 @@ async function renderLenses() {
     const supplierPick = () => (document.querySelector('input[name="lf-sup"]:checked') || {}).value || "current";
 
     async function runFind() {
+        // A tapped patient + no typed sphere: Find re-checks that patient (e.g. after
+        // a blank size went in). Typing an Rx by hand takes over from the patient.
+        if (!sphEl.value.trim() && today.active()) { today.recheck(); return; }
+        today.clear();
         const params = new URLSearchParams();
         params.set("sph", sphEl.value.trim());
         params.set("kind", "Single vision");     // the finder is the stock-vs-grind question
@@ -1859,9 +1865,186 @@ async function renderLenses() {
             <button class="btn btn-quiet" id="lf-usesize" type="button">Use it</button>`;
         document.getElementById("lf-usesize").addEventListener("click", () => {
             blankEl.value = size;
+            today.recheck();   // a tapped patient's answer follows the new blank
         });
     }
     [aEl, dblEl, pdEl].forEach((el) => el.addEventListener("input", suggest));
+
+    const today = wireTodayPatients({ sells, blankEl, pdEl, resultsEl, suggest });
+    blankEl.addEventListener("change", () => today.recheck());
+}
+
+/* --- Today's patients (Mark, 5 Oct 2026) --------------------------------------------
+   The last few patients issued a spectacle script today, read from Optomate by the
+   agent. Tap a name: the ISSUED script fills in for both eyes and the two-eye check
+   runs. Given name + surname initial only — the bench may face patients. Every Rx
+   number is Optomate's own; the server works out a readers sphere (sphere + add)
+   and the binocular PD, and both always come with their working. */
+const RX_MODES = [["distance", "Distance"], ["readers", "Readers"], ["multifocal", "Multifocal"]];
+
+function todayTilesHTML(data) {
+    const ps = data.patients || [];
+    const head = `<div class="lf-today-head"><span class="lf-today-title">Today's patients</span>
+        ${data.fixture ? `<span class="chip">sample patients</span>` : ""}
+        <button class="btn btn-quiet lf-today-refresh" type="button">Refresh</button></div>`;
+    if (!ps.length) return head + `<p class="lf-today-note">No scripts or exams yet today.</p>`;
+    return head + `<div class="lf-today-row">${ps.map((p, i) => p.status === "script"
+        ? `<button type="button" class="lf-pt" data-i="${i}">
+              <span class="lf-pt-name">${esc(p.label)}</span>
+              <span class="lf-pt-meta">${esc([p.time, p.optom].filter(Boolean).join(" · "))}</span></button>`
+        : `<div class="lf-pt lf-pt-none">
+              <span class="lf-pt-name">${esc(p.label)}</span>
+              <span class="lf-pt-meta">${esc([p.time, p.optom].filter(Boolean).join(" · "))}</span>
+              <span class="lf-pt-word">No script issued</span></div>`).join("")}</div>
+        ${data.more ? `<p class="lf-today-note">Latest ${ps.length} shown. Anyone earlier: type the Rx below.</p>` : ""}`;
+}
+
+function rxTableHTML(p) {
+    const cell = (v) => v ? esc(v) : `<span class="lf-dash">—</span>`;
+    const row = (side, e) => e
+        ? `<tr><th>${side}</th><td>${cell(e.sph)}</td><td>${cell(e.cyl)}</td><td>${cell(e.axis)}</td>
+              <td>${cell(e.add)}</td><td>${cell(e.pd)}</td></tr>`
+        : `<tr><th>${side}</th><td colspan="5" class="lf-dash">Not on this script</td></tr>`;
+    return `<table class="lf-rx"><thead><tr><th></th><th>Sph</th><th>Cyl</th><th>Axis</th>
+        <th>Add</th><th>PD</th></tr></thead>
+        <tbody>${row("R", p.right)}${row("L", p.left)}</tbody></table>`;
+}
+
+// /api/lenses/check answers per product; the answer card was built for the finder's
+// option rows. Map one onto the other so a tapped patient gets the same card.
+function checkAsFind(res, kind) {
+    const blankOf = (o) => (o.blanks || []).length ? Math.max(...o.blanks) : null;
+    const asOpt = (o) => {
+        const warn = [...(o.warnings || [])];
+        if ((o.blanks || []).length > 1) warn.push(`the eyes come on different blanks (${o.blanks.join(" / ")}mm)`);
+        return { ...o, price_now: o.price, orderable: true, blank_mm: blankOf(o),
+                 category: o.category || kind, warnings: warn, best: false };
+    };
+    const same = (a, b) => a && b && a.supplier === b.supplier && a.name === b.name
+        && a.code === b.code && a.coating === b.coating && a.type === b.type;
+    const pickSrc = res.status === "stock" && res.best_stock ? res.best_stock : res.best;
+    const options = (res.options || []).map(asOpt);
+    let pick = options.find((o) => same(o, pickSrc));
+    if (!pick && pickSrc) { pick = asOpt(pickSrc); options.unshift(pick); }
+    if (pick) pick.best = true;
+    return { options, verdict: res.headline, supplier: "current" };
+}
+
+function wireTodayPatients(ctx) {
+    const box = document.getElementById("lf-today");
+    const panel = document.getElementById("lf-patient");
+    let data = null, active = null, mode = null;
+
+    function clear() {
+        if (active == null) return;
+        active = null; mode = null;
+        panel.innerHTML = "";
+        box.querySelectorAll(".lf-pt").forEach((t) => t.classList.remove("lf-pt-on"));
+    }
+
+    async function load() {
+        if (!data) {   // the Optomate read takes a couple of seconds: say so
+            box.hidden = false;
+            box.innerHTML = `<div class="lf-today-head"><span class="lf-today-title">Today's patients</span></div>
+                <p class="lf-today-note">Checking Optomate…</p>`;
+        }
+        let d;
+        try {
+            d = await getJSON("/api/lenses/recent");
+        } catch (e) {
+            if (!data) box.hidden = true;   // optional panel — never break the finder over it
+            return;
+        }
+        if (!d.connected) { box.hidden = true; return; }
+        box.hidden = false;
+        if (d.error) {
+            box.innerHTML = `<div class="lf-today-head"><span class="lf-today-title">Today's patients</span>
+                <button class="btn btn-quiet lf-today-refresh" type="button">Refresh</button></div>
+                <p class="lf-today-note">${esc(d.error)}</p>`;
+            return;
+        }
+        data = d;
+        clear();
+        box.innerHTML = todayTilesHTML(d);
+    }
+
+    async function check() {
+        const p = data && data.patients[active];
+        if (!p || !mode) return;
+        const m = p.modes[mode];
+        if (!m) return;
+        const body = { right: m.right || {}, left: m.left || {}, kind: m.kind };
+        if (m.add != null) body.add = m.add;
+        const blank = ctx.blankEl.value.trim();
+        if (blank) body.min_blank = blank;
+        const out = document.getElementById("lf-pt-results");
+        if (!out) return;
+        const label = { distance: "Distance", readers: "Readers", multifocal: "Multifocal" }[mode];
+        const notes = (m.notes || []).map((n) => `<li>${esc(n)}</li>`).join("");
+        const head = `<div class="lf-working"><span class="lf-working-mode">${esc(label)}</span>
+            ${String(m.line || "").split(" · ").map((l) => `<span class="lf-working-line">${esc(l)}</span>`).join("")}
+            ${m.cyl_note ? `<span class="lf-working-sub">${esc(m.cyl_note)}</span>` : ""}
+            ${mode === "multifocal" ? `<span class="lf-working-sub">Multifocals are made to order — this is the cheapest design that covers both eyes.</span>` : ""}
+            ${blank ? `<span class="lf-working-sub">Blank ≥ ${esc(blank)}mm</span>` : ""}
+            ${notes ? `<ul class="ans-notes">${notes}</ul>` : ""}</div>`;
+        out.innerHTML = head + `<div class="loading-panel">Checking the catalogue…</div>`;
+        let res;
+        try {
+            res = await postJSON("/api/lenses/check", body);
+        } catch (e) {
+            out.innerHTML = head + errorPanel(e.message);
+            return;
+        }
+        if (res.catalog_message) {
+            out.innerHTML = head + `<div class="empty-panel">${esc(res.catalog_message)}</div>`;
+            return;
+        }
+        out.innerHTML = head + answerCardHTML(checkAsFind(res, m.kind), ctx.sells);
+    }
+
+    function pick(i) {
+        const p = data && data.patients[i];
+        if (!p || p.status !== "script") return;
+        active = i; mode = null;
+        box.querySelectorAll(".lf-pt").forEach((t) => t.classList.toggle("lf-pt-on", +t.dataset.i === i));
+        ctx.resultsEl.innerHTML = "";
+        if (p.pd) {   // binocular PD into the blank helper
+            ctx.pdEl.value = p.pd.value;
+            ctx.suggest();
+        }
+        const flags = (p.flags || []).map((f) => `<li>${esc(f)}</li>`).join("");
+        panel.innerHTML = `<div class="lf-pt-panel">
+            <div class="lf-pt-panel-head"><strong>${esc(p.label)}</strong>
+                <span>${esc([p.time, p.optom].filter(Boolean).join(" · "))} · issued script</span>
+                <button class="btn btn-quiet lf-pt-clear" type="button">Clear</button></div>
+            ${rxTableHTML(p)}
+            ${p.pd ? `<p class="lf-pt-pd">${esc(p.pd.line)} — filled into the blank helper</p>` : ""}
+            ${flags ? `<ul class="ans-notes lf-flags">${flags}</ul>` : ""}
+            ${!p.checkable ? `<p class="lf-today-note">No power on this script that can be checked — look at it in Optomate.</p>`
+              : p.has_add ? `<div class="lf-mode-q">This script has an add. Making:</div>
+                <div class="lf-supplier lf-modes" role="radiogroup" aria-label="What are we making">
+                ${RX_MODES.map(([v, t]) => `<label class="lf-radio"><input type="radio" name="lf-mode" value="${v}"><span>${t}</span></label>`).join("")}
+                </div>` : ""}
+            <div id="lf-pt-results"></div>
+        </div>`;
+        if (p.checkable && !p.has_add) { mode = "distance"; check(); }
+    }
+
+    box.addEventListener("click", (e) => {
+        if (e.target.closest(".lf-today-refresh")) { load(); return; }
+        const t = e.target.closest("button.lf-pt");
+        if (t) pick(+t.dataset.i);
+    });
+    panel.addEventListener("click", (e) => {
+        if (e.target.closest(".lf-pt-clear")) { clear(); ctx.resultsEl.innerHTML = ""; }
+    });
+    panel.addEventListener("change", (e) => {
+        if (e.target.name === "lf-mode") { mode = e.target.value; check(); }
+    });
+
+    load();
+    return { clear, active: () => active != null,
+             recheck: () => { if (active != null && mode) check(); } };
 }
 
 /* --- Recalls (v1: look only — nothing can be sent from here) ----------------------- */

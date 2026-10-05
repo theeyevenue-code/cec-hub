@@ -1022,7 +1022,7 @@ def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
 
     # A product covers the job when EVERY eye matches one of its rows.
     covering = None
-    details, warnings, thick = {}, {}, {}
+    details, warnings, thick, blanks = {}, {}, {}, {}
     for result in eyes.values():
         keys = set()
         for option in result["options"]:
@@ -1031,6 +1031,8 @@ def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
             key = _product_key(option)
             keys.add(key)
             details.setdefault(key, option)
+            if option.get("blank_mm") is not None:
+                blanks.setdefault(key, set()).add(option["blank_mm"])
             warnings.setdefault(key, []).extend(option.get("warnings") or [])
             # too thick for either eye = too thick for the job
             thick[key] = thick.get(key, False) or bool(option.get("under_index"))
@@ -1051,6 +1053,10 @@ def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
             "warnings": seen, "under_index": thick.get(key, False),
             "standard_coating": bool(o.get("standard_coating", True)),
             "plain": bool(o.get("plain", True)),
+            # every blank this product comes on across the eyes (a stock band
+            # can put the two eyes on different blanks)
+            "blanks": sorted(blanks.get(key, ())),
+            "category": normalise_category(o.get("category", "")),
         })
     # Same order as the finder: right thickness first (a 1.50 that only
     # technically covers a -5.00 job is not the answer), the coating we
@@ -1131,6 +1137,7 @@ def check_job(lenses: list, right: dict | None = None, left: dict | None = None,
                  for label, result in eyes.items()},
         "options": products[:10],
         "best": best,
+        "best_stock": best_stock,
         "chosen": chosen_out,
     }
 

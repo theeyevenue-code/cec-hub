@@ -470,6 +470,23 @@ def lenses_check():
     return jsonify(result)
 
 
+@app.route("/api/lenses/recent")
+def lenses_recent():
+    """Today's patients: the last few issued spectacle scripts (and anyone
+    examined today with none), read from Optomate by the agent. Given name +
+    surname initial only; served no-store; nothing about a patient is logged.
+
+    Fixed arguments only. A test copy can point at a past clinic day or at
+    fictional patients with CEC_HUB_RECENT_RX_DATE / CEC_HUB_RECENT_RX_FIXTURE
+    (environment, never the URL)."""
+    from hub import recent_rx
+    day = os.getenv("CEC_HUB_RECENT_RX_DATE", "").strip()
+    fixture = os.getenv("CEC_HUB_RECENT_RX_FIXTURE", "").strip().lower() in ("1", "true", "yes")
+    resp = jsonify(recent_rx.recent(_integrations(), recent_rx.DEFAULT_N, day, fixture))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @app.route("/api/lenses/jobs")
 def lenses_jobs():
     """Recent Optomate spectacle jobs (from the agent's lens-jobs.jsonl),

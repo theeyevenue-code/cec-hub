@@ -292,6 +292,16 @@ def test_check_job_flags_grind_when_stock_possible():
     assert result["chosen"]["code_known"] is False
 
 
+def test_check_job_reports_blanks_category_and_best_stock():
+    # Today's patients renders the check with the finder's answer card, which
+    # needs the blank, the lens type and the stock pick (5 Oct 2026).
+    result = lenses.check_job(_sample(), right={"sph": -3.0}, left={"sph": -5.0})
+    best = result["best"]
+    assert best["blanks"] == [75.0]
+    assert best["category"] == "Single vision"
+    assert result["best_stock"]["type"] == "stock"
+
+
 def test_check_job_without_rx():
     result = lenses.check_job(_sample())
     assert result["status"] == "no_rx"

@@ -96,6 +96,18 @@ price files — in range? blank big enough? marked Grind when a stock lens
 would do? The same check is callable at `POST /api/lenses/check` for any
 future helper. It's a second pair of eyes only — it never changes an order.
 
+**Today's patients** (top of Find the lens, Mark 5 Oct 2026): the last 3
+patients issued a spectacle script today (anyone examined with no script shows
+greyed, "No script issued"). Tap a name: the ISSUED script (Optomate
+`SPECTACLE_RX`) fills in for both eyes, read-only, and the two-eye check runs.
+A script with an add asks one tap — Distance · Readers · Multifocal; Readers
+shows its working ("R +1.00 + add +2.00 = +3.00"). The Hub runs
+`python -m pulls.recent_rx --json --n 3` in the agent folder (`agent_dir`),
+like the recall tile. Given name + surname initial only, no DOB or ID, served
+no-store, nothing logged. Test copies: `CEC_HUB_RECENT_RX_DATE=YYYY-MM-DD`
+points at a past clinic day, `CEC_HUB_RECENT_RX_FIXTURE=1` shows fictional
+patients.
+
 ## The Stock approve button — what it actually does
 
 Pressing "Approved — mark for entry" renames the proposal file from

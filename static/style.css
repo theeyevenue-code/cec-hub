@@ -1470,3 +1470,71 @@ body.lens-mono main { background: #fafafa; }
 .lens-page .ans-table .ans-alt-row .c-sell { font-size: 17px; }
 .lens-page .opt-table th.c-sell { color: var(--c-stock); }
 @media (max-width: 760px) { .lens-page .ans-table .c-verdict { width: 70px; font-size: 20px; } }
+
+/* --- Lens Finder: Today's patients (Mark, 5 Oct 2026) ------------------------------
+   Three equal tiles at the top of Find the lens. Black on white, hairlines; the only
+   colour is the existing stock/grind/amber meaning. A greyed tile = no script issued. */
+.lens-page .lf-today { margin: 0 0 22px; padding-bottom: 20px; border-bottom: 1px solid var(--lp-rule); }
+.lens-page .lf-today-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.lens-page .lf-today-title { font-size: 17px; font-weight: 700; color: var(--lp-ink); white-space: nowrap; }
+.lens-page .lf-today-head .chip { white-space: nowrap; font-size: 14px; }
+.lens-page .lf-today-refresh { margin-left: auto; font-size: 15px; padding: 6px 14px; min-height: 0; }
+.lens-page .lf-today-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.lens-page .lf-pt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+    font: inherit; background: #fff; border: 1px solid #999; border-radius: 6px; padding: 12px 16px;
+    min-height: 78px; cursor: pointer; color: var(--lp-ink); }
+.lens-page button.lf-pt:hover { background: #f5f5f5; }
+.lens-page button.lf-pt:focus-visible { outline: 3px solid #bbb; outline-offset: 2px; }
+.lens-page .lf-pt-on, .lens-page button.lf-pt-on:hover { border: 2px solid var(--lp-ink); padding: 11px 15px; background: #f5f5f5; }
+.lens-page .lf-pt-name { font-size: 22px; font-weight: 700; line-height: 1.2; }
+.lens-page .lf-pt-meta { font-size: 17px; color: var(--lp-mute); font-variant-numeric: tabular-nums; }
+.lens-page .lf-pt-none { background: #f3f3f3; border-color: var(--lp-rule); cursor: default; color: #8a8a8a; }
+.lens-page .lf-pt-none .lf-pt-name, .lens-page .lf-pt-none .lf-pt-meta { color: #8a8a8a; }
+.lens-page .lf-pt-word { font-size: 15px; font-weight: 600; color: #6f6f6f; margin-top: 2px; }
+.lens-page .lf-today-note { font-size: 16px; color: var(--lp-mute); margin: 10px 0 0; }
+
+.lens-page .lf-pt-panel { margin: 0 0 22px; }
+.lens-page .lf-pt-panel-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 8px; }
+.lens-page .lf-pt-panel-head strong { font-size: 22px; color: var(--lp-ink); }
+.lens-page .lf-pt-panel-head span { font-size: 17px; color: var(--lp-mute); }
+.lens-page .lf-pt-clear { margin-left: auto; font-size: 15px; padding: 6px 14px; min-height: 0; }
+.lens-page .lf-rx { border-collapse: collapse; font-variant-numeric: tabular-nums; margin: 4px 0 8px; }
+.lens-page .lf-rx th { font-size: 14px; font-weight: 600; color: var(--lp-mute); text-transform: uppercase;
+    letter-spacing: .05em; text-align: right; padding: 4px 14px; border-bottom: 1px solid var(--lp-rule); }
+.lens-page .lf-rx tbody th { font-size: 20px; color: var(--lp-ink); text-align: left; padding-left: 0; border-bottom: 1px solid var(--lp-rule-soft); }
+.lens-page .lf-rx thead th:first-child { padding-left: 0; }
+.lens-page .lf-rx td { font-size: 22px; font-weight: 600; color: var(--lp-ink); text-align: right; padding: 6px 14px;
+    border-bottom: 1px solid var(--lp-rule-soft); min-width: 78px; }
+.lens-page .lf-rx .lf-dash { color: #aaa; font-weight: 400; }
+.lens-page .lf-rx td.lf-dash { text-align: left; font-size: 17px; }
+.lens-page .lf-pt-pd { font-size: 17px; color: var(--lp-mute); margin: 4px 0; font-variant-numeric: tabular-nums; }
+.lens-page .lf-flags { font-size: 17px; margin: 6px 0 4px; }
+.lens-page .lf-mode-q { font-size: 17px; font-weight: 600; color: var(--lp-ink); margin: 14px 0 0; }
+.lens-page .lf-modes { margin-top: 8px; }
+.lens-page .lf-modes .lf-radio span { font-size: 18px; padding: 4px 6px; }
+
+.lens-page .lf-working { margin: 18px 0 10px; display: flex; flex-direction: column; gap: 2px; }
+.lens-page .lf-working-mode { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--lp-mute); }
+.lens-page .lf-working-line { font-size: 22px; font-weight: 700; color: var(--lp-ink); font-variant-numeric: tabular-nums; }
+.lens-page .lf-working-sub { font-size: 16px; color: var(--lp-mute); }
+.lens-page .lf-working .ans-notes { font-size: 16px; }
+@media (max-width: 640px) {
+    .lens-page .lf-today-row { grid-template-columns: 1fr; }
+    .lens-page .lf-rx td { min-width: 0; padding: 6px 8px; font-size: 19px; }
+    .lens-page .lf-rx th { padding: 4px 8px; }
+}
+.lens-page .lf-today-head { flex-wrap: wrap; }
+.lens-page .lf-modes { width: max-content; max-width: 100%; }
+.lens-page .lf-pt-panel .answer { margin-top: 8px; }
+@media (max-width: 640px) {
+    .lens-page .lf-rx { width: 100%; }
+    .lens-page .lf-rx td, .lens-page .lf-rx th { padding: 4px 4px; }
+    .lens-page .lf-rx td { font-size: 17px; }
+    .lens-page .lf-rx th { font-size: 12px; letter-spacing: 0; }
+    .lens-page .lf-pt-panel-head .lf-pt-clear { margin-left: 0; }
+    .lens-page .lf-modes { width: 100%; }
+    .lens-page .lf-modes .lf-radio { flex: 1 1 100%; border-right: none; border-bottom: 1px solid #999; }
+    .lens-page .lf-modes .lf-radio:last-child { border-bottom: none; }
+    .lens-page .lf-working-line { font-size: 19px; }
+}
+.lens-page .lf-pt-panel .answer { overflow-x: auto; }
