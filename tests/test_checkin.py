@@ -523,6 +523,23 @@ def test_ipad_page_is_no_store_and_has_no_way_into_the_hub(client):
     assert client.get("/checkin/ipad/index.html").status_code == 404
 
 
+def test_ipad_v2_layout_contract(client):
+    """v2 (Mark, 5 Oct 2026): bands with equal tiles in 4 columns (2 when narrow),
+    None tile clears the others, follow-ups inline, the details skip button, and
+    no side-bar boxes anywhere on the iPad."""
+    js = client.get("/checkin/ipad/ipad.js").get_data(as_text=True)
+    css = client.get("/checkin/ipad/ipad.css").get_data(as_text=True)
+    for used in ("none_value", "follow_up", "skip_button", 'class="reveal"', "revealNew",
+                 "Tap all that apply", "Tap one", 'data-act="skip"'):
+        assert used in js, used
+    assert "repeat(4, minmax(0, 1fr))" in css and "repeat(2, minmax(0, 1fr))" in css
+    assert "grid-template-columns: 250px minmax(0, 1fr)" in css
+    assert ".t.none { border-style: dashed; }" in css
+    assert "border-left" not in css
+    for size in re.findall(r"font-size:\s*(\d+)px", css):
+        assert int(size) >= 14, size
+
+
 def test_full_flow_over_http(client):
     w = client.world
     r = client.post("/api/checkin/send", json={"kind": "appointment", "appointment_id": 1001})

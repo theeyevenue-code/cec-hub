@@ -241,30 +241,41 @@
         return a.join(" ");
     }
 
-    function qHTML(q, inGroup, title) {
+    /* v2 layout (Mark, 5 Oct 2026): every question is a BAND - the question on
+       the left (with "Tap one" / "Tap all that apply"), the answer on the right.
+       Tap answers are EQUAL tiles in straight columns (4 across in landscape, 2
+       in portrait): a square = tap several, a circle = tap one, the None tile is
+       dashed. A follow-up opens INLINE under its question's tiles. */
+
+    function hintFor(q) {
+        if (q.type === "multi") return "Tap all that apply";
+        if (q.type === "choice" || q.type === "yesno") return "Tap one";
+        return "";
+    }
+
+    function tile(q, o, on, multi) {
+        const none = multi && q.none_value === o;
+        return `<button type="button" class="t${multi ? "" : " r"}${on ? " on" : ""}${none ? " none" : ""}"
+            data-${multi ? "tick" : "pick"}="${esc(q.id)}" data-v="${esc(o)}" aria-pressed="${on}"><i class="g" aria-hidden="true"></i><span>${esc(o)}</span></button>`;
+    }
+
+    /* The answer side of a question: tiles, a typed box, a date or a pick list. */
+    function controlHTML(q) {
         const v = S.answers[q.id];
         const id = "q-" + q.id;
-        const req = q.required ? ` <span class="req">(needed)</span>` : "";
-        const cls = "q" + (inGroup ? " in-group" : "");
-        // A question worded the same as its screen title is not said twice.
-        const same = labelOf(q).trim().toLowerCase() === String(title || "").trim().toLowerCase();
-        const lab = same ? (req ? `<label for="${id}">${req}</label>` : "")
-            : `<label for="${id}">${esc(labelOf(q))}${req}</label>`;
-        const plain = same ? (req ? `<div class="label">${req}</div>` : "")
-            : `<div class="label">${esc(labelOf(q))}${req}</div>`;
         switch (q.type) {
             case "text":
             case "number":
-                return `<div class="${cls}">${lab}<input id="${id}" type="text" data-q="${esc(q.id)}"
-                    value="${esc(v || "")}" ${inputAttrs(q)}${q.type === "number" ? ` class="short"` : ""}></div>`;
+                return `<input id="${id}" type="text" data-q="${esc(q.id)}"
+                    value="${esc(v || "")}" ${inputAttrs(q)}${q.type === "number" ? ` class="short"` : ""}>`;
             case "longtext":
-                return `<div class="${cls}">${lab}${noneChip(q, v)}<textarea id="${id}" data-q="${esc(q.id)}"
-                    ${inputAttrs(q)}>${esc(v || "")}</textarea></div>`;
+                return `${noneTile(q, v)}<textarea id="${id}" data-q="${esc(q.id)}"
+                    ${inputAttrs(q)}>${esc(v || "")}</textarea>`;
             case "date": {
                 const p = dateParts(q);
                 const opts = MONTHS.map((name, i) =>
                     `<option value="${i + 1}"${String(i + 1) === p.m ? " selected" : ""}>${name}</option>`).join("");
-                return `<div class="${cls}">${plain}<div class="date">
+                return `<div class="date">
                     <div><input id="${id}" type="text" inputmode="numeric" maxlength="2" data-date="${esc(q.id)}"
                         data-part="d" value="${esc(p.d)}" autocomplete="off" aria-label="Day"><div class="cap">Day</div></div>
                     <div><select data-date="${esc(q.id)}" data-part="m" aria-label="Month">
@@ -272,42 +283,28 @@
                         <div class="cap">Month</div></div>
                     <div><input type="text" inputmode="numeric" maxlength="4" data-date="${esc(q.id)}"
                         data-part="y" value="${esc(p.y)}" autocomplete="off" aria-label="Year"><div class="cap">Year</div></div>
-                    </div></div>`;
+                    </div>`;
             }
             case "yesno":
-                return `<div class="${cls}">${plain}<div class="opts yesno">
-                    ${["Yes", "No"].map((o) => `<button type="button" class="opt${v === o ? " on" : ""}"
-                        data-pick="${esc(q.id)}" data-v="${o}">${o}</button>`).join("")}</div></div>`;
+                return `<div class="grid">${["Yes", "No"].map((o) => tile(q, o, v === o, false)).join("")}</div>`;
             case "choice": {
                 const opts = q.options || [];
                 const other = q.allow_other && v && !opts.includes(v);
                 const otherOn = other || (q.allow_other && S.answers["__other_" + q.id]);
-                return `<div class="${cls}">${plain}<div class="opts">
-                    ${opts.map((o) => `<button type="button" class="opt${v === o ? " on" : ""}"
-                        data-pick="${esc(q.id)}" data-v="${esc(o)}">${esc(o)}</button>`).join("")}
-                    ${q.allow_other ? `<button type="button" class="opt${otherOn ? " on" : ""}"
-                        data-other="${esc(q.id)}">Other</button>` : ""}</div>
+                return `<div class="grid">${opts.map((o) => tile(q, o, v === o, false)).join("")}
+                    ${q.allow_other ? `<button type="button" class="t r${otherOn ? " on" : ""}"
+                        data-other="${esc(q.id)}"><i class="g" aria-hidden="true"></i><span>Other</span></button>` : ""}</div>
                     ${otherOn ? `<input class="other-input" type="text" data-q="${esc(q.id)}"
-                        value="${esc(other ? v : "")}" aria-label="Other" ${inputAttrs(q)}>` : ""}</div>`;
+                        value="${esc(other ? v : "")}" aria-label="Other" ${inputAttrs(q)}>` : ""}`;
             }
             case "multi": {
                 const have = Array.isArray(v) ? v : [];
-                return `<div class="${cls}">${plain}<div class="opts multi">
-                    ${(q.options || []).map((o) => `<button type="button" class="opt${have.includes(o) ? " on" : ""}"
-                        data-tick="${esc(q.id)}" data-v="${esc(o)}" aria-pressed="${have.includes(o)}">${esc(o)}</button>`).join("")}
-                    </div></div>`;
+                return `<div class="grid">${(q.options || []).map((o) => tile(q, o, have.includes(o), true)).join("")}</div>`;
             }
             case "picklist":
-                return `<div class="${cls}">${lab}<input id="${id}" type="text" data-q="${esc(q.id)}"
+                return `<input id="${id}" type="text" data-q="${esc(q.id)}"
                     data-list="${esc(q.list || "")}" value="${esc(v || "")}" ${inputAttrs(q)}
-                    placeholder="Start typing"><div class="picks" id="picks-${esc(q.id)}"></div></div>`;
-            case "info":
-                return `<div class="info${q.style === "small" ? " small" : ""}">${esc(q.text || "")}</div>`;
-            case "signature":
-                return `<div class="${cls}">${plain}<div class="sig-wrap">
-                    <canvas class="sig" id="sig" aria-label="Signature box"></canvas>
-                    <div class="sig-line"></div></div>
-                    <div class="sig-tools"><button type="button" class="btn" data-act="clear-sig">Clear</button></div></div>`;
+                    placeholder="Start typing"><div class="picks" id="picks-${esc(q.id)}"></div>`;
             default:
                 return "";
         }
@@ -315,11 +312,51 @@
 
     /* A one-tap answer on a typed question (questions.json none_option, e.g.
        Medications: "None"). Tapping it fills the box; tapping again clears it. */
-    function noneChip(q, v) {
+    function noneTile(q, v) {
         if (!q.none_option) return "";
         const on = v === q.none_option;
-        return `<div class="opts none-chip"><button type="button" class="opt${on ? " on" : ""}"
-            data-pick="${esc(q.id)}" data-v="${esc(q.none_option)}">${esc(q.none_option)}</button></div>`;
+        return `<div class="grid none-row"><button type="button" class="t none${on ? " on" : ""}"
+            data-pick="${esc(q.id)}" data-v="${esc(q.none_option)}" aria-pressed="${on}"><i class="g" aria-hidden="true"></i><span>${esc(q.none_option)}</span></button></div>`;
+    }
+
+    function typed(q) {
+        return ["text", "number", "longtext", "picklist"].includes(q.type);
+    }
+
+    /* One question as a band, with its revealed follow-ups under the tiles. */
+    function bandHTML(q, follows, title) {
+        if (q.type === "info") {
+            return `<div class="info${q.style === "small" ? " small" : ""}">${esc(q.text || "")}</div>`;
+        }
+        const req = q.required ? ` <span class="req">(needed)</span>` : "";
+        if (q.type === "signature") {
+            return `<div class="sigblock"><div class="lab">${esc(labelOf(q))}${req}</div><div class="sig-wrap">
+                <canvas class="sig" id="sig" aria-label="Signature box"></canvas>
+                <div class="sig-line"></div></div>
+                <div class="sig-tools"><button type="button" class="btn" data-act="clear-sig">Clear</button></div></div>`;
+        }
+        // A question worded the same as its screen title is not said twice.
+        const same = labelOf(q).trim().toLowerCase() === String(title || "").trim().toLowerCase();
+        const hint = hintFor(q);
+        const text = (same ? "" : esc(labelOf(q))) + req;
+        const lab = typed(q) ? `<label class="lab" for="q-${esc(q.id)}">${text}</label>`
+            : `<div class="lab">${text}${hint ? `<span class="hint">${hint}</span>` : ""}</div>`;
+        const reveals = follows.map((f) => `<div class="reveal" data-fu="${esc(f.id)}">
+            ${typed(f) ? `<label class="cap" for="q-${esc(f.id)}">${esc(labelOf(f))}</label>`
+                       : `<div class="cap">${esc(labelOf(f))}</div>`}${controlHTML(f)}</div>`).join("");
+        return `<section class="band" id="b-${esc(q.id)}">${lab}<div class="body">${controlHTML(q)}${reveals}</div></section>`;
+    }
+
+    /* follow-up id -> the question it hangs off (one show_if key, same screen) */
+    function parentOf(q, sc) {
+        if (!q.follow_up) return null;
+        const keys = Object.keys(q.show_if || {});
+        if (keys.length !== 1) return null;
+        return (sc.questions || []).some((x) => x.id === keys[0]) ? keys[0] : null;
+    }
+
+    function shownFollowUps() {
+        return Array.from(app.querySelectorAll(".reveal")).map((e) => e.dataset.fu);
     }
 
     function renderScreen(keepScroll) {
@@ -330,13 +367,20 @@
         const total = S.screens.length;
         const last = S.idx === total - 1;
         let html = `<div class="progress">${S.idx + 1} of ${total}</div>
-            <h1>${esc(sc.title)}</h1>${sc.hint ? `<p class="hint">${esc(sc.hint)}</p>` : ""}`;
+            <h1>${esc(sc.title)}</h1>
+            ${sc.skip_button ? `<button type="button" class="skipbig" data-act="skip">${esc(sc.skip_button)} &rarr;</button>` : ""}
+            ${sc.hint ? `<p class="hint">${esc(sc.hint)}</p>` : ""}`;
+        const follows = {};
+        (sc.questions || []).forEach((q) => {
+            const p = parentOf(q, sc);
+            if (p && isShown(q, index)) (follows[p] = follows[p] || []).push(q);
+        });
         let group = null;
         (sc.questions || []).forEach((q) => {
-            if (!isShown(q, index)) return;
+            if (parentOf(q, sc) || !isShown(q, index)) return;
             if (q.group && q.group !== group) html += `<h2 class="group">${esc(q.group)}</h2>`;
             group = q.group || null;
-            html += qHTML(q, !!q.group, sc.title);
+            html += bandHTML(q, follows[q.id] || [], sc.title);
         });
         if (S.err) html += `<div class="err" role="alert">${esc(S.err)}</div>`;
         const y = window.scrollY;
@@ -347,6 +391,17 @@
             <button class="btn primary" data-act="next">${last ? "Finish" : "Next"}</button>`);
         window.scrollTo(0, keepScroll ? y : 0);
         if (app.querySelector("canvas.sig")) setupSignature();
+    }
+
+    /* After a tap opened a follow-up: keep it in view above the Back/Next bar. */
+    function revealNew(before) {
+        const fresh = Array.from(app.querySelectorAll(".reveal"))
+            .filter((e) => !before.includes(e.dataset.fu));
+        if (!fresh.length) return;
+        const lastEl = fresh[fresh.length - 1];
+        const barH = bar.hidden ? 0 : bar.getBoundingClientRect().height;
+        const over = lastEl.getBoundingClientRect().bottom - (window.innerHeight - barH - 16);
+        if (over > 0) window.scrollBy(0, over);
     }
 
     /* --- signature --------------------------------------------------------------- */
@@ -535,7 +590,9 @@
             S.answers[qid] = S.answers[qid] === v ? "" : v;      // tap again to clear
             delete S.answers["__other_" + qid];
             S.err = "";
+            const before = shownFollowUps();
             renderScreen(true);
+            revealNew(before);
         } else if (t.dataset.other) {
             const qid = t.dataset.other;
             const q = allQuestions()[qid];
@@ -550,12 +607,18 @@
             if (inp) inp.focus();
         } else if (t.dataset.tick) {
             const qid = t.dataset.tick, v = t.dataset.v;
-            const have = Array.isArray(S.answers[qid]) ? S.answers[qid].slice() : [];
-            const i = have.indexOf(v);
-            if (i >= 0) have.splice(i, 1); else have.push(v);
-            S.answers[qid] = have;
+            const q = allQuestions()[qid] || {};
+            const none = q.none_value;
+            let have = Array.isArray(S.answers[qid]) ? S.answers[qid].slice() : [];
+            if (have.includes(v)) have = have.filter((x) => x !== v);
+            else if (none && v === none) have = [v];                 // None clears the others
+            else have = have.filter((x) => x !== none).concat([v]); // and any other clears None
+            // Kept in the order the tiles are shown, so the notes read the same way.
+            S.answers[qid] = (q.options || []).filter((o) => have.includes(o));
             S.err = "";
+            const before = shownFollowUps();
             renderScreen(true);
+            revealNew(before);
         } else if (t.dataset.choose) {
             const qid = t.dataset.choose;
             S.answers[qid] = t.dataset.v;
