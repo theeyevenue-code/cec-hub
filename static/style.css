@@ -1470,3 +1470,88 @@ body.lens-mono main { background: #fafafa; }
 .lens-page .ans-table .ans-alt-row .c-sell { font-size: 17px; }
 .lens-page .opt-table th.c-sell { color: var(--c-stock); }
 @media (max-width: 760px) { .lens-page .ans-table .c-verdict { width: 70px; font-size: 20px; } }
+
+/* --- Check-in tile (#/checkin, #/checkin/<token>) -------------------------------
+   Readability standard: the answer first and biggest, tables, one colour = one
+   meaning (blue = on the iPad, amber = ready to check / a change to look at,
+   green = saved), nothing under 15px. */
+
+.ci-banner { background: var(--amber-bg); border: 2px solid var(--amber-line); color: var(--amber-ink);
+             border-radius: 12px; padding: 10px 18px; font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+.ci-banner-sub { font-weight: 500; font-size: 17px; }
+.ci-slot { font-size: 19px; margin-bottom: 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ci-slot-warn { color: var(--danger-ink); font-weight: 600; }
+.ci-note { font-size: 19px; margin-bottom: 14px; }
+.ci-muted { color: var(--muted); font-size: 17px; }
+.ci-more { margin-top: 10px; font-size: 18px; font-weight: 600; color: var(--amber-ink); }
+.ci-small { min-height: 44px; font-size: 16px; padding: 6px 14px; }
+
+.ci-find { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.ci-find input { flex: 1; min-width: 260px; font: inherit; font-size: 20px; min-height: 56px;
+                 padding: 10px 16px; border: 2px solid var(--line); border-radius: 12px; }
+.ci-find input:focus { outline: none; border-color: var(--green); }
+.ci-newpick { margin-top: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 19px; }
+#ci-found { margin-top: 14px; }
+
+.ci-table { border-collapse: collapse; width: 100%; font-size: 18px; }
+.ci-table th { text-align: left; font-size: 16px; color: var(--muted); font-weight: 600;
+               padding: 6px 12px; border-bottom: 2px solid var(--line); }
+.ci-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.ci-table .ci-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ci-table .btn { min-height: 48px; font-size: 18px; padding: 8px 18px; white-space: nowrap; }
+.ci-row-done td { color: var(--muted); }
+.ci-form { font: inherit; font-size: 18px; min-height: 44px; padding: 4px 10px;
+           border: 2px solid var(--line); border-radius: 10px; background: #fff; }
+
+.ci-chip { display: inline-block; border-radius: 999px; padding: 3px 14px; font-size: 16px; font-weight: 700;
+           border: 1px solid transparent; white-space: nowrap; }
+.ci-chip-none  { background: #f1f3f2; color: #4a5650; border-color: #d4dad6; }
+.ci-chip-ipad  { background: var(--info-bg); color: var(--info-ink); border-color: var(--info-line); }
+.ci-chip-ready { background: var(--amber-bg); color: var(--amber-ink); border-color: var(--amber-line); }
+.ci-chip-saved { background: #dff0e8; color: #1d5741; border-color: var(--green); }
+
+.ci-flash { background: var(--info-bg); border-left: 6px solid var(--info-line); color: var(--info-ink);
+            padding: 10px 16px; font-size: 19px; font-weight: 600; margin-bottom: 14px; border-radius: 8px; }
+.ci-answer { font-family: 'Urbanist', 'Work Sans', sans-serif; font-size: 28px; font-weight: 800;
+             color: var(--ink); line-height: 1.25; margin: 4px 0 12px; }
+.ci-answer-stop { color: var(--danger-ink); }
+.ci-blockers { margin: 0 0 16px 24px; font-size: 20px; color: var(--danger-ink); font-weight: 600; }
+.ci-optom { font-size: 19px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.ci-optom select { font: inherit; font-size: 19px; min-height: 48px; padding: 4px 12px;
+                   border: 2px solid var(--amber-line); border-radius: 10px; background: #fff; }
+.ci-tag { display: inline-block; font-size: 15px; font-weight: 600; padding: 1px 10px; border-radius: 999px;
+          background: var(--amber-bg); color: var(--amber-ink); border: 1px solid var(--amber-line);
+          vertical-align: middle; }
+
+.ci-diff tr.ci-changed td { background: var(--amber-bg); }
+.ci-diff tr.ci-kept td { background: #fff; color: var(--muted); }
+.ci-diff tr.ci-kept .ci-edit { color: var(--muted); }
+.ci-edit { width: 100%; min-width: 180px; font: inherit; font-size: 18px; min-height: 44px; padding: 6px 10px;
+           border: 2px solid var(--line); border-radius: 8px; background: #fff; }
+.ci-tick { text-align: center; }
+.ci-tick input { width: 28px; height: 28px; cursor: pointer; }
+.ci-hint { margin-top: 8px; }
+.ci-fold { margin-top: 14px; }
+.ci-fold summary { cursor: pointer; font-size: 18px; font-weight: 600; color: var(--green-deep); min-height: 40px; }
+
+.ci-warnline { font-size: 19px; font-weight: 700; color: var(--amber-ink); margin-bottom: 10px; }
+.ci-boxes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 8px; }
+.ci-box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: #fff; }
+.ci-box-head { font-weight: 700; font-size: 18px; color: var(--ink); display: flex; justify-content: space-between;
+               align-items: center; gap: 8px; margin-bottom: 6px; }
+.ci-box-text { white-space: pre-wrap; font-size: 17px; line-height: 1.5; overflow-wrap: anywhere; }
+.ci-notes { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.ci-warnings { margin-left: 24px; font-size: 18px; }
+.ci-warnings li { margin: 4px 0; }
+.ci-pdf { font-size: 19px; margin: 4px 0 18px; }
+.ci-pdf a { color: var(--green-deep); font-weight: 600; }
+.ci-savebar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+.ci-save { font-size: 22px; min-height: 64px; padding: 12px 32px; }
+.ci-save:disabled { background: #b9c4bf; border-color: #b9c4bf; cursor: not-allowed; }
+.ci-done { border-left: 6px solid var(--green); }
+.ci-done ul { margin-left: 24px; font-size: 18px; }
+.ci-dupes { border: 2px solid var(--amber-line); }
+.ci-dupe-new { margin-top: 12px; }
+.tile-icon:empty { min-height: 46px; }   /* a tile without an icon (Check-in) keeps the grid even */
+#ci-today, #ci-found, #ci-waiting .card { overflow-x: auto; }   /* a narrow screen scrolls the table, never the page */
+.ci-exam-rule { font-size: 19px; font-weight: 700; margin: 14px 0 0; }
