@@ -2933,6 +2933,7 @@ function mcReviewRowHTML(i, d) {
         r.age !== null && r.age !== undefined ? `Age ${r.age} at visit` : "Age not on file",
         `${esc(i.item)} rejected, code 160 · ${mcMoney(i.amount)} · Claim ${esc(i.claim)}`,
     ];
+    if (r.kind === "check_short") facts.push("Not with fields/OCT items (10938–10943) the same day; check before accepting");
     const accept = (s, quiet) => mcPinBtn(`accepted_${s.item}`, `Accept ${s.item}`, quiet, d, s.claim_note);
     let btns;
     if (r.kind === "check") {

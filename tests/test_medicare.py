@@ -197,6 +197,12 @@ def test_short_booking_review_offers_10916_and_it_can_be_accepted(agent, calls):
     assert calls[0][3:7] == ["--mark", "0123456789ab", "--status", "accepted_10916"]
 
 
+def test_10916_row_details_carry_the_same_day_caution():
+    js = open("static/app.js", encoding="utf-8").read()
+    i = js.index('if (r.kind === "check_short") facts.push(')
+    assert "Not with fields/OCT items (10938–10943) the same day; check before accepting" in js[i:i + 200]
+
+
 def test_no_evidence_rows_lead_with_not_eligible():
     js = open("static/app.js", encoding="utf-8").read()
     assert 'r.kind === "check"' in js and "Another item…" in js
