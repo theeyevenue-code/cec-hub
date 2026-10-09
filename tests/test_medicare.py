@@ -1,4 +1,4 @@
-"""hub.medicare + /api/medicare. The agent subprocess is mocked; FICTIONAL data only."""
+﻿"""hub.medicare + /api/medicare. The agent subprocess is mocked; FICTIONAL data only."""
 import importlib
 import json
 import subprocess
@@ -9,14 +9,24 @@ from hub import medicare as M
 
 ITEM = {"key": "0123456789ab", "service_date": "2026-05-01", "deadline": "2027-05-01",
         "days_left": 200, "patient_label": "Sam K", "item": "10918", "amount": 34.0,
-        "code": "374", "meaning": "Old card issue number used", "action_group": "fix_now",
+        "code": "374", "meaning": "Old card issue number used", "action_group": "do_now",
         "steps": "Resubmit.", "fact": "Record now has issue no. 2", "claim": "Z1001",
         "flag": "", "status": None}
+
+REVIEW = dict(ITEM, key="abcdefabcdef", item="10910", code="160", action_group="review",
+              review={"confidence": "High", "why": "We claimed 10910 on 2025-05-27 (36-month rule)",
+                      "age": 55, "minutes": 30,
+                      "suggestions": [{"item": "10914", "name": "Progressive disorder", "confidence": "High",
+                                       "history_only": False,
+                                       "snippets": [{"section": "Posterior", "text": "Small drusen OU"}]}]})
 
 AGENT_OUT = {"ok": True, "generated_at": "2026-10-13 09:00", "last_report_pull": "2026-10-13 08:55",
              "days_since_pull": 0, "pull_overdue": False,
              "unreported_claims": {"count": 2, "oldest_days": 9},
-             "summary": {"fix_now": {"n": 1, "amount": 34.0}}, "items": [ITEM]}
+             "summary": {"do_now": {"n": 1, "amount": 34.0}, "review": {"n": 1, "amount": 67.85}},
+             "items": [ITEM, REVIEW],
+             "today": [{"time": "09:00", "patient_label": "Ruby H",
+                        "lines": ["Comprehensive used 15 Aug 2025 (10910, 36-month rule): bill 10913/10914 if notes support, else 10918 or private."]}]}
 
 
 class FakeProc:
@@ -50,7 +60,7 @@ def test_worklist_reads_last_json_line_with_fixed_args(agent, calls):
     out = M.worklist(agent, fixture=True)
     assert out["connected"] and out["items"][0]["patient_label"] == "Sam K"
     assert calls[0][1:] == ["-m", "medicare.rejections", "--json", "--fixture"]
-    assert out["summary"]["check"] == {"n": 0, "amount": 0.0}
+    assert out["summary"]["mark"] == {"n": 0, "amount": 0.0}
     assert out["unreported_claims"] == {"count": 2, "oldest_days": 9}
 
 
@@ -66,7 +76,7 @@ def test_unknown_fields_never_reach_the_page(agent, monkeypatch):
 def test_bad_items_dropped(agent, monkeypatch):
     body = dict(AGENT_OUT, items=[dict(ITEM, key="../../etc"), dict(ITEM, action_group="nope"), ITEM])
     monkeypatch.setattr(M.subprocess, "run", lambda a, **k: FakeProc(json.dumps(body)))
-    assert len(M.worklist(agent)["items"]) == 1
+    assert len(M.worklist(agent)["items"]) == 1     # the review card is Mark-only
 
 
 def test_not_connected_and_not_set_up(tmp_path):
@@ -133,3 +143,62 @@ def test_post_mark_without_name_is_refused(client, calls):
 def test_page_route_and_function_exist():
     js = open("static/app.js", encoding="utf-8").read()
     assert "#\\/medicare$/, fn: renderMedicare" in js and "async function renderMedicare" in js
+
+
+# --- Mark's item review: visible only to Mark ----------------------------------------
+def test_is_mark_case_insensitive():
+    assert M.is_mark("Mark") and M.is_mark(" mark ") and M.is_mark("MARK")
+    assert not M.is_mark("Karen") and not M.is_mark("Marky") and not M.is_mark("")
+
+
+def test_karen_never_gets_review_cards_or_snippets(agent, calls):
+    out = M.worklist(agent, fixture=True, mark_view=False)
+    assert "--review" not in calls[-1]
+    assert [i["key"] for i in out["items"]] == ["0123456789ab"]
+    assert "drusen" not in json.dumps(out) and out["summary"]["review"]["n"] == 1
+    assert out["is_mark"] is False
+
+
+def test_mark_gets_cards_with_snippets(agent, calls):
+    out = M.worklist(agent, fixture=True, mark_view=True)
+    assert "--review" in calls[-1]
+    card = [i for i in out["items"] if i["action_group"] == "review"][0]
+    assert card["review"]["suggestions"][0]["snippets"][0] == {"section": "Posterior", "text": "Small drusen OU"}
+    assert card["review"]["why"].startswith("We claimed 10910")
+
+
+def test_review_whitelist_trims_and_drops_odd_items():
+    raw = dict(REVIEW["review"], suggestions=[
+        {"item": "10918", "name": "x", "snippets": []},
+        {"item": "10913", "name": "n", "confidence": "High",
+         "snippets": [{"section": "Complaint", "text": "x" * 500}] * 4}])
+    r = M.clean_review(raw, True)
+    assert [s["item"] for s in r["suggestions"]] == ["10913"]
+    assert len(r["suggestions"][0]["snippets"]) == 2 and len(r["suggestions"][0]["snippets"][0]["text"]) == 140
+    assert M.clean_review(raw, False) == {"confidence": "High"}
+
+
+def test_today_lines_pass_through_cleaned(agent, calls):
+    t = M.worklist(agent, fixture=True)["today"]
+    assert t[0]["time"] == "09:00" and t[0]["patient_label"] == "Ruby H" and "10910" in t[0]["lines"][0]
+
+
+def test_accept_and_not_eligible_are_mark_only(agent, calls):
+    assert M.mark(agent, "0123456789ab", "accepted_10914", "Karen")["error"] == "Only Mark can decide the item."
+    assert M.mark(agent, "0123456789ab", "not_eligible", "Angie")["ok"] is False
+    assert M.mark(agent, "0123456789ab", "accepted_10918", "Mark")["ok"] is False
+    assert calls == []
+    assert M.mark(agent, "0123456789ab", "accepted_10914", "mark")["ok"]
+    assert calls[0][3:7] == ["--mark", "0123456789ab", "--status", "accepted_10914"]
+
+
+def test_endpoint_review_needs_mark_cookie(client, calls):
+    client.set_cookie("hub_staff", "Karen")
+    body = client.get("/api/medicare").get_json()
+    assert all(i["action_group"] != "review" for i in body["items"])
+    client.set_cookie("hub_staff", "Mark")
+    r = client.get("/api/medicare")
+    assert r.headers["Cache-Control"] == "no-store"
+    assert any(i["action_group"] == "review" for i in r.get_json()["items"])
+    client.set_cookie("hub_staff", "Karen")
+    assert client.post("/api/medicare/mark", json={"key": "0123456789ab", "status": "accepted_10914"}).status_code == 400

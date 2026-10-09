@@ -460,16 +460,18 @@ def _medicare_fixture() -> bool:
 def medicare_list():
     """Rejected / short-paid Medicare items, read live from Optomate by the agent.
     Given name + surname initial only; served no-store; nothing about a patient
-    is logged."""
+    is logged. Item review cards (note snippets) only when the name picked is Mark."""
     from hub import medicare
-    resp = jsonify(medicare.worklist(_integrations(), _medicare_fixture()))
+    who = request.cookies.get("hub_staff") or ""
+    resp = jsonify(medicare.worklist(_integrations(), _medicare_fixture(), medicare.is_mark(who)))
     resp.headers["Cache-Control"] = "no-store"
     return resp
 
 
 @app.route("/api/medicare/mark", methods=["POST"])
 def medicare_mark():
-    """Tick one item: done (resubmitted / fixed), written_off, or open (undo)."""
+    """Tick one item: done (resubmitted / fixed), written_off, or open (undo).
+    Mark only: accepted_10913 / accepted_10914 / accepted_10915 / not_eligible."""
     from hub import medicare
     data = request.get_json(silent=True) or {}
     who = (request.cookies.get("hub_staff") or "").strip()

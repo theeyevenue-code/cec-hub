@@ -1575,9 +1575,41 @@ body.lens-mono main { background: #fafafa; }
 .mc-chip-amt { font-size: 24px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 .mc-chip-n { font-size: 15px; color: var(--muted); }
 .mc-chip.mc-zero { opacity: .55; }
-.mc-c-fix_now { border-color: var(--amber-line); background: var(--amber-bg); }
-.mc-c-check { border-color: var(--info-line); background: var(--info-bg); }
-.mc-c-recovered { border-color: var(--green); background: #e1f3ea; }
+.mc-c-now { border-color: var(--amber-line); background: var(--amber-bg); }
+.mc-c-mark { border-color: var(--info-line); background: var(--info-bg); }
+
+/* Do now (open, Karen's list), Mark's item review, Today's check — sections, not boxes */
+.mc-h2 { font-family: 'Urbanist', 'Work Sans', sans-serif; font-size: 26px; font-weight: 800;
+    color: var(--ink); margin: 0 0 6px; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.mc-h2 .mc-g-sum { font-family: 'Work Sans', sans-serif; font-weight: 500; }
+.mc-now, .mc-review, .mc-today { margin-top: 30px; }
+.mc-now { border-top: 3px solid var(--amber-line); padding-top: 14px; }
+.mc-review { border-top: 3px solid var(--info-line); padding-top: 14px; }
+.mc-today { border-top: 1px solid var(--line); padding-top: 14px; }
+.mc-review .mc-g-note, .mc-today .mc-g-note { padding: 0 0 10px; }
+.mc-step { display: block; font-weight: 600; color: var(--ink); }
+.mc-tline { display: block; }
+.mc-tline + .mc-tline { margin-top: 4px; }
+.mc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+.mc-card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+.mc-card-weak { border-style: dashed; }
+.mc-card-top { font-size: 18px; }
+.mc-card-due { margin-top: 2px; }
+.mc-card-why { font-size: 17px; color: var(--body); margin: 6px 0 4px; }
+.mc-sug { margin-top: 10px; }
+.mc-sug-head { font-size: 20px; color: var(--ink); }
+.mc-sug-head strong { font-variant-numeric: tabular-nums; }
+.mc-conf { display: inline-block; font-size: 14px; font-weight: 600; padding: 1px 9px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted); vertical-align: 2px; margin-left: 4px; }
+.mc-conf-High { border-color: var(--green); color: var(--green-dark); }
+.mc-conf-Weak { border-color: var(--amber-line); color: var(--amber-ink); background: var(--amber-bg); }
+.mc-snip { margin: 6px 0 0; padding: 4px 0 4px 12px; border-left: 3px solid var(--line);
+    font-size: 17px; color: var(--ink); font-style: italic; }
+.mc-snip-sec { display: block; font-style: normal; font-size: 14px; font-weight: 600; color: var(--muted); }
+.mc-card-facts { font-size: 16px; color: var(--muted); margin: 10px 0 4px; }
+.mc-card-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.mc-card-btns .mc-btn { margin: 0; }
+.mc-card-confirm { font-size: 14px; color: var(--muted); margin-top: 6px; }
 
 .mc-group { margin-top: 26px; background: var(--paper); border: 1px solid var(--line);
     border-radius: 12px; }
@@ -1590,8 +1622,7 @@ body.lens-mono main { background: #fafafa; }
 .mc-g-title { font-family: 'Urbanist', 'Work Sans', sans-serif; font-size: 24px; font-weight: 800; color: var(--ink); }
 .mc-g-sum { font-size: 18px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .mc-g-note { font-size: 17px; color: var(--muted); padding: 10px 18px 0; }
-.mc-g-fix_now .mc-g-title { color: var(--amber-ink); }
-.mc-g-check .mc-g-title { color: var(--info-ink); }
+.mc-g-mark .mc-g-title { color: var(--info-ink); }
 
 .mc-scroll { overflow-x: auto; padding: 4px 6px 8px; }
 .mc-table { border-collapse: collapse; width: 100%; font-size: 17px; }
@@ -1608,7 +1639,7 @@ body.lens-mono main { background: #fafafa; }
 .mc-fact { display: block; font-size: 16px; font-weight: 600; color: var(--ink); margin-top: 4px; }
 .mc-flag { display: inline-block; margin-top: 6px; padding: 2px 10px; border-radius: 999px; font-size: 15px;
     background: var(--amber-bg); border: 1px solid var(--amber-line); color: var(--amber-ink); }
-.mc-table tr.mc-urgent td { background: var(--danger-bg); }
+.mc-table tr.mc-urgent td.mc-date strong { color: var(--danger-ink); }
 .mc-red { color: var(--danger-ink); font-weight: 700; }
 .mc-act { white-space: nowrap; text-align: right; }
 .mc-btn { font-size: 16px; padding: 8px 14px; min-height: 0; margin: 0 0 6px 6px; }
@@ -1617,13 +1648,17 @@ body.lens-mono main { background: #fafafa; }
 @media (max-width: 760px) {
     .mc-answer { font-size: 23px; }
     .mc-chip { min-width: 0; flex: 1 1 140px; }
-    /* phone: each row becomes a card, label beside each value */
+    /* phone: each row is a compact card — date · patient · item · $ on one line,
+       then what to do, then the tick */
     .mc-table thead { display: none; }
-    .mc-table, .mc-table tbody, .mc-table tr, .mc-table td { display: block; width: 100%; }
-    .mc-table tr { padding: 8px 0; border-bottom: 1px solid var(--line); }
-    .mc-table td { border: none; padding: 4px 8px; min-width: 0; }
-    .mc-table .mc-num, .mc-act { text-align: left; }
-    .mc-table td[data-l]::before { content: attr(data-l); display: block; font-size: 14px;
-        font-weight: 600; color: var(--muted); }
+    .mc-table, .mc-table tbody { display: block; width: 100%; }
+    .mc-table tr { display: grid; grid-template-columns: auto 1fr auto auto; gap: 2px 10px;
+        padding: 10px 2px; border-bottom: 1px solid var(--line); }
+    .mc-table tr:last-child { border-bottom: none; }
+    .mc-table td { display: block; border: none; padding: 0; min-width: 0; }
+    .mc-table .mc-todo, .mc-table .mc-act, .mc-today-t td:last-child { grid-column: 1 / -1; }
+    .mc-table .mc-act { text-align: left; }
     .mc-btn { margin: 6px 6px 0 0; }
+    .mc-cards { grid-template-columns: 1fr; }
+    .mc-h2 { font-size: 22px; }
 }
