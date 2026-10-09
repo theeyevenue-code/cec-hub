@@ -19,6 +19,8 @@
   "scorecard_drop": "C:\\Claude\\Claude Code\\Claude Second Brain\\scorecard-drop",
   "checkin": {
     "ipad_key": "CHANGE-ME-to-a-long-random-string",
+    "staff_code": "CHANGE-ME-staff-code",
+    "_staff_code_note": "What each front-desk computer types once to unlock Check-in (6+ characters). Never type it on the iPad. While this is the placeholder, Check-in works only on the server itself. Changing it locks every computer out again.",
     "_note": "The reception iPad's device key. Make one with:  python -c \"import secrets; print(secrets.token_urlsafe(24))\"  then open http://<server>:5680/checkin/ipad#<the key> on the iPad and Add to Home Screen (README, 'iPad setup'). Every iPad call must carry it; while this is the placeholder (or shorter than 16 characters) the iPad shows 'Not set up yet'. Changing it locks out the old iPad link."
   }
 }

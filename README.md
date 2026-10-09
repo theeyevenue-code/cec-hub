@@ -116,17 +116,35 @@ the note that will be added. The iPad: the question set, plus the patient's own 
 from Optomate on the "Your details" screen so they can check them.
 
 **Where it is stored.** Only in the agent's git-ignored folder on the server:
-`<agent_dir>\local-reports\checkin\sessions\<token>.json` (one file per form, answers and
-signature included). The engine keeps the signed PDF and a journal of each save under
-`local-reports\checkin\` too. A form file is deleted the moment it is discarded or saved
-for real; unsent and unfinished forms are deleted after 24 hours. Forms waiting to be
-checked stay until someone checks or discards them. While in test mode a checked form is
-kept so it can be checked again — press **Discard this form** when done.
+`<agent_dir>\local-reports\checkin\sessions\<token>.json` (one file per form). The engine
+keeps a journal of each save under `local-reports\checkin\` too. There is **no signature and
+no signed PDF** (Mark, 9 Oct 2026: the paper form never had one); the last iPad screen is
+"Check and send", and the dated Optomate note quotes the consent sentence and says who sent it. A form file is deleted the moment it is discarded or saved
+for real; forms not yet submitted (unsent, unfinished, paused) are deleted after 2 days.
+Forms waiting to be checked stay until someone checks or discards them. While in test
+mode a checked form is kept so it can be checked again — press **Discard this form**
+when done.
+
+**Who can reach it (Codex review, 9 Oct 2026).** The iPad's device key opens the iPad
+routes and nothing else. Every staff Check-in route (today's list, search, send, the
+check screen, save, discard) refuses any request carrying the device key, and
+otherwise works only on the server itself, or on a front-desk computer unlocked once
+with the **staff code** (`checkin.staff_code` in `config\integrations.json`). Unlocking
+sets an HttpOnly cookie on that computer; changing the code locks every computer out
+again; five wrong codes in 15 minutes stop all tries for 15 minutes. So a patient who
+gets out of Guided Access can open the Hub's address but not anyone's form.
+
+**Inactivity lock.** No touch for 3 minutes: the iPad asks "Still there?" with
+Continue. 2 more minutes: the form is hidden and the iPad says "Please return the iPad
+to reception". The answers so far are kept on the server; the
+Check-in page shows the form as **Paused** with **Resume on the iPad**.
 
 **What is never stored or logged.** `hub.log` gets the patient's Optomate ID and what
 happened (sent, submitted, saved), never a name or an answer. Names never go into a web
 address (search goes in the request body), and nothing goes into the browser's storage
-or cookies — on the iPad the form lives in memory and is wiped when it is sent.
+— on the iPad the form lives in memory and is wiped when it is sent. The only cookies are
+the staff-unlock one on front-desk computers (no patient data) and the optional
+"Who's using this?" name.
 
 ### iPad setup (once)
 
@@ -144,11 +162,32 @@ or cookies — on the iPad the form lives in memory and is wiped when it is sent
    passcode. Open Check-in, triple-click the top (or home) button -> Start. Patients can
    then not leave the form. Triple-click + passcode to end it.
 6. Changing the key locks out the old iPad link — repeat steps 3-5.
+7. Staff code: add `"staff_code": "<6+ characters>"` under `"checkin"` in
+   `config\integrations.json`. Each front-desk computer types it once on the Check-in
+   page. Never type it on the iPad. Without it, Check-in works only on the server.
+
+### Real-iPad test checklist (before live use)
+
+Run with the test copy or test mode, ZZTEST patients only. Tick each on the real iPad:
+
+| Check | Pass when |
+|---|---|
+| Keyboard | Typing in Mobile / Email / Medicare: the field stays visible above the keyboard and the Back / Next bar |
+| Scrolling | On the longest screens (Your details, Today, Your health) the last question scrolls clear of the bar |
+| Pinch-zoom | Two-finger zoom works and nothing is cut off afterwards |
+| Rotation | Turn the iPad mid-form and on Check and send: the answers stay |
+| Safari Back | Swiping back / the Back gesture does not show an earlier patient's form |
+| App switching | Switch away and back mid-form: the form is still there; after Send, nothing comes back |
+| Still there? | Leave it 3 minutes: "Still there?"; 2 more: "Please return the iPad to reception"; Resume on the Hub brings the answers back |
+| Wi-Fi drop at Send | Turn Wi-Fi off, Send ("Could not send"), Wi-Fi on, Tap to try again: a thank-you, and ONE form on the Hub. (The lost-answer case shows "Thank you, received.") |
+| Guided Access exit | Triple-click + passcode ends it; then in Safari the Hub's Check-in page asks for the staff code and shows no patient |
+| Thanks wipe | 8 seconds after Send the iPad says "Please see reception"; Back shows nothing |
 
 Using it: Hub -> **Check-in** -> **Send to iPad** on today's row (or Find a patient, or
 **New patient** -> Adult / Child). Hand over the iPad. When the row says **Ready to
-check**, press **Check**, look at the highlighted rows, then press the save button. If
-the iPad is in use, the Hub asks before replacing that form.
+check**, press **Check**, look at the highlighted rows, then press the save button (it
+stays at the bottom of the screen). If the iPad is in use, the Hub asks before replacing
+that form.
 
 To try it with fake patients: double-click `RUN-CHECKIN-TEST.bat` (port 5699, ZZTEST
 fixtures, nothing written anywhere near Optomate).

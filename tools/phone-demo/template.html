@@ -1,0 +1,549 @@
+﻿<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="robots" content="noindex">
+    <title>Check-in phone demo</title>
+<!--
+  OFFLINE DEMO of the iPad check-in, patient side, built by
+  cec-hub tools/build_phone_demo.py (__BUILT__). Made-up ZZTEST patients only.
+  The real ipad.css + ipad.js are inlined UNCHANGED; the server is a mock
+  inside this page (window.fetch is replaced). No network: the CSP above
+  blocks every request. Nothing is saved anywhere.
+-->
+<style>
+/* ===== real ipad.css (unchanged) ===== */
+__IPAD_CSS__
+</style>
+<style>
+/* ===== demo-only additions (never in the real app) ===== */
+:root { color-scheme: light; }
+#demo-banner { position: sticky; top: 0; z-index: 40; background: #fdf0c4; color: #3d2f00;
+    border-bottom: 1px solid #d9c27a; font: 600 14px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    padding: 6px 12px; padding-top: max(6px, env(safe-area-inset-top));
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#demo-banner .demo-what { flex: 1 1 auto; min-width: 0; }
+#demo-banner button { font: inherit; font-size: 14px; min-height: 36px; padding: 4px 10px; border-radius: 8px;
+    border: 1px solid #a8913f; background: #fff; color: #3d2f00; cursor: pointer; touch-action: manipulation; }
+#demo-banner button[hidden] { display: none; }
+#demo-banner .demo-resume { background: #3d2f00; color: #fff; border-color: #3d2f00; }
+.demo-sheet { position: fixed; inset: 0; z-index: 30; background: #fff; overflow-y: auto;
+    -webkit-overflow-scrolling: touch; padding: 64px 16px 40px; color: #111;
+    font: 17px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+.demo-sheet[hidden] { display: none; }
+.demo-in { max-width: 720px; margin: 0 auto; }
+.demo-sheet h2 { font-size: 26px; line-height: 1.2; margin: 6px 0 6px; }
+.demo-sheet h3 { font-size: 19px; margin: 26px 0 8px; }
+.demo-sheet p { margin: 6px 0; }
+.demo-sheet .demo-small { font-size: 15px; color: #555; }
+.demo-paths { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+.demo-paths button { font: inherit; text-align: left; padding: 14px 16px; min-height: 64px; border-radius: 12px;
+    border: 2px solid #8a8a8a; background: #fff; color: #111; cursor: pointer; touch-action: manipulation; }
+.demo-paths button b { display: block; font-size: 19px; }
+.demo-paths button span { display: block; font-size: 15px; color: #555; margin-top: 2px; }
+.demo-sheet pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 15px/1.45 ui-monospace, Consolas, Menlo, monospace;
+    background: #f6f6f6; border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; margin: 0; }
+.demo-box { margin-top: 12px; }
+.demo-box .demo-boxname { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+.demo-box .demo-empty { color: #777; font-style: italic; font-size: 15px; }
+.demo-sheet table { border-collapse: collapse; width: 100%; font-size: 15px; }
+.demo-sheet th, .demo-sheet td { text-align: left; vertical-align: top; padding: 6px 6px; border-top: 1px solid #ddd; }
+.demo-sheet th { font-weight: 700; color: #444; border-top: 0; }
+.demo-sheet td.demo-ch { font-weight: 700; }
+.demo-sheet details { margin-top: 22px; }
+.demo-sheet summary { font-weight: 700; cursor: pointer; min-height: 40px; display: flex; align-items: center; }
+.demo-fitrow { margin-top: 14px; font-size: 15px; color: #555; }
+.demo-fitrow button { font: inherit; font-weight: 700; min-height: 44px; padding: 6px 14px; margin-top: 6px; border-radius: 10px;
+    border: 2px solid #8a8a8a; background: #fff; color: #111; cursor: pointer; }
+.demo-fitrow button[aria-pressed="true"] { background: #111; border-color: #111; color: #fff; }
+/* "Phone fit" (demo only, off by default): what a fix for the bar could look like. */
+html.demo-fit .bar { padding-left: 16px; padding-right: 16px; }
+html.demo-fit .bar-in { gap: 8px; }
+html.demo-fit .bar-in .btn { padding-left: 16px; padding-right: 16px; }
+html.demo-fit .date { grid-template-columns: 72px minmax(0, 1fr) 96px; gap: 8px; }
+html.demo-fit .bar-in .primary, html.demo-fit .bar-in .primary.send { min-width: 0; flex: 1 1 auto; }
+.demo-actions { display: flex; gap: 12px; margin-top: 26px; flex-wrap: wrap; }
+.demo-actions button { font: inherit; font-weight: 700; min-height: 54px; padding: 8px 20px; border-radius: 12px;
+    border: 2px solid #8a8a8a; background: #fff; cursor: pointer; }
+.demo-actions button.demo-go { background: #2e6a52; border-color: #2e6a52; color: #fff; }
+</style>
+</head>
+<body>
+    <div id="demo-banner" role="region" aria-label="Demo controls">
+        <span class="demo-what">DEMO &middot; nothing is saved</span>
+        <button type="button" data-demo="resume" class="demo-resume" hidden>Reception: resume</button>
+        <button type="button" data-demo="idle">Idle +3 min</button>
+        <button type="button" data-demo="restart">Restart</button>
+    </div>
+    <main id="app" aria-live="polite">
+        <div class="center"><p class="big">Concord Eyecare</p></div>
+    </main>
+    <div id="bar" class="bar" hidden></div>
+    <div id="still" class="still" hidden></div>
+
+    <div id="demo-pick" class="demo-sheet">
+        <div class="demo-in">
+            <h2>Check-in demo</h2>
+            <p>The real iPad form, on your phone. Made-up patients only; nothing leaves the phone and nothing is saved.</p>
+            <p class="demo-small">Form __VERSION__. In this demo the idle lock runs 3&times; faster: &ldquo;Still there?&rdquo; after 1 min, lock 40 s later. &ldquo;Idle +3 min&rdquo; jumps ahead.</p>
+            <div class="demo-paths" id="demo-paths"></div>
+            <div class="demo-fitrow">On a phone the real Next / Send button runs past the right edge, and the birth-month box is too narrow to show the month (both sized for the iPad). Tap the part you can see, or:<br>
+                <button type="button" data-demo="fit" aria-pressed="false">Phone fit for the button bar: off</button></div>
+        </div>
+    </div>
+    <div id="demo-result" class="demo-sheet" hidden></div>
+
+<script>
+/* ===== demo harness: runs BEFORE the real ipad.js ===== */
+"use strict";
+(function () {
+    const DATA = __DATA__;
+    const D = window.__demo = { data: DATA, slot: null, last: null, pollFn: null };
+
+    /* 1. No network, ever. fetch is answered by the mock below; everything else refuses. */
+    const refuse = function () { throw new Error("Demo: no network"); };
+    try { window.XMLHttpRequest = refuse; } catch (e) {}
+    try { window.EventSource = refuse; } catch (e) {}
+    try { window.WebSocket = refuse; } catch (e) {}
+    try { navigator.sendBeacon = function () { return false; }; } catch (e) {}
+
+    /* 2. The device key: ipad.js reads it from the URL fragment. */
+    if (!location.hash || location.hash === "#") {
+        try { history.replaceState(null, "", "#demo-key"); } catch (e) { try { location.hash = "demo-key"; } catch (e2) {} }
+    }
+
+    /* 3. Catch ipad.js's 3 s poll so a demo pick starts at once (no 3 s wait). */
+    const realSetInterval = window.setInterval;
+    window.setInterval = function (fn, ms) {
+        if (ms === 3000 && !D.pollFn) D.pollFn = fn;
+        return realSetInterval.apply(window, arguments);
+    };
+    D.restoreTimers = function () { window.setInterval = realSetInterval; };
+    D.kick = function () { if (D.pollFn) D.pollFn(); };
+
+    /* 4. Idle-lock clock: 3x faster, plus "Idle +3 min". ipad.js only uses
+       Date.now() for the time since the last touch. */
+    const realNow = Date.now.bind(Date);
+    const t0 = realNow();
+    let skew = 0;
+    Date.now = function () { return t0 + (realNow() - t0) * 3 + skew; };
+    D.skip = function (ms) { skew += ms; };
+
+    /* ---- the mock server (same shapes as hub/checkin.py ipad_*) -------------- */
+    const clone = (x) => JSON.parse(JSON.stringify(x));
+    const nameRe = /^[a-z][a-z0-9_]{0,60}$/;
+
+    function shownQ(q, answers, index) {               // = checkin._shown / schema.is_shown
+        const nia = q.not_if_answered;
+        if (nia && answered(answers[nia])) return false;
+        const cond = q.show_if || {};
+        return Object.keys(cond).every((ref) => {
+            if (index[ref] && !shownQ(index[ref], answers, index)) return false;
+            const want = [].concat(cond[ref]);
+            const got = answers[ref];
+            const gots = Array.isArray(got) ? got : (got !== undefined && got !== null && got !== "" ? [got] : []);
+            return gots.some((g) => want.includes(g));
+        });
+    }
+    function answered(v) { return Array.isArray(v) ? v.length > 0 : !!(v !== undefined && v !== null && String(v).trim()); }
+    function cleanAnswers(raw) {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+        const out = {};
+        for (const k of Object.keys(raw)) {
+            const v = raw[k];
+            if (!nameRe.test(k)) return null;
+            if (typeof v === "string") out[k] = v.trim().slice(0, 2000);
+            else if (Array.isArray(v)) out[k] = v.filter((x) => String(x).trim()).map((x) => String(x).trim());
+            else if (v === null) continue;
+            else return null;
+        }
+        return out;
+    }
+    function setFor(s) { return DATA.sets[s.set]; }
+
+    function route(method, path, body) {
+        const s = D.slot;
+        if (method === "GET" && path === "/current") {
+            if (!s || !["sent", "filling", "paused"].includes(s.state)) return [200, { state: "idle" }];
+            if (s.state === "paused") return [200, { state: "paused" }];
+            return [200, { token: s.token, state: s.state }];
+        }
+        const m = path.match(/^\/session\/([^/]+)(?:\/(filling|draft|submit))?$/);
+        if (!m) return [404, { error: "Not found" }];
+        const token = decodeURIComponent(m[1]), act = m[2] || "";
+        const mine = s && s.token === token;
+        if (method === "GET" && !act) {
+            if (!mine || !["sent", "filling"].includes(s.state)) return [409, { gone: true }];
+            const out = { token: s.token, state: s.state, audience: s.audience, name: s.greeting,
+                          prefill: clone(s.prefill), version: DATA.version,
+                          questions: clone(setFor(s)), lists: clone(DATA.lists) };
+            if (s.resumed && s.draft) out.draft = clone({ answers: s.draft.answers, skipped: s.draft.skipped, idx: s.draft.idx });
+            return [200, out];
+        }
+        if (method === "POST" && act === "filling") {
+            if (!mine || !["sent", "filling"].includes(s.state)) return [409, { gone: true }];
+            if (s.state === "sent") s.state = "filling";
+            return [200, { ok: true }];
+        }
+        if (method === "POST" && act === "draft") {
+            if (!mine || !["sent", "filling", "paused"].includes(s.state)) return [409, { gone: true }];
+            if (s.state === "paused") return [200, { ok: true, state: "paused" }];
+            if (body && "answers" in body) {
+                const a = cleanAnswers(body.answers);
+                if (a === null) return [400, { error: "The answers could not be read." }];
+                s.draft = { answers: a, skipped: Array.from(new Set(body.skipped_screens || [])).sort(), idx: body.idx };
+            }
+            if (body && body.pause === true) { s.state = "paused"; delete s.resumed; banner(); }
+            return [200, { ok: true, state: s.state }];
+        }
+        if (method === "POST" && act === "submit") {
+            const answers = cleanAnswers(body && body.answers);
+            if (answers === null) return [400, { error: "The answers could not be read." }];
+            const skipped = (body && body.skipped_screens) || [];
+            if (!mine || !["sent", "filling"].includes(s.state)) {
+                return D.last && D.last.token === token ? [200, { ok: true, already: true }] : [409, { gone: true }];
+            }
+            const set = setFor(s);
+            const index = {};
+            set.screens.forEach((sc) => sc.questions.forEach((q) => { index[q.id] = q; }));
+            for (const sc of set.screens) {
+                if (skipped.includes(sc.id) && sc.skippable) continue;
+                for (const q of sc.questions) {
+                    if (!q.required || q.type === "info") continue;
+                    if (shownQ(q, answers, index) && !answered(answers[q.id])) {
+                        return [400, { error: "Please fill in: " + (q.label || q.id), field: q.id }];
+                    }
+                }
+            }
+            s.state = "submitted";
+            D.last = Object.assign({}, s, { answers: answers, skipped_screens: Array.from(new Set(skipped)).sort(),
+                                            submitted: new Date().toISOString(), questions_version: DATA.version });
+            D.slot = null;
+            banner();
+            setTimeout(showResult, 2500);
+            return [200, { ok: true }];
+        }
+        return [404, { error: "Not found" }];
+    }
+
+    window.fetch = function (input, init) {
+        init = init || {};
+        const url = typeof input === "string" ? input : (input && input.url) || "";
+        const m = url.match(/^\/api\/checkin\/ipad(\/.*)$/);
+        if (!m) return Promise.reject(new TypeError("Demo: no network"));
+        const headers = init.headers || {};
+        return new Promise((resolve) => setTimeout(() => {
+            let status, data;
+            if (!headers["X-Checkin-Key"]) { status = 401; data = { error: "No key" }; }
+            else {
+                let body = null;
+                try { body = init.body ? JSON.parse(init.body) : null; } catch (e) { body = null; }
+                [status, data] = route(String(init.method || "GET").toUpperCase(), m[1], body);
+            }
+            resolve(new Response(JSON.stringify(data), { status: status, headers: { "Content-Type": "application/json" } }));
+        }, 120));
+    };
+
+    /* ---- start a demo path (what reception's "Send to iPad" does) ------------- */
+    function token() {
+        const a = new Uint8Array(16);
+        (window.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach((_, i) => { a[i] = (Math.random() * 256) | 0; });
+        return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
+    }
+    function greeting(p) {
+        if (String(p.preferred_name || "").trim()) return String(p.preferred_name).trim();
+        return String(p.given_name || "").split(/\s+/)[0] || "";
+    }
+    D.startPath = function (id) {
+        const p = DATA.paths.find((x) => x.id === id);
+        if (!p) return;
+        const prefill = Object.assign({}, p.prefill);
+        if (p.booking_reason) prefill.booking_reason = p.booking_reason;
+        D.path = p;
+        D.slot = { token: token(), state: "sent", audience: p.audience, set: p.set, returning: !!p.returning,
+                   last_exam: p.last_exam || "", prefill: prefill, greeting: greeting(prefill) };
+        D.last = null;
+        document.getElementById("demo-pick").hidden = true;
+        document.getElementById("demo-result").hidden = true;
+        banner();
+        D.kick();
+    };
+
+    /* ---- demo banner ------------------------------------------------------------ */
+    function banner() {
+        const r = document.querySelector('#demo-banner [data-demo="resume"]');
+        if (r) r.hidden = !(D.slot && D.slot.state === "paused");
+    }
+    D.banner = banner;
+    function onDemoControl(ev) {
+        const b = ev.target && ev.target.closest && ev.target.closest("#demo-banner button, #demo-pick button, #demo-result button");
+        if (!b) return;
+        // Demo controls are not a patient's touch: keep them away from ipad.js
+        // (its touch timer and its click handler).
+        ev.stopPropagation();
+        if (ev.type !== "click") return;
+        ev.preventDefault();
+        const act = b.dataset.demo;
+        if (act === "restart") { location.reload(); }
+        else if (act === "idle") { D.skip(3 * 60 * 1000); }
+        else if (act === "resume") {
+            if (D.slot && D.slot.state === "paused") { D.slot.state = "sent"; D.slot.resumed = true; banner(); D.kick(); }
+        }
+        else if (act === "path") { D.startPath(b.dataset.path); }
+        else if (act === "fit") {
+            const on = document.documentElement.classList.toggle("demo-fit");
+            b.setAttribute("aria-pressed", String(on));
+            b.textContent = "Phone fit for the button bar: " + (on ? "on (demo only)" : "off");
+        }
+        else if (act === "close") { document.getElementById("demo-result").hidden = true; }
+    }
+    ["pointerdown", "touchstart", "keydown", "input", "click"].forEach((t) =>
+        window.addEventListener(t, onDemoControl, true));
+
+    /* ---- "what reception would see": a JS port of the engine's compose.py ------ */
+    const CRLF = "\r\n";
+    const BOXES = [["complaint", "Reason for visit"], ["general_health", "General health"],
+                   ["past_ocular", "Past ocular history"], ["family_ocular", "Family ocular history"]];
+    function indexOf(set) { const o = {}; set.screens.forEach((sc) => sc.questions.forEach((q) => { o[q.id] = q; })); return o; }
+    function lineLabel(q) { return String(q.short || q.label || "").trim().replace(/[?:]+$/, "").trim(); }
+    function noneValues(q) { const v = q.none_value; return typeof v === "string" ? (v ? [v] : []) : (Array.isArray(v) ? v : []); }
+    function ticks(q, value) {
+        let vals = value.map((v) => String(v).trim()).filter(Boolean);
+        const nones = noneValues(q);
+        if (nones.length && vals.some((v) => !nones.includes(v))) vals = vals.filter((v) => !nones.includes(v));
+        return vals;
+    }
+    function answerText(q, value) {
+        if (Array.isArray(value)) return ticks(q, value).join(", ");
+        if (value === undefined || value === null) return "";
+        return String(value).replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim().replace(/\n/g, CRLF);
+    }
+    function soft(t) { return t.length > 1 && t[0] === t[0].toUpperCase() && t[0] !== t[0].toLowerCase() && !(t[1] === t[1].toUpperCase() && t[1] !== t[1].toLowerCase()) ? t[0].toLowerCase() + t.slice(1) : t; }
+    function followText(f, value) {
+        let t = answerText(f, value);
+        if (["choice", "multi", "yesno"].includes(f.type) && !f.keep_case) t = t.split(", ").map((x) => soft(x.trim())).join(", ");
+        return t;
+    }
+    function parentOf(q) { if (!q.follow_up) return null; const k = Object.keys(q.show_if || {}); return k.length === 1 ? k[0] : null; }
+    function attachOption(q) {
+        const ref = parentOf(q); if (ref === null) return null;
+        const want = q.show_if[ref];
+        if (Array.isArray(want)) return want.length === 1 ? want[0] : null;
+        return want;
+    }
+    function merges(q, index) { const ref = parentOf(q); return !!(ref && index[ref] && index[ref].target === q.target); }
+    function mergedText(q, answers, follows) {
+        const value = answers[q.id];
+        if (!follows.length) return answerText(q, value);
+        const perOpt = {}, after = [];
+        follows.forEach((f) => {
+            const t = followText(f, answers[f.id]);
+            if (!t) return;
+            const opt = attachOption(f);
+            if (opt !== null) { const lab = String(f.attach_label || "").trim(); (perOpt[opt] = perOpt[opt] || []).push(lab ? lab + ": " + t : t); }
+            else after.push(lineLabel(f) + ": " + t);
+        });
+        let base;
+        if (Array.isArray(value)) base = ticks(q, value).map((v) => perOpt[v] ? v + " (" + perOpt[v].join(", ") + ")" : v).join(", ");
+        else { base = answerText(q, value); if (perOpt[base]) base = base + " (" + perOpt[base].join(", ") + ")"; }
+        if (!base) return "";
+        return [base].concat(after).join(". ");
+    }
+    function parseDMY(v) { const m = String(v || "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return m ? { d: +m[1], m: +m[2], y: +m[3] } : null; }
+    function ageOn(dob, t) { const d = parseDMY(dob); if (!d) return null; return t.getFullYear() - d.y - ((t.getMonth() + 1 < d.m || (t.getMonth() + 1 === d.m && t.getDate() < d.d)) ? 1 : 0); }
+    function fired(m, answers, booking, age) {
+        const t = m.triggers || {}, out = [];
+        const text = String(booking || "").toLowerCase();
+        if (text && (t.booking || []).some((w) => text.includes(String(w).toLowerCase()))) out.push("booking");
+        if (age !== null && Number.isInteger(t.age_min) && age >= t.age_min) out.push("age");
+        Object.keys(t.answers || {}).forEach((ref) => {
+            const want = [].concat(t.answers[ref]); const got = answers[ref];
+            const gots = Array.isArray(got) ? got : (answered(got) ? [got] : []);
+            if (gots.some((g) => want.includes(g))) out.push(ref);
+        });
+        return out;
+    }
+    function screenOrder(set, answers, booking, age) {          // = schema.screen_order
+        const core = set.screens.filter((s) => !s.module).map((s) => s.id);
+        const where = {}; set.screens.forEach((s) => s.questions.forEach((q) => { where[q.id] = s.id; }));
+        const mods = {}; (set.modules || []).forEach((m) => { mods[m.id] = m; });
+        const slot = {};
+        set.screens.forEach((s) => {
+            if (!s.module || !mods[s.module]) return;
+            const why = fired(mods[s.module], answers, booking, age);
+            if (!why.length) return;
+            let pos = Math.max(0, core.indexOf(mods[s.module].after));
+            if (!why.some((f) => f === "booking" || f === "age")) {
+                const srcs = why.map((f) => core.indexOf(where[f])).filter((i) => i >= 0);
+                if (srcs.length) pos = Math.max(pos, Math.min.apply(null, srcs));
+            }
+            (slot[core[pos]] = slot[core[pos]] || []).push(s.id);
+        });
+        const out = []; core.forEach((c) => { out.push(c); (slot[c] || []).forEach((x) => out.push(x)); });
+        return out;
+    }
+    function ctxOf(sess) {
+        const dob = sess.answers.dob || sess.prefill.dob;
+        return { booking: String(sess.prefill.booking_reason || ""), age: ageOn(dob, new Date()) };
+    }
+    function effectiveAnswers(set, sess) {
+        const answers = sess.answers, skipped = new Set(sess.skipped_screens || []);
+        const c = ctxOf(sess);
+        const open = new Set(screenOrder(set, answers, c.booking, c.age));
+        const index = indexOf(set);
+        const asked = [];
+        set.screens.forEach((s) => { if (open.has(s.id)) s.questions.forEach((q) => asked.push([s, q])); });
+        const follows = {};
+        asked.forEach(([, q]) => { if (merges(q, index) && shownQ(q, answers, index)) (follows[parentOf(q)] = follows[parentOf(q)] || []).push(q); });
+        const out = [];
+        asked.forEach(([s, q]) => {
+            if (skipped.has(s.id) || q.type === "info") return;
+            if (merges(q, index) || !shownQ(q, answers, index)) return;
+            const t = mergedText(q, answers, follows[q.id] || []);
+            if (t) out.push([s, q, t]);
+        });
+        return out;
+    }
+    function ddmmyyyy(d) { return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear(); }
+    function composeExamNotes(set, sess) {
+        const header = "Patient-entered on iPad, " + ddmmyyyy(new Date()) + ":";
+        const boxes = {}, subs = {};
+        BOXES.forEach(([k]) => { boxes[k] = []; subs[k] = {}; });
+        effectiveAnswers(set, sess).forEach(([, q, t]) => {
+            const target = q.target || "";
+            if (!target.startsWith("exam.")) return;
+            const box = target.split(".")[1];
+            const line = lineLabel(q) + ": " + t;
+            const sub = String(q.subhead || "").trim();
+            if (sub) (subs[box][sub] = subs[box][sub] || []).push("  " + line);
+            else boxes[box].push(line);
+        });
+        if (sess.last_exam && (boxes.past_ocular.length || Object.keys(subs.past_ocular).length)) {
+            boxes.past_ocular.unshift("Last exam here (Optomate): " + sess.last_exam);
+        }
+        const out = {};
+        BOXES.forEach(([k]) => {
+            const lines = boxes[k].slice();
+            Object.keys(subs[k]).forEach((sub) => { lines.push(sub + ":"); subs[k][sub].forEach((l) => lines.push(l)); });
+            out[k] = lines.length ? [header].concat(lines).join(CRLF) : "";
+        });
+        return out;
+    }
+    function infoText(set, small) {
+        for (const s of set.screens) for (const q of s.questions) {
+            if (q.type === "info" && q.target === "screen" && (q.style === "small") === small) return q.text || "";
+        }
+        return "";
+    }
+    function submittedBy(sess) {
+        if (sess.audience !== "child") return "the patient";
+        const name = String(sess.answers.guardian_name || "").split(/\s+/).filter(Boolean).join(" ");
+        const rel = String(sess.answers.guardian_relationship || "").split(/\s+/).filter(Boolean).join(" ");
+        if (name && rel) return name + " (" + rel + "), parent or guardian";
+        if (name || rel) return (name || rel) + ", parent or guardian";
+        return "a parent or guardian (name not given)";
+    }
+    function composeNotesBlock(set, sess) {
+        const lines = ["--- iPad check-in " + ddmmyyyy(new Date()) + " (form " + DATA.version + ") ---"];
+        const consent = infoText(set, false);
+        if (consent) lines.push("Consent shown: " + consent);
+        lines.push("Submitted on iPad by: " + submittedBy(sess));
+        effectiveAnswers(set, sess).forEach(([, q, t]) => {
+            if (q.id === "guardian_name" || q.id === "guardian_relationship") return;
+            if (q.field === "source" || q.target === "notes") lines.push(lineLabel(q) + ": " + t);
+        });
+        lines.push("Check-in ref: " + sess.token);
+        return lines.join(CRLF);
+    }
+    function norm(v) { return String(v || "").replace(/\s+/g, " ").trim().toLowerCase(); }
+    function detailRows(set, sess) {
+        const index = indexOf(set), skipped = new Set(sess.skipped_screens || []);
+        const rows = [];
+        set.screens.forEach((s) => s.questions.forEach((q) => {
+            if (q.target !== "patient") return;
+            const old = sess.prefill[q.field] || "";
+            let v = (skipped.has(s.id) || !shownQ(q, sess.answers, index)) ? "" : (sess.answers[q.id] || "");
+            if (Array.isArray(v)) v = v.join(", ");
+            if (v && q.field === "source" && q.optomate_names && q.optomate_names[v]) v = q.optomate_names[v];
+            const same = !v || (q.field === "phone_mobile" ? old.replace(/\D/g, "") === v.replace(/\D/g, "") : norm(old) === norm(v));
+            if (!old && !v) return;
+            rows.push({ label: lineLabel(q), old: old, now: v || old, changed: !same });
+        }));
+        return rows;
+    }
+    function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+    function modulesOpened(set, sess) {
+        const c = ctxOf(sess);
+        return (set.modules || []).map((m) => {
+            const why = fired(m, sess.answers, c.booking, c.age);
+            if (!why.length) return null;
+            const words = why.map((w) => w === "booking" ? "booking reason" : w === "age" ? "age " + m.triggers.age_min + "+" : "a tap");
+            return m.subhead + " (" + Array.from(new Set(words)).join(", ") + ")";
+        }).filter(Boolean);
+    }
+
+    function showResult() {
+        const sess = D.last;
+        if (!sess) return;
+        const set = setFor(sess);
+        const notes = composeExamNotes(set, sess);
+        const block = composeNotesBlock(set, sess);
+        const rows = detailRows(set, sess);
+        const mods = modulesOpened(set, sess);
+        D.result = { exam: notes, notes_block: block, details: rows, modules: mods };
+        const skipped = new Set(sess.skipped_screens || []);
+        const c = ctxOf(sess);
+        const order = screenOrder(set, sess.answers, c.booking, c.age);
+        const byId = {}; set.screens.forEach((s) => { byId[s.id] = s; });
+        const raw = order.map((sid) => {
+            const s = byId[sid];
+            const items = s.questions.filter((q) => q.type !== "info" && answered(sess.answers[q.id]))
+                .map((q) => `<tr><td>${esc(q.label)}</td><td>${esc([].concat(sess.answers[q.id]).join(", "))}</td></tr>`).join("");
+            return `<h3>${esc(s.title)}${skipped.has(sid) ? " (skipped)" : ""}</h3>` +
+                (items ? `<table>${items}</table>` : `<p class="demo-empty">Nothing answered.</p>`);
+        }).join("");
+        const p = D.path || {};
+        document.getElementById("demo-result").innerHTML = `<div class="demo-in">
+            <h2>Demo: what reception would see</h2>
+            <p class="demo-small">${esc(p.title || "")}. Text built in this page by a copy of the engine's rules (compose.py); nothing was saved.</p>
+            <h3>Extra screens opened</h3>
+            <p>${mods.length ? mods.map(esc).join("<br>") : "None"}</p>
+            <h3>Today's exam: history boxes</h3>
+            ${BOXES.map(([k, name]) => `<div class="demo-box"><div class="demo-boxname">${esc(name)}</div>
+                ${notes[k] ? `<pre>${esc(notes[k])}</pre>` : `<div class="demo-empty">Empty</div>`}</div>`).join("")}
+            <h3>Patient notes (added to the record)</h3>
+            <pre>${esc(block)}</pre>
+            <h3>Details</h3>
+            ${rows.length ? `<table><tr><th>Field</th><th>On file</th><th>From iPad</th></tr>${rows.map((r) =>
+                `<tr><td>${esc(r.label)}</td><td>${esc(r.old) || "&ndash;"}</td><td${r.changed ? ` class="demo-ch"` : ""}>${r.changed ? esc(r.now) + " (new)" : "same"}</td></tr>`).join("")}</table>`
+                : `<p class="demo-empty">Nothing.</p>`}
+            <p class="demo-small">Details are simplified: the real check screen also validates each field against Optomate.</p>
+            <details><summary>Every answer, by screen</summary>${raw}</details>
+            <div class="demo-actions">
+                <button type="button" class="demo-go" data-demo="restart">Restart demo</button>
+                <button type="button" data-demo="close">Close</button>
+            </div></div>`;
+        const el = document.getElementById("demo-result");
+        el.hidden = false;
+        el.scrollTop = 0;
+    }
+    D.showResult = showResult;
+
+    /* ---- the path picker ------------------------------------------------------- */
+    document.getElementById("demo-paths").innerHTML = DATA.paths.map((p) =>
+        `<button type="button" data-demo="path" data-path="${esc(p.id)}"><b>${esc(p.title)}</b><span>${esc(p.blurb)}</span></button>`).join("");
+})();
+</script>
+<script>
+/* ===== real ipad.js (unchanged) ===== */
+__IPAD_JS__
+</script>
+<script>
+"use strict";
+window.__demo.restoreTimers();
+</script>
+</body>
+</html>

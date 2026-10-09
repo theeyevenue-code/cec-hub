@@ -2286,13 +2286,45 @@ async function ciCall(url, body) {
     return { status: res.status, data };
 }
 
+/* Staff guard (Codex #1): a computer other than the server unlocks Check-in once
+   with the staff code; the server sets an HttpOnly cookie. The iPad never can. */
+function ciLocked(r) {
+    return r && r.status === 403 && r.data && r.data.staff_needed;
+}
+
+function ciUnlockPanel(d, after) {
+    view.innerHTML = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Check-in</h1>
+        <div class="card ci-unlock">
+            <h2>Unlock Check-in on this computer</h2>
+            ${d.code_set === false
+                ? `<p>No staff code is set up yet. Ask Mark, or use the Hub on the server.</p>`
+                : `<p>Type the staff code once. This computer then stays unlocked.</p>
+                   <form id="ci-unlock" class="ci-find">
+                       <input id="ci-code" type="password" autocomplete="off" aria-label="Staff code" placeholder="Staff code">
+                       <button class="btn" type="submit">Unlock</button>
+                   </form>`}
+            <div id="ci-unlock-msg" class="ci-muted"></div>
+        </div>`;
+    const f = document.getElementById("ci-unlock");
+    if (!f) return;
+    document.getElementById("ci-code").focus();
+    f.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const r = await ciCall("/api/checkin/staff/unlock", { code: document.getElementById("ci-code").value });
+        if (r.status === 200 && r.data.ok) { after(); return; }
+        document.getElementById("ci-unlock-msg").textContent = r.data.error || "That didn't work.";
+    });
+}
+
 function ciBanner(d) {
     if (d && d.dry_run === false) return "";
     return `<div class="ci-banner">Test mode - nothing is saved to Optomate${
         d && d.fixture ? " <span class=\"ci-banner-sub\">· fake ZZTEST patients</span>" : ""}</div>`;
 }
 
-const CI_CHIP = { "Not sent": "ci-chip-none", "On the iPad": "ci-chip-ipad",
+const CI_CHIP = { "Not sent": "ci-chip-none", "On the iPad": "ci-chip-ipad", "Paused": "ci-chip-ready",
                   "Ready to check": "ci-chip-ready", "Saved": "ci-chip-saved" };
 
 function ciChip(status) {
@@ -2313,7 +2345,9 @@ async function ciSend(payload, note) {
         const who = r.data.name || "someone";
         const q = r.data.state === "filling"
             ? `${who} is filling in the form on the iPad right now.\n\nReplace it? Their answers so far will be lost.`
-            : `The iPad is waiting for ${who}.\n\nReplace it?`;
+            : r.data.state === "paused"
+                ? `${who}'s form is paused (the iPad was left untouched).\n\nReplace it? Their answers so far will be lost.`
+                : `The iPad is waiting for ${who}.\n\nReplace it?`;
         if (!window.confirm(q)) return false;
         r = await ciCall("/api/checkin/send", { ...payload, replace: true });
     }
@@ -2358,6 +2392,7 @@ function renderCheckin() {
         const q = document.getElementById("ci-q").value;
         found.innerHTML = `<div class="ci-muted">Searching…</div>`;
         const r = await ciCall("/api/checkin/search", { q });
+        if (ciLocked(r)) { ciUnlockPanel(r.data, renderCheckin); return; }
         if (r.status !== 200 || r.data.error) {
             found.innerHTML = `<div class="ci-muted">${esc(r.data.error || "Search didn't work.")}</div>`;
             return;
@@ -2369,7 +2404,7 @@ function renderCheckin() {
             <tbody>${ps.map((p) => `<tr>
                 <td><strong>${esc(p.surname)}</strong>, ${esc(p.given)}</td>
                 <td class="ci-num">${esc(p.dob)}</td><td>${esc(p.suburb)}</td>
-                <td>${ciFormSelect("p" + p.id, ciIsChild(p.dob) ? "child" : "adult")}</td>
+                <td>${ciFormSelect("p" + p.id, p.is_child ? "child" : "adult")}</td>
                 <td><button class="btn ci-send" data-pid="${esc(p.id)}">Send to iPad</button></td></tr>`).join("")}
             </tbody></table>
             ${r.data.more ? `<div class="ci-more">More matches - type more of the name</div>` : ""}`;
@@ -2404,14 +2439,8 @@ function renderCheckin() {
     }, 10000);
 }
 
-function ciIsChild(dob) {
-    const m = String(dob || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (!m) return false;
-    const now = new Date();
-    let age = now.getFullYear() - Number(m[3]);
-    if (now.getMonth() + 1 < Number(m[2]) || (now.getMonth() + 1 === Number(m[2]) && now.getDate() < Number(m[1]))) age--;
-    return age < 18;
-}
+/* No age sum here: Adult / Child comes from the engine's one rule (under 16 on
+   the visit date = child form; checkin/plan.py CHILD_UNDER), as is_child. */
 
 async function ciLoadToday(quiet) {
     const box = document.getElementById("ci-today");
@@ -2421,6 +2450,7 @@ async function ciLoadToday(quiet) {
         if (!quiet) box.innerHTML = errorPanel("The Hub didn't answer.");
         return;
     }
+    if (ciLocked(r)) { clearInterval(ciTimer); ciUnlockPanel(r.data, renderCheckin); return; }
     const d = r.data || {};
     document.getElementById("ci-banner").innerHTML = ciBanner(d);
     if (d.connected === false) { box.innerHTML = `<div class="empty-panel">${esc(d.message || d.error)}</div>`; return; }
@@ -2429,6 +2459,10 @@ async function ciLoadToday(quiet) {
     const slot = document.getElementById("ci-slot");
     slot.innerHTML = !d.ipad_ready
         ? `<div class="ci-slot ci-slot-warn">The iPad isn't set up yet: no device key in config\\integrations.json (README, "iPad setup").</div>`
+        : d.ipad && d.ipad.state === "paused"
+            ? `<div class="ci-slot ci-slot-paused"><span><strong>${esc(d.ipad.name)}</strong>: the iPad was left untouched, so the form is hidden. Answers are kept.</span>
+                <button class="btn" data-resume="${esc(d.ipad.token)}">Resume on the iPad</button>
+                <button class="btn btn-quiet ci-small" data-off="${esc(d.ipad.token)}">Take it off the iPad</button></div>`
         : d.ipad
             ? `<div class="ci-slot">On the iPad now: <strong>${esc(d.ipad.name)}</strong>
                 ${d.ipad.state === "filling" ? "- filling in the form" : "- waiting to start"}
@@ -2445,6 +2479,7 @@ async function ciLoadToday(quiet) {
             if (a.status === "Not sent") btn = `<button class="btn ci-send" data-aid="${esc(a.appointment_id)}">Send to iPad</button>`;
             else if (a.status === "Ready to check" && a.token) btn = `<a class="btn" href="#/checkin/${esc(a.token)}">Check</a>`;
             else if (a.status === "On the iPad" && a.token) btn = `<button class="btn btn-quiet ci-small" data-off="${esc(a.token)}">Take it off</button>`;
+            else if (a.status === "Paused" && a.token) btn = `<button class="btn" data-resume="${esc(a.token)}">Resume on the iPad</button>`;
             return `<tr class="${a.status === "Saved" ? "ci-row-done" : ""}">
                 <td class="ci-num"><strong>${esc(a.time)}</strong></td>
                 <td>${esc(a.name)}${a.has_exam_today ? ` <span class="ci-muted">· exam open</span>` : ""}</td>
@@ -2475,6 +2510,12 @@ async function ciLoadToday(quiet) {
         await ciCall(`/api/checkin/session/${b.dataset.off}/discard`, {});
         ciLoadToday(true);
     }));
+    view.querySelectorAll("[data-resume]").forEach((b) => b.addEventListener("click", async () => {
+        b.disabled = true;
+        const rr = await ciCall(`/api/checkin/session/${b.dataset.resume}/resume`, {});
+        if (rr.status !== 200) window.alert(rr.data.error || "That didn't work.");
+        ciLoadToday(true);
+    }));
 }
 
 function ciWhen(iso) {
@@ -2491,6 +2532,17 @@ const CI_BOXES = [["complaint", "Reason for visit"], ["general_health", "General
                   ["past_ocular", "Past ocular history"], ["family_ocular", "Family ocular history"]];
 
 let ciChooseOptom = false;
+
+/* "Last exam here: 14 Mar 2024" (read from Optomate - a returning patient is
+   not asked) and which extra question screens the form opened (v5 modules). */
+function ciVisitLine(plan) {
+    const parts = [];
+    if (plan.last_exam_here) parts.push(`Last exam here: <strong>${esc(plan.last_exam_here.text)}</strong>`);
+    else if (!plan.is_new_patient) parts.push("No exam here before");
+    const mods = (plan.modules || []).map((m) => esc(m.name));
+    if (mods.length) parts.push(`Extra questions: ${mods.join(", ")}`);
+    return parts.length ? `<p class="ci-visit">${parts.join(" · ")}</p>` : "";
+}
 
 function ciHeadline(plan) {
     if (!plan.can_save) return "Can't save yet.";
@@ -2551,6 +2603,7 @@ async function renderCheckinCheck(token, flash) {
     if (flash === undefined) view.innerHTML = `<div class="loading-panel">Getting the form…</div>`;
     const y = window.scrollY;
     const r = await ciCall(`/api/checkin/session/${token}`);
+    if (ciLocked(r)) { ciUnlockPanel(r.data, () => renderCheckinCheck(token)); return; }
     const d = r.data || {};
     const back = `<a class="btn btn-quiet btn-back" href="#/checkin">← Check-in</a>`;
     if (r.status !== 200 || d.connected === false) {
@@ -2620,8 +2673,15 @@ async function renderCheckinCheck(token, flash) {
     view.innerHTML = `${back}${ciBanner(d)}
         ${flash ? `<div class="ci-flash">${esc(flash)}</div>` : ""}
         <h1 class="page-title">${esc(s.name)}${plan.is_new_patient ? ` <span class="ci-tag">new patient</span>` : ""}</h1>
-        <div class="ci-answer${plan.can_save ? "" : " ci-answer-stop"}">${esc(ciHeadline(plan))}</div>
-        ${blockers.length ? `<ul class="ci-blockers">${blockers.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
+        ${ciVisitLine(plan)}
+        <div class="ci-top">
+            <div>
+                <div class="ci-answer${plan.can_save ? "" : " ci-answer-stop"}">${esc(ciHeadline(plan))}</div>
+                ${blockers.length ? `<ul class="ci-blockers">${blockers.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
+            </div>
+            ${warnings.length ? `<div class="ci-checkthese"><h2>Check these</h2><ul class="ci-warnings">${warnings.map((w) =>
+                `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
+        </div>
         ${optomHTML}
         ${dupHTML}
         <div class="card">
@@ -2637,17 +2697,16 @@ async function renderCheckinCheck(token, flash) {
                 </details>` : ""}
         </div>
         <div class="card"><h2>Today's exam history</h2>${examHTML}</div>
-        ${plan.notes_append ? `<div class="card"><h2>Patient notes - added to the end</h2>
-            <div class="ci-box-text ci-notes">${esc(plan.notes_append)}</div></div>` : ""}
-        ${warnings.length ? `<div class="card"><h2>Check these</h2><ul class="ci-warnings">${warnings.map((w) =>
-            `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
-        <p class="ci-pdf"><a href="/checkin/pdf/${esc(s.token)}" target="_blank" rel="noopener">Signed form (PDF)</a></p>
-        <div class="ci-savebar">
+        ${plan.notes_append ? `<div class="card"><details class="ci-fold ci-notes-fold">
+            <summary>Patient notes added to the end (consent, who sent it, form reference)</summary>
+            <div class="ci-box-text ci-notes">${esc(plan.notes_append)}</div></details></div>` : ""}
+        <div id="ci-result">${s.test_saved && !live ? `<p class="ci-muted">Test-saved at ${esc(ciWhen(s.test_saved))}. Nothing was written.</p>` : ""}</div>
+        <div class="ci-savebar" role="region" aria-label="Save">
+            <span class="ci-savebar-what">${esc(ciHeadline(plan))}</span>
+            <button class="btn btn-quiet" id="ci-discard">Discard this form</button>
             <button class="btn ci-save" id="ci-save"${plan.can_save ? "" : " disabled"}>
                 ${live ? "Save to Optomate" : "Test save (nothing is written)"}</button>
-            <button class="btn btn-quiet" id="ci-discard">Discard this form</button>
-        </div>
-        <div id="ci-result">${s.test_saved && !live ? `<p class="ci-muted">Test-saved at ${esc(ciWhen(s.test_saved))}. Nothing was written.</p>` : ""}</div>`;
+        </div>`;
     window.scrollTo(0, flash ? 0 : y);
 
     const override = async (body) => {
@@ -2680,7 +2739,7 @@ async function renderCheckinCheck(token, flash) {
         ciCopy((exam.notes || {})[b.dataset.copy] || "", b)));
 
     document.getElementById("ci-discard").addEventListener("click", async () => {
-        if (!window.confirm("Discard this form? The answers and signature are deleted. Nothing goes into Optomate.")) return;
+        if (!window.confirm("Discard this form? The answers are deleted. Nothing goes into Optomate.")) return;
         await ciCall(`/api/checkin/session/${token}/discard`, {});
         location.hash = "#/checkin";
     });
@@ -2702,8 +2761,7 @@ async function renderCheckinCheck(token, flash) {
             out.innerHTML = `<div class="card ci-done">
                 <h2>Test save done - nothing was written to Optomate.</h2>
                 <p>A real save would:</p>
-                <ul>${items.map((i) => `<li>${esc(i)}</li>`).join("")}
-                    <li>Keep the signed form: ${esc(String(res.pdf || "").split(/[\\/]/).pop())}</li></ul>
+                <ul>${items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
                 ${(res.would_save.exam || {}).action === "create" ? `<p class="ci-exam-rule">${esc(CI_EXAM_RULE)}</p>` : ""}</div>`;
             saveBtn.disabled = false;
             return;

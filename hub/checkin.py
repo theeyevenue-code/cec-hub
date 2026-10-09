@@ -14,19 +14,36 @@ The form itself lives ONLY in the engine's session folder,
 machine). Nothing patient-identifying goes to hub.log (patient ID and state
 only), to a tracked file, to a URL query string, or to the browser's storage.
 
-Session states: sent -> filling -> submitted -> saved | discarded.
-- One iPad slot: the session in state sent/filling. Sending another asks first,
-  then the old one is discarded.
-- discarded = the file is deleted at once (answers and signature go with it).
+Session states: sent -> filling -> submitted -> saved | discarded, and
+filling -> paused -> sent (the iPad's inactivity lock, resumed by reception).
+- One iPad slot: the session in state sent/filling/paused. Sending another asks
+  first, then the old one is discarded.
+- paused = the iPad was left untouched (about 5 minutes): it hid the form and
+  shows "Please return the iPad to reception". The answers so far are kept HERE
+  as a draft (never on the iPad); only a staff "Resume on the iPad" brings them
+  back.
+- discarded = the file is deleted at once (answers go with it).
 - A LIVE save that the engine reports as saved deletes the file at once; the
-  engine keeps the signed PDF and the journal. A small marker (IDs only) lets
-  today's list say "Saved".
+  engine keeps its journal. A small marker (IDs only) lets today's list say
+  "Saved".
+- No signature and no signed PDF (Mark, 9 Oct 2026: the paper form never had
+  one). The last iPad screen is "Check and send"; the dated Optomate note quotes
+  the consent sentence and says who sent the form.
 - In dry run the session is kept so it can be checked again; staff discard it.
-- Files older than 24 hours that are not `submitted` are purged.
+- Forms not yet submitted (sent / filling / paused) are deleted 2 days after
+  they were made (Mark, 9 Oct 2026). Submitted forms wait for staff to check,
+  save or discard them.
+- A submitted form's token is remembered (as a hash, 2 days) so an iPad that
+  lost the "received" answer and sends again is told "received", not "gone".
+
+Staff vs iPad (Codex #1, 9 Oct 2026): the device key opens the iPad routes
+ONLY. Every staff route goes through app.py's staff guard: a request carrying
+the device key is refused outright, and otherwise the request must come from
+the server itself or from a browser unlocked once with the staff code
+(staff_cookie_value / staff_code_ok below).
 """
 
-import base64
-import binascii
+import hashlib
 import hmac
 import json
 import logging
@@ -46,16 +63,22 @@ TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")          # question ids / logical fields
 SEARCH_STRIP_RE = re.compile(r"[^A-Za-zÀ-ɏ' .-]")
-SIG_PREFIX = "data:image/png;base64,"
 
 AUDIENCES = ("adult", "child")
-SLOT_STATES = ("sent", "filling")
+SLOT_STATES = ("sent", "filling", "paused")       # the one form the iPad slot holds
+IPAD_STATES = ("sent", "filling")                 # ...and the ones the iPad may open
 STATUS_WORDS = {None: "Not sent", "sent": "On the iPad", "filling": "On the iPad",
-                "submitted": "Ready to check", "saved": "Saved", "discarded": "Not sent"}
+                "paused": "Paused", "submitted": "Ready to check", "saved": "Saved",
+                "discarded": "Not sent"}
 
-PURGE_AFTER = timedelta(hours=24)
+PURGE_AFTER = timedelta(days=2)                   # unsubmitted forms (Mark, 9 Oct 2026)
+RECEIPT_KEEP = timedelta(days=2)
+MAX_SCREEN_INDEX = 30
+STAFF_COOKIE = "cec_checkin_staff"
+STAFF_COOKIE_DAYS = 400
+UNLOCK_TRIES = 5                                  # wrong staff codes ...
+UNLOCK_WINDOW_S = 15 * 60                         # ... per 15 minutes, then a 15-minute wait
 LISTS_MAX_AGE_S = 600
-MAX_SIGNATURE_CHARS = 2_000_000
 MAX_ANSWERS = 300
 MAX_TEXT = 2000
 MAX_EDIT = 200
@@ -67,7 +90,7 @@ CHANGED = "The record changed - check it again"
 # than the one this module reads and writes.
 _ENGINE_ONLY_ENV = ("CHECKIN_DRY_RUN", "CHECKIN_LIVE_WRITES", "CHECKIN_DATA_DIR")
 
-TIMEOUTS = {"save": 240, "pdf": 120}
+TIMEOUTS = {"save": 240}
 DEFAULT_TIMEOUT = 60
 
 NOT_CONNECTED = "The check-in engine isn't connected on this computer yet."
@@ -120,6 +143,53 @@ def ipad_key(cfg: dict) -> str:
 def key_ok(cfg: dict, given) -> bool:
     key = ipad_key(cfg)
     return bool(key) and hmac.compare_digest(key.encode(), str(given or "").encode())
+
+
+# ---- staff side (Codex #1) ---------------------------------------------------
+
+def staff_code(cfg: dict) -> str:
+    """config\\integrations.json checkin.staff_code: what a front-desk computer
+    types once to unlock Check-in. A placeholder or under 6 characters = not set
+    (then only the server itself can use Check-in)."""
+    code = str(((cfg or {}).get("checkin") or {}).get("staff_code") or "").strip()
+    if len(code) < 6 or code.upper().startswith("CHANGE"):
+        return ""
+    return code
+
+
+def staff_cookie_value(cfg: dict) -> str:
+    """The unlocked-computer cookie: derived from the staff code, so changing
+    the code locks every computer out again. '' when no code is set."""
+    code = staff_code(cfg)
+    if not code:
+        return ""
+    return hmac.new(code.encode(), b"cec-checkin-staff-v1", "sha256").hexdigest()
+
+
+def staff_cookie_ok(cfg: dict, given) -> bool:
+    want = staff_cookie_value(cfg)
+    return bool(want) and hmac.compare_digest(want.encode(), str(given or "").encode())
+
+
+_unlock_fails: list[float] = []
+
+
+def staff_code_ok(cfg: dict, given) -> tuple[bool, str]:
+    """Check a typed staff code, with a lock-out after UNLOCK_TRIES wrong codes
+    in UNLOCK_WINDOW_S (all computers together - it is the iPad we keep out)."""
+    now = time.time()
+    with _lock:
+        _unlock_fails[:] = [t for t in _unlock_fails if now - t < UNLOCK_WINDOW_S]
+        if len(_unlock_fails) >= UNLOCK_TRIES:
+            return False, "Too many wrong codes. Wait 15 minutes, or use the Hub on the server."
+        code = staff_code(cfg)
+        if not code:
+            return False, "No staff code is set up yet. Ask Mark (config, checkin.staff_code)."
+        if hmac.compare_digest(code.encode(), str(given or "").strip().encode()):
+            return True, ""
+        _unlock_fails.append(now)
+    logger.warning("Check-in: wrong staff code typed")
+    return False, "That code isn't right."
 
 
 def session_path(cfg: dict, token) -> Path | None:
@@ -263,8 +333,9 @@ def all_sessions(cfg: dict) -> list[dict]:
 
 
 def purge(cfg: dict, now: datetime | None = None) -> int:
-    """Delete session files older than 24 hours that are not waiting to be
-    checked (`submitted`), plus stray temp files. Returns how many went."""
+    """Delete forms not yet submitted that are older than PURGE_AFTER (2 days),
+    plus stray temp files. Forms waiting to be checked (`submitted`) stay.
+    Returns how many went."""
     base = sessions_dir(cfg)
     if base is None or not base.is_dir():
         return 0
@@ -288,7 +359,7 @@ def purge(cfg: dict, now: datetime | None = None) -> int:
 
 
 def current_slot(cfg: dict) -> dict | None:
-    """The one session the iPad should be showing (sent / filling), if any."""
+    """The one session the iPad slot holds (sent / filling / paused), if any."""
     live = [s for s in all_sessions(cfg) if s.get("state") in SLOT_STATES]
     return live[-1] if live else None
 
@@ -314,6 +385,44 @@ def greeting_name(s: dict) -> str:
         return pref
     given = str(p.get("given_name") or "").split()
     return given[0] if given else ""
+
+
+# ---- received receipts (hashes only) -----------------------------------------
+
+def _receipts_path(cfg: dict) -> Path | None:
+    r = checkin_root(cfg)
+    return r / "hub-received.json" if r else None
+
+
+def _token_digest(token: str) -> str:
+    return hashlib.sha256(("cec-checkin-received:" + str(token)).encode()).hexdigest()
+
+
+def _receipts(cfg: dict) -> list[dict]:
+    p = _receipts_path(cfg)
+    try:
+        rows = json.loads(p.read_text(encoding="utf-8")) if p and p.is_file() else []
+    except (OSError, ValueError):
+        rows = []
+    now = _now()
+    return [r for r in rows if isinstance(r, dict) and r.get("t")
+            and (_parse(r.get("at")) or now) > now - RECEIPT_KEEP]
+
+
+def _add_receipt(cfg: dict, token: str) -> None:
+    p = _receipts_path(cfg)
+    if p is None:
+        return
+    rows = _receipts(cfg) + [{"t": _token_digest(token), "at": _iso()}]
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(rows, indent=1), encoding="utf-8")
+
+
+def was_received(cfg: dict, token) -> bool:
+    if not TOKEN_RE.match(str(token or "")):
+        return False
+    d = _token_digest(token)
+    return any(hmac.compare_digest(r["t"], d) for r in _receipts(cfg))
 
 
 # ---- saved markers (IDs only) ----------------------------------------------
@@ -432,6 +541,7 @@ def send(cfg: dict, body: dict) -> tuple[int, dict]:
         return 400, {"error": "Pick Adult or Child."}
     pid = aid = opt_id = None
     prefill: dict = {}
+    last_exam = ""
     booking_reason = ""
     if kind == "appointment":
         aid = _int(body.get("appointment_id"))
@@ -464,6 +574,9 @@ def send(cfg: dict, body: dict) -> tuple[int, dict]:
             return 200, {"error": p["error"]}
         prefill = p.get("details") or {}
         audience = audience or ("child" if p.get("is_child") else "adult")
+        # A previous exam here = a returning patient (v5): the iPad asks
+        # "Anything new since your last visit?" instead of the full history.
+        last_exam = str(p.get("last_exam") or "")[:10]
     if booking_reason:
         prefill = {**prefill, "booking_reason": booking_reason}
 
@@ -479,12 +592,32 @@ def send(cfg: dict, body: dict) -> tuple[int, dict]:
         s = {"token": secrets.token_hex(16), "created": _iso(), "state": "sent",
              "patient_id": pid, "appointment_id": aid, "optometrist_id": opt_id,
              "audience": audience, "prefill": prefill, "answers": {},
-             "skipped_screens": [], "signature_png": "", "submitted": None,
+             "returning": bool(last_exam), "last_exam": last_exam or None,
+             "skipped_screens": [], "submitted": None,
              "staff_overrides": {"rejected_fields": [], "edited": {}},
              "questions_version": None}
         _write_session(cfg, s)
     logger.info("Check-in: patient %s sent to the iPad", pid or "new")
     return 200, {"ok": True, "token": s["token"], "state": "sent", "name": display_name(s)}
+
+
+def resume(cfg: dict, token) -> tuple[int, dict]:
+    """Reception gives a paused form back to the iPad: it opens with the
+    answers kept so far, at the screen the patient was on."""
+    with _lock:
+        s = load_session(cfg, token)
+        if s is None:
+            return 404, {"error": "That form isn't here any more."}
+        if s.get("state") != "paused":
+            return 409, {"error": "That form isn't paused."}
+        busy = current_slot(cfg)
+        if busy and busy["token"] != s["token"]:
+            return 409, {"error": "The iPad has another form on it now."}
+        s["state"] = "sent"
+        s["resumed"] = _iso()
+        _write_session(cfg, s)
+    logger.info("Check-in: patient %s form resumed on the iPad", s.get("patient_id") or "new")
+    return 200, {"ok": True, "state": "sent"}
 
 
 def discard(cfg: dict, token) -> tuple[int, dict]:
@@ -614,7 +747,7 @@ def save(cfg: dict, token, expect_hash, staff: str) -> tuple[int, dict]:
                         s.get("patient_id") or "new")
             return 200, {**result, "test_saved": True}
         if result.get("dry_run") is False and result.get("saved") is True:
-            _delete_session(cfg, s["token"])           # answers + signature gone
+            _delete_session(cfg, s["token"])           # answers gone
             _add_marker(cfg, s, s.get("patient_id"))
             logger.info("Check-in: patient %s saved to Optomate", s.get("patient_id"))
             return 200, result
@@ -622,31 +755,6 @@ def save(cfg: dict, token, expect_hash, staff: str) -> tuple[int, dict]:
         logger.info("Check-in: patient %s save not completed", s.get("patient_id") or "new")
         return 200, result
 
-
-def pdf_file(cfg: dict, token) -> tuple[Path | None, str]:
-    """Build the signed PDF for a submitted form and return its path, only if
-    it lies inside the engine's checkin folder."""
-    s = load_session(cfg, token)
-    if s is None:
-        return None, "That form isn't here any more."
-    if s.get("state") != "submitted":
-        return None, "That form hasn't been signed yet."
-    data = run_engine(cfg, "pdf", "--session", f"{s['token']}.json")
-    if data.get("error"):
-        return None, str(data["error"])
-    return confine_pdf(cfg, data.get("pdf")), "The signed form couldn't be found."
-
-
-def confine_pdf(cfg: dict, path_text) -> Path | None:
-    root = checkin_root(cfg)
-    if root is None or not path_text:
-        return None
-    try:
-        p = Path(str(path_text)).resolve()
-        p.relative_to(root.resolve())
-    except (OSError, ValueError):
-        return None
-    return p if p.suffix.lower() == ".pdf" and p.is_file() else None
 
 
 # ---------------------------------------------------------------------------
@@ -657,20 +765,23 @@ def ipad_current(cfg: dict) -> dict:
     with _lock:
         purge(cfg)
         s = current_slot(cfg)
+    if s and s["state"] == "paused":
+        return {"state": "paused"}             # no token: the iPad cannot reopen it
     return {"token": s["token"], "state": s["state"]} if s else {"state": "idle"}
 
 
 def _slot_session(cfg: dict, token) -> dict | None:
     s = load_session(cfg, token)
-    return s if s and s.get("state") in SLOT_STATES else None
+    return s if s and s.get("state") in IPAD_STATES else None
 
 
 def _questions(cfg: dict, s: dict) -> dict:
-    """The question set for this form. A form linked to an Optomate record asks
-    the engine to leave out its new-patient-only questions (occupation)."""
+    """The question set for this form. A returning patient (a previous exam
+    here, v5) gets the returning set: 'Anything new since your last visit?'
+    gates, and no new-patient questions (occupation, how heard, last exam)."""
     args = ["questions", "--audience", s["audience"]]
-    if s.get("patient_id"):
-        args.append("--existing")
+    if s.get("returning"):
+        args.append("--returning")
     return run_engine(cfg, *args)
 
 
@@ -693,10 +804,14 @@ def ipad_session(cfg: dict, token) -> tuple[int, dict]:
         if s2.get("questions_version") != qs.get("version"):
             s2["questions_version"] = qs.get("version")
             _write_session(cfg, s2)
-    return 200, {"token": s["token"], "state": s["state"], "audience": s["audience"],
-                 "name": greeting_name(s), "prefill": s.get("prefill") or {},
-                 "version": qs.get("version"), "questions": qs["questions"],
-                 "lists": {k: pl.get(k) or [] for k in needed if k in ("occupations", "sources")}}
+    out = {"token": s["token"], "state": s["state"], "audience": s["audience"],
+           "name": greeting_name(s), "prefill": s.get("prefill") or {},
+           "version": qs.get("version"), "questions": qs["questions"],
+           "lists": {k: pl.get(k) or [] for k in needed if k in ("occupations", "sources")}}
+    draft = s.get("draft")
+    if s.get("resumed") and isinstance(draft, dict) and draft.get("version") == qs.get("version"):
+        out["draft"] = {k: draft.get(k) for k in ("answers", "skipped", "idx")}
+    return 200, out
 
 
 def ipad_filling(cfg: dict, token) -> tuple[int, dict]:
@@ -713,6 +828,9 @@ def ipad_filling(cfg: dict, token) -> tuple[int, dict]:
 
 def _shown(q: dict, answers: dict, index: dict) -> bool:
     """Same rule as the engine's schema.is_shown."""
+    nia = q.get("not_if_answered")
+    if nia and answers.get(nia):
+        return False
     for ref, want in (q.get("show_if") or {}).items():
         if ref in index and not _shown(index[ref], answers, index):
             return False
@@ -742,16 +860,49 @@ def _clean_answers(raw) -> dict | None:
     return out
 
 
-def _signature_ok(sig) -> bool:
-    if not isinstance(sig, str) or not sig.startswith(SIG_PREFIX):
-        return False
-    if len(sig) > MAX_SIGNATURE_CHARS or len(sig) < len(SIG_PREFIX) + 40:
-        return False
-    try:
-        head = base64.b64decode(sig[len(SIG_PREFIX):], validate=True)[:8]
-    except (binascii.Error, ValueError):
-        return False
-    return head == b"\x89PNG\r\n\x1a\n"
+def ipad_draft(cfg: dict, token, body: dict) -> tuple[int, dict]:
+    """The iPad's answers so far, kept HERE (not on the iPad) so the inactivity
+    lock can wipe the iPad and reception can resume. body: answers,
+    skipped_screens, idx (the screen showing), pause (true = the lock).
+    """
+    body = body if isinstance(body, dict) else {}
+    pause = body.get("pause") is True
+    with _lock:
+        s = load_session(cfg, token)
+        if s is None or s.get("state") not in SLOT_STATES:
+            return 409, {"gone": True}
+        if s["state"] == "paused":
+            return 200, {"ok": True, "state": "paused"}        # already locked: keep the draft
+        if "answers" in body:
+            answers = _clean_answers(body.get("answers"))
+            skipped = body.get("skipped_screens") or []
+            idx = body.get("idx")
+            if answers is None or not isinstance(skipped, list) or len(skipped) > 30 or \
+                    not all(isinstance(x, str) and NAME_RE.match(x) for x in skipped) or \
+                    not (isinstance(idx, int) and -1 <= idx <= MAX_SCREEN_INDEX):
+                return 400, {"error": "The answers could not be read."}
+            s["draft"] = {"answers": answers, "skipped": sorted(set(skipped)), "idx": idx,
+                          "version": s.get("questions_version"), "at": _iso()}
+        if pause:
+            s["state"] = "paused"
+            s["paused"] = _iso()
+            s.pop("resumed", None)
+        _write_session(cfg, s)
+    if pause:
+        logger.info("Check-in: patient %s form paused on the iPad (left untouched)",
+                    s.get("patient_id") or "new")
+    return 200, {"ok": True, "state": s["state"]}
+
+
+
+def _already_or_gone(cfg: dict, token) -> tuple[int, dict]:
+    """Codex #11: the form was saved here but the iPad never heard back, so it
+    sends again. Same token, already submitted (or since checked / saved /
+    discarded by staff) = success, "received". Anything else = gone."""
+    s = load_session(cfg, token)
+    if (s and s.get("state") == "submitted") or was_received(cfg, token):
+        return 200, {"ok": True, "already": True}
+    return 409, {"gone": True}
 
 
 def ipad_submit(cfg: dict, token, body: dict) -> tuple[int, dict]:
@@ -763,13 +914,9 @@ def ipad_submit(cfg: dict, token, body: dict) -> tuple[int, dict]:
     if not isinstance(skipped, list) or len(skipped) > 30 or \
             not all(isinstance(x, str) and NAME_RE.match(x) for x in skipped):
         return 400, {"error": "The answers could not be read."}
-    sig = body.get("signature_png")
-    if not _signature_ok(sig):
-        return 400, {"error": "Please sign the form.", "field": "signature"}
-
     s = _slot_session(cfg, token)
     if s is None:
-        return 409, {"gone": True}
+        return _already_or_gone(cfg, token)
     # Required questions (from questions.json), checked here as well as on the iPad.
     qs = _questions(cfg, s)
     screens = (qs.get("questions") or {}).get("screens") or []
@@ -778,7 +925,7 @@ def ipad_submit(cfg: dict, token, body: dict) -> tuple[int, dict]:
         if sc.get("id") in skipped and sc.get("skippable"):
             continue
         for q in sc.get("questions") or []:
-            if not q.get("required") or q.get("type") in ("signature", "info"):
+            if not q.get("required") or q.get("type") == "info":
                 continue
             if _shown(q, answers, index) and not answers.get(q["id"]):
                 return 400, {"error": "Please fill in: " + str(q.get("label") or q["id"]),
@@ -786,11 +933,14 @@ def ipad_submit(cfg: dict, token, body: dict) -> tuple[int, dict]:
     with _lock:
         s = _slot_session(cfg, token)
         if s is None:
-            return 409, {"gone": True}
-        s.update(answers=answers, skipped_screens=sorted(set(skipped)), signature_png=sig,
+            return _already_or_gone(cfg, token)
+        s.update(answers=answers, skipped_screens=sorted(set(skipped)),
                  submitted=_iso(), state="submitted")
+        s.pop("signature_png", None)          # a form begun before 9 Oct: none kept
+        s.pop("draft", None)
         if qs.get("version"):
             s["questions_version"] = qs["version"]
         _write_session(cfg, s)
+        _add_receipt(cfg, s["token"])
     logger.info("Check-in: patient %s form submitted from the iPad", s.get("patient_id") or "new")
     return 200, {"ok": True}
