@@ -251,3 +251,13 @@ input.short { max-width: 220px; }
     .reveal { margin-left: 16px; }
     .bar { padding-left: 22px; padding-right: 22px; }
 }
+
+/* Phone widths (Mark, 10 Oct 2026: test on a phone too). The fixed-width Next/Send ran off the
+   right edge at 390-430 px and the birth-month box was too narrow to show the month. */
+@media (max-width: 600px) {
+  .bar { padding-left: 16px; padding-right: 16px; }
+  .bar-in { gap: 8px; }
+  .bar-in .btn { padding-left: 16px; padding-right: 16px; }
+  .bar-in .primary, .bar-in .primary.send { min-width: 0; flex: 1 1 auto; }
+  .date { grid-template-columns: 72px minmax(0, 1fr) 96px; gap: 8px; }
+}
