@@ -2533,6 +2533,17 @@ const CI_BOXES = [["complaint", "Reason for visit"], ["general_health", "General
 
 let ciChooseOptom = false;
 
+/* "Last exam here: 14 Mar 2024" (read from Optomate - a returning patient is
+   not asked) and which extra question screens the form opened (v5 modules). */
+function ciVisitLine(plan) {
+    const parts = [];
+    if (plan.last_exam_here) parts.push(`Last exam here: <strong>${esc(plan.last_exam_here.text)}</strong>`);
+    else if (!plan.is_new_patient) parts.push("No exam here before");
+    const mods = (plan.modules || []).map((m) => esc(m.name));
+    if (mods.length) parts.push(`Extra questions: ${mods.join(", ")}`);
+    return parts.length ? `<p class="ci-visit">${parts.join(" · ")}</p>` : "";
+}
+
 function ciHeadline(plan) {
     if (!plan.can_save) return "Can't save yet.";
     const parts = [];
@@ -2662,6 +2673,7 @@ async function renderCheckinCheck(token, flash) {
     view.innerHTML = `${back}${ciBanner(d)}
         ${flash ? `<div class="ci-flash">${esc(flash)}</div>` : ""}
         <h1 class="page-title">${esc(s.name)}${plan.is_new_patient ? ` <span class="ci-tag">new patient</span>` : ""}</h1>
+        ${ciVisitLine(plan)}
         <div class="ci-top">
             <div>
                 <div class="ci-answer${plan.can_save ? "" : " ci-answer-stop"}">${esc(ciHeadline(plan))}</div>

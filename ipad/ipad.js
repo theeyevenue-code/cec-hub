@@ -21,7 +21,14 @@
    screen is "Check and send" - the notice, the consent sentence, a big Send.
 
    No links: this page never links anywhere (the privacy policy address on
-   the Start screen is plain text). */
+   the Start screen is plain text).
+
+   Flow chart (v5, Mark 9 Oct 2026): a short core for everyone, plus MODULE
+   screens that open only when a tap, the online booking reason or the age
+   calls for them (questions.json "modules"). screenOrder() is the same rule
+   as the engine's schema.screen_order(): an open module comes after its
+   "after" screen, or straight after the later screen whose tap opened it.
+   Answers on a module screen that is no longer open are never sent. */
 
 "use strict";
 
@@ -267,11 +274,12 @@
             welcome: d.questions.welcome || null,
             resumed: false,
         };
+        S.modules = d.questions.modules || [];
         if (!S.screens.length) { S = null; return; }
         if (d.draft && d.draft.answers) {               // reception resumed a locked form
             S.answers = Object.assign({}, d.draft.answers);
             (d.draft.skipped || []).forEach((x) => S.skipped.add(x));
-            S.resumeAt = Math.max(0, Math.min(Number(d.draft.idx) || 0, S.screens.length - 1));
+            S.resumeAt = Math.max(0, Math.min(Number(d.draft.idx) || 0, order().length - 1));
             S.resumed = true;
         }
         lastTouch = Date.now();
@@ -286,7 +294,13 @@
         return out;
     }
 
+    function answered(v) {
+        return Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim());
+    }
+
     function isShown(q, index) {
+        // not_if_answered: already answered elsewhere - never asked twice.
+        if (q.not_if_answered && answered(S.answers[q.not_if_answered])) return false;
         const cond = q.show_if;
         if (!cond) return true;
         return Object.keys(cond).every((ref) => {
@@ -296,6 +310,61 @@
             const gots = Array.isArray(got) ? got : (got ? [got] : []);
             return gots.some((g) => want.includes(g));
         });
+    }
+
+    /* --- modules (the flow chart) ------------------------------------------- */
+
+    /* Age on the day from the form's DOB (dd/mm/yyyy), else Optomate's. Only
+       the module trigger "age_min" uses it; the adult/child form is decided by
+       the engine (plan.is_child), never here. */
+    function ageNow() {
+        const m = String(S.answers.dob || S.prefill.dob || "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (!m) return null;
+        const d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
+        const t = new Date();
+        return t.getFullYear() - y - ((t.getMonth() + 1 < mo || (t.getMonth() + 1 === mo && t.getDate() < d)) ? 1 : 0);
+    }
+
+    /* What opened module m: "booking" / "age" / the question ids whose taps match. */
+    function firedBy(m) {
+        const t = m.triggers || {};
+        const out = [];
+        const text = String(S.prefill.booking_reason || "").toLowerCase();
+        if (text && (t.booking || []).some((w) => text.includes(String(w).toLowerCase()))) out.push("booking");
+        const age = ageNow();
+        if (age !== null && Number.isInteger(t.age_min) && age >= t.age_min) out.push("age");
+        Object.keys(t.answers || {}).forEach((ref) => {
+            const want = [].concat(t.answers[ref]);
+            const got = S.answers[ref];
+            const gots = Array.isArray(got) ? got : (answered(got) ? [got] : []);
+            if (gots.some((g) => want.includes(g))) out.push(ref);
+        });
+        return out;
+    }
+
+    /* The screens the iPad shows now, in order (= schema.screen_order). */
+    function order() {
+        const core = S.screens.filter((sc) => !sc.module);
+        const coreIds = core.map((sc) => sc.id);
+        const where = {};
+        S.screens.forEach((sc) => (sc.questions || []).forEach((q) => { where[q.id] = sc.id; }));
+        const mods = {};
+        (S.modules || []).forEach((m) => { mods[m.id] = m; });
+        const slot = {};
+        S.screens.forEach((sc) => {
+            if (!sc.module || !mods[sc.module]) return;
+            const why = firedBy(mods[sc.module]);
+            if (!why.length) return;
+            let pos = Math.max(0, coreIds.indexOf(mods[sc.module].after));
+            if (!why.some((f) => f === "booking" || f === "age")) {
+                const srcs = why.map((f) => coreIds.indexOf(where[f])).filter((i) => i >= 0);
+                if (srcs.length) pos = Math.max(pos, Math.min.apply(null, srcs));
+            }
+            (slot[coreIds[pos]] = slot[coreIds[pos]] || []).push(sc);
+        });
+        const out = [];
+        core.forEach((sc) => { out.push(sc); (slot[sc.id] || []).forEach((m) => out.push(m)); });
+        return out;
     }
 
     function controlsShowIf(qid) {
@@ -486,10 +555,12 @@
 
     function renderScreen(keepScroll) {
         mode = "form";
-        const sc = S.screens[S.idx];
+        const vis = order();
+        S.idx = Math.max(0, Math.min(S.idx, vis.length - 1));
+        const sc = vis[S.idx];
         seedPrefill(sc);
         const index = allQuestions();
-        const total = S.screens.length;
+        const total = vis.length;
         const last = S.idx === total - 1;
         let html = `<div class="progress">${S.idx + 1} of ${total}</div>
             <h1>${esc(sc.title)}</h1>
@@ -570,16 +641,17 @@
     }
 
     function next() {
-        const sc = S.screens[S.idx];
+        const vis = order();
+        const sc = vis[S.idx];
         const p = problemOn(sc);
         if (p) { S.err = p; renderScreen(true); scrollToErr(); return; }
         S.skipped.delete(sc.id);
-        if (S.idx === S.screens.length - 1) { submit(); return; }
+        if (S.idx === order().length - 1) { submit(); return; }
         go(1);
     }
 
     function skip() {
-        const sc = S.screens[S.idx];
+        const sc = order()[S.idx];
         // A skipped screen sends nothing: its answers are dropped.
         (sc.questions || []).forEach((q) => { delete S.answers[q.id]; delete S.dates[q.id]; });
         S.skipped.add(sc.id);
@@ -591,11 +663,12 @@
         if (e) e.scrollIntoView({ block: "center" });
     }
 
-    /* Only what the patient was actually shown, on screens not skipped. */
+    /* Only what the patient was actually shown, on screens not skipped - and
+       a module screen only while its module is open. */
     function finalAnswers() {
         const index = allQuestions();
         const out = {};
-        S.screens.forEach((sc) => {
+        order().forEach((sc) => {
             if (S.skipped.has(sc.id)) return;
             (sc.questions || []).forEach((q) => {
                 if (q.type === "info") return;
@@ -623,9 +696,9 @@
         if (r.status === 409 && r.data.gone) { renderIdle(); return; }   // cancelled at reception
         if (r.status === 400 && r.data.error) {
             const at = r.data.field
-                ? S.screens.findIndex((sc) => (sc.questions || []).some((q) => q.id === r.data.field))
+                ? order().findIndex((sc) => (sc.questions || []).some((q) => q.id === r.data.field))
                 : -1;
-            S.idx = at >= 0 ? at : S.screens.length - 1;
+            S.idx = at >= 0 ? at : order().length - 1;
             S.err = r.data.error;
             renderScreen(false);
             scrollToErr();

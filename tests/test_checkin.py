@@ -74,16 +74,17 @@ class FakeEngine:
         elif cmd == "patient":
             pid = int(args[2])
             out.update(patient_id=pid, is_child=pid == 99002,
+                       last_exam="2024-10-02" if pid == 99001 else "",
                        details={"given_name": "Childone" if pid == 99002 else "Adultone",
                                 "family_name": "ZZTEST", "preferred_name": "",
                                 "dob": "01/06/2017" if pid == 99002 else "15/03/1980"})
         elif cmd == "questions":
             aud = args[2] if len(args) > 2 else "adult"
-            existing = "--existing" in args
+            returning = "--returning" in args
             qs = json.loads(json.dumps(QUESTIONS))
             for s in qs["screens"]:
                 s["questions"] = [q for q in s["questions"] if q.get("audience", "both") in ("both", aud)
-                                  and not (existing and q.get("new_patient_only"))]
+                                  and not (returning and q.get("new_patient_only"))]
             out.update(version="test-v1", questions=qs)
         elif cmd == "lists":
             out.update(sources=["Google"], occupations=["TEACHER"],
@@ -236,14 +237,23 @@ def test_booking_reason_goes_to_the_session_prefill_not_the_staff_list(world):
     assert "booking_reason" not in checkin.load_session(world["cfg"], out["token"])["prefill"]
 
 
-def test_new_patient_only_questions_hidden_for_an_existing_record(world):
+def test_returning_patient_gets_the_returning_set(world):
+    """v5: returning = a previous exam here (engine `patient` last_exam), not
+    merely a record on file."""
     def ids(form):
         return {q["id"] for sc in form["questions"]["screens"] for q in sc["questions"]}
-    _st, out = _send(world)                                          # 99001, on file
+    _st, out = _send(world)                                          # 99001, examined before
+    s = checkin.load_session(world["cfg"], out["token"])
+    assert s["returning"] is True and s["last_exam"] == "2024-10-02"
     form = checkin.ipad_session(world["cfg"], out["token"])[1]
     assert "occupation" not in ids(form) and "given_name" in ids(form)
     q_call = [c for c in world["eng"].calls if c[3] == "questions"][-1]
-    assert q_call[4:] == ["--audience", "adult", "--existing"]
+    assert q_call[4:] == ["--audience", "adult", "--returning"]
+    # on file but never examined (99002): the new-patient set
+    _st, out = checkin.send(world["cfg"], {"kind": "patient", "patient_id": 99002, "replace": True})
+    assert checkin.load_session(world["cfg"], out["token"])["returning"] is False
+    checkin.ipad_session(world["cfg"], out["token"])
+    assert [c for c in world["eng"].calls if c[3] == "questions"][-1][4:] == ["--audience", "child"]
     _st, out = checkin.send(world["cfg"], {"kind": "new", "audience": "adult", "replace": True})
     form = checkin.ipad_session(world["cfg"], out["token"])[1]
     assert "occupation" in ids(form)
@@ -770,3 +780,21 @@ def test_ipad_v3_contract(client):
     # never a link out of the iPad page - the policy address is plain text
     assert "<a " not in js and "href" not in js and "window.open" not in js
     assert "location.href" not in js and "location.assign" not in js
+
+
+def test_ipad_v5_flow_chart_contract(client):
+    """v5 (Mark, 9 Oct 2026): module screens open from taps, the booking reason
+    or age (same rule as the engine's schema.screen_order); answers on a module
+    screen that is no longer open are never sent; no question asked twice."""
+    js = client.get("/checkin/ipad/ipad.js").get_data(as_text=True)
+    for used in ("function order()", "function firedBy(", "booking_reason", "age_min",
+                 "not_if_answered", "order().forEach", "S.modules"):
+        assert used in js, used
+    assert "S.screens[S.idx]" not in js            # the shown order, never the raw list
+
+
+def test_check_screen_shows_last_exam_here():
+    import pathlib
+    app_js = (pathlib.Path(checkin.__file__).resolve().parent.parent / "static" / "app.js").read_text(encoding="utf-8")
+    assert "Last exam here: <strong>" in app_js and "ciVisitLine(plan)" in app_js
+    assert "Extra questions: " in app_js

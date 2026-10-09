@@ -541,6 +541,7 @@ def send(cfg: dict, body: dict) -> tuple[int, dict]:
         return 400, {"error": "Pick Adult or Child."}
     pid = aid = opt_id = None
     prefill: dict = {}
+    last_exam = ""
     booking_reason = ""
     if kind == "appointment":
         aid = _int(body.get("appointment_id"))
@@ -573,6 +574,9 @@ def send(cfg: dict, body: dict) -> tuple[int, dict]:
             return 200, {"error": p["error"]}
         prefill = p.get("details") or {}
         audience = audience or ("child" if p.get("is_child") else "adult")
+        # A previous exam here = a returning patient (v5): the iPad asks
+        # "Anything new since your last visit?" instead of the full history.
+        last_exam = str(p.get("last_exam") or "")[:10]
     if booking_reason:
         prefill = {**prefill, "booking_reason": booking_reason}
 
@@ -588,6 +592,7 @@ def send(cfg: dict, body: dict) -> tuple[int, dict]:
         s = {"token": secrets.token_hex(16), "created": _iso(), "state": "sent",
              "patient_id": pid, "appointment_id": aid, "optometrist_id": opt_id,
              "audience": audience, "prefill": prefill, "answers": {},
+             "returning": bool(last_exam), "last_exam": last_exam or None,
              "skipped_screens": [], "submitted": None,
              "staff_overrides": {"rejected_fields": [], "edited": {}},
              "questions_version": None}
@@ -771,11 +776,12 @@ def _slot_session(cfg: dict, token) -> dict | None:
 
 
 def _questions(cfg: dict, s: dict) -> dict:
-    """The question set for this form. A form linked to an Optomate record asks
-    the engine to leave out its new-patient-only questions (occupation)."""
+    """The question set for this form. A returning patient (a previous exam
+    here, v5) gets the returning set: 'Anything new since your last visit?'
+    gates, and no new-patient questions (occupation, how heard, last exam)."""
     args = ["questions", "--audience", s["audience"]]
-    if s.get("patient_id"):
-        args.append("--existing")
+    if s.get("returning"):
+        args.append("--returning")
     return run_engine(cfg, *args)
 
 
@@ -822,6 +828,9 @@ def ipad_filling(cfg: dict, token) -> tuple[int, dict]:
 
 def _shown(q: dict, answers: dict, index: dict) -> bool:
     """Same rule as the engine's schema.is_shown."""
+    nia = q.get("not_if_answered")
+    if nia and answers.get(nia):
+        return False
     for ref, want in (q.get("show_if") or {}).items():
         if ref in index and not _shown(index[ref], answers, index):
             return False
