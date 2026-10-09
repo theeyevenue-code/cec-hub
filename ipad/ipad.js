@@ -8,7 +8,17 @@
    Nothing is ever stored on the iPad: no localStorage / sessionStorage /
    cookies. The form lives in memory (`S`) and is wiped when it is sent, when
    reception cancels it, and on return to the idle screen. The device key
-   comes from this page's URL fragment (#<key>) and travels in a header. */
+   comes from this page's URL fragment (#<key>) and travels in a header.
+
+   Inactivity lock (Codex #4, 9 Oct 2026): no touch for WARN_MS -> "Still
+   there?" with Continue; LOCK_MS -> the answers so far go to the server as a
+   draft, the iPad is wiped and says "Please return the iPad to reception".
+   Only reception can resume it (Hub: Resume on the iPad). The answers so far
+   are also sent as a draft at every screen change, so a lock while the Wi-Fi
+   is down loses at most one screen. The signature is never in a draft.
+
+   No links: this page never links anywhere (the privacy policy address on
+   the Start screen is plain text). */
 
 "use strict";
 
@@ -16,6 +26,8 @@
     const KEY = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
     const POLL_MS = 3000;
     const THANKS_MS = 8000;
+    const WARN_MS = 3 * 60 * 1000;          // no touch for 3 minutes: "Still there?"
+    const LOCK_MS = WARN_MS + 2 * 60 * 1000; // 2 more minutes: hide it, back to reception
     const MONTHS = ["January", "February", "March", "April", "May", "June", "July",
                     "August", "September", "October", "November", "December"];
 
@@ -23,8 +35,11 @@
     const bar = document.getElementById("bar");
 
     let S = null;          // the one form in memory
-    let mode = "boot";     // boot | setup | idle | welcome | form | sending | failed | thanks
+    let mode = "boot";     // boot | setup | idle | welcome | form | sending | failed | thanks | paused
     let thanksTimer = null;
+    let lastTouch = Date.now();
+    let pausePending = null;   // token whose lock has not reached the server yet
+    const warnEl = document.getElementById("still");
 
     function esc(s) {
         return String(s == null ? "" : s)
@@ -55,6 +70,7 @@
     function wipe() {
         S = null;
         if (thanksTimer) { clearTimeout(thanksTimer); thanksTimer = null; }
+        hideWarning();
         app.innerHTML = "";
         setBar("");
     }
@@ -76,14 +92,20 @@
     function renderWelcome() {
         mode = "welcome";
         const name = S.name;
+        const back = S.resumed ? " back" : "";
         const lines = S.audience === "child"
             // A child's form: greet the parent neutrally, name the child.
-            ? `<p class="big">Welcome.</p>
+            ? `<p class="big">Welcome${back}.</p>
                <p class="mid">This form is for ${name ? esc(name) : "your child"}.</p>`
-            : `<p class="big">Welcome${name ? ", " + esc(name) : ""}.</p>`;
+            : `<p class="big">Welcome${back}${name ? ", " + esc(name) : ""}.</p>`;
+        // Collection notice at Start (Codex #10): questions.json "welcome", plain
+        // text only - the policy address is NOT a link (this page never links out).
+        const w = S.welcome || {};
+        const notice = w.notice ? `<div class="notice"><p>${esc(w.notice)}</p>
+            ${w.policy ? `<p>${esc(w.policy)}</p>` : ""}</div>` : "";
         app.innerHTML = `<div class="center">${lines}
-            <p class="mid">Tap Start to begin.</p>
-            <button class="btn primary" data-act="start">Start</button></div>`;
+            <p class="mid">${S.resumed ? "Tap Start to carry on." : "Tap Start to begin."}</p>
+            <button class="btn primary" data-act="start">Start</button>${notice}</div>`;
         setBar("");
         window.scrollTo(0, 0);
     }
@@ -102,14 +124,91 @@
         setBar("");
     }
 
-    function renderThanks() {
+    /* "already" = a retry of a form the server had already received (the
+       first answer was lost on the way back): same thanks, never "cancelled". */
+    function renderThanks(already) {
         mode = "thanks";
-        app.innerHTML = `<div class="center"><p class="big">Thank you.</p>
+        hideWarning();
+        app.innerHTML = `<div class="center"><p class="big">${already ? "Thank you, received." : "Thank you."}</p>
             <p class="mid">Please hand the iPad back to reception.</p></div>`;
         setBar("");
         window.scrollTo(0, 0);
         thanksTimer = setTimeout(renderIdle, THANKS_MS);
     }
+
+    /* --- inactivity lock ------------------------------------------------------ */
+
+    function renderPaused() {
+        wipe();
+        mode = "paused";
+        app.innerHTML = `<div class="center"><p class="big">Please return the iPad to reception.</p>
+            <p class="mid">Your answers are kept. Reception will carry on from here.</p></div>`;
+        window.scrollTo(0, 0);
+    }
+
+    function showWarning() {
+        if (!warnEl || !warnEl.hidden) return;
+        warnEl.innerHTML = `<div class="still-box" role="alertdialog" aria-label="Still there?">
+            <p class="big">Still there?</p>
+            <p class="mid">Tap Continue to keep going.</p>
+            <button class="btn primary" data-act="continue">Continue</button></div>`;
+        warnEl.hidden = false;
+    }
+
+    function hideWarning() {
+        if (!warnEl) return;
+        warnEl.hidden = true;
+        warnEl.innerHTML = "";
+    }
+
+    function touched() {
+        lastTouch = Date.now();
+        if (warnEl && !warnEl.hidden) hideWarning();
+    }
+
+    ["pointerdown", "keydown", "input", "touchstart"].forEach((t) =>
+        document.addEventListener(t, touched, { capture: true, passive: true }));
+
+    /* The answers so far, as the server keeps them: real question ids only,
+       on screens not skipped (no signature, no "Other" flags). */
+    function draftBody() {
+        const index = allQuestions();
+        const answers = {};
+        Object.keys(S.answers).forEach((k) => {
+            const v = S.answers[k];
+            if (!index[k] || index[k].type === "signature") return;
+            if (Array.isArray(v) ? v.length : (v && String(v).trim())) answers[k] = v;
+        });
+        return { answers: answers, skipped_screens: Array.from(S.skipped), idx: S.idx };
+    }
+
+    function saveDraft() {
+        if (!S) return;
+        api(`/session/${encodeURIComponent(S.token)}/draft`, draftBody()).catch(() => {});
+    }
+
+    async function sendPause(token, body) {
+        try {
+            const r = await api(`/session/${encodeURIComponent(token)}/draft`,
+                                Object.assign({ pause: true }, body || {}));
+            if (r.status === 200 || r.status === 409) pausePending = null;
+        } catch (e) { /* offline: poll() tries again */ }
+    }
+
+    function lock() {
+        const token = S.token;
+        const body = draftBody();
+        pausePending = token;
+        renderPaused();               // wipe the iPad first, then tell the server
+        sendPause(token, body);
+    }
+
+    setInterval(() => {
+        if (!S || !["welcome", "form", "failed"].includes(mode)) return;
+        const idle = Date.now() - lastTouch;
+        if (idle >= LOCK_MS) lock();
+        else if (idle >= WARN_MS) showWarning();
+    }, 1000);
 
     /* --- polling ------------------------------------------------------------ */
 
@@ -120,19 +219,35 @@
         if (r.status === 401 || r.status === 503) { renderSetup(); return; }
         if (r.status !== 200) return;
         const cur = r.data || {};
+        if (mode === "paused") {
+            if (pausePending) {
+                // The lock never reached the server: say it again (no answers -
+                // the server keeps the last draft). Never reopen the form here.
+                if (cur.token === pausePending) sendPause(pausePending);
+                else pausePending = null;
+                return;
+            }
+            if (cur.state === "paused") return;          // waiting for reception
+            if (cur.token) { await start(cur.token); return; }   // reception resumed it
+            renderIdle();
+            return;
+        }
         if (S) {
             // Reception replaced or cancelled this form: back to idle, wipe.
             // (While "Could not send" is showing, the retry itself finds out.)
-            if (mode !== "failed" && cur.token !== S.token) renderIdle();
+            if (mode !== "failed" && cur.token !== S.token) {
+                if (cur.state === "paused") renderPaused(); else renderIdle();
+            }
             return;
         }
+        if (mode === "idle" && cur.state === "paused") { renderPaused(); return; }
         if (mode === "idle" && cur.token) await start(cur.token);
     }
 
     async function start(token) {
         let r;
         try { r = await api("/session/" + encodeURIComponent(token)); } catch (e) { return; }
-        if (r.status !== 200 || !r.data || !r.data.questions || mode !== "idle") return;
+        if (r.status !== 200 || !r.data || !r.data.questions || !["idle", "paused"].includes(mode)) return;
         const d = r.data;
         S = {
             token: token,
@@ -147,8 +262,17 @@
             idx: -1,
             sig: "",
             err: "",
+            welcome: d.questions.welcome || null,
+            resumed: false,
         };
         if (!S.screens.length) { S = null; return; }
+        if (d.draft && d.draft.answers) {               // reception resumed a locked form
+            S.answers = Object.assign({}, d.draft.answers);
+            (d.draft.skipped || []).forEach((x) => S.skipped.add(x));
+            S.resumeAt = Math.max(0, Math.min(Number(d.draft.idx) || 0, S.screens.length - 1));
+            S.resumed = true;
+        }
+        lastTouch = Date.now();
         renderWelcome();
     }
 
@@ -253,8 +377,13 @@
         return "";
     }
 
+    /* none_value: one tile, or a list ("None" / "Never worn glasses"). */
+    function nonesOf(q) {
+        return [].concat(q.none_value || []);
+    }
+
     function tile(q, o, on, multi) {
-        const none = multi && q.none_value === o;
+        const none = multi && nonesOf(q).includes(o);
         return `<button type="button" class="t${multi ? "" : " r"}${on ? " on" : ""}${none ? " none" : ""}"
             data-${multi ? "tick" : "pick"}="${esc(q.id)}" data-v="${esc(o)}" aria-pressed="${on}"><i class="g" aria-hidden="true"></i><span>${esc(o)}</span></button>`;
     }
@@ -368,7 +497,7 @@
         const last = S.idx === total - 1;
         let html = `<div class="progress">${S.idx + 1} of ${total}</div>
             <h1>${esc(sc.title)}</h1>
-            ${sc.skip_button ? `<button type="button" class="skipbig" data-act="skip">${esc(sc.skip_button)} &rarr;</button>` : ""}
+            ${sc.skip_button ? `<button type="button" class="skipsmall" data-act="skip">${esc(sc.skip_button)}</button>` : ""}
             ${sc.hint ? `<p class="hint">${esc(sc.hint)}</p>` : ""}`;
         const follows = {};
         (sc.questions || []).forEach((q) => {
@@ -389,6 +518,7 @@
             <span class="grow"></span>
             ${sc.skippable ? `<button class="btn quiet" data-act="skip">Skip</button>` : ""}
             <button class="btn primary" data-act="next">${last ? "Finish" : "Next"}</button>`);
+        roomForBar();
         window.scrollTo(0, keepScroll ? y : 0);
         if (app.querySelector("canvas.sig")) setupSignature();
     }
@@ -492,8 +622,17 @@
     function go(delta) {
         S.err = "";
         S.idx += delta;
-        if (S.idx < 0) { S.idx = -1; renderWelcome(); return; }
+        if (S.idx < 0) { S.idx = -1; renderWelcome(); saveDraft(); return; }
         renderScreen(false);
+        saveDraft();
+    }
+
+    /* Long pages: always leave room to scroll the last question clear of the
+       fixed Back / Next bar, however tall the bar wraps (portrait, big text). */
+    function roomForBar() {
+        const h = bar.hidden ? 0 : bar.getBoundingClientRect().height;
+        app.style.paddingBottom = Math.round(h + 48) + "px";
+        document.documentElement.style.scrollPaddingBottom = Math.round(h + 16) + "px";
     }
 
     function next() {
@@ -547,7 +686,7 @@
             renderFailed();      // Wi-Fi dropped: everything is still in memory
             return;
         }
-        if (r.status === 200 && r.data.ok) { S = null; renderThanks(); return; }
+        if (r.status === 200 && r.data.ok) { S = null; renderThanks(!!r.data.already); return; }
         if (r.status === 409 && r.data.gone) { renderIdle(); return; }   // cancelled at reception
         if (r.status === 400 && r.data.error) {
             const at = r.data.field
@@ -568,9 +707,11 @@
         const t = ev.target.closest("button");
         if (!t || !S && t.dataset.act !== "retry") return;
         const act = t.dataset.act;
-        if (act === "start") {
+        if (act === "continue") {
+            touched();
+        } else if (act === "start") {
             api(`/session/${encodeURIComponent(S.token)}/filling`, {}).catch(() => {});
-            S.idx = 0;
+            S.idx = S.resumed ? S.resumeAt : 0;
             renderScreen(false);
         } else if (act === "back") {
             go(-1);
@@ -608,11 +749,11 @@
         } else if (t.dataset.tick) {
             const qid = t.dataset.tick, v = t.dataset.v;
             const q = allQuestions()[qid] || {};
-            const none = q.none_value;
+            const nones = nonesOf(q);
             let have = Array.isArray(S.answers[qid]) ? S.answers[qid].slice() : [];
             if (have.includes(v)) have = have.filter((x) => x !== v);
-            else if (none && v === none) have = [v];                 // None clears the others
-            else have = have.filter((x) => x !== none).concat([v]); // and any other clears None
+            else if (nones.includes(v)) have = [v];                          // None clears the others
+            else have = have.filter((x) => !nones.includes(x)).concat([v]); // and any other clears None
             // Kept in the order the tiles are shown, so the notes read the same way.
             S.answers[qid] = (q.options || []).filter((o) => have.includes(o));
             S.err = "";

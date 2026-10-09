@@ -18,6 +18,8 @@ import pytest
 from hub import checkin
 
 KEY = "zztest-device-key-0123456789"
+STAFF_CODE = "zztest-staff-code"
+LAN = {"REMOTE_ADDR": "192.168.1.50"}          # a front-desk PC, not the server
 H1 = "a" * 64
 H2 = "b" * 64
 
@@ -87,7 +89,10 @@ class FakeEngine:
                        optometrists=[{"id": 5, "name": "ZZTEST Optom", "code": "Z5"}])
         elif cmd == "search":
             out.update(patients=[{"id": 99001, "given": "Adultone", "surname": "ZZTEST",
-                                  "dob": "15/03/1980", "suburb": "CONCORD"}], more=True)
+                                  "dob": "15/03/1980", "is_child": False, "suburb": "CONCORD"},
+                                 {"id": 99002, "given": "Childone", "surname": "ZZTEST",
+                                  "dob": "01/06/2017", "is_child": True, "suburb": "CONCORD"}],
+                       more=True)
         elif cmd == "plan":
             out.update(hash=H1, can_save=True, blockers=[], warnings=[], patient_changes=[],
                        unchanged=[], duplicates=self.duplicates, is_new_patient=False,
@@ -112,7 +117,8 @@ def world(tmp_path, monkeypatch):
     agent = tmp_path / "agent"
     (agent / "checkin").mkdir(parents=True)
     cfg = {"optomate_agent": {"agent_dir": str(agent), "python": "py"},
-           "checkin": {"ipad_key": KEY}}
+           "checkin": {"ipad_key": KEY, "staff_code": STAFF_CODE}}
+    checkin._unlock_fails.clear()
     eng = FakeEngine()
     monkeypatch.setattr(checkin.subprocess, "run", eng)
     checkin._lists_cache.update(at=0.0, dir=None, data=None)
@@ -293,7 +299,8 @@ def test_state_transitions_sent_filling_submitted(world):
     assert checkin.ipad_current(world["cfg"]) == {"state": "idle"}
     # a submitted form is not the iPad's any more
     assert checkin.ipad_filling(world["cfg"], tok)[0] == 409
-    assert _submit(world, tok)[0] == 409
+    # ...but sending it again is "received", not "gone" (Codex #11)
+    assert _submit(world, tok) == (200, {"ok": True, "already": True})
 
 
 def test_submit_stores_answers_signature_and_skips(world):
@@ -418,15 +425,18 @@ def test_discard_deletes_the_file(world):
     assert checkin.discard(world["cfg"], tok)[0] == 404
 
 
-def test_purge_keeps_forms_waiting_to_be_checked(world):
+def test_purge_unsubmitted_after_two_days_keeps_forms_waiting_to_be_checked(world):
     cfg = world["cfg"]
-    old = checkin._iso(checkin._now() - timedelta(hours=30))
+    old = checkin._iso(checkin._now() - timedelta(days=2, hours=1))
+    recent = checkin._iso(checkin._now() - timedelta(hours=30))
     world["sessions"].mkdir(parents=True, exist_ok=True)
-    for tok, state in (("1" * 32, "sent"), ("2" * 32, "filling"), ("3" * 32, "submitted")):
+    for tok, state, made in (("1" * 32, "sent", old), ("2" * 32, "filling", old),
+                             ("4" * 32, "paused", old), ("3" * 32, "submitted", old),
+                             ("5" * 32, "filling", recent)):
         (world["sessions"] / f"{tok}.json").write_text(json.dumps(
-            {"token": tok, "state": state, "created": old, "audience": "adult"}), encoding="utf-8")
-    assert checkin.purge(cfg) == 2
-    assert [p.stem for p in world["sessions"].glob("*.json")] == ["3" * 32]
+            {"token": tok, "state": state, "created": made, "audience": "adult"}), encoding="utf-8")
+    assert checkin.purge(cfg) == 3
+    assert sorted(p.stem for p in world["sessions"].glob("*.json")) == ["3" * 32, "5" * 32]
 
 
 def test_today_shows_plain_status_words_and_waiting(world):
@@ -509,6 +519,8 @@ def test_ipad_page_is_no_store_and_has_no_way_into_the_hub(client):
     assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
     assert 'name="apple-mobile-web-app-capable" content="yes"' in html
     assert "href=\"#" not in html and "<a " not in html
+    # Codex #9: pinch-zoom allowed
+    assert "user-scalable=no" not in html and "maximum-scale" not in html
     srcs = re.findall(r'(?:src|href)="([^"]+)"', html)
     assert srcs and all(s.startswith("/checkin/ipad/") for s in srcs)
     for name in ("ipad.js", "ipad.css"):
@@ -563,3 +575,201 @@ def test_full_flow_over_http(client):
     assert client.post("/api/checkin/search", json={"q": ""}).status_code == 400
     assert client.post(f"/api/checkin/session/{tok}/discard", json={}).status_code == 200
     assert not list(w["sessions"].glob("*.json"))
+
+
+# --- Codex review, 9 Oct 2026 ------------------------------------------------------
+
+STAFF_ROUTES = [("get", "/api/checkin/today", None), ("post", "/api/checkin/search", {"q": "ZZTEST"}),
+                ("post", "/api/checkin/send", {"kind": "new", "audience": "adult"}),
+                ("get", "/api/checkin/session/" + "c" * 32, None),
+                ("post", "/api/checkin/session/" + "c" * 32 + "/override", {"action": "accept", "field": "email"}),
+                ("post", "/api/checkin/session/" + "c" * 32 + "/save", {"hash": H1}),
+                ("post", "/api/checkin/session/" + "c" * 32 + "/discard", {}),
+                ("post", "/api/checkin/session/" + "c" * 32 + "/resume", {}),
+                ("get", "/checkin/pdf/" + "c" * 32, None)]
+
+
+def _call(client, method, path, body, **kw):
+    if method == "get":
+        return client.get(path, **kw)
+    return client.post(path, json=body, **kw)
+
+
+@pytest.mark.parametrize("method,path,body", STAFF_ROUTES)
+def test_staff_routes_refuse_the_ipad_key_even_on_the_server(client, method, path, body):
+    """Codex #1: the device key opens the iPad routes ONLY. A request carrying it
+    is refused on every staff route - even from the server itself, even with a
+    valid staff cookie."""
+    client.set_cookie(checkin.STAFF_COOKIE, checkin.staff_cookie_value(client.world["cfg"]))
+    r = _call(client, method, path, body, headers={"X-Checkin-Key": KEY})
+    assert r.status_code == 403 and r.get_json()["ipad"] is True
+    assert r.headers["Cache-Control"] == "no-store"
+    assert "ZZTEST" not in r.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("method,path,body", STAFF_ROUTES)
+def test_staff_routes_need_the_staff_unlock_off_the_server(client, method, path, body):
+    r = _call(client, method, path, body, environ_base=LAN)
+    assert r.status_code == 403 and r.get_json()["staff_needed"] is True
+    assert "ZZTEST" not in r.get_data(as_text=True)
+
+
+def test_unlock_with_the_staff_code_then_staff_routes_work(client):
+    assert client.get("/api/checkin/today", environ_base=LAN).status_code == 403
+    r = client.post("/api/checkin/staff/unlock", json={"code": "wrong-code"}, environ_base=LAN)
+    assert r.status_code == 403 and "isn't right" in r.get_json()["error"]
+    # the iPad cannot unlock itself, even with the right code
+    r = client.post("/api/checkin/staff/unlock", json={"code": STAFF_CODE}, environ_base=LAN,
+                    headers={"X-Checkin-Key": KEY})
+    assert r.status_code == 403
+    r = client.post("/api/checkin/staff/unlock", json={"code": STAFF_CODE}, environ_base=LAN)
+    assert r.status_code == 200
+    cookie = r.headers["Set-Cookie"]
+    assert checkin.STAFF_COOKIE in cookie and "HttpOnly" in cookie and "SameSite=Strict" in cookie
+    assert STAFF_CODE not in cookie
+    assert client.get("/api/checkin/today", environ_base=LAN).status_code == 200
+    # changing the code locks every computer out again
+    cfg = json.loads(client.cfg_path.read_text())
+    cfg["checkin"]["staff_code"] = "zztest-new-code"
+    client.cfg_path.write_text(json.dumps(cfg))
+    assert client.get("/api/checkin/today", environ_base=LAN).status_code == 403
+
+
+def test_unlock_locks_out_after_five_wrong_codes(client):
+    for _ in range(5):
+        client.post("/api/checkin/staff/unlock", json={"code": "nope-nope"}, environ_base=LAN)
+    r = client.post("/api/checkin/staff/unlock", json={"code": STAFF_CODE}, environ_base=LAN)
+    assert r.status_code == 403 and "Too many" in r.get_json()["error"]
+
+
+def test_no_staff_code_means_only_the_server_can_use_checkin(client):
+    cfg = json.loads(client.cfg_path.read_text())
+    for code in ("", "short", "CHANGE-ME-staff-code"):
+        cfg["checkin"]["staff_code"] = code
+        client.cfg_path.write_text(json.dumps(cfg))
+        r = client.get("/api/checkin/today", environ_base=LAN)
+        assert r.status_code == 403 and r.get_json()["code_set"] is False
+        assert client.post("/api/checkin/staff/unlock", json={"code": code},
+                           environ_base=LAN).status_code == 403
+    assert client.get("/api/checkin/today").status_code == 200        # the server itself
+
+
+def test_ipad_key_still_opens_the_ipad_routes_from_the_lan(client):
+    r = client.get("/api/checkin/ipad/current", headers={"X-Checkin-Key": KEY}, environ_base=LAN)
+    assert r.status_code == 200 and r.get_json() == {"state": "idle"}
+
+
+def _filling(world):
+    _st, out = _send(world)
+    tok = out["token"]
+    checkin.ipad_session(world["cfg"], tok)
+    checkin.ipad_filling(world["cfg"], tok)
+    return tok
+
+
+def test_inactivity_pause_keeps_answers_on_the_server_and_only_staff_resume(world):
+    """Codex #4: the lock sends the answers so far as a draft and pauses the
+    form. The iPad sees 'paused' with no token and cannot reopen it; reception
+    resumes it and the iPad gets the answers back at the same screen."""
+    cfg = world["cfg"]
+    tok = _filling(world)
+    body = {"answers": {"given_name": "Adultone", "symptoms": ["Blurry vision"]},
+            "skipped_screens": ["details"], "idx": 2}
+    assert checkin.ipad_draft(cfg, tok, body)[0] == 200
+    st, out = checkin.ipad_draft(cfg, tok, {"pause": True})
+    assert st == 200 and out["state"] == "paused"
+    s = checkin.load_session(cfg, tok)
+    assert s["state"] == "paused" and s["draft"]["answers"]["symptoms"] == ["Blurry vision"]
+    assert "signature_png" not in s["draft"] and s["signature_png"] == ""
+    assert checkin.ipad_current(cfg) == {"state": "paused"}           # no token
+    assert checkin.ipad_session(cfg, tok)[0] == 409                    # cannot reopen it
+    assert checkin.ipad_filling(cfg, tok)[0] == 409
+    assert _submit(world, tok)[0] == 409
+    # a second pause (the iPad retrying) changes nothing
+    assert checkin.ipad_draft(cfg, tok, {"pause": True, "answers": {}, "skipped_screens": [],
+                                         "idx": 0})[1]["state"] == "paused"
+    assert checkin.load_session(cfg, tok)["draft"]["idx"] == 2
+    # the staff list shows it, and the slot is still taken
+    t = checkin.today(cfg)
+    assert t["ipad"]["state"] == "paused" and t["ipad"]["status"] == "Paused"
+    row = next(a for a in t["appointments"] if a["appointment_id"] == 1001)
+    assert row["status"] == "Paused" and row["token"] == tok
+    assert checkin.send(cfg, {"kind": "new", "audience": "adult"})[0] == 409
+    # reception resumes
+    assert checkin.resume(cfg, tok) == (200, {"ok": True, "state": "sent"})
+    assert checkin.ipad_current(cfg) == {"token": tok, "state": "sent"}
+    st, form = checkin.ipad_session(cfg, tok)
+    assert st == 200 and form["draft"] == {"answers": body["answers"], "skipped": ["details"], "idx": 2}
+    assert _submit(world, tok)[0] == 200
+    assert "draft" not in checkin.load_session(cfg, tok)
+    assert checkin.resume(cfg, tok)[0] == 409                          # not paused any more
+
+
+def test_draft_input_is_checked(world):
+    cfg = world["cfg"]
+    tok = _filling(world)
+    for bad in ({"answers": {"Bad Key": "x"}, "skipped_screens": [], "idx": 0},
+                {"answers": {}, "skipped_screens": ["../x"], "idx": 0},
+                {"answers": {}, "skipped_screens": [], "idx": 99},
+                {"answers": {}, "skipped_screens": [], "idx": "2"}):
+        assert checkin.ipad_draft(cfg, tok, bad)[0] == 400
+    assert checkin.ipad_draft(cfg, "f" * 32, {"pause": True})[0] == 409
+
+
+def test_draft_route_needs_the_key(client):
+    tok = "c" * 32
+    assert client.post(f"/api/checkin/ipad/session/{tok}/draft", json={"pause": True}).status_code == 401
+    r = client.post(f"/api/checkin/ipad/session/{tok}/draft", json={"pause": True},
+                    headers={"X-Checkin-Key": KEY})
+    assert r.status_code == 409 and r.get_json() == {"gone": True}
+
+
+def test_submit_retry_is_received_not_gone(world):
+    """Codex #11: the server saved the form, the answer never reached the iPad,
+    the iPad sends again: 'received', even after staff checked or discarded it.
+    A token never submitted is still 'gone'."""
+    cfg = world["cfg"]
+    tok = _filling(world)
+    assert _submit(world, tok) == (200, {"ok": True})
+    assert _submit(world, tok) == (200, {"ok": True, "already": True})
+    checkin.discard(cfg, tok)
+    assert _submit(world, tok) == (200, {"ok": True, "already": True})
+    receipts = (world["agent"] / "local-reports" / "checkin" / "hub-received.json").read_text()
+    assert tok not in receipts                                         # hashes only
+    other = _filling(world)
+    checkin.discard(cfg, other)                                        # cancelled, never submitted
+    assert _submit(world, other) == (409, {"gone": True})
+    assert _submit(world, "f" * 32) == (409, {"gone": True})
+
+
+def test_search_and_today_take_child_or_adult_from_the_engine(world):
+    """Codex #3: one age rule (the engine's is_child, under 16). The Hub passes it
+    through and never works out an age itself."""
+    out = checkin.search(world["cfg"], "ZZTEST")
+    assert {p["id"]: p["is_child"] for p in out["patients"]} == {99001: False, 99002: True}
+    t = checkin.today(world["cfg"])
+    assert {a["patient_id"]: a["audience"] for a in t["appointments"]} == {99001: "adult", 99002: "child"}
+
+
+def test_staff_page_has_no_age_sum_of_its_own():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parent.parent / "static" / "app.js").read_text(encoding="utf-8")
+    ci = js[js.index("/* --- Check-in (iPad registration form)"):]
+    assert "ciIsChild" not in ci and "getFullYear" not in ci and "age < " not in ci
+    assert 'p.is_child ? "child" : "adult"' in ci
+
+
+def test_ipad_v3_contract(client):
+    """Codex #4/#6/#9/#10/#11 on the iPad page."""
+    js = client.get("/checkin/ipad/ipad.js").get_data(as_text=True)
+    css = client.get("/checkin/ipad/ipad.css").get_data(as_text=True)
+    html = client.get("/checkin/ipad").get_data(as_text=True)
+    for used in ("Still there?", "Please return the iPad to reception.", "WARN_MS = 3 * 60 * 1000",
+                 "2 * 60 * 1000", "/draft", "pause: true", "Thank you, received.", "S.welcome",
+                 "roomForBar", "nonesOf", 'class="skipsmall"'):
+        assert used in js, used
+    assert 'id="still"' in html
+    assert "grid-auto-rows: 1fr" in css and ".skipsmall" in css and ".skipbig" not in css
+    # never a link out of the iPad page - the policy address is plain text
+    assert "<a " not in js and "href" not in js and "window.open" not in js
+    assert "location.href" not in js and "location.assign" not in js

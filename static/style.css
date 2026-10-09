@@ -1490,6 +1490,7 @@ body.lens-mono main { background: #fafafa; }
 .ci-find input { flex: 1; min-width: 260px; font: inherit; font-size: 20px; min-height: 56px;
                  padding: 10px 16px; border: 2px solid var(--line); border-radius: 12px; }
 .ci-find input:focus { outline: none; border-color: var(--green); }
+.ci-newpick[hidden] { display: none; }
 .ci-newpick { margin-top: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 19px; }
 #ci-found { margin-top: 14px; }
 
@@ -1545,7 +1546,22 @@ body.lens-mono main { background: #fafafa; }
 .ci-warnings li { margin: 4px 0; }
 .ci-pdf { font-size: 19px; margin: 4px 0 18px; }
 .ci-pdf a { color: var(--green-deep); font-weight: 600; }
-.ci-savebar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+/* Decisions and Save together (Codex #5): the Save bar stays on screen at the
+   bottom while Karen scrolls the rows above it. */
+.ci-savebar { position: sticky; bottom: 0; z-index: 5; display: flex; gap: 14px; align-items: center;
+              flex-wrap: wrap; justify-content: flex-end; background: #fff; border-top: 1px solid var(--line);
+              padding: 12px 0; margin: 18px 0 0; box-shadow: 0 -6px 12px -10px rgba(0, 0, 0, 0.25); }
+.ci-savebar-what { flex: 1; min-width: 220px; font-size: 18px; font-weight: 600; }
+.ci-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px 28px;
+          align-items: start; margin-bottom: 8px; }
+.ci-top .ci-answer { margin-bottom: 8px; }
+.ci-checkthese { border: 2px solid var(--amber-line); background: var(--amber-bg); border-radius: 10px;
+                 padding: 10px 16px; }
+.ci-checkthese h2 { font-size: 19px; margin: 0 0 4px; color: var(--amber-ink); }
+@media (max-width: 900px) { .ci-top { grid-template-columns: minmax(0, 1fr); } }
+.ci-slot-paused { background: var(--amber-bg); border: 2px solid var(--amber-line); border-radius: 10px;
+                  padding: 10px 14px; }
+.ci-unlock input { max-width: 320px; }
 .ci-save { font-size: 22px; min-height: 64px; padding: 12px 32px; }
 .ci-save:disabled { background: #b9c4bf; border-color: #b9c4bf; cursor: not-allowed; }
 .ci-done { border-left: 6px solid var(--green); }

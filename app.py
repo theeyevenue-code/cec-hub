@@ -12,6 +12,8 @@ gracefully when the files aren't on this machine.
 """
 
 import json
+import functools
+import ipaddress
 import logging
 import os
 from pathlib import Path
@@ -343,12 +345,76 @@ def _json(status_and_body):
     return _no_store(jsonify(body)), status
 
 
+# Staff guard (Codex #1, 9 Oct 2026). The device key opens the iPad routes and
+# nothing else; every staff route below needs ONE of:
+#   - the request comes from the server itself (loopback), or
+#   - the browser was unlocked once with the staff code (checkin.staff_code in
+#     config\integrations.json) and carries the HttpOnly cookie that sets.
+# A request carrying the device key is refused first, whatever else it has, so
+# the iPad can never be a staff screen. A patient who gets out of Guided Access
+# can reach the Hub's address, but not the staff code.
+
+def _from_this_computer() -> bool:
+    try:
+        return ipaddress.ip_address(request.remote_addr or "").is_loopback
+    except ValueError:
+        return False
+
+
+def _staff_refusal():
+    """None when this request may use the staff Check-in routes, else the
+    refusal response (403, plain words, no-store)."""
+    if request.headers.get("X-Checkin-Key"):
+        logger.warning("Check-in: staff route refused - request carried the iPad device key")
+        return _no_store(jsonify({"error": "Not from the iPad.", "ipad": True})), 403
+    if _from_this_computer():
+        return None
+    cfg = _integrations()
+    if checkin.staff_cookie_ok(cfg, request.cookies.get(checkin.STAFF_COOKIE)):
+        return None
+    return _no_store(jsonify({
+        "staff_needed": True, "code_set": bool(checkin.staff_code(cfg)),
+        "error": "Check-in is locked on this computer. Type the staff code to unlock it."})), 403
+
+
+def staff_only(view):
+    @functools.wraps(view)
+    def wrapped(*args, **kwargs):
+        refused = _staff_refusal()
+        if refused is not None:
+            return refused
+        return view(*args, **kwargs)
+    return wrapped
+
+
+@app.route("/api/checkin/staff/unlock", methods=["POST"])
+def checkin_staff_unlock():
+    """Unlock Check-in on this front-desk computer with the staff code. Sets an
+    HttpOnly cookie (no patient data in it); changing the code locks every
+    computer out again."""
+    if request.headers.get("X-Checkin-Key"):
+        return _no_store(jsonify({"error": "Not from the iPad.", "ipad": True})), 403
+    cfg = _integrations()
+    data = request.get_json(silent=True) or {}
+    ok, why = checkin.staff_code_ok(cfg, data.get("code", ""))
+    if not ok:
+        return _no_store(jsonify({"error": why})), 403
+    resp = _no_store(jsonify({"ok": True}))
+    resp.set_cookie(checkin.STAFF_COOKIE, checkin.staff_cookie_value(cfg),
+                    max_age=checkin.STAFF_COOKIE_DAYS * 86400, httponly=True, samesite="Strict",
+                    path="/")
+    logger.info("Check-in: a computer was unlocked with the staff code")
+    return resp
+
+
 @app.route("/api/checkin/today")
+@staff_only
 def checkin_today():
     return _no_store(jsonify(checkin.today(_integrations())))
 
 
 @app.route("/api/checkin/search", methods=["POST"])
+@staff_only
 def checkin_search():
     data = request.get_json(silent=True) or {}
     out = checkin.search(_integrations(), data.get("q", ""))
@@ -356,32 +422,45 @@ def checkin_search():
 
 
 @app.route("/api/checkin/send", methods=["POST"])
+@staff_only
 def checkin_send():
     return _json(checkin.send(_integrations(), request.get_json(silent=True) or {}))
 
 
 @app.route("/api/checkin/session/<token>")
+@staff_only
 def checkin_session(token):
     return _json(checkin.detail(_integrations(), token))
 
 
 @app.route("/api/checkin/session/<token>/override", methods=["POST"])
+@staff_only
 def checkin_override(token):
     return _json(checkin.override(_integrations(), token, request.get_json(silent=True) or {}))
 
 
 @app.route("/api/checkin/session/<token>/save", methods=["POST"])
+@staff_only
 def checkin_save(token):
     data = request.get_json(silent=True) or {}
     return _json(checkin.save(_integrations(), token, data.get("hash", ""), _staff_name()))
 
 
 @app.route("/api/checkin/session/<token>/discard", methods=["POST"])
+@staff_only
 def checkin_discard(token):
     return _json(checkin.discard(_integrations(), token))
 
 
+@app.route("/api/checkin/session/<token>/resume", methods=["POST"])
+@staff_only
+def checkin_resume(token):
+    """A form the iPad locked (left untouched) goes back on the iPad."""
+    return _json(checkin.resume(_integrations(), token))
+
+
 @app.route("/checkin/pdf/<token>")
+@staff_only
 def checkin_pdf(token):
     """The signed form as a PDF (built on request). Served only from inside the
     engine's checkin folder."""
@@ -438,6 +517,16 @@ def checkin_ipad_filling(token):
     if bad:
         return bad
     return _json(checkin.ipad_filling(cfg, token))
+
+
+@app.route("/api/checkin/ipad/session/<token>/draft", methods=["POST"])
+def checkin_ipad_draft(token):
+    """Answers so far (kept on the server, not the iPad); pause=true = the
+    inactivity lock."""
+    cfg, bad = _ipad_cfg()
+    if bad:
+        return bad
+    return _json(checkin.ipad_draft(cfg, token, request.get_json(silent=True) or {}))
 
 
 @app.route("/api/checkin/ipad/session/<token>/submit", methods=["POST"])

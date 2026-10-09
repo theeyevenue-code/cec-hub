@@ -36,7 +36,7 @@ body {
 main {
     max-width: 1120px;
     margin: 0 auto;
-    padding: 28px 32px 150px;
+    padding: 28px 32px 150px;     /* bottom: room for the bar; ipad.js widens it to fit */
     padding-top: max(28px, env(safe-area-inset-top));
 }
 
@@ -55,30 +55,44 @@ main {
 .mid { font-size: 28px; color: var(--soft); }
 .center .btn { min-width: 280px; }
 
+/* Collection notice under Start (Codex #10): plain text, never a link. */
+.notice { max-width: 640px; margin-top: 18px; font-size: 17px; line-height: 1.45;
+          color: var(--muted); }
+.notice p + p { margin-top: 4px; }
+
+/* "Still there?" - covers the form until Continue (or any touch). */
+.still { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.97); z-index: 10;
+         display: flex; align-items: center; justify-content: center; padding: 24px; }
+.still[hidden] { display: none; }
+.still-box { text-align: center; display: flex; flex-direction: column; gap: 20px;
+             align-items: center; }
+.still-box .btn { min-width: 280px; }
+
 /* --- Form screens -------------------------------------------------------- */
 
 .progress { font-size: 17px; color: var(--soft); margin-bottom: 2px; }
 h1 { font-size: 32px; line-height: 1.2; font-weight: 700; margin-bottom: 12px; }
 .hint { font-size: 18px; color: var(--soft); margin-bottom: 4px; }
 
-/* The details screen's way out: big, green, full width, at the top. */
-.skipbig {
-    display: block;
-    width: 100%;
+/* The details screen's way out (Codex #6, 9 Oct 2026): still at the top, but a
+   small outlined button - checking the details is the screen's job. */
+.skipsmall {
+    display: inline-block;
     font: inherit;
-    font-size: 22px;
-    font-weight: 700;
+    font-size: 18px;
+    font-weight: 600;
     line-height: 1.3;
-    color: #fff;
-    background: var(--accent);
-    border: 0;
-    border-radius: 12px;
-    padding: 20px 24px;
-    margin: 4px 0 18px;
+    color: var(--ink);
+    background: #fff;
+    border: 2px solid var(--line);
+    border-radius: 10px;
+    min-height: 56px;
+    padding: 10px 20px;
+    margin: 2px 0 14px;
     cursor: pointer;
     touch-action: manipulation;
 }
-.skipbig:active { background: var(--accent-dark); }
+.skipsmall:active { background: #eee; }
 
 .group { font-size: 23px; font-weight: 700; margin-top: 32px; }
 
@@ -100,6 +114,7 @@ h1 { font-size: 32px; line-height: 1.2; font-weight: 700; margin-bottom: 12px; }
 .grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: 1fr;          /* every row as tall as the tallest: equal tiles */
     gap: 12px;
 }
 .t {
