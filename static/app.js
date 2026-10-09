@@ -2729,19 +2729,19 @@ async function renderCheckinCheck(token, flash) {
 }
 
 /* --- Medicare rejections ------------------------------------------------------------ */
-/* Karen's Tuesday list (Mark, 9 Oct 2026). ONE "Do now" list; everything else folded
-   with totals. Mark's item review box shows only when the name picked is Mark.
-   Reads the reports she has just pulled in Optomate, live, through the agent.
-   Given name + surname initial only. */
+/* Karen's Tuesday list (Mark, 9 Oct 2026; Codex review applied the same day). ONE "Do now"
+   list; everything else folded with totals. Mark's review shows only when the name picked
+   is Mark; Accept / Not eligible / undoing either need his 4-digit PIN. Nothing is ever
+   written off or accepted automatically. Given name + surname initial only. */
 
 const MC_FOLDED = [
-    { id: "mark", title: "Waiting for Mark", note: "Mark decides these." },
-    { id: "written_off", title: "Written off", note: "Off the list. The balance still needs writing off in Optomate." },
-    { id: "expired", title: "Expired", note: "Past the 1-year limit. Medicare won't pay. Write off in Optomate." },
+    { id: "written_off", title: "Written off", note: "Done in Optomate. Off the list." },
+    { id: "expired", title: "Expired", note: "Past the 1-year limit. Medicare won't pay." },
     { id: "waiting", title: "Waiting for payment", note: "Resubmitted. Closes itself when Medicare pays." },
     { id: "recovered", title: "Paid since", note: "Medicare has paid. Nothing to do." },
 ];
 const MC_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MC_URGENT_DAYS = 31;
 
 function mcDate(iso) {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
@@ -2760,37 +2760,58 @@ function mcSum(d, ids) {
         return { n: a.n + s.n, amount: a.amount + s.amount };
     }, { n: 0, amount: 0 });
 }
+function mcUrgent(i) { return i.days_left !== null && i.days_left <= MC_URGENT_DAYS; }
 
-function mcStatusHTML(d) {
-    const pulled = d.last_report_pull
-        ? (d.pull_overdue
-            ? `<div class="mc-answer mc-late">Reports not pulled since ${esc(mcDate(d.last_report_pull))}
-                <span class="mc-answer-sub">${mcPlural(d.days_since_pull, "day")} ago. Pull them in Optomate first.</span></div>`
-            : `<div class="mc-answer">Reports pulled ${esc(mcDate(d.last_report_pull))}
-                <span class="mc-answer-sub">${d.days_since_pull === 0 ? "today" : mcPlural(d.days_since_pull, "day") + " ago"}</span></div>`)
-        : `<div class="mc-answer mc-late">No Medicare reports pulled yet
-                <span class="mc-answer-sub">Pull them in Optomate first.</span></div>`;
+/* Codex #5: ONE count everywhere: "6 awaiting Mark: 5 item reviews + 1 other decision". */
+function mcAwaiting(d) {
+    const rv = ((d.summary || {}).review || {}).n || 0;
+    const ot = ((d.summary || {}).mark || {}).n || 0;
+    const parts = [];
+    if (rv) parts.push(mcPlural(rv, "item review"));
+    if (ot) parts.push(mcPlural(ot, "other decision"));
+    return { n: rv + ot, rv, ot, amount: mcSum(d, ["review", "mark"]).amount,
+        parts: parts.join(" + "),
+        text: `${rv + ot} awaiting Mark` + (parts.length ? `: ${parts.join(" + ")}` : "") };
+}
+
+/* Codex #1: the answer first. Stale reports -> pull first; otherwise the claims to fix. */
+function mcAnswerHTML(d) {
+    const now = mcSum(d, ["do_now"]);
+    const ago = d.days_since_pull === 0 ? "today" : mcPlural(d.days_since_pull, "day") + " ago";
+    let html;
+    if (!d.last_report_pull) {
+        html = `<div class="mc-answer mc-late">Pull reports in Optomate first
+            <span class="mc-answer-sub">No Medicare reports pulled yet.</span></div>`;
+    } else if (d.pull_overdue) {
+        html = `<div class="mc-answer mc-late">Pull reports in Optomate first
+            <span class="mc-answer-sub">Last pulled ${esc(mcDate(d.last_report_pull))}, ${esc(ago)}.</span></div>`;
+    } else {
+        html = `<div class="mc-answer">${now.n ? `${mcPlural(now.n, "claim")} to fix · ${mcMoney(now.amount)}` : "Nothing to fix"}
+            <span class="mc-answer-sub">Reports pulled ${esc(mcDate(d.last_report_pull))}, ${esc(ago)}.</span></div>`;
+    }
     const u = d.unreported_claims || {};
     const unrep = u.count
         ? `<p class="mc-unrep">${mcPlural(u.count, "claim")} lodged, no report yet. Oldest ${mcPlural(u.oldest_days, "day")}.</p>`
         : "";
-    return pulled + unrep;
+    return html + unrep;
 }
 
+/* Tiles, zero ones hidden. Each one leads somewhere on the page. */
 function mcChipsHTML(d) {
     const now = mcSum(d, ["do_now"]);
-    const mark = mcSum(d, ["review", "mark"]);
+    const aw = mcAwaiting(d);
     const wait = mcSum(d, ["waiting"]);
-    const chip = (cls, jump, name, big, small) =>
-        `<a class="mc-chip ${cls}${big === "0" || big === "$0.00" ? " mc-zero" : ""}" href="#/medicare" data-jump="${jump}">
-            <span class="mc-chip-name">${esc(name)}</span>
+    const chip = (cls, jump, big, small) =>
+        `<a class="mc-chip ${cls}" href="#/medicare" data-jump="${jump}">
             <span class="mc-chip-amt">${esc(big)}</span>
             <span class="mc-chip-n">${esc(small)}</span></a>`;
-    return `<div class="mc-chips">
-        ${chip("mc-c-now", "do_now", "Do now", mcMoney(now.amount), mcPlural(now.n, "item"))}
-        ${chip("mc-c-mark", d.is_mark && (d.summary.review || {}).n ? "review" : "mark", "Waiting for Mark", String(mark.n), mcMoney(mark.amount))}
-        ${chip("mc-c-wait", "waiting", "Waiting for payment", String(wait.n), mcMoney(wait.amount))}
-    </div>`;
+    const markJump = d.is_mark && aw.rv ? "review" : "mark";
+    const tiles = [
+        now.n ? chip("mc-c-now", "do_now", `Do now · ${mcMoney(now.amount)}`, mcPlural(now.n, "claim")) : "",
+        aw.n ? chip("mc-c-mark", markJump, `${aw.n} awaiting Mark`, aw.parts) : "",
+        wait.n ? chip("mc-c-wait", "waiting", `${wait.n} waiting for payment`, mcMoney(wait.amount)) : "",
+    ].join("");
+    return tiles ? `<div class="mc-chips">${tiles}</div>` : "";
 }
 
 function mcLeft(i) {
@@ -2799,128 +2820,211 @@ function mcLeft(i) {
     return i.days_left === 0 ? "today" : `${mcPlural(i.days_left, "day")} left`;
 }
 
+/* Decisions are Mark's: a PIN button (disabled until his PIN is set). */
+function mcPinBtn(status, label, quiet, d, note) {
+    return `<button class="btn${quiet ? " btn-quiet" : ""} mc-btn" data-mc="${esc(status)}" data-pin="1"${
+        note ? ` data-note="${esc(note)}"` : ""}${d.pin_set ? "" : " disabled"}>${esc(label)}</button>`;
+}
+
 function mcButtons(i, d) {
     const g = i.action_group;
-    if (g === "recovered") return "";
+    if (g === "recovered" || g === "review") return "";
     const st = i.status || {};
     const who = st.by ? `<span class="mc-who">${esc(st.by)} · ${esc(mcDate(st.at))}</span>` : "";
     if (g === "waiting" || g === "written_off") {
-        return st.status === "auto" ? `<span class="mc-who">Automatic</span>`
-            : `${who}<button class="btn btn-quiet mc-btn" data-mc="open">Undo</button>`;
+        return `${who}<button class="btn btn-quiet mc-btn" data-mc="open">Undo</button>`;
     }
     if (g === "expired") return `<button class="btn btn-quiet mc-btn" data-mc="written_off">Written off</button>`;
-    const main = i.code === "" && !i.item_change
+    const writeOff = (i.code === "" && !i.item_change) || st.status === "not_eligible";
+    const main = writeOff
         ? `<button class="btn mc-btn" data-mc="written_off">Written off</button>`
-        : `<button class="btn mc-btn" data-mc="done">Done</button>`;
-    const undoAccept = (d.is_mark && i.item_change && /^accepted_/.test(st.status || ""))
-        ? `<button class="btn btn-quiet mc-btn" data-mc="open">Undo accept</button>` : "";
+        : `<button class="btn mc-btn" data-mc="resubmitted">Resubmitted</button>`;
     const off = g === "mark" ? `<button class="btn btn-quiet mc-btn" data-mc="written_off">Written off</button>` : "";
-    return `${main}${off}${undoAccept}`;
+    let undo = "";
+    if (d.is_mark && /^accepted_/.test(st.status || "")) undo = mcPinBtn("open", "Undo accept", true, d);
+    if (d.is_mark && st.status === "not_eligible") undo = mcPinBtn("open", "Undo not eligible", true, d);
+    return `${main}${off}${undo}`;
 }
 
+/* Codex #6 / #8: action first; service date + claim visible; code and detail behind
+   "Details". Phone: patient + item, then deadline + amount, then action and button. */
 function mcRowHTML(i, d) {
-    const live = ["do_now", "mark"].includes(i.action_group);
-    const urgent = live && i.days_left !== null && i.days_left <= 31;
-    const item = i.item_change ? `${esc(i.item)}→${esc(i.item_change)}` : esc(i.item);
+    const live = ["do_now", "mark", "review"].includes(i.action_group);
+    const urgent = live && mcUrgent(i);
+    const item = i.item_change ? `${esc(i.item)} → ${esc(i.item_change)}` : esc(i.item);
+    const details = [
+        i.code ? `Medicare code ${esc(i.code)}: ${esc(i.meaning)}` : esc(i.meaning),
+        i.fact ? esc(mcText(i.fact)) : "",
+    ].filter(Boolean);
     return `<tr class="${urgent ? "mc-urgent" : ""}" data-key="${esc(i.key)}">
-        <td class="mc-date" data-l="Resubmit by"><strong>${esc(mcDate(i.deadline)) || "—"}</strong>
+        <td class="mc-pt"><strong>${esc(i.patient_label)}</strong></td>
+        <td class="mc-num mc-item"><strong>${item}</strong></td>
+        <td class="mc-date"><strong>${esc(mcDate(i.deadline)) || "—"}</strong>
             <span class="mc-small${urgent ? " mc-red" : ""}">${esc(mcLeft(i))}</span></td>
-        <td class="mc-pt" data-l="Patient">${esc(i.patient_label)}</td>
-        <td class="mc-num" data-l="Item"><strong>${item}</strong></td>
-        <td class="mc-num" data-l="$">${mcMoney(i.amount)}</td>
-        <td class="mc-todo" data-l="What to do"><span class="mc-step">${esc(mcText(i.steps))}</span>
+        <td class="mc-num mc-amt">${mcMoney(i.amount)}</td>
+        <td class="mc-todo"><span class="mc-step">${esc(mcText(i.steps))}</span>
+            ${i.claim_note ? `<span class="mc-note">Claim note: “${esc(i.claim_note)}”</span>` : ""}
             ${i.flag ? `<span class="mc-flag">${esc(mcText(i.flag))}</span>` : ""}
-            ${i.fact ? `<span class="mc-fact">${esc(mcText(i.fact))}</span>` : ""}
-            <span class="mc-small">Seen ${esc(mcDate(i.service_date))} · Claim ${esc(i.claim)}${i.code ? ` · code ${esc(i.code)}` : ""}</span></td>
+            <span class="mc-small">Seen ${esc(mcDate(i.service_date))} · Claim ${esc(i.claim)}</span>
+            ${details.length ? `<details class="mc-more"><summary>Details</summary>${details.map((x) => `<span class="mc-small">${x}</span>`).join("")}</details>` : ""}</td>
         <td class="mc-act">${mcButtons(i, d)}</td>
     </tr>`;
 }
 
 function mcTableHTML(rows, d) {
     return `<div class="mc-scroll"><table class="mc-table">
-        <thead><tr><th>Resubmit by</th><th>Patient</th><th class="mc-num">Item</th>
+        <thead><tr><th>Patient</th><th class="mc-num">Item</th><th>Resubmit by</th>
         <th class="mc-num">$</th><th>What to do</th><th></th></tr></thead>
         <tbody>${rows.map((i) => mcRowHTML(i, d)).join("")}</tbody></table></div>`;
+}
+
+/* "Awaiting Mark": the same count as the tile. Karen sees every line (review lines as
+   "Mark to review the item", nothing from the notes); Mark sees his other decisions. */
+function mcAwaitingHTML(d) {
+    const aw = mcAwaiting(d);
+    const groups = d.is_mark ? ["mark"] : ["review", "mark"];
+    const rows = (d.items || []).filter((i) => groups.includes(i.action_group));
+    if (!rows.length) return "";
+    const title = d.is_mark ? "Other decisions for Mark" : "Awaiting Mark";
+    const sum = d.is_mark ? `${mcPlural(aw.ot, "item")} · ${mcMoney(mcSum(d, ["mark"]).amount)}`
+        : `${aw.text} · ${mcMoney(aw.amount)}`;
+    return `<details class="mc-group mc-g-mark" id="mc-mark">
+        <summary><span class="mc-g-title">${esc(title)}</span>
+        <span class="mc-g-sum">${esc(sum)}</span></summary>
+        <p class="mc-g-note">Mark decides these.</p>${mcTableHTML(rows, d)}</details>`;
 }
 
 function mcFoldedHTML(g, d) {
     const rows = (d.items || []).filter((i) => i.action_group === g.id);
     if (!rows.length) return "";
     const s = (d.summary || {})[g.id] || { n: rows.length, amount: 0 };
-    const rv = ((d.summary || {}).review || {}).n || 0;
-    const note = g.id === "mark" && !d.is_mark && rv
-        ? `${g.note} Plus ${mcPlural(rv, "item review")} only Mark sees.` : g.note;
     return `<details class="mc-group mc-g-${g.id}" id="mc-${g.id}">
         <summary><span class="mc-g-title">${esc(g.title)}</span>
         <span class="mc-g-sum">${mcPlural(s.n, "item")} · ${mcMoney(s.amount)}</span></summary>
-        ${note ? `<p class="mc-g-note">${esc(note)}</p>` : ""}${mcTableHTML(rows, d)}</details>`;
+        ${g.note ? `<p class="mc-g-note">${esc(g.note)}</p>` : ""}${mcTableHTML(rows, d)}</details>`;
 }
 
 function mcDoNowHTML(d) {
     const rows = (d.items || []).filter((i) => i.action_group === "do_now");
     const s = mcSum(d, ["do_now"]);
     return `<section class="mc-now" id="mc-do_now">
-        <h2 class="mc-h2">Do now <span class="mc-g-sum">${mcPlural(s.n, "item")} · ${mcMoney(s.amount)}</span></h2>
+        <h2 class="mc-h2">Do now <span class="mc-g-sum">${mcPlural(s.n, "claim")} · ${mcMoney(s.amount)}</span></h2>
         ${rows.length ? mcTableHTML(rows, d) : `<div class="empty-panel">Nothing to do. All clear.</div>`}
     </section>`;
 }
 
-function mcCardHTML(i) {
+/* Codex #2 / #4: Mark's review as a compact table (stacked cards on phones). Labels say
+   where the word was, never how sure. Every item choice weighs the same. */
+function mcReviewRowHTML(i, d) {
     const r = i.review || {};
     const sugs = r.suggestions || [];
-    if (!sugs.length) return "";
-    const weak = r.confidence === "Weak";
-    const first = sugs[0];
-    const other = sugs.slice(1).find((s) => ["10913", "10914"].includes(s.item) && ["10913", "10914"].includes(first.item));
-    const urgent = i.days_left !== null && i.days_left <= 31;
-    const sugHTML = sugs.map((s) => `<div class="mc-sug">
-            <div class="mc-sug-head"><strong>${esc(s.item)}</strong> ${esc(s.name)}
-                <span class="mc-conf mc-conf-${esc(s.confidence)}">${esc(s.confidence)}</span>
-                ${s.history_only ? `<span class="mc-conf mc-conf-hist">History only</span>` : ""}</div>
-            ${(s.snippets || []).map((x) => `<blockquote class="mc-snip"><span class="mc-snip-sec">${esc(x.section)}</span>${esc(x.text)}</blockquote>`).join("")}
+    const urgent = mcUrgent(i);
+    const evidence = r.kind === "check"
+        ? `<div class="mc-sug"><span class="mc-sug-item">Check eligibility</span>
+            <span class="mc-sug-why">${esc(mcText(r.check))}</span></div>`
+        : sugs.map((s) => `<div class="mc-sug">
+            <span class="mc-sug-item">${esc(s.item)} ${esc(s.name)}</span>
+            ${s.basis ? `<span class="mc-basis">${esc(s.basis)}</span>` : ""}
+            ${(s.snippets || []).map((x) => `<span class="mc-snip"><span class="mc-snip-sec">${esc(x.section)}</span>“${esc(x.text)}”</span>`).join("")}
         </div>`).join("");
-    return `<article class="mc-card${weak ? " mc-card-weak" : ""}" data-key="${esc(i.key)}">
-        <div class="mc-card-top">
-            <div class="mc-card-who"><strong>${esc(i.patient_label)}</strong> · seen ${esc(mcDate(i.service_date))} ·
-                ${esc(i.item)} rejected ${weak ? `<span class="mc-conf mc-conf-Weak">Weak</span>` : ""}</div>
-            <div class="mc-card-due${urgent ? " mc-red" : ""}">Resubmit by <strong>${esc(mcDate(i.deadline))}</strong></div>
-        </div>
-        <p class="mc-card-why">${esc(mcText(r.why))}</p>
-        ${sugHTML}
-        <p class="mc-card-facts">${r.minutes !== null && r.minutes !== undefined ? `Booked ${r.minutes} min` : "Booking length not on file"}
-            · ${r.age !== null && r.age !== undefined ? `Age ${r.age} at visit` : "Age not on file"} · ${mcMoney(i.amount)}</p>
-        <div class="mc-card-btns">
-            <button class="btn mc-btn" data-mc="accepted_${esc(first.item)}">Accept ${esc(first.item)}</button>
-            ${other ? `<button class="btn btn-quiet mc-btn" data-mc="accepted_${esc(other.item)}">${esc(other.item)} instead</button>` : ""}
-            <button class="btn btn-quiet mc-btn" data-mc="not_eligible">Not eligible</button>
-        </div>
-        <p class="mc-card-confirm">You're confirming the notes from that day support this item.</p>
-    </article>`;
+    const facts = [
+        esc(mcText(r.why)),
+        r.minutes !== null && r.minutes !== undefined ? `Booked ${r.minutes} min` : "Booking length not on file",
+        r.age !== null && r.age !== undefined ? `Age ${r.age} at visit` : "Age not on file",
+        `${esc(i.item)} rejected, code 160 · ${mcMoney(i.amount)} · Claim ${esc(i.claim)}`,
+    ];
+    const btns = sugs.map((s) => mcPinBtn(`accepted_${s.item}`, `Accept ${s.item}`, false, d, s.claim_note)).join("")
+        + mcPinBtn("not_eligible", "Not eligible", true, d);
+    return `<tr class="${urgent ? "mc-urgent" : ""}" data-key="${esc(i.key)}" data-label="${esc(i.patient_label)}">
+        <td class="mc-rv-pt"><strong>${esc(i.patient_label)}</strong>
+            <span class="mc-small">Seen ${esc(mcDate(i.service_date))}</span>
+            <span class="mc-small${urgent ? " mc-red" : ""}">Resubmit by ${esc(mcDate(i.deadline))}</span></td>
+        <td class="mc-rv-ev">${evidence}
+            <details class="mc-more"><summary>Details</summary>${facts.map((x) => `<span class="mc-small">${x}</span>`).join("")}</details></td>
+        <td class="mc-rv-act"><div class="mc-rv-btns">${btns}</div></td>
+    </tr>`;
 }
 
 function mcReviewHTML(d) {
     if (!d.is_mark) return "";
-    const cards = (d.items || []).filter((i) => i.action_group === "review");
-    if (!cards.length) return "";
+    const rows = (d.items || []).filter((i) => i.action_group === "review");
+    if (!rows.length) return "";
+    const pin = d.pin_set ? ""
+        : `<p class="mc-pin-needed">Mark: set your PIN at the server (one-off)
+            <span class="mc-small">In the agent folder: python -m medicare.pin set</span></p>`;
     return `<section class="mc-review" id="mc-review">
-        <h2 class="mc-h2">Item review <span class="mc-g-sum">${mcPlural(cards.length, "claim")} · only you see this</span></h2>
-        <p class="mc-g-note">Limit reached on a comprehensive consult. That day's notes may support another item.</p>
-        <div class="mc-cards">${cards.map(mcCardHTML).join("")}</div>
+        <h2 class="mc-h2">Mark: review ${mcPlural(rows.length, "claim")} <span class="mc-g-sum">Mark's review</span></h2>
+        <p class="mc-instr">Confirm eligibility against the full notes from that day.</p>
+        ${pin}
+        <div class="mc-scroll"><table class="mc-table mc-rv-t">
+            <thead><tr><th>Patient</th><th>Possible item + evidence</th><th>Decision</th></tr></thead>
+            <tbody>${rows.map((i) => mcReviewRowHTML(i, d)).join("")}</tbody></table></div>
     </section>`;
 }
 
+/* Codex #7 / #9: one action line per patient, the earlier item/date underneath; and say
+   so when today's check couldn't run, rather than hiding the box. */
 function mcTodayHTML(d) {
+    if (d.today_error) {
+        return `<section class="mc-today" id="mc-today">
+            <h2 class="mc-h2">Today: check before billing</h2>
+            <p class="mc-today-err">Today's billing checks unavailable - check in Optomate</p>
+        </section>`;
+    }
     const rows = d.today || [];
     if (!rows.length) return "";
     return `<section class="mc-today" id="mc-today">
         <h2 class="mc-h2">Today: check before billing</h2>
         <div class="mc-scroll"><table class="mc-table mc-today-t"><tbody>
-        ${rows.map((t) => `<tr><td class="mc-date" data-l="Time"><strong>${esc(t.time)}</strong></td>
-            <td class="mc-pt" data-l="Patient">${esc(t.patient_label)}</td>
-            <td data-l="Check">${t.lines.map((l) => `<span class="mc-tline">${esc(l)}</span>`).join("")}</td></tr>`).join("")}
+        ${rows.map((t) => `<tr><td class="mc-date"><strong>${esc(t.time)}</strong></td>
+            <td class="mc-pt"><strong>${esc(t.patient_label)}</strong></td>
+            <td class="mc-tcheck">${t.lines.map((l) => `<span class="mc-tline">${esc(l.text)}</span>${l.sub ? `<span class="mc-small">${esc(l.sub)}</span>` : ""}`).join("")}</td></tr>`).join("")}
         </tbody></table></div>
         <p class="mc-g-note">Our own claims only. A visit elsewhere can still use the limit.</p>
     </section>`;
+}
+
+/* Mark's PIN for Accept / Not eligible / undoing either. Not a login: one 4-digit box.
+   send(pin) -> true (saved) or an error message to show in the box. */
+function mcAskPin(title, send) {
+    return new Promise((resolve) => {
+        let dlg = document.getElementById("mc-pin");
+        if (!dlg) {
+            dlg = document.createElement("dialog");
+            dlg.id = "mc-pin";
+            dlg.className = "mc-pin";
+            document.body.appendChild(dlg);
+        }
+        dlg.innerHTML = `<form class="mc-pin-form">
+            <p class="mc-pin-title">${esc(title)}</p>
+            <label class="mc-pin-label">Mark's PIN
+                <input class="mc-pin-input" type="password" inputmode="numeric" maxlength="4"
+                    autocomplete="off"></label>
+            <p class="mc-pin-err" aria-live="polite"></p>
+            <div class="mc-pin-btns"><button type="submit" class="btn mc-btn">Confirm</button>
+            <button type="button" class="btn btn-quiet mc-btn" data-cancel="1">Cancel</button></div></form>`;
+        const input = dlg.querySelector("input");
+        const err = dlg.querySelector(".mc-pin-err");
+        const ok = dlg.querySelector("button[type=submit]");
+        let settled = false;
+        const finish = (v) => { if (settled) return; settled = true; if (dlg.open) dlg.close(); resolve(v); };
+        dlg.querySelector("[data-cancel]").addEventListener("click", () => finish(false));
+        dlg.addEventListener("cancel", () => finish(false), { once: true });
+        dlg.querySelector("form").addEventListener("submit", async (ev) => {
+            ev.preventDefault();
+            const pin = input.value.trim();
+            input.value = "";
+            if (!/^\d{4}$/.test(pin)) { err.textContent = "Enter your 4-digit PIN."; input.focus(); return; }
+            ok.disabled = true;
+            err.textContent = "Saving…";
+            const res = await send(pin);
+            ok.disabled = false;
+            if (res === true) finish(true);
+            else { err.textContent = res; input.focus(); }
+        });
+        dlg.showModal();
+        input.focus();
+    });
 }
 
 async function renderMedicare() {
@@ -2949,12 +3053,12 @@ async function renderMedicare() {
     view.innerHTML = `<div class="mc-page">
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Medicare${d.fixture ? ` <span class="chip chip-amber">Test data, not real patients</span>` : ""}</h1>
-        <p class="mc-how">Tuesday: pull the reports in Optomate, then work Do now from the top.</p>
-        ${mcStatusHTML(d)}
+        ${mcAnswerHTML(d)}
         ${mcChipsHTML(d)}
         ${mcReviewHTML(d)}
         ${mcDoNowHTML(d)}
         ${mcTodayHTML(d)}
+        ${mcAwaitingHTML(d)}
         ${MC_FOLDED.map((g) => mcFoldedHTML(g, d)).join("")}
         <p class="mc-foot">Read from Optomate ${esc(d.generated_at)}. Red: resubmit within a month. Patients show first name and initial only.</p>
     </div>`;
@@ -2971,13 +3075,32 @@ async function renderMedicare() {
     view.querySelectorAll("[data-mc]").forEach((b) => b.addEventListener("click", async () => {
         if (!getStaff()) { alert("Pick your name at the top first."); return; }
         const status = b.dataset.mc;
-        if (status === "written_off" &&
-            !confirm("Mark this as written off?\n\nDo the write-off in Optomate as well. It leaves the list.")) return;
         const holder = b.closest("[data-key]");
+        const body = { key: holder.dataset.key, status };
+        if (b.dataset.pin) {
+            const who = holder.dataset.label ? ` for ${holder.dataset.label}` : "";
+            const label = b.textContent.trim();
+            const title = status === "not_eligible" ? `Not eligible${who}? Karen then writes it off in Optomate.`
+                : status === "open" ? `${label}?`
+                : `${label}${who}? Karen then changes the item and resubmits.`;
+            if (b.dataset.note) body.claim_note = b.dataset.note;
+            const saved = await mcAskPin(title, async (pin) => {
+                try {
+                    await postJSON("/api/medicare/mark", Object.assign({}, body, { pin }));
+                    return true;
+                } catch (e) {
+                    return e.message;
+                }
+            });
+            if (saved) renderMedicare();
+            return;
+        }
+        if (status === "written_off" &&
+            !confirm("Have you written this off in Optomate?\n\nIt moves to Written off.")) return;
         holder.querySelectorAll("button").forEach((x) => { x.disabled = true; });
         b.textContent = "Saving…";
         try {
-            await postJSON("/api/medicare/mark", { key: holder.dataset.key, status });
+            await postJSON("/api/medicare/mark", body);
         } catch (e) {
             alert(e.message);
         }

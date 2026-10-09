@@ -470,13 +470,16 @@ def medicare_list():
 
 @app.route("/api/medicare/mark", methods=["POST"])
 def medicare_mark():
-    """Tick one item: done (resubmitted / fixed), written_off, or open (undo).
-    Mark only: accepted_10913 / accepted_10914 / accepted_10915 / not_eligible."""
+    """Tick one item: resubmitted, written_off, or open (undo).
+    Mark only, with his 4-digit PIN: accepted_10913 / accepted_10914 / accepted_10915 /
+    not_eligible, and undoing those. The PIN is passed to the agent on stdin and is
+    never logged."""
     from hub import medicare
     data = request.get_json(silent=True) or {}
     who = (request.cookies.get("hub_staff") or "").strip()
     result = medicare.mark(_integrations(), data.get("key", ""), data.get("status", ""),
-                           who, _medicare_fixture())
+                           who, _medicare_fixture(), pin=str(data.get("pin") or ""),
+                           claim_note=str(data.get("claim_note") or ""))
     if result.get("ok"):
         logger.info(f"Medicare item marked {result['status']} by {who[:60]}")
     resp = jsonify(result)

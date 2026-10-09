@@ -161,12 +161,16 @@ subprocess pattern as Today's patients). ONE "Do now" list (fix-and-resubmit, Ma
 changes, rejected again, short payments); Waiting for Mark / Written off / Expired / Waiting for
 payment / Paid since are folded with totals. Red date = resubmit-by within 31 days.
 
-- **Item review (Mark only).** When the name picked is Mark (cookie `hub_staff`, case-insensitive),
-  the Hub adds `--review` and shows cards for 160 rejections of 10910/10911 where that day's notes
-  point to 10913/10914/10915: why it was rejected, up to 2 note snippets, booking length, age,
-  resubmit-by, Accept / other item / Not eligible. Anyone else gets a count only, and the accept /
-  not-eligible POSTs are refused unless the name is Mark. No auto-accept.
-- **Today: check before billing** - one line per booked patient whose limit our own claims already used.
+- **Mark's review.** When the name picked is Mark (cookie `hub_staff`, case-insensitive) the Hub adds
+  `--review` and shows a table of 160 rejections of 10910/10911: a possible item (10913/10914/10915) with
+  up to 2 note snippets labelled Finding noted / History only / Symptom noted, or "Check eligibility".
+  Accept / Not eligible / undoing either need **Mark's 4-digit PIN** (checked, rate-limited and logged
+  by the agent; sent on stdin, never logged by the Hub). Anyone else sees those lines under "Awaiting
+  Mark" as "Mark to review the item", with nothing from the notes. No auto-accept, **no automatic
+  write-off**: after Not eligible Karen gets "Write off in Optomate" and ticks it when done.
+- **Today: check before billing** - one line per booked patient whose limit our own claims already used
+  ("Comprehensive limit used: ask Mark which item applies."). If the bookings can't be read it says
+  "Today's billing checks unavailable - check in Optomate".
 - Ticks call `--mark` in the agent (state in its git-ignored local-reports). `/api/medicare` is no-store;
   nothing about a patient is logged.
 - Test copy with fictional patients: `CEC_HUB_MEDICARE_FIXTURE=1`, port 5699, a config dir
@@ -175,6 +179,8 @@ payment / Paid since are folded with totals. Red date = resubmit-by within 31 da
 - To go live: merge this branch AND the agent's `session/2026-10-09-medicare-rejections`, pull both,
   add to `config\tiles.json`: `{"id": "medicare", "icon": "$", "name": "Medicare", "description":
   "Rejected claims: what to fix, what to write off", "link": "#/medicare"}`, then RESTART-HUB.
+  Then **Mark sets PIN: python -m medicare.pin set** (once, at the server, in the agent folder). Until
+  then his review shows "Mark: set your PIN at the server (one-off)" and Accept is disabled.
   The tile is deliberately NOT in tiles.example.json, so it only appears when Mark adds it.
 ## The Stock approve button — what it actually does
 
