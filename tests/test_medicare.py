@@ -186,6 +186,27 @@ def test_mark_gets_cards_with_snippets(agent, calls):
     assert card["review"]["why"].startswith("We claimed 10910") and card["review"]["kind"] == "suggest"
 
 
+def test_short_booking_review_offers_10916_and_it_can_be_accepted(agent, calls):
+    raw = dict(REVIEW["review"], kind="check_short",
+               check="Booked 15 min: a brief visit fits 10916, not 10910/10913/10914",
+               suggestions=[{"item": "10916", "name": "Brief initial attendance", "claim_note": "",
+                             "snippets": []}])
+    r = M.clean_review(raw, True)
+    assert r["kind"] == "check_short" and [s["item"] for s in r["suggestions"]] == ["10916"]
+    assert M.mark(agent, "0123456789ab", "accepted_10916", "Mark", pin="2468")["ok"]
+    assert calls[0][3:7] == ["--mark", "0123456789ab", "--status", "accepted_10916"]
+
+
+def test_no_evidence_rows_lead_with_not_eligible():
+    js = open("static/app.js", encoding="utf-8").read()
+    assert 'r.kind === "check"' in js and "Another item…" in js
+    assert "Only if the full notes from that day show new symptoms or a progressive condition." in js
+    i = js.index('if (r.kind === "check") {')
+    block = js[i:js.index("} else {", i)]
+    assert block.index('"Not eligible", false') < block.index("Another item")   # primary first
+    assert "accept(s, true)" in block                                          # alternatives secondary
+
+
 def test_review_whitelist_trims_and_drops_odd_items():
     raw = dict(REVIEW["review"], suggestions=[
         {"item": "10918", "name": "x", "snippets": []},

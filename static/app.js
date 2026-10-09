@@ -2919,7 +2919,7 @@ function mcReviewRowHTML(i, d) {
     const r = i.review || {};
     const sugs = r.suggestions || [];
     const urgent = mcUrgent(i);
-    const evidence = r.kind === "check"
+    const evidence = r.kind === "check" || r.kind === "check_short"
         ? `<div class="mc-sug"><span class="mc-sug-item">Check eligibility</span>
             <span class="mc-sug-why">${esc(mcText(r.check))}</span></div>`
         : sugs.map((s) => `<div class="mc-sug">
@@ -2933,8 +2933,18 @@ function mcReviewRowHTML(i, d) {
         r.age !== null && r.age !== undefined ? `Age ${r.age} at visit` : "Age not on file",
         `${esc(i.item)} rejected, code 160 · ${mcMoney(i.amount)} · Claim ${esc(i.claim)}`,
     ];
-    const btns = sugs.map((s) => mcPinBtn(`accepted_${s.item}`, `Accept ${s.item}`, false, d, s.claim_note)).join("")
-        + mcPinBtn("not_eligible", "Not eligible", true, d);
+    const accept = (s, quiet) => mcPinBtn(`accepted_${s.item}`, `Accept ${s.item}`, quiet, d, s.claim_note);
+    let btns;
+    if (r.kind === "check") {
+        /* No evidence: Not eligible leads; accepting another item takes a deliberate extra step. */
+        btns = `<div class="mc-wide">${mcPinBtn("not_eligible", "Not eligible", false, d)}</div>`
+            + `<details class="mc-alt"><summary class="btn btn-quiet mc-btn">Another item…</summary>
+                <p class="mc-alt-note">Only if the full notes from that day show new symptoms or a progressive condition.</p>
+                <div class="mc-alt-btns">${sugs.map((s) => accept(s, true)).join("")}</div></details>`;
+    } else {
+        /* Evidence (unchanged), or a short booking (10916 only: the others need over 15 min). */
+        btns = sugs.map((s) => accept(s, false)).join("") + mcPinBtn("not_eligible", "Not eligible", true, d);
+    }
     return `<tr class="${urgent ? "mc-urgent" : ""}" data-key="${esc(i.key)}" data-label="${esc(i.patient_label)}">
         <td class="mc-rv-pt"><strong>${esc(i.patient_label)}</strong>
             <span class="mc-small">Seen ${esc(mcDate(i.service_date))}</span>

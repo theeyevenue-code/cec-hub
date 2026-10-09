@@ -37,7 +37,7 @@ from pathlib import Path
 
 TIMEOUT_S = 60
 KEY_RE = re.compile(r"^[0-9a-f]{12}$")
-ACCEPT_ITEMS = ("10913", "10914", "10915")
+ACCEPT_ITEMS = ("10913", "10914", "10915", "10916")   # 10916: short bookings only
 STAFF_STATUSES = ("done", "resubmitted", "written_off", "open")
 MARK_STATUSES = ("not_eligible",) + tuple(f"accepted_{i}" for i in ACCEPT_ITEMS)
 LANES = ("review", "do_now", "mark", "waiting", "written_off", "expired", "recovered")
@@ -124,7 +124,7 @@ def clean_review(r, mark_view: bool):
     the notes (the row shows as "Mark to review the item")."""
     if not isinstance(r, dict):
         return None
-    kind = r.get("kind") if r.get("kind") in ("suggest", "check") else ""
+    kind = r.get("kind") if r.get("kind") in ("suggest", "check", "check_short") else ""
     if not mark_view:
         return {"kind": kind}
     sugs = []
