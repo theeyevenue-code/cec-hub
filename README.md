@@ -153,6 +153,23 @@ the iPad is in use, the Hub asks before replacing that form.
 To try it with fake patients: double-click `RUN-CHECKIN-TEST.bat` (port 5699, ZZTEST
 fixtures, nothing written anywhere near Optomate).
 
+## Medicare (rejected claims) - built 9 Oct 2026, not live yet
+
+Karen's Tuesday page. She pulls the Medicare processing + payment reports in Optomate Touch first;
+the page then runs the agent's `python -m medicare.rejections --json` LIVE (hub/medicare.py, same
+subprocess pattern as Today's patients) and shows Fix now / Check with Mark / Write off, plus
+Expired, Waiting for payment and Paid since folded away. Red row = resubmit-by within 31 days.
+Done / Written off buttons need a name picked at the top; they call `--mark` in the agent, which
+keeps the ticks in its own git-ignored local-reports folder. Patients show first name + initial only;
+`/api/medicare` is no-store and nothing about a patient is logged.
+
+- Test copy with fictional patients: set `CEC_HUB_MEDICARE_FIXTURE=1` and run `RUN-TEST-COPY.bat`
+  (port 5699), with `optomate_agent.agent_dir` pointing at an agent checkout that has `medicare\`.
+- To go live: merge this branch AND the agent's `session/2026-10-09-medicare-rejections`, pull both,
+  add to `config	iles.json`: `{"id": "medicare", "icon": "$", "name": "Medicare", "description":
+  "Rejected claims: what to fix, what to write off", "link": "#/medicare"}`, then RESTART-HUB.
+  The tile is deliberately NOT in tiles.example.json, so it only appears when Mark adds it.
+
 ## The Stock approve button — what it actually does
 
 Pressing "Approved — mark for entry" renames the proposal file from

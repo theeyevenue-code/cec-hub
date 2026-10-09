@@ -1555,3 +1555,75 @@ body.lens-mono main { background: #fafafa; }
 .tile-icon:empty { min-height: 46px; }   /* a tile without an icon (Check-in) keeps the grid even */
 #ci-today, #ci-found, #ci-waiting .card { overflow-x: auto; }   /* a narrow screen scrolls the table, never the page */
 .ci-exam-rule { font-size: 19px; font-weight: 700; margin: 14px 0 0; }
+
+/* --- Medicare rejections (Mark's readability standard: answer first, 17px+ body,
+       colour only with a meaning — red = resubmit-by within a month) ------------- */
+.mc-page { font-size: 17px; }
+.mc-how { font-size: 18px; color: var(--muted); margin-bottom: 18px; }
+.mc-answer { font-family: 'Urbanist', 'Work Sans', sans-serif; font-size: 28px; font-weight: 800;
+    color: var(--ink); line-height: 1.25; }
+.mc-answer.mc-late { color: var(--danger-ink); }
+.mc-answer-sub { display: block; font-family: 'Work Sans', sans-serif; font-size: 18px;
+    font-weight: 500; color: var(--body); margin-top: 2px; }
+.mc-unrep { font-size: 18px; margin-top: 8px; color: var(--body); }
+.mc-chips { display: flex; flex-wrap: wrap; gap: 12px; margin: 22px 0 8px; }
+.mc-chip { display: flex; flex-direction: column; min-width: 150px; padding: 10px 16px;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--paper);
+    text-decoration: none; color: var(--body); }
+.mc-chip:hover { background: var(--mint-soft); }
+.mc-chip-name { font-size: 15px; font-weight: 600; color: var(--muted); }
+.mc-chip-amt { font-size: 24px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.mc-chip-n { font-size: 15px; color: var(--muted); }
+.mc-chip.mc-zero { opacity: .55; }
+.mc-c-fix_now { border-color: var(--amber-line); background: var(--amber-bg); }
+.mc-c-check { border-color: var(--info-line); background: var(--info-bg); }
+.mc-c-recovered { border-color: var(--green); background: #e1f3ea; }
+
+.mc-group { margin-top: 26px; background: var(--paper); border: 1px solid var(--line);
+    border-radius: 12px; }
+.mc-group > summary { cursor: pointer; padding: 14px 18px; display: flex; align-items: baseline;
+    gap: 14px; flex-wrap: wrap; list-style: none; }
+.mc-group > summary::-webkit-details-marker { display: none; }
+.mc-group > summary::before { content: "\25B8"; color: var(--muted); font-size: 18px; }
+.mc-group[open] > summary::before { content: "\25BE"; }
+.mc-group[open] > summary { border-bottom: 1px solid var(--line); }
+.mc-g-title { font-family: 'Urbanist', 'Work Sans', sans-serif; font-size: 24px; font-weight: 800; color: var(--ink); }
+.mc-g-sum { font-size: 18px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mc-g-note { font-size: 17px; color: var(--muted); padding: 10px 18px 0; }
+.mc-g-fix_now .mc-g-title { color: var(--amber-ink); }
+.mc-g-check .mc-g-title { color: var(--info-ink); }
+
+.mc-scroll { overflow-x: auto; padding: 4px 6px 8px; }
+.mc-table { border-collapse: collapse; width: 100%; font-size: 17px; }
+.mc-table th { text-align: left; font-size: 15px; font-weight: 600; color: var(--muted);
+    padding: 10px 10px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.mc-table td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.mc-table tr:last-child td { border-bottom: none; }
+.mc-table .mc-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mc-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mc-pt { white-space: nowrap; }
+.mc-why { min-width: 180px; }
+.mc-todo { min-width: 260px; }
+.mc-small { display: block; font-size: 15px; color: var(--muted); }
+.mc-fact { display: block; font-size: 16px; font-weight: 600; color: var(--ink); margin-top: 4px; }
+.mc-flag { display: inline-block; margin-top: 6px; padding: 2px 10px; border-radius: 999px; font-size: 15px;
+    background: var(--amber-bg); border: 1px solid var(--amber-line); color: var(--amber-ink); }
+.mc-table tr.mc-urgent td { background: var(--danger-bg); }
+.mc-red { color: var(--danger-ink); font-weight: 700; }
+.mc-act { white-space: nowrap; text-align: right; }
+.mc-btn { font-size: 16px; padding: 8px 14px; min-height: 0; margin: 0 0 6px 6px; }
+.mc-who { display: block; font-size: 15px; color: var(--muted); margin: 2px 0 6px; }
+.mc-foot { font-size: 15px; color: var(--muted); margin-top: 22px; }
+@media (max-width: 760px) {
+    .mc-answer { font-size: 23px; }
+    .mc-chip { min-width: 0; flex: 1 1 140px; }
+    /* phone: each row becomes a card, label beside each value */
+    .mc-table thead { display: none; }
+    .mc-table, .mc-table tbody, .mc-table tr, .mc-table td { display: block; width: 100%; }
+    .mc-table tr { padding: 8px 0; border-bottom: 1px solid var(--line); }
+    .mc-table td { border: none; padding: 4px 8px; min-width: 0; }
+    .mc-table .mc-num, .mc-act { text-align: left; }
+    .mc-table td[data-l]::before { content: attr(data-l); display: block; font-size: 14px;
+        font-weight: 600; color: var(--muted); }
+    .mc-btn { margin: 6px 6px 0 0; }
+}

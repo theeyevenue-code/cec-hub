@@ -71,6 +71,7 @@ const routes = [
     { re: /^#\/stock$/, fn: renderStock },
     { re: /^#\/lenses$/, fn: renderLenses },
     { re: /^#\/recalls$/, fn: renderRecalls },
+    { re: /^#\/medicare$/, fn: renderMedicare },
     { re: /^#\/checkin$/, fn: renderCheckin },
     { re: /^#\/checkin\/([0-9a-f]{32})$/, fn: (m) => renderCheckinCheck(m[1]) },
     { re: /^#\/scanner$/, fn: renderScanner },
@@ -2725,6 +2726,165 @@ async function renderCheckinCheck(token, flash) {
         if (rc) rc.addEventListener("click", () => renderCheckinCheck(token, "Checked again against Optomate."));
         saveBtn.disabled = !plan.can_save || res.dry_run === false;
     });
+}
+
+/* --- Medicare rejections ------------------------------------------------------------ */
+/* Karen's Tuesday list (Mark, 9 Oct 2026). Reads the reports she has just pulled in
+   Optomate, live, through the agent. Given name + surname initial only. */
+
+const MC_GROUPS = [
+    { id: "fix_now", title: "Fix now", note: "Fix, resubmit in Optomate, then tick Done.", open: true },
+    { id: "check", title: "Check with Mark", note: "Mark decides. Tick Done once resubmitted.", open: true },
+    { id: "write_off", title: "Write off", note: "Mark accepts. Write off in Optomate, then tick.", open: true },
+    { id: "expired", title: "Expired", note: "Past the 1-year limit. Medicare won't pay.", open: false },
+    { id: "waiting", title: "Waiting for payment", note: "Resubmitted. Closes itself when Medicare pays.", open: false },
+    { id: "written_off", title: "Written off", note: "", open: false },
+    { id: "recovered", title: "Paid since", note: "Medicare has paid these. Nothing to do.", open: false },
+];
+const MC_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function mcDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
+    return m ? `${+m[3]} ${MC_MONTHS[+m[2] - 1]} ${m[1]}` : "";
+}
+function mcMoney(n) {
+    return "$" + Number(n || 0).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function mcText(t) {   // ISO dates inside agent sentences read as "27 May 2025"
+    return String(t || "").replace(/(\d{4}-\d{2}-\d{2})/g, (m) => mcDate(m));
+}
+function mcPlural(n, word) { return `${n} ${word}${n === 1 ? "" : "s"}`; }
+
+function mcStatusHTML(d) {
+    const pulled = d.last_report_pull
+        ? (d.pull_overdue
+            ? `<div class="mc-answer mc-late">Reports not pulled since ${esc(mcDate(d.last_report_pull))}
+                <span class="mc-answer-sub">${mcPlural(d.days_since_pull, "day")} ago. Pull them in Optomate first.</span></div>`
+            : `<div class="mc-answer">Reports pulled ${esc(mcDate(d.last_report_pull))}
+                <span class="mc-answer-sub">${d.days_since_pull === 0 ? "today" : mcPlural(d.days_since_pull, "day") + " ago"}</span></div>`)
+        : `<div class="mc-answer mc-late">No Medicare reports pulled yet
+                <span class="mc-answer-sub">Pull them in Optomate first.</span></div>`;
+    const u = d.unreported_claims || {};
+    const unrep = u.count
+        ? `<p class="mc-unrep">${mcPlural(u.count, "claim")} lodged with no report yet. Oldest ${mcPlural(u.oldest_days, "day")}.</p>`
+        : "";
+    return pulled + unrep;
+}
+
+function mcChipsHTML(d) {
+    return `<div class="mc-chips">${MC_GROUPS.filter((g) => g.id !== "written_off").map((g) => {
+        const s = (d.summary || {})[g.id] || { n: 0, amount: 0 };
+        return `<a class="mc-chip mc-c-${g.id}${s.n ? "" : " mc-zero"}" href="#/medicare" data-jump="${g.id}">
+            <span class="mc-chip-name">${esc(g.title)}</span>
+            <span class="mc-chip-amt">${mcMoney(s.amount)}</span>
+            <span class="mc-chip-n">${mcPlural(s.n, "item")}</span></a>`;
+    }).join("")}</div>`;
+}
+
+function mcButtons(i) {
+    const g = i.action_group;
+    if (g === "recovered") return "";
+    const who = i.status ? `<span class="mc-who">${esc(i.status.by)} · ${esc(mcDate(i.status.at))}</span>` : "";
+    if (g === "waiting" || g === "written_off") {
+        return `${who}<button class="btn btn-quiet mc-btn" data-mc="open">Undo</button>`;
+    }
+    const done = (g === "expired" || g === "write_off") ? "" : `<button class="btn mc-btn" data-mc="done">Done</button>`;
+    return `${done}<button class="btn btn-quiet mc-btn" data-mc="written_off">Written off</button>${who}`;
+}
+
+function mcRowHTML(i) {
+    const open = ["fix_now", "check", "write_off"].includes(i.action_group);
+    const urgent = open && i.days_left !== null && i.days_left <= 31;
+    const left = i.days_left === null ? "" : i.days_left < 0 ? `${-i.days_left} days ago`
+        : i.days_left === 0 ? "today" : `${mcPlural(i.days_left, "day")} left`;
+    return `<tr class="${urgent ? "mc-urgent" : ""}" data-key="${esc(i.key)}">
+        <td class="mc-date" data-l="Service"><strong>${esc(mcDate(i.service_date))}</strong></td>
+        <td class="mc-date" data-l="Resubmit by">${esc(mcDate(i.deadline)) || "—"}<span class="mc-small${urgent ? " mc-red" : ""}">${esc(left)}</span></td>
+        <td class="mc-pt" data-l="Patient">${esc(i.patient_label)}</td>
+        <td class="mc-num" data-l="Item">${esc(i.item)}</td>
+        <td class="mc-num" data-l="Owed"><strong>${mcMoney(i.amount)}</strong></td>
+        <td class="mc-why" data-l="Reason"><strong>${esc(i.code || "—")}</strong> ${esc(i.meaning)}</td>
+        <td class="mc-todo" data-l="What to do">${esc(i.steps)}
+            ${i.fact ? `<span class="mc-fact">${esc(mcText(i.fact))}</span>` : ""}
+            ${i.flag ? `<span class="mc-flag">${esc(mcText(i.flag))}</span>` : ""}
+            <span class="mc-small">Claim ${esc(i.claim)}</span></td>
+        <td class="mc-act">${mcButtons(i)}</td>
+    </tr>`;
+}
+
+function mcGroupHTML(g, d) {
+    const rows = (d.items || []).filter((i) => i.action_group === g.id);
+    if (!rows.length) return "";
+    const s = (d.summary || {})[g.id] || { n: rows.length, amount: 0 };
+    const head = `<span class="mc-g-title">${esc(g.title)}</span>
+        <span class="mc-g-sum">${mcPlural(s.n, "item")} · ${mcMoney(s.amount)}</span>`;
+    const table = `${g.note ? `<p class="mc-g-note">${esc(g.note)}</p>` : ""}
+        <div class="mc-scroll"><table class="mc-table">
+        <thead><tr><th>Service</th><th>Resubmit by</th><th>Patient</th><th class="mc-num">Item</th>
+        <th class="mc-num">Owed</th><th>Reason</th><th>What to do</th><th></th></tr></thead>
+        <tbody>${rows.map(mcRowHTML).join("")}</tbody></table></div>`;
+    return `<details class="mc-group mc-g-${g.id}" id="mc-${g.id}"${g.open ? " open" : ""}>
+        <summary>${head}</summary>${table}</details>`;
+}
+
+async function renderMedicare() {
+    const y = window.scrollY;
+    const again = !!view.querySelector(".mc-page");
+    const openNow = again ? [...view.querySelectorAll("details.mc-group")].filter((x) => x.open).map((x) => x.id) : null;
+    if (!again) {
+        view.innerHTML = `<div class="loading-panel">Reading the Medicare reports from Optomate…</div>`;
+    }
+    let d;
+    try {
+        d = await getJSON("/api/medicare");
+    } catch (e) {
+        view.innerHTML = errorPanel(e.message);
+        return;
+    }
+    if (!d.connected) {
+        view.innerHTML = `<a class="btn btn-quiet btn-back" href="#/">← Home</a>
+            <div class="empty-panel">${esc(d.message || "Not connected.")}</div>`;
+        return;
+    }
+    if (d.error) {
+        view.innerHTML = `<a class="btn btn-quiet btn-back" href="#/">← Home</a>` + errorPanel(d.error);
+        return;
+    }
+    const groups = MC_GROUPS.map((g) => mcGroupHTML(g, d)).join("");
+    view.innerHTML = `<div class="mc-page">
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Medicare${d.fixture ? ` <span class="chip chip-amber">Test data, not real patients</span>` : ""}</h1>
+        <p class="mc-how">Tuesday: pull the processing and payment reports in Optomate, then work Fix now from the top. Red rows: resubmit within a month.</p>
+        ${mcStatusHTML(d)}
+        ${mcChipsHTML(d)}
+        ${groups || `<div class="empty-panel">Nothing rejected. All paid.</div>`}
+        <p class="mc-foot">Read from Optomate ${esc(d.generated_at)}. Patients show first name and initial only.</p>
+    </div>`;
+    if (openNow) {
+        view.querySelectorAll("details.mc-group").forEach((x) => { x.open = openNow.includes(x.id); });
+        window.scrollTo(0, y);
+    }
+
+    view.querySelectorAll("[data-jump]").forEach((a) => a.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        const box = document.getElementById("mc-" + a.dataset.jump);
+        if (box) { box.open = true; box.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    }));
+    view.querySelectorAll("[data-mc]").forEach((b) => b.addEventListener("click", async () => {
+        if (!getStaff()) { alert("Pick your name at the top first."); return; }
+        const status = b.dataset.mc;
+        if (status === "written_off" &&
+            !confirm("Mark this as written off?\n\nDo the write-off in Optomate as well. It leaves the list.")) return;
+        const key = b.closest("tr").dataset.key;
+        b.closest("td").querySelectorAll("button").forEach((x) => { x.disabled = true; });
+        b.textContent = "Saving…";
+        try {
+            await postJSON("/api/medicare/mark", { key, status });
+        } catch (e) {
+            alert(e.message);
+        }
+        renderMedicare();
+    }));
 }
 
 /* --- Go ---------------------------------------------------------------------------- */
