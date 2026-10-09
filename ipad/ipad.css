@@ -201,14 +201,6 @@ input.short { max-width: 220px; }
 .info.small { font-size: 17px; color: var(--muted); font-weight: 400; border-top: 0;
               padding-top: 0; margin-top: 10px; }
 
-.sigblock { margin-top: 22px; }
-.sigblock .lab { font-size: 20px; font-weight: 600; margin-bottom: 10px; }
-.sig-wrap { position: relative; }
-canvas.sig { display: block; width: 100%; height: 260px; border: 2px solid var(--line);
-             border-radius: 12px; background: #fff; touch-action: none; }
-.sig-line { position: absolute; left: 24px; right: 24px; bottom: 60px;
-            border-bottom: 1px solid var(--hair); pointer-events: none; }
-.sig-tools { display: flex; justify-content: flex-end; margin-top: 10px; }
 
 .err { margin-top: 24px; padding: 14px 18px; border: 2px solid var(--ink);
        border-radius: 10px; font-weight: 700; }
@@ -245,6 +237,8 @@ canvas.sig { display: block; width: 100%; height: 260px; border: 2px solid var(-
 .bar-in { max-width: 1056px; margin: 0 auto; display: flex; gap: 14px; align-items: center; }
 .bar-in .grow { flex: 1; }
 .bar-in .primary { min-width: 200px; }
+/* The last screen's Send: the biggest thing on it (no signature since 9 Oct 2026). */
+.bar-in .primary.send { min-width: 300px; min-height: 72px; font-size: 26px; }
 
 /* --- Portrait / narrow: stack the band, 2 tiles across ----------------- */
 

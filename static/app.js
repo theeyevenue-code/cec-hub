@@ -2686,9 +2686,8 @@ async function renderCheckinCheck(token, flash) {
         </div>
         <div class="card"><h2>Today's exam history</h2>${examHTML}</div>
         ${plan.notes_append ? `<div class="card"><details class="ci-fold ci-notes-fold">
-            <summary>Patient notes added to the end (consent and form reference)</summary>
+            <summary>Patient notes added to the end (consent, who sent it, form reference)</summary>
             <div class="ci-box-text ci-notes">${esc(plan.notes_append)}</div></details></div>` : ""}
-        <p class="ci-pdf"><a href="/checkin/pdf/${esc(s.token)}" target="_blank" rel="noopener">Signed form (PDF)</a></p>
         <div id="ci-result">${s.test_saved && !live ? `<p class="ci-muted">Test-saved at ${esc(ciWhen(s.test_saved))}. Nothing was written.</p>` : ""}</div>
         <div class="ci-savebar" role="region" aria-label="Save">
             <span class="ci-savebar-what">${esc(ciHeadline(plan))}</span>
@@ -2728,7 +2727,7 @@ async function renderCheckinCheck(token, flash) {
         ciCopy((exam.notes || {})[b.dataset.copy] || "", b)));
 
     document.getElementById("ci-discard").addEventListener("click", async () => {
-        if (!window.confirm("Discard this form? The answers and signature are deleted. Nothing goes into Optomate.")) return;
+        if (!window.confirm("Discard this form? The answers are deleted. Nothing goes into Optomate.")) return;
         await ciCall(`/api/checkin/session/${token}/discard`, {});
         location.hash = "#/checkin";
     });
@@ -2750,8 +2749,7 @@ async function renderCheckinCheck(token, flash) {
             out.innerHTML = `<div class="card ci-done">
                 <h2>Test save done - nothing was written to Optomate.</h2>
                 <p>A real save would:</p>
-                <ul>${items.map((i) => `<li>${esc(i)}</li>`).join("")}
-                    <li>Keep the signed form: ${esc(String(res.pdf || "").split(/[\\/]/).pop())}</li></ul>
+                <ul>${items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
                 ${(res.would_save.exam || {}).action === "create" ? `<p class="ci-exam-rule">${esc(CI_EXAM_RULE)}</p>` : ""}</div>`;
             saveBtn.disabled = false;
             return;

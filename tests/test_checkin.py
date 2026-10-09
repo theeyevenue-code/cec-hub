@@ -8,6 +8,7 @@ are ZZTEST fakes.
 import base64
 import json
 import logging
+import os
 import re
 import struct
 import zlib
@@ -31,7 +32,8 @@ def _png():
             + chunk(b"IDAT", zlib.compress(b"\x00\x00\x00\x00")) + chunk(b"IEND", b""))
 
 
-SIG = "data:image/png;base64," + base64.b64encode(_png()).decode()
+# An old iPad page (before 9 Oct 2026) might still send a signature: it is ignored.
+OLD_SIG = "data:image/png;base64," + base64.b64encode(_png()).decode()
 
 QUESTIONS = {"version": "test-v1", "screens": [
     {"id": "details", "title": "Your details", "skippable": True, "prefilled": True, "questions": [
@@ -41,7 +43,7 @@ QUESTIONS = {"version": "test-v1", "screens": [
     {"id": "consent", "title": "Consent", "skippable": False, "questions": [
         {"id": "guardian_name", "label": "Parent or guardian's name", "type": "text", "required": True,
          "audience": "child"},
-        {"id": "signature", "label": "Sign", "type": "signature", "required": True}]},
+        {"id": "consent_statement", "type": "info", "text": "I confirm these details are correct."}]},
 ]}
 
 
@@ -52,7 +54,6 @@ class FakeEngine:
         self.calls = []
         self.env = None
         self.save_result = None
-        self.pdf_path = None
         self.duplicates = []
 
     def __call__(self, argv, **kw):
@@ -102,9 +103,7 @@ class FakeEngine:
             if h != H1:
                 out = {"error": "The record changed - check it again", "dry_run": True}
             else:
-                out = self.save_result or {"dry_run": True, "would_save": {"hash": H1}, "pdf": "x.pdf"}
-        elif cmd == "pdf":
-            out.update(pdf=str(self.pdf_path))
+                out = self.save_result or {"dry_run": True, "would_save": {"hash": H1}}
 
         class P:
             stdout = "engine warning line\n" + json.dumps(out) + "\n"
@@ -146,7 +145,7 @@ def _send(world, **body):
 
 
 def _submit(world, token, **over):
-    body = {"answers": {"given_name": "Adultone"}, "skipped_screens": [], "signature_png": SIG}
+    body = {"answers": {"given_name": "Adultone"}, "skipped_screens": []}
     body.update(over)
     return checkin.ipad_submit(world["cfg"], token, body)
 
@@ -303,18 +302,20 @@ def test_state_transitions_sent_filling_submitted(world):
     assert _submit(world, tok) == (200, {"ok": True, "already": True})
 
 
-def test_submit_stores_answers_signature_and_skips(world):
+def test_submit_stores_answers_and_skips_and_no_signature(world):
+    """Mark, 9 Oct 2026: no signature. A form sends without one; a signature an old
+    iPad page still sends is not kept."""
     _st, out = _send(world)
+    assert "signature_png" not in checkin.load_session(world["cfg"], out["token"])
     st, _ = _submit(world, out["token"], answers={"given_name": "Adultone", "medical": ["Asthma"]},
-                    skipped_screens=["details"])
+                    skipped_screens=["details"], signature_png=OLD_SIG)
     s = checkin.load_session(world["cfg"], out["token"])
     assert st == 200 and s["answers"] == {"given_name": "Adultone", "medical": ["Asthma"]}
-    assert s["signature_png"] == SIG and s["skipped_screens"] == ["details"]
+    assert "signature_png" not in s and s["skipped_screens"] == ["details"]
+    assert OLD_SIG not in checkin.session_path(world["cfg"], out["token"]).read_text()
 
 
-@pytest.mark.parametrize("over", [{"signature_png": ""}, {"signature_png": "data:image/png;base64,AAAA"},
-                                  {"signature_png": "data:image/png;base64," + base64.b64encode(b"x" * 80).decode()},
-                                  {"answers": {"Bad Key": "x"}}, {"answers": {"a": {"nested": 1}}},
+@pytest.mark.parametrize("over", [{"answers": {"Bad Key": "x"}}, {"answers": {"a": {"nested": 1}}},
                                   {"answers": "nope"}, {"skipped_screens": ["../x"]}])
 def test_submit_rejects_bad_input(world, over):
     _st, out = _send(world)
@@ -400,7 +401,7 @@ def test_live_saved_deletes_the_session_and_marks_saved(world):
     world["eng"].save_result = {"dry_run": False, "saved": True, "patient_id": 99001, "warnings": []}
     st, out = checkin.save(world["cfg"], tok, H1, "x")
     assert st == 200 and out["saved"] is True
-    assert checkin.session_path(world["cfg"], tok).exists() is False      # answers + signature gone
+    assert checkin.session_path(world["cfg"], tok).exists() is False      # answers gone
     row = next(a for a in checkin.today(world["cfg"])["appointments"] if a["appointment_id"] == 1001)
     assert row["status"] == "Saved" and row["token"] is None
     marker = (world["agent"] / "local-reports" / "checkin" / "hub-saved.json").read_text()
@@ -450,21 +451,18 @@ def test_today_shows_plain_status_words_and_waiting(world):
     assert t["dry_run"] is True and t["ipad_ready"] is True
 
 
-def test_pdf_path_confinement(world, tmp_path):
-    tok = _submitted(world)
-    outside = tmp_path / "elsewhere.pdf"
-    outside.write_bytes(b"%PDF-1.4")
-    world["eng"].pdf_path = outside
-    assert checkin.pdf_file(world["cfg"], tok)[0] is None
-    inside = world["agent"] / "local-reports" / "checkin" / "dry-run" / "f.pdf"
-    inside.parent.mkdir(parents=True)
-    inside.write_bytes(b"%PDF-1.4")
-    world["eng"].pdf_path = inside
-    assert checkin.pdf_file(world["cfg"], tok)[0] == inside.resolve()
-    not_pdf = inside.with_suffix(".json")
-    not_pdf.write_text("{}")
-    assert checkin.confine_pdf(world["cfg"], str(not_pdf)) is None
-
+def test_no_signed_pdf_any_more(client):
+    """No signed PDF (Mark, 9 Oct 2026): the route and the engine call are gone."""
+    tok = _submitted(client.world)
+    assert client.get("/checkin/pdf/" + tok).status_code == 404
+    assert not hasattr(checkin, "pdf_file")
+    assert all(c[3] != "pdf" for c in client.world["eng"].calls)
+    js = open(os.path.join(os.path.dirname(__file__), "..", "static", "app.js"), encoding="utf-8").read()
+    assert "/checkin/pdf/" not in js and "Signed form" not in js
+    ipad = open(os.path.join(os.path.dirname(__file__), "..", "ipad", "ipad.js"), encoding="utf-8").read()
+    for gone in ("canvas", "signature_png", "clear-sig", "Sign with your finger"):
+        assert gone not in ipad, gone
+    assert '"Send"' in ipad and " send" in ipad
 
 def test_device_key_rules(world):
     assert checkin.key_ok(world["cfg"], KEY)
@@ -562,7 +560,7 @@ def test_full_flow_over_http(client):
     assert form["name"] == "Adultone" and form["questions"]["screens"]
     assert client.post(f"/api/checkin/ipad/session/{tok}/filling", headers=hk, json={}).status_code == 200
     r = client.post(f"/api/checkin/ipad/session/{tok}/submit", headers=hk,
-                    json={"answers": {"given_name": "Adultone"}, "skipped_screens": [], "signature_png": SIG})
+                    json={"answers": {"given_name": "Adultone"}, "skipped_screens": []})
     assert r.status_code == 200
     d = client.get(f"/api/checkin/session/{tok}").get_json()
     assert d["plan"]["hash"] == H1
@@ -585,8 +583,7 @@ STAFF_ROUTES = [("get", "/api/checkin/today", None), ("post", "/api/checkin/sear
                 ("post", "/api/checkin/session/" + "c" * 32 + "/override", {"action": "accept", "field": "email"}),
                 ("post", "/api/checkin/session/" + "c" * 32 + "/save", {"hash": H1}),
                 ("post", "/api/checkin/session/" + "c" * 32 + "/discard", {}),
-                ("post", "/api/checkin/session/" + "c" * 32 + "/resume", {}),
-                ("get", "/checkin/pdf/" + "c" * 32, None)]
+                ("post", "/api/checkin/session/" + "c" * 32 + "/resume", {})]
 
 
 def _call(client, method, path, body, **kw):
@@ -680,7 +677,7 @@ def test_inactivity_pause_keeps_answers_on_the_server_and_only_staff_resume(worl
     assert st == 200 and out["state"] == "paused"
     s = checkin.load_session(cfg, tok)
     assert s["state"] == "paused" and s["draft"]["answers"]["symptoms"] == ["Blurry vision"]
-    assert "signature_png" not in s["draft"] and s["signature_png"] == ""
+    assert "signature_png" not in s["draft"] and "signature_png" not in s
     assert checkin.ipad_current(cfg) == {"state": "paused"}           # no token
     assert checkin.ipad_session(cfg, tok)[0] == 409                    # cannot reopen it
     assert checkin.ipad_filling(cfg, tok)[0] == 409

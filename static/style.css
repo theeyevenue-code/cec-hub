@@ -1544,8 +1544,6 @@ body.lens-mono main { background: #fafafa; }
 .ci-notes { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
 .ci-warnings { margin-left: 24px; font-size: 18px; }
 .ci-warnings li { margin: 4px 0; }
-.ci-pdf { font-size: 19px; margin: 4px 0 18px; }
-.ci-pdf a { color: var(--green-deep); font-weight: 600; }
 /* Decisions and Save together (Codex #5): the Save bar stays on screen at the
    bottom while Karen scrolls the rows above it. */
 .ci-savebar { position: sticky; bottom: 0; z-index: 5; display: flex; gap: 14px; align-items: center;

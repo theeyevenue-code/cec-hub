@@ -15,7 +15,10 @@
    draft, the iPad is wiped and says "Please return the iPad to reception".
    Only reception can resume it (Hub: Resume on the iPad). The answers so far
    are also sent as a draft at every screen change, so a lock while the Wi-Fi
-   is down loses at most one screen. The signature is never in a draft.
+   is down loses at most one screen.
+
+   No signature (Mark, 9 Oct 2026: the paper form never had one): the last
+   screen is "Check and send" - the notice, the consent sentence, a big Send.
 
    No links: this page never links anywhere (the privacy policy address on
    the Start screen is plain text). */
@@ -170,13 +173,13 @@
         document.addEventListener(t, touched, { capture: true, passive: true }));
 
     /* The answers so far, as the server keeps them: real question ids only,
-       on screens not skipped (no signature, no "Other" flags). */
+       (no "Other" flags). */
     function draftBody() {
         const index = allQuestions();
         const answers = {};
         Object.keys(S.answers).forEach((k) => {
             const v = S.answers[k];
-            if (!index[k] || index[k].type === "signature") return;
+            if (!index[k] || index[k].type === "info") return;
             if (Array.isArray(v) ? v.length : (v && String(v).trim())) answers[k] = v;
         });
         return { answers: answers, skipped_screens: Array.from(S.skipped), idx: S.idx };
@@ -260,7 +263,6 @@
             dates: {},          // partly typed dates: {qid: {d, m, y}}
             skipped: new Set(),
             idx: -1,
-            sig: "",
             err: "",
             welcome: d.questions.welcome || null,
             resumed: false,
@@ -458,12 +460,6 @@
             return `<div class="info${q.style === "small" ? " small" : ""}">${esc(q.text || "")}</div>`;
         }
         const req = q.required ? ` <span class="req">(needed)</span>` : "";
-        if (q.type === "signature") {
-            return `<div class="sigblock"><div class="lab">${esc(labelOf(q))}${req}</div><div class="sig-wrap">
-                <canvas class="sig" id="sig" aria-label="Signature box"></canvas>
-                <div class="sig-line"></div></div>
-                <div class="sig-tools"><button type="button" class="btn" data-act="clear-sig">Clear</button></div></div>`;
-        }
         // A question worded the same as its screen title is not said twice.
         const same = labelOf(q).trim().toLowerCase() === String(title || "").trim().toLowerCase();
         const hint = hintFor(q);
@@ -517,10 +513,9 @@
         setBar(`<button class="btn" data-act="back">Back</button>
             <span class="grow"></span>
             ${sc.skippable ? `<button class="btn quiet" data-act="skip">Skip</button>` : ""}
-            <button class="btn primary" data-act="next">${last ? "Finish" : "Next"}</button>`);
+            <button class="btn primary${last ? " send" : ""}" data-act="next">${last ? "Send" : "Next"}</button>`);
         roomForBar();
         window.scrollTo(0, keepScroll ? y : 0);
-        if (app.querySelector("canvas.sig")) setupSignature();
     }
 
     /* After a tap opened a follow-up: keep it in view above the Back/Next bar. */
@@ -532,65 +527,6 @@
         const barH = bar.hidden ? 0 : bar.getBoundingClientRect().height;
         const over = lastEl.getBoundingClientRect().bottom - (window.innerHeight - barH - 16);
         if (over > 0) window.scrollBy(0, over);
-    }
-
-    /* --- signature --------------------------------------------------------------- */
-
-    function setupSignature() {
-        const c = document.getElementById("sig");
-        const ratio = window.devicePixelRatio || 1;
-        const w = c.clientWidth, h = c.clientHeight;
-        c.width = Math.round(w * ratio);
-        c.height = Math.round(h * ratio);
-        const ctx = c.getContext("2d");
-        ctx.scale(ratio, ratio);
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(0, 0, w, h);
-        ctx.lineWidth = 3;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.strokeStyle = "#111";
-        if (S.sig) {
-            const img = new Image();
-            img.onload = () => ctx.drawImage(img, 0, 0, w, h);
-            img.src = S.sig;
-        }
-        let drawing = false, inked = !!S.sig;
-        const at = (ev) => {
-            const r = c.getBoundingClientRect();
-            return [ev.clientX - r.left, ev.clientY - r.top];
-        };
-        c.addEventListener("pointerdown", (ev) => {
-            ev.preventDefault();
-            drawing = true;
-            if (S.err) {                      // signing answers "please sign"
-                S.err = "";
-                const e = app.querySelector(".err");
-                if (e) e.remove();
-            }
-            try { c.setPointerCapture(ev.pointerId); } catch (e) { /* older Safari */ }
-            const [x, y] = at(ev);
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + 0.1, y + 0.1);
-            ctx.stroke();
-        });
-        c.addEventListener("pointermove", (ev) => {
-            if (!drawing) return;
-            ev.preventDefault();
-            const [x, y] = at(ev);
-            ctx.lineTo(x, y);
-            ctx.stroke();
-            inked = true;
-        });
-        const end = () => {
-            if (!drawing) return;
-            drawing = false;
-            if (inked) S.sig = c.toDataURL("image/png");
-        };
-        c.addEventListener("pointerup", end);
-        c.addEventListener("pointercancel", end);
-        c.addEventListener("pointerleave", end);
     }
 
     /* --- moving between screens ------------------------------------------------- */
@@ -607,9 +543,7 @@
                 if (p) return p;
             }
             if (!q.required) continue;
-            if (q.type === "signature") {
-                if (!S.sig) return "Please sign with your finger in the box.";
-            } else if (q.type !== "info") {
+            if (q.type !== "info") {
                 const v = S.answers[q.id];
                 if (!v || (Array.isArray(v) && !v.length) || !String(v).trim()) {
                     return "Please fill in: " + labelOf(q);
@@ -664,7 +598,7 @@
         S.screens.forEach((sc) => {
             if (S.skipped.has(sc.id)) return;
             (sc.questions || []).forEach((q) => {
-                if (q.type === "info" || q.type === "signature") return;
+                if (q.type === "info") return;
                 if (!isShown(q, index)) return;
                 const v = S.answers[q.id];
                 if (Array.isArray(v) ? v.length : (v && String(v).trim())) out[q.id] = v;
@@ -680,7 +614,6 @@
             r = await api(`/session/${encodeURIComponent(S.token)}/submit`, {
                 answers: finalAnswers(),
                 skipped_screens: Array.from(S.skipped),
-                signature_png: S.sig,
             });
         } catch (e) {
             renderFailed();      // Wi-Fi dropped: everything is still in memory
@@ -723,9 +656,6 @@
             if (S) submit();
         } else if (act === "back-to-form") {
             renderScreen(false);
-        } else if (act === "clear-sig") {
-            S.sig = "";
-            renderScreen(true);
         } else if (t.dataset.pick) {
             const qid = t.dataset.pick, v = t.dataset.v;
             S.answers[qid] = S.answers[qid] === v ? "" : v;      // tap again to clear
@@ -811,15 +741,6 @@
         box.innerHTML = hits.map((n) => `<button type="button" class="opt" data-choose="${esc(qid)}"
             data-v="${esc(n)}">${esc(n)}</button>`).join("");
     }
-
-    // Turning the iPad round: redraw the signature box at its new width. (Only
-    // on a width change - the on-screen keyboard must not wipe a text field.)
-    let lastWidth = window.innerWidth;
-    window.addEventListener("resize", () => {
-        if (window.innerWidth === lastWidth) return;
-        lastWidth = window.innerWidth;
-        if (S && mode === "form" && app.querySelector("canvas.sig")) renderScreen(true);
-    });
 
     /* --- go ------------------------------------------------------------------- */
 

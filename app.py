@@ -18,7 +18,7 @@ import logging
 import os
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_file, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 from hub import checkin, integrations, lenses, sop_parser
 
@@ -33,7 +33,7 @@ logging.basicConfig(
 logger = logging.getLogger("cec-hub")
 
 app = Flask(__name__, static_folder="static", static_url_path="/")
-app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024   # a signed iPad form is well under this
+app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024   # an iPad form (no signature) is well under this
 
 BASE_DIR = Path(__file__).parent
 IPAD_DIR = BASE_DIR / "ipad"                       # the iPad page's own files (no Hub links)
@@ -457,17 +457,6 @@ def checkin_discard(token):
 def checkin_resume(token):
     """A form the iPad locked (left untouched) goes back on the iPad."""
     return _json(checkin.resume(_integrations(), token))
-
-
-@app.route("/checkin/pdf/<token>")
-@staff_only
-def checkin_pdf(token):
-    """The signed form as a PDF (built on request). Served only from inside the
-    engine's checkin folder."""
-    path, err = checkin.pdf_file(_integrations(), token)
-    if path is None:
-        return _no_store(app.response_class(err, status=404, mimetype="text/plain"))
-    return _no_store(send_file(path, mimetype="application/pdf", max_age=0))
 
 
 # iPad: its own page and files, every API call needs the device key header.

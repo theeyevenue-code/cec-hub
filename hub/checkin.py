@@ -21,16 +21,18 @@ filling -> paused -> sent (the iPad's inactivity lock, resumed by reception).
 - paused = the iPad was left untouched (about 5 minutes): it hid the form and
   shows "Please return the iPad to reception". The answers so far are kept HERE
   as a draft (never on the iPad); only a staff "Resume on the iPad" brings them
-  back. The signature is never kept in a draft.
-- discarded = the file is deleted at once (answers and signature go with it).
+  back.
+- discarded = the file is deleted at once (answers go with it).
 - A LIVE save that the engine reports as saved deletes the file at once; the
-  engine keeps the signed PDF and the journal. A small marker (IDs only) lets
-  today's list say "Saved".
+  engine keeps its journal. A small marker (IDs only) lets today's list say
+  "Saved".
+- No signature and no signed PDF (Mark, 9 Oct 2026: the paper form never had
+  one). The last iPad screen is "Check and send"; the dated Optomate note quotes
+  the consent sentence and says who sent the form.
 - In dry run the session is kept so it can be checked again; staff discard it.
 - Forms not yet submitted (sent / filling / paused) are deleted 2 days after
   they were made (Mark, 9 Oct 2026). Submitted forms wait for staff to check,
-  save or discard them. The signed PDFs are the engine's (local-reports), kept as
-  the consent record - Optomate holds no copy.
+  save or discard them.
 - A submitted form's token is remembered (as a hash, 2 days) so an iPad that
   lost the "received" answer and sends again is told "received", not "gone".
 
@@ -41,8 +43,6 @@ the server itself or from a browser unlocked once with the staff code
 (staff_cookie_value / staff_code_ok below).
 """
 
-import base64
-import binascii
 import hashlib
 import hmac
 import json
@@ -63,7 +63,6 @@ TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")          # question ids / logical fields
 SEARCH_STRIP_RE = re.compile(r"[^A-Za-zÀ-ɏ' .-]")
-SIG_PREFIX = "data:image/png;base64,"
 
 AUDIENCES = ("adult", "child")
 SLOT_STATES = ("sent", "filling", "paused")       # the one form the iPad slot holds
@@ -80,7 +79,6 @@ STAFF_COOKIE_DAYS = 400
 UNLOCK_TRIES = 5                                  # wrong staff codes ...
 UNLOCK_WINDOW_S = 15 * 60                         # ... per 15 minutes, then a 15-minute wait
 LISTS_MAX_AGE_S = 600
-MAX_SIGNATURE_CHARS = 2_000_000
 MAX_ANSWERS = 300
 MAX_TEXT = 2000
 MAX_EDIT = 200
@@ -92,7 +90,7 @@ CHANGED = "The record changed - check it again"
 # than the one this module reads and writes.
 _ENGINE_ONLY_ENV = ("CHECKIN_DRY_RUN", "CHECKIN_LIVE_WRITES", "CHECKIN_DATA_DIR")
 
-TIMEOUTS = {"save": 240, "pdf": 120}
+TIMEOUTS = {"save": 240}
 DEFAULT_TIMEOUT = 60
 
 NOT_CONNECTED = "The check-in engine isn't connected on this computer yet."
@@ -590,7 +588,7 @@ def send(cfg: dict, body: dict) -> tuple[int, dict]:
         s = {"token": secrets.token_hex(16), "created": _iso(), "state": "sent",
              "patient_id": pid, "appointment_id": aid, "optometrist_id": opt_id,
              "audience": audience, "prefill": prefill, "answers": {},
-             "skipped_screens": [], "signature_png": "", "submitted": None,
+             "skipped_screens": [], "submitted": None,
              "staff_overrides": {"rejected_fields": [], "edited": {}},
              "questions_version": None}
         _write_session(cfg, s)
@@ -744,7 +742,7 @@ def save(cfg: dict, token, expect_hash, staff: str) -> tuple[int, dict]:
                         s.get("patient_id") or "new")
             return 200, {**result, "test_saved": True}
         if result.get("dry_run") is False and result.get("saved") is True:
-            _delete_session(cfg, s["token"])           # answers + signature gone
+            _delete_session(cfg, s["token"])           # answers gone
             _add_marker(cfg, s, s.get("patient_id"))
             logger.info("Check-in: patient %s saved to Optomate", s.get("patient_id"))
             return 200, result
@@ -752,31 +750,6 @@ def save(cfg: dict, token, expect_hash, staff: str) -> tuple[int, dict]:
         logger.info("Check-in: patient %s save not completed", s.get("patient_id") or "new")
         return 200, result
 
-
-def pdf_file(cfg: dict, token) -> tuple[Path | None, str]:
-    """Build the signed PDF for a submitted form and return its path, only if
-    it lies inside the engine's checkin folder."""
-    s = load_session(cfg, token)
-    if s is None:
-        return None, "That form isn't here any more."
-    if s.get("state") != "submitted":
-        return None, "That form hasn't been signed yet."
-    data = run_engine(cfg, "pdf", "--session", f"{s['token']}.json")
-    if data.get("error"):
-        return None, str(data["error"])
-    return confine_pdf(cfg, data.get("pdf")), "The signed form couldn't be found."
-
-
-def confine_pdf(cfg: dict, path_text) -> Path | None:
-    root = checkin_root(cfg)
-    if root is None or not path_text:
-        return None
-    try:
-        p = Path(str(path_text)).resolve()
-        p.relative_to(root.resolve())
-    except (OSError, ValueError):
-        return None
-    return p if p.suffix.lower() == ".pdf" and p.is_file() else None
 
 
 # ---------------------------------------------------------------------------
@@ -882,7 +855,7 @@ def ipad_draft(cfg: dict, token, body: dict) -> tuple[int, dict]:
     """The iPad's answers so far, kept HERE (not on the iPad) so the inactivity
     lock can wipe the iPad and reception can resume. body: answers,
     skipped_screens, idx (the screen showing), pause (true = the lock).
-    No signature is ever kept in a draft."""
+    """
     body = body if isinstance(body, dict) else {}
     pause = body.get("pause") is True
     with _lock:
@@ -912,17 +885,6 @@ def ipad_draft(cfg: dict, token, body: dict) -> tuple[int, dict]:
     return 200, {"ok": True, "state": s["state"]}
 
 
-def _signature_ok(sig) -> bool:
-    if not isinstance(sig, str) or not sig.startswith(SIG_PREFIX):
-        return False
-    if len(sig) > MAX_SIGNATURE_CHARS or len(sig) < len(SIG_PREFIX) + 40:
-        return False
-    try:
-        head = base64.b64decode(sig[len(SIG_PREFIX):], validate=True)[:8]
-    except (binascii.Error, ValueError):
-        return False
-    return head == b"\x89PNG\r\n\x1a\n"
-
 
 def _already_or_gone(cfg: dict, token) -> tuple[int, dict]:
     """Codex #11: the form was saved here but the iPad never heard back, so it
@@ -943,10 +905,6 @@ def ipad_submit(cfg: dict, token, body: dict) -> tuple[int, dict]:
     if not isinstance(skipped, list) or len(skipped) > 30 or \
             not all(isinstance(x, str) and NAME_RE.match(x) for x in skipped):
         return 400, {"error": "The answers could not be read."}
-    sig = body.get("signature_png")
-    if not _signature_ok(sig):
-        return 400, {"error": "Please sign the form.", "field": "signature"}
-
     s = _slot_session(cfg, token)
     if s is None:
         return _already_or_gone(cfg, token)
@@ -958,7 +916,7 @@ def ipad_submit(cfg: dict, token, body: dict) -> tuple[int, dict]:
         if sc.get("id") in skipped and sc.get("skippable"):
             continue
         for q in sc.get("questions") or []:
-            if not q.get("required") or q.get("type") in ("signature", "info"):
+            if not q.get("required") or q.get("type") == "info":
                 continue
             if _shown(q, answers, index) and not answers.get(q["id"]):
                 return 400, {"error": "Please fill in: " + str(q.get("label") or q["id"]),
@@ -967,8 +925,9 @@ def ipad_submit(cfg: dict, token, body: dict) -> tuple[int, dict]:
         s = _slot_session(cfg, token)
         if s is None:
             return _already_or_gone(cfg, token)
-        s.update(answers=answers, skipped_screens=sorted(set(skipped)), signature_png=sig,
+        s.update(answers=answers, skipped_screens=sorted(set(skipped)),
                  submitted=_iso(), state="submitted")
+        s.pop("signature_png", None)          # a form begun before 9 Oct: none kept
         s.pop("draft", None)
         if qs.get("version"):
             s["questions_version"] = qs["version"]
