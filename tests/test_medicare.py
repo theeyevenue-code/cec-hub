@@ -9,7 +9,7 @@ from hub import medicare as M
 
 ITEM = {"key": "0123456789ab", "service_date": "2026-05-01", "deadline": "2027-05-01",
         "days_left": 200, "patient_label": "Sam K", "item": "10918", "amount": 34.0,
-        "code": "374", "meaning": "Old card issue number used", "action_group": "do_now",
+        "code": "374", "meaning": "Old card number used", "action_group": "do_now",
         "steps": "Resubmit.", "fact": "Record now has issue no. 2", "claim": "Z1001",
         "flag": "", "status": None}
 
@@ -315,6 +315,10 @@ def test_page_wording_follows_the_codex_review():
                  "Today's billing checks unavailable - check in Optomate", "Possible item + evidence",
                  "Check eligibility"):
         assert want in js, want
+    # Mark, 11 Oct 2026: Resubmitted only after Optomate confirms; "lodged, no report" says what to do
+    assert "Has Optomate confirmed the resubmission?" in js
+    assert 'status === "resubmitted" && !confirm(MC_RESUBMIT_CONFIRM)' in js
+    assert "Still missing after 2 weeks? Tell Mark." in js
     for gone in ("Only you see this", "only you see this", "Automatic", "mc-conf-Weak",
                  "You're confirming the notes"):
         assert gone not in js, gone

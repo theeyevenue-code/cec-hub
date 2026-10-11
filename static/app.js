@@ -2742,6 +2742,8 @@ const MC_FOLDED = [
 ];
 const MC_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MC_URGENT_DAYS = 31;
+const MC_RESUBMIT_CONFIRM = "Has Optomate confirmed the resubmission?\n\n"
+    + "Press OK only after Optomate shows the claim was sent. It then moves to Waiting for payment.";
 
 function mcDate(iso) {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
@@ -2791,7 +2793,8 @@ function mcAnswerHTML(d) {
     }
     const u = d.unreported_claims || {};
     const unrep = u.count
-        ? `<p class="mc-unrep">${mcPlural(u.count, "claim")} lodged, no report yet. Oldest ${mcPlural(u.oldest_days, "day")}.</p>`
+        ? `<p class="mc-unrep">${mcPlural(u.count, "claim")} lodged, no report yet (oldest ${mcPlural(u.oldest_days, "day")}).
+            <span class="mc-small">Pull the reports in Optomate. Still missing after 2 weeks? Tell Mark.</span></p>`
         : "";
     return html + unrep;
 }
@@ -2838,7 +2841,7 @@ function mcButtons(i, d) {
     const writeOff = (i.code === "" && !i.item_change) || st.status === "not_eligible";
     const main = writeOff
         ? `<button class="btn mc-btn" data-mc="written_off">Written off</button>`
-        : `<button class="btn mc-btn" data-mc="resubmitted">Resubmitted</button>`;
+        : `<button class="btn mc-btn" data-mc="resubmitted" title="Press only after Optomate confirms the resubmission">Resubmitted</button>`;
     const off = g === "mark" ? `<button class="btn btn-quiet mc-btn" data-mc="written_off">Written off</button>` : "";
     let undo = "";
     if (d.is_mark && /^accepted_/.test(st.status || "")) undo = mcPinBtn("open", "Undo accept", true, d);
@@ -3108,6 +3111,8 @@ async function renderMedicare() {
         }
         if (status === "written_off" &&
             !confirm("Have you written this off in Optomate?\n\nIt moves to Written off.")) return;
+        /* Mark, 11 Oct 2026: the likeliest slip is ticking before the resubmission went through. */
+        if (status === "resubmitted" && !confirm(MC_RESUBMIT_CONFIRM)) return;
         holder.querySelectorAll("button").forEach((x) => { x.disabled = true; });
         b.textContent = "Saving…";
         try {

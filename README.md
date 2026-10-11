@@ -171,6 +171,7 @@ payment / Paid since are folded with totals. Red date = resubmit-by within 31 da
 - **Today: check before billing** - one line per booked patient whose limit our own claims already used
   ("Comprehensive limit used: ask Mark which item applies."). If the bookings can't be read it says
   "Today's billing checks unavailable - check in Optomate".
+- Resubmitted asks "Has Optomate confirmed the resubmission?" first (11 Oct 2026); "lodged, no report yet" says pull the reports, tell Mark after 2 weeks.
 - Ticks call `--mark` in the agent (state in its git-ignored local-reports). `/api/medicare` is no-store;
   nothing about a patient is logged.
 - Test copy with fictional patients: `CEC_HUB_MEDICARE_FIXTURE=1`, port 5699, a config dir
