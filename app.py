@@ -526,6 +526,45 @@ def checkin_ipad_submit(token):
     return _json(checkin.ipad_submit(cfg, token, request.get_json(silent=True) or {}))
 
 
+# --- Medicare rejections -------------------------------------------------------
+
+def _medicare_fixture() -> bool:
+    """A test copy shows fictional patients with CEC_HUB_MEDICARE_FIXTURE=1
+    (environment, never the URL)."""
+    return os.getenv("CEC_HUB_MEDICARE_FIXTURE", "").strip().lower() in ("1", "true", "yes")
+
+
+@app.route("/api/medicare")
+def medicare_list():
+    """Rejected / short-paid Medicare items, read live from Optomate by the agent.
+    Given name + surname initial only; served no-store; nothing about a patient
+    is logged. Item review cards (note snippets) only when the name picked is Mark."""
+    from hub import medicare
+    who = request.cookies.get("hub_staff") or ""
+    resp = jsonify(medicare.worklist(_integrations(), _medicare_fixture(), medicare.is_mark(who)))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.route("/api/medicare/mark", methods=["POST"])
+def medicare_mark():
+    """Tick one item: resubmitted, written_off, or open (undo).
+    Mark only, with his 4-digit PIN: accepted_10913 / accepted_10914 / accepted_10915 /
+    not_eligible, and undoing those. The PIN is passed to the agent on stdin and is
+    never logged."""
+    from hub import medicare
+    data = request.get_json(silent=True) or {}
+    who = (request.cookies.get("hub_staff") or "").strip()
+    result = medicare.mark(_integrations(), data.get("key", ""), data.get("status", ""),
+                           who, _medicare_fixture(), pin=str(data.get("pin") or ""),
+                           claim_note=str(data.get("claim_note") or ""))
+    if result.get("ok"):
+        logger.info(f"Medicare item marked {result['status']} by {who[:60]}")
+    resp = jsonify(result)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp, (200 if result.get("ok") else 400)
+
+
 @app.route("/api/attention")
 def attention():
     return jsonify(integrations.attention_summary(_integrations()))
