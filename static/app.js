@@ -117,8 +117,8 @@ async function renderHome() {
                       : "What do you need?";
 
     const all = data.tiles || [];
-    // needs-attention tiles live in their own compact 2-across block up top
-    // (2x2 when four of them); everything quiet stays in the normal grid below
+    // needs-attention tiles live in their own compact 2-across block BELOW the
+    // everyday tools (Mark, 13 Oct 2026: "I use them way more than the 6 big boxes")
     const hot = all.filter((t) => attn[t.id] && attn[t.id].count > 0)
         .sort((x, y) => ((x.id === "todo" ? -1 : 0) - (y.id === "todo" ? -1 : 0)) ||
                         (attn[y.id].alert - attn[x.id].alert) ||
@@ -162,10 +162,10 @@ async function renderHome() {
             <button class="btn btn-quiet home-edit-btn" id="home-edit">
                 ${homeEdit ? "✔ Done" : "✏ Edit layout"}</button>
         </div>
-        ${hot.length ? `<div class="attn-head">Needs attention</div>
-            <div class="attn-grid">${hot.map(hotTile).join("")}</div>` : ""}
-        ${hot.length && quiet.length ? `<div class="attn-head attn-head-quiet">Everything else</div>` : ""}
+        ${hot.length && quiet.length ? `<div class="attn-head attn-head-quiet attn-head-first">Everything else</div>` : ""}
         <div class="tile-grid">${quiet.map(quietTile).join("")}</div>
+        ${hot.length ? `<div class="attn-head attn-head-after">Needs attention</div>
+            <div class="attn-grid">${hot.map(hotTile).join("")}</div>` : ""}
         ${homeEdit && (data.hidden || []).length ? `<div class="hidden-bar">
             Hidden: ${(data.hidden || []).map((h) =>
                 `<button class="chip" data-show="${esc(h)}">${esc(h)} — show</button>`).join(" ")}
