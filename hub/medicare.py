@@ -1,5 +1,13 @@
 """Medicare — rejected and short-paid claims, and what to do about each.
 
+OPTION C (Mark, 13 Oct 2026) supersedes the review/approval design below: "find out yourself
+from the consult notes and give suggestions to Karen. If there's nothing, build it as a 10918."
+Every line reaches Karen in ONE list grouped by claim batch, with a suggested item (or write off)
+and a <=6-word cue; she may pick another allowed item before ticking. No PIN on this page (the
+agent's medicare.pin module is kept, unused, for an easy restore). Ticks go through
+    python -m medicare.rejections --tick --by NAME      (stdin: [{key, to}])
+which logs suggested vs used, who and when. No note snippets are fetched for the page.
+
 Mark, 9 Oct 2026: Karen works Tuesdays. First thing she pulls the Medicare
 processing and payment reports in Optomate Touch, then opens this page. It reads
 the freshly pulled reports LIVE (no waiting for a nightly run). The page is ONE
@@ -47,10 +55,11 @@ ITEM_KEYS = ("key", "service_date", "deadline", "days_left", "patient_label", "i
 WRITE_OFF = "write_off"
 PICKS = ACCEPT_ITEMS + (WRITE_OFF,)
 CLAIM_RE = re.compile(r"^[\w-]{1,20}$")
-BATCH_RE = re.compile(r"^B\d{14}(-\d+)?$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ITEM_RE = re.compile(r"^\d{5}$")          # any MBS item, e.g. 10910 -> 10911 for an age fix
 MAX_PICKS = 300
+# claim notes Karen types: the agent's three forms only (medicare.state.CLAIM_NOTE_RE)
+KAREN_NOTE_RE = re.compile(r"^(progressive disorder|new symptoms|diabetic, pupils dilated)(: [\w /+'-]{1,40})?$")
 BASIS = ("Finding noted", "History only", "Symptom noted")
 PIN_RE = re.compile(r"^\d{4}$")
 CLAIM_NOTE_RE = re.compile(r"^[\w ,:/+'-]{1,80}$")
@@ -174,17 +183,7 @@ def clean_item(i: dict, mark_view: bool = False) -> dict | None:
         out["claim_date"] = ""
     out["claim"] = out["claim"][:20]
     f = i.get("fix") if isinstance(i.get("fix"), dict) else None
-    to = str((f or {}).get("to") or "")
-    out["fix"] = ({"to": to, "why": _s(f.get("why"), 60)}
-                  if f and out["action_group"] == "do_now"
-                  and (to in ("same", WRITE_OFF) or ITEM_RE.match(to)) else None)
-    s = i.get("suggestion") if isinstance(i.get("suggestion"), dict) else None
-    out["suggestion"] = None
-    if mark_view and s and out["action_group"] == "review":
-        opts = [o for o in (s.get("options") or []) if o in PICKS]
-        sto = str(s.get("to") or "")
-        out["suggestion"] = {"to": sto if sto in opts else "", "why": _s(s.get("why"), 60),
-                             "options": opts}
+    out["fix"] = clean_fix(f) if f and out["action_group"] == "do_now" else None
     return out
 
 
@@ -210,7 +209,8 @@ def clean_today(rows) -> list:
 def worklist(cfg: dict, fixture: bool = False, mark_view: bool = False) -> dict:
     """The page's data. Never raises. Note snippets only for Mark; everyone else sees
     the review lines as "Mark to review the item" under Awaiting Mark (Codex #5)."""
-    data, err = _run(cfg, ["--json"] + (["--review"] if mark_view else []), fixture)
+    # Option C (13 Oct 2026): no review step, so no note snippets for anyone (--review not sent)
+    data, err = _run(cfg, ["--json"], fixture)
     if err:
         return err
     summary = {}
@@ -235,81 +235,53 @@ def worklist(cfg: dict, fixture: bool = False, mark_view: bool = False) -> dict:
         "today": clean_today(data.get("today")),
         "today_error": _s(data.get("today_error"), 80),
         "pin_set": bool(data.get("pin_set")),
-        "last_approval": _clean_batch(data.get("last_approval")) if mark_view else None,
     }
 
 
-def _clean_batch(b):
-    if not isinstance(b, dict) or not BATCH_RE.match(str(b.get("id") or "")):
+def _ok_to(o) -> bool:
+    return o in ("same", WRITE_OFF) or bool(ITEM_RE.match(str(o or "")))
+
+
+def clean_fix(f: dict):
+    """Karen's suggested action (Option C, Mark 13 Oct 2026): the item to change to (or same /
+    write off), a <=6-word reason, the items she may pick instead, and the claim note per item.
+    Nothing from the notes beyond the reason's one cue word."""
+    to = str(f.get("to") or "")
+    if not _ok_to(to):
         return None
-    return {"id": str(b["id"]), "by": _s(b.get("by"), 40), "at": _s(b.get("at"), 19),
-            "n": _int_or_none(b.get("n")) or 0, "undoable": _int_or_none(b.get("undoable")) or 0}
+    opts = [str(o) for o in (f.get("options") or []) if _ok_to(o)][:8] or [to]
+    if to not in opts:
+        opts = [to] + opts
+    notes = f.get("notes") if isinstance(f.get("notes"), dict) else {}
+    notes = {k: _s(v, 80) for k, v in notes.items()
+             if k in opts and ITEM_RE.match(k) and KAREN_NOTE_RE.match(_s(v, 80))}
+    return {"to": to, "why": _s(f.get("why"), 60), "options": opts, "notes": notes}
 
 
 def _who(by) -> str:
     return re.sub(r"[^\w .'\-]", "", str(by or "")).strip()[:40]
 
 
-def approve(cfg: dict, picks, by: str, fixture: bool = False, pin: str = "") -> dict:
-    """Mark's "Approve all suggestions" (13 Oct 2026): ONE PIN for every ticked line.
-    picks: [{"key", "to"}]. The agent re-checks each line against today's worklist and
-    saves all or none; the PIN goes on stdin, never on a command line, never logged."""
-    by = _who(by)
-    if not is_mark(by):
-        return {"ok": False, "error": "Only Mark can decide the item."}
-    pin = str(pin or "").strip()
-    if not PIN_RE.match(pin):
-        return {"ok": False, "error": "Enter your 4-digit PIN.", "pin": True}
-    if not isinstance(picks, list) or not picks:
-        return {"ok": False, "error": "Nothing ticked."}
-    clean = []
-    for p in picks[:MAX_PICKS + 1]:
-        if not isinstance(p, dict) or not KEY_RE.match(str(p.get("key") or "")) \
-                or str(p.get("to") or "") not in PICKS:
-            return {"ok": False, "error": "Unknown item."}
-        clean.append({"key": str(p["key"]), "to": str(p["to"])})
-    if len(clean) > MAX_PICKS:
-        return {"ok": False, "error": "Too many lines at once."}
-    data, err = _run(cfg, ["--approve", "--by", by], fixture,
-                     stdin=pin + "\n" + json.dumps(clean) + "\n")
-    if err:
-        return {"ok": False, "error": err.get("error") or err.get("message") or "Couldn't save."}
-    return {"ok": True, "n": _int_or_none(data.get("n")) or 0}
-
-
-def undo_approval(cfg: dict, batch: str, by: str, fixture: bool = False, pin: str = "") -> dict:
-    by = _who(by)
-    if not is_mark(by):
-        return {"ok": False, "error": "Only Mark can decide the item."}
-    pin = str(pin or "").strip()
-    if not PIN_RE.match(pin):
-        return {"ok": False, "error": "Enter your 4-digit PIN.", "pin": True}
-    batch = str(batch or "").strip()
-    if not BATCH_RE.match(batch):
-        return {"ok": False, "error": "Unknown approval."}
-    data, err = _run(cfg, ["--undo-approval", batch, "--by", by], fixture, stdin=pin + "\n")
-    if err:
-        return {"ok": False, "error": err.get("error") or err.get("message") or "Couldn't save."}
-    return {"ok": True, "undone": _int_or_none(data.get("undone")) or 0,
-            "kept": _int_or_none(data.get("kept")) or 0}
-
-
-def mark_many(cfg: dict, keys, status: str, by: str, fixture: bool = False) -> dict:
-    """Karen's "tick all in this batch". Staff ticks only."""
+def tick(cfg: dict, lines, by: str, fixture: bool = False) -> dict:
+    """Karen's tick - one line or a whole batch: [{"key", "to"}] where to is the item she used
+    (or same / write_off). No PIN (Option C). The agent re-checks each line against today's
+    list and its allowed items, saves all or none, and logs suggested vs used, who, when."""
     by = _who(by)
     if not by:
         return {"ok": False, "error": "Pick your name at the top first."}
-    status = str(status or "").strip().lower()
-    if status not in ("resubmitted", "written_off"):
-        return {"ok": False, "error": "Unknown action."}
-    if not isinstance(keys, list) or not keys or len(keys) > MAX_PICKS \
-            or not all(KEY_RE.match(str(k or "")) for k in keys):
-        return {"ok": False, "error": "Unknown item."}
-    data, err = _run(cfg, ["--mark-many", status, "--by", by], fixture,
-                     stdin=json.dumps([str(k) for k in keys]) + "\n")
+    if not isinstance(lines, list) or not lines:
+        return {"ok": False, "error": "Nothing ticked."}
+    if len(lines) > MAX_PICKS:
+        return {"ok": False, "error": "Too many lines at once."}
+    clean = []
+    for p in lines:
+        if not isinstance(p, dict) or not KEY_RE.match(str(p.get("key") or "")) or not _ok_to(p.get("to")):
+            return {"ok": False, "error": "Unknown item."}
+        clean.append({"key": str(p["key"]), "to": str(p["to"])})
+    data, err = _run(cfg, ["--tick", "--by", by], fixture, stdin=json.dumps(clean) + "\n")
     if err:
         return {"ok": False, "error": err.get("error") or err.get("message") or "Couldn't save."}
-    return {"ok": True, "n": _int_or_none(data.get("n")) or 0, "status": status}
+    return {"ok": True, "n": _int_or_none(data.get("n")) or 0}
 
 
 def mark(cfg: dict, key: str, status: str, by: str, fixture: bool = False,
