@@ -1717,6 +1717,7 @@ body.lens-mono main { background: #fafafa; }
     .mc-today-t .mc-tcheck { grid-column: 1 / -1; }
 }
 
+<<<<<<< HEAD
 /* --- Medicare: Mark's approve-all + Karen's batch worklist (13 Oct 2026) ------------
    One line per claim, 17px body. Colour has one job: the new item is ink and bold, a
    write-off is amber, red is a deadline within a month. Details fold behind ▸. */
@@ -1787,4 +1788,30 @@ body.lens-mono main { background: #fafafa; }
     body.mc-print-batch .mc-to-off { background: none; border: 1pt solid #000; }
     body.mc-print-batch .mc-to-pick { appearance: none; -webkit-appearance: none; border: none; padding: 0;
         min-height: 0; font-size: 12pt; background: none; }
+=======
+/* --- Bug fixes on the existing design (13 Oct 2026, from Codex's review) -------------
+   1. .lens-table (Recalls, Payment follow-ups, invoice detail) had no rule at all, so
+      those tables rendered with browser defaults and the fields ran together.
+   2. Phone: To-do and Credits rows squeezed the task into a narrow middle column and
+      wrapped it word by word. Tick | text | remove, with the name under the text. */
+.lens-table { border-collapse: collapse; width: 100%; font-size: 17px; margin: 8px 0; }
+.lens-table th { text-align: left; font-size: 15px; font-weight: 600; color: var(--muted);
+    padding: 8px 12px; border-bottom: 2px solid var(--line); white-space: nowrap; }
+.lens-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.lens-table tr:last-child td { border-bottom: none; }
+@media (max-width: 760px) {
+    /* a wide table scrolls inside its card instead of pushing the page sideways */
+    .lens-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .lens-table td, .lens-table th { white-space: nowrap; }
+    .card { padding: 18px 14px; }
+    .todo-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 40px; gap: 2px 10px;
+        align-items: start; }
+    .todo-row .todo-tick { grid-column: 1; grid-row: 1 / span 2; }
+    .todo-row .todo-text { grid-column: 2; grid-row: 1; min-width: 0; overflow-wrap: anywhere; }
+    .todo-row > .todo-meta { grid-column: 2; grid-row: 2; white-space: normal; }
+    .todo-row .todo-x { grid-column: 3; grid-row: 1; }
+    .todo-text .chip { white-space: normal; }
+    .todo-addbar input[type="text"] { min-width: 0; flex-basis: 100%; }
+    main select { max-width: 100%; }   /* Recalls "Which reminder" ran off the screen */
+>>>>>>> session/2026-10-13-hub-bugfixes
 }
