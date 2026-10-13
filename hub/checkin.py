@@ -149,10 +149,10 @@ def key_ok(cfg: dict, given) -> bool:
 
 def staff_code(cfg: dict) -> str:
     """config\\integrations.json checkin.staff_code: what a front-desk computer
-    types once to unlock Check-in. A placeholder or under 6 characters = not set
+    types once to unlock Check-in. A placeholder or under 4 characters = not set (4 digits OK: Mark, 13 Oct 2026; 5 tries then a 15-min wait)
     (then only the server itself can use Check-in)."""
     code = str(((cfg or {}).get("checkin") or {}).get("staff_code") or "").strip()
-    if len(code) < 6 or code.upper().startswith("CHANGE"):
+    if len(code) < 4 or code.upper().startswith("CHANGE"):
         return ""
     return code
 

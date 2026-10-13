@@ -651,7 +651,7 @@ def test_unlock_locks_out_after_five_wrong_codes(client):
 
 def test_no_staff_code_means_only_the_server_can_use_checkin(client):
     cfg = json.loads(client.cfg_path.read_text())
-    for code in ("", "short", "CHANGE-ME-staff-code"):
+    for code in ("", "abc", "CHANGE-ME-staff-code"):
         cfg["checkin"]["staff_code"] = code
         client.cfg_path.write_text(json.dumps(cfg))
         r = client.get("/api/checkin/today", environ_base=LAN)
