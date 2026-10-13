@@ -1717,7 +1717,6 @@ body.lens-mono main { background: #fafafa; }
     .mc-today-t .mc-tcheck { grid-column: 1 / -1; }
 }
 
-<<<<<<< HEAD
 /* --- Medicare: Mark's approve-all + Karen's batch worklist (13 Oct 2026) ------------
    One line per claim, 17px body. Colour has one job: the new item is ink and bold, a
    write-off is amber, red is a deadline within a month. Details fold behind ▸. */
@@ -1788,7 +1787,7 @@ body.lens-mono main { background: #fafafa; }
     body.mc-print-batch .mc-to-off { background: none; border: 1pt solid #000; }
     body.mc-print-batch .mc-to-pick { appearance: none; -webkit-appearance: none; border: none; padding: 0;
         min-height: 0; font-size: 12pt; background: none; }
-=======
+
 /* --- Bug fixes on the existing design (13 Oct 2026, from Codex's review) -------------
    1. .lens-table (Recalls, Payment follow-ups, invoice detail) had no rule at all, so
       those tables rendered with browser defaults and the fields ran together.
@@ -1813,5 +1812,4 @@ body.lens-mono main { background: #fafafa; }
     .todo-text .chip { white-space: normal; }
     .todo-addbar input[type="text"] { min-width: 0; flex-basis: 100%; }
     main select { max-width: 100%; }   /* Recalls "Which reminder" ran off the screen */
->>>>>>> session/2026-10-13-hub-bugfixes
 }
