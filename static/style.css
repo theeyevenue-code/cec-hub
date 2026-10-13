@@ -276,6 +276,9 @@ main {
     margin: 4px 0 12px;
 }
 .attn-head-quiet { color: var(--muted); margin-top: 30px; }
+/* Mark, 13 Oct 2026: everyday tools on top, needs-attention block underneath */
+.attn-head-first { margin-top: 4px; }
+.attn-head-after { margin-top: 30px; }
 .attn-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);   /* 2 across -> 2x2 with four hot tiles */
