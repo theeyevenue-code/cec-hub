@@ -492,6 +492,16 @@ def checkin_ipad_current():
     return _no_store(jsonify(checkin.ipad_current(cfg)))
 
 
+@app.route("/api/checkin/ipad/self", methods=["POST"])
+def checkin_ipad_self():
+    """The patient checks themselves in: surname + date of birth (or mobile)
+    matched to one of today's bookings (Mark, 13 Oct 2026, option A)."""
+    cfg, bad = _ipad_cfg()
+    if bad:
+        return bad
+    return _json(checkin.ipad_self(cfg, request.get_json(silent=True) or {}))
+
+
 @app.route("/api/checkin/ipad/session/<token>")
 def checkin_ipad_session(token):
     cfg, bad = _ipad_cfg()

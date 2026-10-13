@@ -2326,7 +2326,13 @@ function ciBanner(d) {
 }
 
 const CI_CHIP = { "Not sent": "ci-chip-none", "On the iPad": "ci-chip-ipad", "Paused": "ci-chip-ready",
-                  "Ready to check": "ci-chip-ready", "Saved": "ci-chip-saved" };
+                  "Ready to check": "ci-chip-ready", "Saved": "ci-chip-saved", "Saved (test)": "ci-chip-saved" };
+
+/* Why a form is waiting for a person (self check-in auto-save, 13 Oct 2026). */
+function ciWhy(a) {
+    const why = a.check_reasons || [];
+    return why.length ? `<div class="ci-why">${why.map(esc).join(" · ")}</div>` : "";
+}
 
 function ciChip(status) {
     return `<span class="ci-chip ${CI_CHIP[status] || "ci-chip-none"}">${esc(status)}</span>`;
@@ -2365,7 +2371,7 @@ function renderCheckin() {
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <div id="ci-banner"></div>
         <h1 class="page-title">Check-in</h1>
-        <p class="page-sub">Send a patient's form to the iPad. When it comes back, check it and save.</p>
+        <p class="page-sub">Patients check in on the iPad themselves. Only forms marked Check need you.</p>
         <div id="ci-slot"></div>
         <div id="ci-note"></div>
         <div class="card">
@@ -2479,12 +2485,13 @@ async function ciLoadToday(quiet) {
             let btn = "";
             if (a.status === "Not sent") btn = `<button class="btn ci-send" data-aid="${esc(a.appointment_id)}">Send to iPad</button>`;
             else if (a.status === "Ready to check" && a.token) btn = `<a class="btn" href="#/checkin/${esc(a.token)}">Check</a>`;
+            else if (a.status === "Saved (test)" && a.token) btn = `<a class="btn btn-quiet ci-small" href="#/checkin/${esc(a.token)}">View</a>`;
             else if (a.status === "On the iPad" && a.token) btn = `<button class="btn btn-quiet ci-small" data-off="${esc(a.token)}">Take it off</button>`;
             else if (a.status === "Paused" && a.token) btn = `<button class="btn" data-resume="${esc(a.token)}">Resume on the iPad</button>`;
-            return `<tr class="${a.status === "Saved" ? "ci-row-done" : ""}">
+            return `<tr class="${a.status === "Saved" || a.status === "Saved (test)" ? "ci-row-done" : ""}">
                 <td class="ci-num"><strong>${esc(a.time)}</strong></td>
                 <td>${esc(a.name)}${a.has_exam_today ? ` <span class="ci-muted">· exam open</span>` : ""}</td>
-                <td>${form}</td><td>${ciChip(a.status)}</td><td>${btn}</td></tr>`;
+                <td>${form}</td><td>${ciChip(a.status)}${ciWhy(a)}</td><td>${btn}</td></tr>`;
         }).join("")}</tbody></table>`
         : `<div class="ci-muted">No appointments today.</div>`;
 
@@ -2494,7 +2501,7 @@ async function ciLoadToday(quiet) {
         <table class="ci-table"><tbody>${waiting.map((w) => `<tr>
             <td class="ci-num">${esc(ciWhen(w.submitted))}</td>
             <td>${esc(w.name)}</td><td>${w.audience === "child" ? "Child" : "Adult"}</td>
-            <td>${ciChip("Ready to check")}</td>
+            <td>${ciChip("Ready to check")}${ciWhy(w)}</td>
             <td><a class="btn" href="#/checkin/${esc(w.token)}">Check</a></td></tr>`).join("")}
         </tbody></table></div>` : "";
 

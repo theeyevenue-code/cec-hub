@@ -1813,3 +1813,6 @@ body.lens-mono main { background: #fafafa; }
     .todo-addbar input[type="text"] { min-width: 0; flex-basis: 100%; }
     main select { max-width: 100%; }   /* Recalls "Which reminder" ran off the screen */
 }
+
+/* Check-in: why a form waits for a person (self check-in, 13 Oct 2026) */
+.ci-why { font-size: 14px; color: var(--amber-ink); margin-top: 4px; }
