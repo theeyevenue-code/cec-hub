@@ -1728,6 +1728,7 @@ body.lens-mono main { background: #fafafa; }
 .mc-to { font-size: 19px; color: var(--ink); }
 .mc-to-off { color: var(--amber-ink); background: var(--amber-bg); padding: 0 6px; border-radius: 4px; }
 .mc-cn { white-space: normal; }
+.mc-cn[hidden] { display: none; }
 .mc-why { font-size: 17px; color: var(--body); min-width: 200px; }
 .mc-fold { display: inline; }
 .mc-fold > summary { display: inline; list-style: none; cursor: pointer; color: var(--muted); padding: 2px 6px; }
@@ -1736,9 +1737,9 @@ body.lens-mono main { background: #fafafa; }
 .mc-fold[open] { display: block; margin-top: 4px; }
 .mc-undo-one { display: block; margin-top: 6px; }
 .mc-undo-one .mc-btn { margin: 0; }
-.mc-ap-to { font: inherit; font-size: 17px; font-weight: 700; padding: 6px 8px; min-height: 40px;
+.mc-ap-to, .mc-to-pick { font: inherit; font-size: 17px; font-weight: 700; padding: 6px 8px; min-height: 40px;
     border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
-.mc-ap-row.mc-changed .mc-ap-to { border-color: var(--info-line); background: var(--info-bg); }
+.mc-row.mc-changed .mc-to-pick { border-color: var(--info-line); background: var(--info-bg); }
 .mc-flagmark { color: var(--info-ink); }
 .mc-ap-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
 .mc-ap-bar .mc-btn { margin: 0; }
@@ -1750,32 +1751,31 @@ body.lens-mono main { background: #fafafa; }
 .mc-bt-group:first-of-type .mc-bt-head th { padding-top: 6px; }
 .mc-bt-claim { font-family: 'Urbanist', 'Work Sans', sans-serif; font-size: 22px; font-weight: 800;
     color: var(--ink); margin-right: 10px; font-variant-numeric: tabular-nums; }
-.mc-bt-all { float: right; margin: -6px 0 0; min-height: 40px; padding: 6px 12px; font-size: 16px; }
-.mc-table .mc-bt-group tr.mc-bt-row:last-child td { border-bottom: none; }
+.mc-bt-btns { float: right; display: inline-flex; gap: 8px; margin-top: -6px; }
+.mc-bt-btns .mc-btn { margin: 0; min-height: 40px; padding: 6px 12px; font-size: 16px; }
+.mc-table .mc-bt-group tr.mc-row:last-child td { border-bottom: none; }
 .mc-table tr.mc-urgent .mc-date { color: var(--danger-ink); font-weight: 700; }
 .mc-print-only { display: none; }
 @media (max-width: 760px) {
     .mc-table .mc-bt-head { display: block; }
     .mc-table .mc-bt-head th { display: block; padding: 14px 0 6px; white-space: normal; }
     .mc-bt-meta { display: block; }
-    .mc-bt-all { float: none; display: block; margin: 8px 0 0; width: 100%; }
-    .mc-bt tr.mc-bt-row, .mc-ap-t tr.mc-ap-row { grid-template-columns: auto 1fr auto; align-items: baseline; }
-    .mc-bt .mc-tick, .mc-ap-t .mc-tick { grid-row: span 3; align-self: start; padding-top: 2px; }
-    .mc-bt .mc-pt, .mc-ap-t .mc-pt { grid-column: 2; }
-    .mc-bt .mc-num, .mc-ap-t .mc-num { grid-column: 3; grid-row: 1; }
-    .mc-bt .mc-date, .mc-ap-t .mc-date { grid-column: 2 / -1; font-size: 15px; color: var(--muted); }
-    .mc-bt .mc-chg, .mc-ap-t .mc-chg { grid-column: 2 / -1; white-space: normal; }
-    .mc-bt .mc-why, .mc-ap-t .mc-why { grid-column: 2 / -1; min-width: 0; }
-    .mc-ap-t thead { display: table-header-group; }
-    .mc-ap-t thead tr { display: flex; gap: 8px; border: none; padding: 0 0 4px; }
-    .mc-ap-t thead th:not(.mc-tick) { display: none; }
-    .mc-ap-t thead th.mc-tick::after { content: "All"; font-size: 15px; margin-left: 6px; }
+    .mc-bt-btns { float: none; display: flex; flex-wrap: wrap; margin: 8px 0 0; }
+    .mc-bt-btns .mc-btn { flex: 1 1 140px; }
+    .mc-bt tr.mc-row { grid-template-columns: auto 1fr auto; align-items: baseline; }
+    .mc-bt .mc-tick { grid-row: span 3; align-self: start; padding-top: 2px; }
+    .mc-bt .mc-pt { grid-column: 2; }
+    .mc-bt .mc-num { grid-column: 3; grid-row: 1; }
+    .mc-bt .mc-date { grid-column: 2 / -1; font-size: 15px; color: var(--muted); }
+    .mc-bt .mc-chg { grid-column: 2 / -1; white-space: normal; }
+    .mc-bt .mc-why { grid-column: 2 / -1; min-width: 0; }
     .mc-ap-bar #mc-approve { flex: 1 1 100%; }
 }
 @media print {
     body.mc-print-batch .mc-page > :not(#mc-do_now) { display: none !important; }
     body.mc-print-batch #mc-do_now > .mc-instr,
-    body.mc-print-batch .mc-fold, body.mc-print-batch .mc-bt-all { display: none !important; }
+    body.mc-print-batch .mc-fold, body.mc-print-batch .mc-bt-btns,
+    body.mc-print-batch .mc-inline-btns, body.mc-print-batch .mc-ap-bar { display: none !important; }
     body.mc-print-batch .mc-print-only { display: block; font-size: 11pt; margin: 0 0 6pt; }
     body.mc-print-batch #mc-do_now { border: none; margin: 0; padding: 0; }
     body.mc-print-batch .mc-scroll { overflow: visible; padding: 0; }
@@ -1785,4 +1785,6 @@ body.lens-mono main { background: #fafafa; }
     body.mc-print-batch .mc-tick input { appearance: none; -webkit-appearance: none; width: 14pt; height: 14pt;
         border: 1.2pt solid #000; border-radius: 2pt; background: #fff; }
     body.mc-print-batch .mc-to-off { background: none; border: 1pt solid #000; }
+    body.mc-print-batch .mc-to-pick { appearance: none; -webkit-appearance: none; border: none; padding: 0;
+        min-height: 0; font-size: 12pt; background: none; }
 }
