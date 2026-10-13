@@ -116,8 +116,11 @@ class FakeEngine:
 def world(tmp_path, monkeypatch):
     agent = tmp_path / "agent"
     (agent / "checkin").mkdir(parents=True)
+    # Self check-in and the automatic save are OFF here, so these tests keep
+    # covering the staff-sent flow; test_checkin_self.py turns them on.
     cfg = {"optomate_agent": {"agent_dir": str(agent), "python": "py"},
-           "checkin": {"ipad_key": KEY, "staff_code": STAFF_CODE}}
+           "checkin": {"ipad_key": KEY, "staff_code": STAFF_CODE,
+                       "self_checkin": False, "auto_save": False}}
     checkin._unlock_fails.clear()
     eng = FakeEngine()
     monkeypatch.setattr(checkin.subprocess, "run", eng)

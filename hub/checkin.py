@@ -464,9 +464,18 @@ def _int(v):
     return i if i > 0 else None
 
 
+def _status(s: dict | None) -> str:
+    """Staff word for a form. A form the iPad saved by itself in test mode reads
+    "Saved (test)"; one waiting for a person still reads "Ready to check"."""
+    if s and s.get("state") == "submitted" and (s.get("auto") or {}).get("result") == "test_saved":
+        return "Saved (test)"
+    return STATUS_WORDS.get(s.get("state") if s else None, "Not sent")
+
+
 def _summary(s: dict) -> dict:
     return {"token": s["token"], "state": s.get("state"),
-            "status": STATUS_WORDS.get(s.get("state"), "Not sent"),
+            "status": _status(s), "check_reasons": s.get("check_reasons") or [],
+            "self": s.get("via") == "self",
             "name": display_name(s), "audience": s.get("audience"),
             "patient_id": s.get("patient_id"), "appointment_id": s.get("appointment_id"),
             "created": s.get("created"), "submitted": s.get("submitted"),
@@ -506,7 +515,9 @@ def today(cfg: dict) -> dict:
         a = {k: v for k, v in a.items() if k not in _PREFILL_ONLY_KEYS}
         rows.append({**a, "name": " ".join(x for x in (a.get("given"), a.get("surname")) if x),
                      "audience": audience, "state": state,
-                     "status": STATUS_WORDS.get(state, "Not sent"),
+                     "status": _status(s) if s and state == s.get("state") else STATUS_WORDS.get(state, "Not sent"),
+                     "check_reasons": (s or {}).get("check_reasons") or [],
+                     "self": (s or {}).get("via") == "self",
                      "token": s["token"] if s and state not in ("saved", "discarded") else None})
     waiting = [_summary(s) for s in sessions
                if s.get("state") == "submitted" and s["token"] not in used]
@@ -514,6 +525,7 @@ def today(cfg: dict) -> dict:
     return {"connected": True, "date": day, "appointments": rows, "waiting": waiting,
             "ipad": _summary(slot) if slot else None,
             "ipad_ready": bool(ipad_key(cfg)),
+            "self_checkin": self_checkin_on(cfg), "auto_save": auto_save_on(cfg),
             "dry_run": data.get("dry_run", True), "fixture": bool(data.get("fixture"))}
 
 
@@ -767,7 +779,9 @@ def ipad_current(cfg: dict) -> dict:
         s = current_slot(cfg)
     if s and s["state"] == "paused":
         return {"state": "paused"}             # no token: the iPad cannot reopen it
-    return {"token": s["token"], "state": s["state"]} if s else {"state": "idle"}
+    if s:
+        return {"token": s["token"], "state": s["state"]}
+    return {"state": "idle", "self": True} if self_checkin_on(cfg) else {"state": "idle"}
 
 
 def _slot_session(cfg: dict, token) -> dict | None:
@@ -943,4 +957,174 @@ def ipad_submit(cfg: dict, token, body: dict) -> tuple[int, dict]:
         _write_session(cfg, s)
         _add_receipt(cfg, s["token"])
     logger.info("Check-in: patient %s form submitted from the iPad", s.get("patient_id") or "new")
+    if auto_save_on(cfg) and s.get("patient_id"):
+        _run_later(auto_save, cfg, s["token"])
     return 200, {"ok": True}
+
+
+def _run_later(fn, *args) -> None:
+    """The iPad gets its "Thank you" at once; the save runs behind it. (Tests
+    swap this for a direct call.)"""
+    threading.Thread(target=fn, args=args, daemon=True).start()
+
+
+# ---------------------------------------------------------------------------
+# Self check-in + automatic save (Mark, 13 Oct 2026, "option A": "it has to be
+# almost seamless"). The iPad waits on "Check in here"; the patient types their
+# surname and date of birth (or mobile); the engine matches it to ONE of today's
+# bookings and the form opens - no staff step. When they press Send, the form
+# saves itself unless something needs a person: a changed name, birth date,
+# Medicare, mobile or email, a new record, an exam already open, or any engine
+# warning. Those wait on the Check-in page as "Check" with the reason.
+# Live writes are still held by the engine's own gate (agent .env): in dry run
+# the automatic save is a TEST save and nothing reaches Optomate.
+# ---------------------------------------------------------------------------
+
+SELF_TRIES = 6                      # failed look-ups ...
+SELF_WINDOW_S = 10 * 60             # ... per 10 minutes, then "please see reception"
+SURNAME_MAX = 40
+AUTO_STAFF = "iPad - automatic"     # who saved it, in the Optomate note (save() drops brackets)
+# A change to any of these is never saved without a person looking first.
+CHECK_FIELDS = {"given_name": "Name", "family_name": "Name", "dob": "Date of birth",
+                "medicare_number": "Medicare", "medicare_ref": "Medicare",
+                "medicare_expiry": "Medicare", "phone_mobile": "Mobile", "email": "Email"}
+
+_self_fails: list[float] = []
+
+
+def _flag(cfg: dict, key: str, default: bool = True) -> bool:
+    v = ((cfg or {}).get("checkin") or {}).get(key)
+    return default if v is None else v is True
+
+
+def self_checkin_on(cfg: dict) -> bool:
+    """config checkin.self_checkin (default on): the iPad's idle screen is
+    "Check in here". false = back to "Please see reception"."""
+    return _flag(cfg, "self_checkin")
+
+
+def auto_save_on(cfg: dict) -> bool:
+    """config checkin.auto_save (default on): a form with nothing to check saves
+    itself when the patient presses Send."""
+    return _flag(cfg, "auto_save")
+
+
+def _self_locked(now: float) -> bool:
+    _self_fails[:] = [t for t in _self_fails if now - t < SELF_WINDOW_S]
+    return len(_self_fails) >= SELF_TRIES
+
+
+SEE_RECEPTION = "Please see reception."
+
+
+def ipad_self(cfg: dict, body: dict) -> tuple[int, dict]:
+    """The patient's own look-up on the iPad. body: surname + dob (dd/mm/yyyy)
+    or surname + mobile. Answers carry no patient data except, on a match, the
+    form's token (the form greets them by first name as it always has)."""
+    body = body if isinstance(body, dict) else {}
+    if not self_checkin_on(cfg):
+        return 403, {"error": SEE_RECEPTION}
+    surname = " ".join(SEARCH_STRIP_RE.sub(" ", str(body.get("surname") or "")).split())[:SURNAME_MAX]
+    dob = str(body.get("dob") or "").strip()
+    mobile = re.sub(r"[^\d+]", "", str(body.get("mobile") or ""))[:16]
+    if len(surname.replace(" ", "")) < 2:
+        return 400, {"error": "Type your surname.", "field": "surname"}
+    if dob and not re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", dob):
+        return 400, {"error": "Check the date of birth.", "field": "dob"}
+    if not dob and len(re.sub(r"\D", "", mobile)) < 9:
+        return 400, {"error": "Type your mobile number.", "field": "mobile"}
+    now = time.time()
+    with _lock:
+        if _self_locked(now):
+            return 429, {"error": SEE_RECEPTION, "locked": True}
+        if current_slot(cfg):
+            return 409, {"error": SEE_RECEPTION, "busy": True}
+    args = ["match", "--surname", surname] + (["--dob", dob] if dob else ["--mobile", mobile])
+    m = run_engine(cfg, *args)
+    if m.get("error"):
+        if m.get("connected") is False:
+            return 200, {"error": SEE_RECEPTION}
+        if dob:
+            return 400, {"error": "Check the date of birth.", "field": "dob"}
+        return 200, {"error": SEE_RECEPTION}
+    count = int(m.get("count") or 0)
+    if count != 1:
+        with _lock:
+            if count == 0:
+                _self_fails.append(now)
+        logger.info("Check-in: iPad self check-in - %s", "no booking matched" if count == 0
+                    else "more than one booking matched")
+        # No match: let them try again (or the mobile route). Two or more: reception.
+        return 200, {"found": False, "many": count > 1}
+    hit = (m.get("matches") or [{}])[0]
+    aid, pid = _int(hit.get("appointment_id")), _int(hit.get("patient_id"))
+    if aid is None or pid is None:
+        return 200, {"error": SEE_RECEPTION}
+    day = _now().date().isoformat()
+    done = [s for s in all_sessions(cfg) if str(s.get("created") or "")[:10] == day
+            and s.get("appointment_id") == aid and s.get("state") in ("submitted", "saved")]
+    if done or any(r.get("appointment_id") == aid for r in _markers(cfg, day)):
+        logger.info("Check-in: patient %s self check-in - already done today", pid)
+        return 200, {"done": True}
+    code, out = send(cfg, {"kind": "appointment", "appointment_id": aid})
+    if code != 200 or not out.get("token"):
+        return 200, {"error": SEE_RECEPTION}
+    with _lock:
+        s = load_session(cfg, out["token"])
+        if s is not None:
+            s["via"] = "self"
+            _write_session(cfg, s)
+    logger.info("Check-in: patient %s checked themselves in on the iPad", pid)
+    return 200, {"ok": True, "token": out["token"]}
+
+
+def _check_reasons(plan: dict) -> list[str]:
+    """Why a person must look at this form before it saves. [] = save it."""
+    reasons: list[str] = []
+    if plan.get("error"):
+        return ["Couldn't check it automatically"]
+    if plan.get("is_new_patient"):
+        reasons.append("New patient")
+    for c in plan.get("patient_changes") or []:
+        word = CHECK_FIELDS.get(c.get("field"))
+        if word and c.get("accepted", True) and word not in reasons:
+            reasons.append(f"{word} changed" if word != "Name" else "Name changed")
+    if plan.get("duplicates"):
+        reasons.append("May already be in Optomate")
+    if (plan.get("exam") or {}).get("action") == "exists":
+        reasons.append("Exam already open")
+    if plan.get("blockers") or not plan.get("can_save"):
+        reasons.append("Needs a staff decision")
+    elif plan.get("warnings") and not reasons:
+        reasons.append("Something to look at")
+    return reasons
+
+
+def auto_save(cfg: dict, token) -> None:
+    """Run straight after a form is submitted (background thread). Saves it -
+    a TEST save in dry run - when nothing needs a person, else records why."""
+    s = load_session(cfg, token)
+    if s is None or s.get("state") != "submitted":
+        return
+    plan = run_engine(cfg, "plan", "--session", f"{s['token']}.json")
+    reasons = _check_reasons(plan)
+    if not reasons:
+        code, result = save(cfg, token, plan.get("hash"), AUTO_STAFF)
+        if code == 200 and (result.get("saved") is True or result.get("test_saved")):
+            if result.get("test_saved"):
+                with _lock:
+                    s2 = load_session(cfg, token)
+                    if s2 is not None:
+                        s2["auto"] = {"at": _iso(), "result": "test_saved"}
+                        _write_session(cfg, s2)
+            logger.info("Check-in: patient %s saved automatically%s", s.get("patient_id"),
+                        " (test - nothing written)" if result.get("test_saved") else "")
+            return
+        reasons = ["Didn't save - check it"]
+    with _lock:
+        s2 = load_session(cfg, token)
+        if s2 is not None and s2.get("state") == "submitted":
+            s2["check_reasons"] = reasons[:4]
+            _write_session(cfg, s2)
+    logger.info("Check-in: patient %s left for staff to check (%d reason%s)",
+                s.get("patient_id"), len(reasons), "" if len(reasons) == 1 else "s")

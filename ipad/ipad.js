@@ -92,12 +92,125 @@
             <p class="mid">Please see reception.</p></div>`;
     }
 
+    /* Idle = "Check in here" when self check-in is on (Mark, 13 Oct 2026,
+       option A): surname + date of birth, or surname + mobile. The server says
+       only "found / not found / see reception" - it never shows a name, so a
+       wrong guess learns nothing. What was typed lives in the page only and is
+       cleared after SELF_IDLE_MS untouched. Otherwise: "Please see reception". */
+    const SELF_IDLE_MS = 60 * 1000;
+    const NOTE_MS = 8000;
+    let selfOn = false;
+    let selfMiss = 0;          // no-match tries on this screen
+    let selfMobile = false;    // showing the mobile box instead of the birth date
+    let noteTimer = null;
+
     function renderIdle() {
         wipe();
+        if (noteTimer) { clearTimeout(noteTimer); noteTimer = null; }
+        selfMiss = 0;
+        selfMobile = false;
+        if (selfOn) { renderSelf(""); return; }
         mode = "idle";
         app.innerHTML = `<div class="center"><p class="big">Concord Eyecare</p>
             <p class="mid">Please see reception.</p></div>`;
     }
+
+    function renderSelf(err, keep) {
+        mode = "self";
+        const k = keep || {};
+        const opts = MONTHS.map((name, i) =>
+            `<option value="${i + 1}"${String(i + 1) === k.m ? " selected" : ""}>${name}</option>`).join("");
+        const second = selfMobile
+            ? `<label class="lab" for="self-mobile">Mobile number</label>
+               <input id="self-mobile" type="tel" inputmode="tel" autocomplete="off" value="${esc(k.mobile || "")}">`
+            : `<div class="lab">Date of birth</div>
+               <div class="date">
+                 <div><input id="self-d" type="text" inputmode="numeric" maxlength="2" autocomplete="off"
+                     value="${esc(k.d || "")}" aria-label="Day"><div class="cap">Day</div></div>
+                 <div><select id="self-m" aria-label="Month"><option value="">Month</option>${opts}</select>
+                     <div class="cap">Month</div></div>
+                 <div><input id="self-y" type="text" inputmode="numeric" maxlength="4" autocomplete="off"
+                     value="${esc(k.y || "")}" aria-label="Year"><div class="cap">Year</div></div>
+               </div>`;
+        app.innerHTML = `<form class="self" id="self-form" autocomplete="off">
+            <p class="big">Check in here</p>
+            <p class="mid">For a child, use the child's details.</p>
+            ${err ? `<p class="err" role="alert">${esc(err)}</p>` : ""}
+            <label class="lab" for="self-surname">Surname</label>
+            <input id="self-surname" type="text" autocomplete="off" autocapitalize="words"
+                spellcheck="false" value="${esc(k.surname || "")}">
+            ${second}
+            <button class="btn primary" type="submit" data-act="self-go">Check in</button>
+            <button class="btn quiet" type="button" data-act="self-swap">${selfMobile
+                ? "Use date of birth instead" : "Use mobile number instead"}</button>
+            </form>`;
+        setBar("");
+        lastTouch = Date.now();
+    }
+
+    function renderNote(big, mid) {
+        mode = "note";
+        app.innerHTML = `<div class="center"><p class="big">${esc(big)}</p>
+            ${mid ? `<p class="mid">${esc(mid)}</p>` : ""}</div>`;
+        setBar("");
+        noteTimer = setTimeout(renderIdle, NOTE_MS);
+    }
+
+    function selfTyped() {
+        const v = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+        return { surname: v("self-surname"), d: v("self-d").replace(/\D/g, ""),
+                 m: v("self-m"), y: v("self-y").replace(/\D/g, ""), mobile: v("self-mobile") };
+    }
+
+    async function selfGo() {
+        const k = selfTyped();
+        const body = { surname: k.surname };
+        if (k.surname.replace(/[^A-Za-zÀ-ɏ]/g, "").length < 2) { renderSelf("Type your surname.", k); return; }
+        if (selfMobile) {
+            if (k.mobile.replace(/\D/g, "").length < 9) { renderSelf("Type your mobile number.", k); return; }
+            body.mobile = k.mobile;
+        } else {
+            if (!k.d || !k.m || k.y.length !== 4) { renderSelf("Fill in day, month and year.", k); return; }
+            body.dob = `${k.d}/${k.m}/${k.y}`;
+        }
+        mode = "sending";
+        app.innerHTML = `<div class="center"><p class="big">Finding your booking...</p></div>`;
+        let r;
+        try { r = await api("/self", body); } catch (e) { renderSelf("Couldn't connect. Tap Check in again.", k); return; }
+        const d = r.data || {};
+        if (r.status === 200 && d.ok && d.token) {
+            mode = "idle";
+            await start(d.token);
+            if (mode === "idle") renderIdle();      // the form didn't open: start again
+            return;
+        }
+        if (d.done) { renderNote("You're already checked in.", "Please take a seat."); return; }
+        if (r.status === 400 && d.error) { renderSelf(d.error, k); return; }
+        if (r.status === 200 && d.found === false && !d.many) {
+            selfMiss += 1;
+            if (selfMiss >= 3) { renderNote("Please see reception.", ""); return; }
+            if (!selfMobile && selfMiss >= 1) {
+                selfMobile = true;
+                renderSelf("We couldn't find a booking today with those details. Try your mobile number.",
+                           { surname: k.surname });
+                return;
+            }
+            renderSelf("We couldn't find a booking today with those details. Check and try again.", k);
+            return;
+        }
+        renderNote("Please see reception.", "");
+    }
+
+    app.addEventListener("submit", (ev) => {
+        if (ev.target && ev.target.id === "self-form") { ev.preventDefault(); selfGo(); }
+    });
+
+    setInterval(() => {      // a half-typed check-in is cleared, never left on show
+        if (mode === "self" && Date.now() - lastTouch >= SELF_IDLE_MS) {
+            const k = selfTyped();
+            if (k.surname || k.d || k.y || k.mobile || k.m) renderIdle();
+        }
+    }, 5000);
 
     function renderWelcome() {
         mode = "welcome";
@@ -140,7 +253,7 @@
         mode = "thanks";
         hideWarning();
         app.innerHTML = `<div class="center"><p class="big">${already ? "Thank you, received." : "Thank you."}</p>
-            <p class="mid">Please hand the iPad back to reception.</p></div>`;
+            <p class="mid">${selfOn ? "Please take a seat." : "Please hand the iPad back to reception."}</p></div>`;
         setBar("");
         window.scrollTo(0, 0);
         thanksTimer = setTimeout(renderIdle, THANKS_MS);
@@ -250,8 +363,19 @@
             }
             return;
         }
-        if (mode === "idle" && cur.state === "paused") { renderPaused(); return; }
-        if (mode === "idle" && cur.token) await start(cur.token);
+        if (["idle", "self", "note"].includes(mode) && cur.state === "paused") { renderPaused(); return; }
+        if (["self", "note"].includes(mode) && cur.token) {   // reception sent a form: it wins
+            if (noteTimer) { clearTimeout(noteTimer); noteTimer = null; }
+            mode = "idle";
+            await start(cur.token);
+            if (mode === "idle") renderIdle();
+            return;
+        }
+        if (mode === "idle" && cur.token) { await start(cur.token); return; }
+        if (cur.state === "idle" && !!cur.self !== selfOn) {   // switched on or off in config
+            selfOn = !!cur.self;
+            if (mode === "idle" || mode === "self") renderIdle();
+        }
     }
 
     async function start(token) {
@@ -711,6 +835,12 @@
 
     document.addEventListener("click", (ev) => {
         const t = ev.target.closest("button");
+        if (t && t.dataset.act === "self-swap" && mode === "self") {
+            const k = selfTyped();
+            selfMobile = !selfMobile;
+            renderSelf("", { surname: k.surname });
+            return;
+        }
         if (!t || !S && t.dataset.act !== "retry") return;
         const act = t.dataset.act;
         if (act === "continue") {
