@@ -546,17 +546,20 @@ def test_ipad_page_is_no_store_and_has_no_way_into_the_hub(client):
     assert client.get("/checkin/ipad/index.html").status_code == 404
 
 
-def test_ipad_v2_layout_contract(client):
-    """v2 (Mark, 5 Oct 2026): bands with equal tiles in 4 columns (2 when narrow),
-    None tile clears the others, follow-ups inline, the details skip button, and
-    no side-bar boxes anywhere on the iPad."""
+def test_ipad_v3_layout_contract(client):
+    """v3 (Mark, 13 Oct 2026, iPad Pro: "squashed, sentences running into a
+    second line"): the question on its own line, answers full width under it,
+    2 tiles across (1 on a phone, Yes / No stays 2), one ~820 px column, words
+    never split. Kept from v2: None tile, follow-ups inline, the details skip
+    button, no side-bar boxes."""
     js = client.get("/checkin/ipad/ipad.js").get_data(as_text=True)
     css = client.get("/checkin/ipad/ipad.css").get_data(as_text=True)
     for used in ("none_value", "follow_up", "skip_button", 'class="reveal"', "revealNew",
                  "Tap all that apply", "Tap one", 'data-act="skip"'):
         assert used in js, used
-    assert "repeat(4, minmax(0, 1fr))" in css and "repeat(2, minmax(0, 1fr))" in css
-    assert "grid-template-columns: 250px minmax(0, 1fr)" in css
+    assert "repeat(4, minmax(0, 1fr))" not in css and "250px" not in css      # no v2 squeeze
+    assert "repeat(2, minmax(0, 1fr))" in css and ".grid.yn" in css and 'class="grid yn"' in js
+    assert "max-width: 820px" in css and "overflow-wrap: anywhere" not in css
     assert ".t.none { border-style: dashed; }" in css
     assert "border-left" not in css
     for size in re.findall(r"font-size:\s*(\d+)px", css):

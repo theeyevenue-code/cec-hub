@@ -3,11 +3,14 @@
    only for the primary action and the skip-details button. No decoration, no
    side bars.
 
-   v2 layout (Mark, 5 Oct 2026, landscape iPad): each question is a BAND - the
-   question on the left (~250 px), equal answer TILES on the right in 4 straight
-   columns. Square glyph = tap several, circle = tap one, dashed = None. A
-   follow-up opens inline under its tiles. Portrait / narrow: the band stacks
-   and the tiles drop to 2 columns. */
+   v3 layout (Mark, 13 Oct 2026, after trying it on the iPad Pro: "questions
+   were squashed and hard to read, sentences running into a second line"): the
+   v2 side-by-side band (question in a 250 px column, answers in 4 columns)
+   broke both mid-phrase. Now every question reads top-down on every screen:
+   the question on its own line, the answers full width under it, 2 tiles
+   across (Yes / No always 2), 1 across on a phone. One readable column, at
+   most ~760 px wide, centred. Square glyph = tap several, circle = tap one,
+   dashed = None. A follow-up opens inline under its tiles. */
 
 :root {
     --ink: #111;
@@ -34,7 +37,7 @@ body {
 }
 
 main {
-    max-width: 1120px;
+    max-width: 820px;             /* one readable column (v3) */
     margin: 0 auto;
     padding: 28px 32px 150px;     /* bottom: room for the bar; ipad.js widens it to fit */
     padding-top: max(28px, env(safe-area-inset-top));
@@ -96,16 +99,16 @@ h1 { font-size: 32px; line-height: 1.2; font-weight: 700; margin-bottom: 12px; }
 
 .group { font-size: 23px; font-weight: 700; margin-top: 32px; }
 
-/* One question = one band: label column + answer area. */
+/* One question = one band: the question on its own line, the answers under it. */
 .band {
     display: grid;
-    grid-template-columns: 250px minmax(0, 1fr);
-    gap: 22px;
-    padding: 18px 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 22px 0;
     border-top: 1px solid var(--hair);
 }
-.band .lab { display: block; font-size: 20px; font-weight: 600; line-height: 1.3; padding-top: 6px; }
-.band .lab .hint { display: block; font-size: 16px; font-weight: 400; color: var(--muted);
+.band .lab { display: block; font-size: 22px; font-weight: 700; line-height: 1.3; }
+.band .lab .hint { display: block; font-size: 17px; font-weight: 400; color: var(--muted);
                    margin: 4px 0 0; }
 .req { font-weight: 400; color: var(--soft); font-size: 17px; }
 .body { min-width: 0; }
@@ -113,13 +116,13 @@ h1 { font-size: 32px; line-height: 1.2; font-weight: 700; margin-bottom: 12px; }
 /* Equal tiles in straight columns; text wraps inside, never overflows. */
 .grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-auto-rows: 1fr;          /* every row as tall as the tallest: equal tiles */
     gap: 12px;
 }
 .t {
     font: inherit;
-    font-size: 18px;
+    font-size: 20px;
     line-height: 1.25;
     text-align: left;
     min-width: 0;
@@ -135,7 +138,7 @@ h1 { font-size: 32px; line-height: 1.2; font-weight: 700; margin-bottom: 12px; }
     cursor: pointer;
     touch-action: manipulation;
 }
-.t span { min-width: 0; overflow-wrap: anywhere; hyphens: auto; }
+.t span { min-width: 0; overflow-wrap: break-word; hyphens: none; }   /* whole words only */
 .t .g { flex: none; width: 16px; height: 16px; border: 2px solid #666; border-radius: 3px; }
 .t.r .g { border-radius: 50%; }
 .t.none { border-style: dashed; }
@@ -234,20 +237,16 @@ input.short { max-width: 220px; }
     padding: 12px 32px;
     padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
-.bar-in { max-width: 1056px; margin: 0 auto; display: flex; gap: 14px; align-items: center; }
+.bar-in { max-width: 756px; margin: 0 auto; display: flex; gap: 14px; align-items: center; }
 .bar-in .grow { flex: 1; }
 .bar-in .primary { min-width: 200px; }
 /* The last screen's Send: the biggest thing on it (no signature since 9 Oct 2026). */
 .bar-in .primary.send { min-width: 300px; min-height: 72px; font-size: 26px; }
 
-/* --- Portrait / narrow: stack the band, 2 tiles across ----------------- */
+/* --- Narrow (iPad mini portrait and below) ------------------------------- */
 
 @media (max-width: 900px) {
     main { padding-left: 22px; padding-right: 22px; }
-    .band { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-    .band .lab { padding-top: 0; }
-    .band .lab .hint { display: inline; margin: 0 0 0 10px; }
-    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .reveal { margin-left: 16px; }
     .bar { padding-left: 22px; padding-right: 22px; }
 }
@@ -260,6 +259,9 @@ input.short { max-width: 220px; }
   .bar-in .btn { padding-left: 16px; padding-right: 16px; }
   .bar-in .primary, .bar-in .primary.send { min-width: 0; flex: 1 1 auto; }
   .date { grid-template-columns: 72px minmax(0, 1fr) 96px; gap: 8px; }
+  .grid { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; }   /* 1 across */
+  .grid.yn { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .band .lab { font-size: 21px; }
 }
 
 /* --- Self check-in (Mark, 13 Oct 2026, option A): "Check in here" ---------- */

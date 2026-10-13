@@ -610,7 +610,7 @@
                     </div>`;
             }
             case "yesno":
-                return `<div class="grid">${["Yes", "No"].map((o) => tile(q, o, v === o, false)).join("")}</div>`;
+                return `<div class="grid yn">${["Yes", "No"].map((o) => tile(q, o, v === o, false)).join("")}</div>`;
             case "choice": {
                 const opts = q.options || [];
                 const other = q.allow_other && v && !opts.includes(v);
