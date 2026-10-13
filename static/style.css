@@ -1,26 +1,34 @@
 /* CEC Hub — big text, big buttons, CEC greens, nothing scary. */
 
 :root {
-    --green: #438F73;        /* CEC primary — accents, borders, icons   */
-    --green-deep: #2e6a52;   /* darker green — buttons & links (AA text) */
-    --green-dark: #24543f;   /* hover                                     */
-    --ink: #0f2b21;          /* headings                                  */
-    --body: #22332c;         /* body text                                 */
-    --muted: #46604f;        /* secondary text (AA on white)              */
-    --mint: #e8f2ee;         /* page background                           */
-    --mint-soft: #f3f9f6;    /* row hover / done steps                    */
+    /* Readability pass (13 Oct 2026, Codex review): black on white, hairlines,
+       colour only with a meaning. Brand greens retired from the chrome. */
+    --green: #17643b;        /* meaning only: confirmed / saved / stock      */
+    --green-deep: #171717;   /* buttons & links (was brand green)           */
+    --green-dark: #000000;   /* hover                                        */
+    --ink: #171717;          /* headings                                     */
+    --body: #222222;         /* body text                                    */
+    --muted: #595959;        /* secondary text (7:1 on white)                */
+    --mint: #ffffff;         /* page background (was mint)                   */
+    --mint-soft: #f5f5f5;    /* row hover / done steps                       */
     --paper: #ffffff;
-    --line: #cfe0d8;
-    --amber-bg: #fff6df;
+    --line: #d6d6d6;
+    --line-soft: #e8e8e8;
+    --control: #8c8c8c;      /* input and quiet-button borders               */
+    --amber-bg: #fff6df;     /* meaning only: look at this / test mode       */
     --amber-line: #d9b23a;
     --amber-ink: #5d4a00;
     --info-bg: #eaf3fb;
     --info-line: #9dc0dd;
     --info-ink: #163a57;
-    --danger-ink: #a02c20;
-    --danger-bg: #fdecea;
-    --radius: 16px;
-    --shadow: 0 2px 10px rgba(15, 43, 33, 0.08);
+    --danger-ink: #a52222;   /* meaning only: needs action / deadline        */
+    --danger-bg: #fdf2f2;
+    --radius: 6px;
+    --shadow: none;
+    --font: 'Segoe UI', system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    /* the type scale: six steps, nothing under 14px */
+    --t-small: 14px; --t-body: 17px; --t-row: 18px;
+    --t-section: 22px; --t-title: 28px; --t-key: 32px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,9 +36,9 @@
 html { scroll-behavior: smooth; }
 
 body {
-    font-family: 'Work Sans', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
-    font-size: 19px;
-    line-height: 1.6;
+    font-family: var(--font);
+    font-size: 17px;
+    line-height: 1.5;
     color: var(--body);
     background: var(--mint);
     min-height: 100vh;
@@ -1712,4 +1720,420 @@ body.lens-mono main { background: #fafafa; }
     .mc-alt-btns { grid-template-columns: 1fr 1fr; }
     .mc-today-t tr { grid-template-columns: auto 1fr; }
     .mc-today-t .mc-tcheck { grid-column: 1 / -1; }
+}
+
+/* ==== Readability pass (Mark, 13 Oct 2026: "cleaner and easier to read") ===============
+   From Codex's design review; decisions in DECISIONS.md. One block, last in the file, so
+   it wins and can be reverted in one piece. Rules: black on white, hairlines not boxes,
+   no shadows, one type scale (14 / 17 / 18 / 22 / 28 / 32 px, nothing under 14),
+   controls 48px high, colour only with a meaning (red = needs action, green = confirmed,
+   amber = look at this / test mode, grey = pending). Keeps the Lens Finder's own colour
+   key and the check-in status colours (Mark's standing rules).
+   Note: tests guard everything below the Medicare marker: no left-edge accent borders
+   and no font-size under 14px anywhere in this block. */
+
+body { background: #fff; color: var(--body); }
+h1, h2, h3, .brand, .tile-name, .stat-number, .greeting, .attn-head, .todo-do,
+.mc-answer, .mc-h2, .mc-g-title, .ci-answer, .ans-word, .lens-page .page-title {
+    font-family: var(--font);
+}
+main { max-width: 1200px; padding: 20px 24px 56px; }
+:focus-visible { outline: 3px solid #171717; outline-offset: 2px; }
+a { color: var(--ink); }
+
+/* --- Top bar: white, a hairline, the picker ------------------------------------------- */
+.topbar { background: #fff; color: var(--ink); border-bottom: 1px solid var(--line); padding: 10px 24px; }
+.brand { color: var(--ink); font-size: 20px; font-weight: 700; }
+.brand-text { color: var(--ink); }
+.brand-badge, .brand-sub { display: none; }
+.who label { font-size: 14px; color: var(--muted); }
+.who select { font-size: 17px; min-height: 44px; padding: 6px 10px; border: 1px solid var(--control);
+    border-radius: 6px; color: var(--ink); }
+
+/* --- Type scale ------------------------------------------------------------------------ */
+.page-title, .sop-title { font-size: 28px; font-weight: 700; line-height: 1.25; margin: 4px 0 6px; color: var(--ink); }
+.page-sub { font-size: 17px; color: var(--muted); margin-bottom: 20px; max-width: 72ch; }
+.card h2, .sop-blocks h2, .section-title { font-size: 22px; font-weight: 700; margin: 0 0 12px; color: var(--ink); }
+.section-title { margin: 36px 0 8px; }
+.answer-line { font-size: 28px; font-weight: 700; line-height: 1.25; color: var(--ink); margin: 0 0 10px; }
+.title-count { font-size: 17px; font-weight: 500; color: var(--muted); margin-left: 8px; }
+.note { font-size: 14px; color: var(--muted); margin: 6px 0 10px; max-width: 80ch; }
+.updated-line { font-size: 14px; color: var(--muted); margin-bottom: 10px; }
+.text-red { color: var(--danger-ink); }
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.num-l { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* --- Surfaces: sections with a hairline, not boxes -------------------------------------- */
+.card { background: #fff; border: none; border-top: 1px solid var(--line); border-radius: 0;
+    box-shadow: none; padding: 20px 0 24px; margin-bottom: 8px; }
+.card p + p { margin-top: 8px; }
+.card-alert { background: var(--danger-bg); border: 1px solid #e3b4b4; border-radius: 6px; padding: 16px 20px; margin: 4px 0 16px; }
+.card-alert h2 { color: var(--danger-ink); }
+.loading-panel, .error-panel, .empty-panel { border-radius: 6px; box-shadow: none; font-size: 17px;
+    padding: 20px; border-color: var(--line); }
+.error-panel { background: var(--danger-bg); color: var(--danger-ink); }
+.error-panel small { font-size: 14px; }
+
+/* "How it works" folds: detail behind a click */
+.how { margin: 16px 0; }
+.how > summary { cursor: pointer; font-size: 17px; font-weight: 600; color: var(--ink);
+    min-height: 44px; display: flex; align-items: center; gap: 8px; list-style: none; }
+.how > summary::-webkit-details-marker { display: none; }
+.how > summary::before { content: "\25B8"; color: var(--muted); }
+.how[open] > summary::before { content: "\25BE"; }
+.how > p, .how > ol, .how > ul { font-size: 17px; max-width: 80ch; margin: 4px 0 10px; }
+.how ol, .card ol { padding-left: 24px; }
+.how ol li, .card ol li { margin: 4px 0; }
+.fold-card { border-top: 1px solid var(--line); padding-top: 4px; }
+.fold-card > summary { font-size: 18px; font-weight: 700; }
+
+/* --- Controls: 48px, 17px, one radius --------------------------------------------------- */
+.btn { font-family: var(--font); font-size: 17px; font-weight: 600; min-height: 48px; padding: 8px 18px;
+    border-radius: 6px; border: 1px solid #171717; background: #171717; color: #fff; gap: 8px; }
+.btn:hover { background: #000; border-color: #000; }
+.btn:focus-visible { outline: 3px solid #171717; outline-offset: 2px; }
+.btn-quiet { background: #fff; color: var(--ink); border-color: var(--control); }
+.btn-quiet:hover { background: #f5f5f5; color: var(--ink); border-color: #171717; }
+.btn:disabled, .btn[disabled] { background: #e8e8e8; border-color: #d6d6d6; color: var(--muted); cursor: not-allowed; }
+.btn-danger { background: var(--danger-ink); border-color: var(--danger-ink); }
+.btn-danger:hover { background: #7f1a1a; border-color: #7f1a1a; }
+/* "Home" is a link, not a slab */
+.btn.btn-back { background: none; border: none; color: var(--ink); min-height: 44px; padding: 0 2px;
+    font-size: 17px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px;
+    margin-bottom: 4px; justify-content: flex-start; }
+.btn.btn-back:hover { background: none; color: #000; }
+
+main input[type="text"], main input[type="search"], main input[type="date"], main input[type="password"],
+main input:not([type]), main select, .search-box, .todo-addbar input[type="text"], .todo-addbar select,
+.ci-find input, .ci-form, .lens-select {
+    font-family: var(--font); font-size: 17px; min-height: 48px; padding: 8px 12px;
+    border: 1px solid var(--control); border-radius: 6px; background: #fff; color: var(--ink);
+    max-width: 100%;
+}
+main input:focus, main select:focus, .search-box:focus { outline: 3px solid #171717; outline-offset: 1px;
+    border-color: #171717; box-shadow: none; }
+.search-box { margin-bottom: 16px; }
+.todo-opt { font-size: 14px; }
+.todo-opt input[type="date"] { font-size: 17px; padding: 8px 10px; }
+.rc-tick { width: 22px; height: 22px; accent-color: #171717; }
+
+/* --- Chips: words, a hairline at most --------------------------------------------------- */
+.chip { font-size: 14px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: #fff;
+    border: 1px solid var(--line); color: var(--muted); }
+.chip-on, .chip-green { background: #fff; border-color: var(--line); color: var(--ink); }
+.chip-amber { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber-ink); }
+
+/* --- Tables (.lens-table had no rule at all) ------------------------------------------- */
+.table-scroll { overflow-x: auto; border: none; border-radius: 0; -webkit-overflow-scrolling: touch; }
+.lens-table, .stock-table { width: 100%; border-collapse: collapse; font-size: 17px; margin: 6px 0 4px; }
+.lens-table th, .stock-table th { text-align: left; font-size: 14px; font-weight: 600; color: var(--muted);
+    background: #fff; padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.lens-table td, .stock-table td { padding: 10px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.lens-table tr:last-child td, .stock-table tr:last-child td { border-bottom: none; }
+.lens-table th.num, .stock-table th.num { text-align: right; }
+.lens-table td:first-child, .lens-table th:first-child,
+.stock-table td:first-child, .stock-table th:first-child { padding-left: 0; }
+
+/* --- Home: the queue, then the tools ---------------------------------------------------- */
+.home-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.home-head .page-title { margin-top: 8px; }
+.home-count { display: inline-block; min-width: 1.6em; padding: 0 8px; margin-left: 6px; border-radius: 999px;
+    background: var(--danger-ink); color: #fff; font-size: 22px; line-height: 1.5; text-align: center;
+    vertical-align: 3px; }
+.home-edit-btn { float: none; font-size: 17px; }
+.attn-table { width: 100%; border-collapse: collapse; font-size: 17px; }
+.attn-table th { text-align: left; font-size: 14px; font-weight: 600; color: var(--muted);
+    padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.attn-table th:first-child, .attn-table td:first-child { padding-left: 0; }
+.attn-table th.num { text-align: right; }
+.attn-table td { padding: 14px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.attn-area { width: 22%; }
+.attn-area a { font-size: 18px; font-weight: 700; color: var(--ink); text-decoration: none; }
+.attn-area a:hover { text-decoration: underline; }
+.attn-item + .attn-item { margin-top: 10px; }
+.attn-do { display: block; font-size: 17px; font-weight: 600; color: var(--ink); line-height: 1.35; }
+.attn-how { display: block; font-size: 14px; color: var(--muted); margin-top: 2px; }
+.attn-n { font-size: 22px; font-weight: 700; color: var(--ink); width: 1%; }
+.attn-open { width: 1%; text-align: right; }
+.attn-open .btn { min-height: 44px; }
+.attn-alert .attn-area a, .attn-alert .attn-n { color: var(--danger-ink); }
+.tool-list { list-style: none; margin: 0; padding: 0; display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; }
+.tool-row { border-top: 1px solid var(--line); padding: 12px 0 14px; display: flex; flex-direction: column; gap: 2px; }
+.tool-name { font-size: 18px; font-weight: 700; color: var(--ink); text-decoration: none; }
+.tool-name:hover { text-decoration: underline; }
+.tool-desc { font-size: 17px; color: var(--muted); }
+.tool-ext { font-size: 14px; }
+.tile-editbar { display: flex; gap: 6px; margin-top: 6px; }
+.tile-editbar button { font-size: 14px; min-height: 36px; padding: 4px 12px; border: 1px solid var(--control);
+    border-radius: 6px; background: #fff; cursor: pointer; }
+.hidden-bar { font-size: 14px; }
+
+/* system map fold at the bottom of Home */
+.sysmap { border-radius: 6px; box-shadow: none; max-width: none; margin-top: 40px; }
+.sysmap > summary { font-size: 17px; font-weight: 600; }
+.sysmap-safe { border-radius: 6px; background: #fff; border-color: var(--line); color: var(--ink); font-size: 14px; }
+.sysmap-tool { background: #fff; border-radius: 6px; }
+.sysmap-owner-row { background: #fff; color: var(--ink); border-color: var(--line); border-radius: 6px; }
+.sysmap-arrows { color: var(--muted); }
+.sysmap-tool-name { font-size: 17px; }
+.sysmap-tool-port, .sysmap-tool-owner, .sysmap-restart, .sysmap-restart code { font-size: 14px; }
+.sysmap-tool-owner b { color: var(--ink); }
+
+/* --- To-do and Credits rows: tick | text | (amount) | who | remove ---------------------- */
+.todo-addbar { gap: 10px; align-items: center; margin-bottom: 12px; }
+.todo-addbar input[type="text"] { flex: 1 1 260px; min-width: 0; }
+.credit-amount { width: 8em; flex: 0 0 auto; }
+.todo-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto 44px; gap: 4px 12px;
+    align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+.cr-row { grid-template-columns: 44px minmax(0, 1fr) auto auto 44px; }
+.todo-tick { width: 30px; height: 30px; justify-self: center; border: 2px solid var(--muted); border-radius: 4px;
+    background: #fff; color: #fff; font-size: 18px; font-weight: 700; line-height: 1; display: flex;
+    align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+.todo-tick:hover { border-color: #171717; }
+.todo-tick.is-done { background: var(--green); border-color: var(--green); }
+.todo-text { font-size: 18px; line-height: 1.4; min-width: 0; overflow-wrap: anywhere; }
+.todo-done .todo-text { text-decoration: line-through; opacity: 1; color: var(--muted); }
+.todo-meta { font-size: 14px; color: var(--muted); }
+.todo-x { font-size: 17px; color: var(--muted); min-height: 44px; min-width: 44px; padding: 0; }
+.todo-x:hover { color: var(--danger-ink); }
+.todo-empty { font-size: 17px; }
+.todo-due, .todo-repeat { font-size: 14px; background: none; padding: 0; margin-left: 10px; border-radius: 0;
+    color: var(--muted); white-space: nowrap; }
+.todo-overdue { background: none; color: var(--danger-ink); font-weight: 700; }
+.cr-line { display: block; margin-top: 2px; }
+.cr-status { font-size: 14px; color: var(--muted); margin-right: 10px; }
+.cr-arrived { color: var(--ink); font-weight: 700; }
+.cr-chase { color: var(--danger-ink); font-weight: 700; }
+.cr-amt { font-size: 18px; font-weight: 700; color: var(--ink); }
+
+/* --- Records as rows: letters, Mark's pile ----------------------------------------------- */
+.rec-list { list-style: none; margin: 6px 0 8px; padding: 0; }
+.rec-list li { font-size: 17px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); overflow-wrap: anywhere; }
+.rec-list li:last-child { border-bottom: none; }
+.details-toggle { margin: 20px 0 12px; }
+
+/* --- Recalls --------------------------------------------------------------------------- */
+.rc-pickers { display: flex; gap: 12px 20px; flex-wrap: wrap; align-items: flex-end; }
+.rc-pickers label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.rc-out { margin-top: 16px; }
+.rc-period { margin-left: 8px; }
+.rc-period select { min-height: 40px; font-size: 14px; padding: 4px 8px; }
+.msg-label { font-size: 14px; font-weight: 600; color: var(--muted); margin: 12px 0 4px; }
+.msg-sample { font-size: 17px; background: #f5f5f5; border: 1px solid var(--line-soft); border-radius: 6px;
+    padding: 10px 14px; max-width: 80ch; }
+.rc-print { margin-top: 10px; }
+.rc-check label { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 17px; margin: 14px 0 4px; }
+.rc-check input { min-width: 240px; }
+.rc-send { margin-top: 16px; padding: 14px 16px; border-radius: 6px; display: flex; gap: 8px 16px;
+    align-items: center; flex-wrap: wrap; }
+.rc-send-off { border: 1px solid var(--line); }
+.rc-send-live { border: 2px solid var(--danger-ink); }
+.rc-send .note { margin: 0; }
+.callout { background: #f5f5f5; border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; font-size: 17px; }
+
+/* --- Stock ------------------------------------------------------------------------------ */
+.approved-banner { background: #fff; border: 1px solid var(--green); color: var(--green); border-radius: 6px;
+    font-size: 17px; padding: 12px 16px; }
+.confirm-strip { background: #fff; border: 1px solid var(--control); border-radius: 6px; padding: 14px 16px; }
+.confirm-strip p { font-size: 17px; color: var(--ink); }
+.confirm-strip .btn { margin-right: 8px; }
+.status-msg { font-size: 17px; }
+.review-alert { border-color: #e3b4b4; background: var(--danger-bg); }
+.review-alert p { color: var(--danger-ink); }
+
+/* --- Google Reviews -------------------------------------------------------------------- */
+.stat-card { text-align: left; padding: 20px 0; }
+.stat-number { font-size: 32px; font-weight: 700; color: var(--ink); }
+.stat-label { font-size: 17px; }
+.stat-foot { font-size: 14px; }
+
+/* --- How-To Guides ---------------------------------------------------------------------- */
+.cat-sidebar { flex-basis: 200px; gap: 6px; }
+.cat-btn { font-size: 17px; min-height: 48px; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--control); }
+.cat-btn:hover { border-color: #171717; }
+.cat-btn.active { background: #171717; border-color: #171717; color: #fff; }
+.sop-card { border: none; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none;
+    padding: 14px 0; margin: 0; }
+.sop-card:hover .sop-card-title { text-decoration: underline; }
+.sop-card-title { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+.sop-card-summary { font-size: 17px; color: var(--muted); }
+.sop-card-meta { margin-top: 4px; gap: 12px; }
+.sop-cat { font-size: 14px; color: var(--muted); }
+.sop-confirm { font-size: 14px; font-weight: 600; color: var(--amber-ink); }
+.sop-meta { margin-bottom: 12px; }
+.tick-hint { font-size: 14px; margin-bottom: 12px; }
+.sop-blocks { max-width: 900px; }
+.sop-blocks p { font-size: 17px; line-height: 1.55; }
+.sop-blocks ul li { font-size: 17px; padding: 6px 10px 6px 28px; }
+.sop-blocks ul li::before { color: var(--muted); font-size: 22px; left: 8px; top: 0; }
+.sop-blocks code { font-size: 15px; background: #f5f5f5; }
+.sop-blocks img { border-radius: 6px; }
+.step { border: none; border-bottom: 1px solid var(--line-soft); border-radius: 0; box-shadow: none;
+    padding: 14px 4px; margin: 0; gap: 14px; background: #fff; }
+.step:hover { border-color: var(--line-soft); background: #fafafa; }
+.step-tick { flex: 0 0 32px; height: 32px; border: 2px solid var(--muted); font-size: 18px; }
+.step-number { color: var(--ink); font-size: 18px; }
+.step-text { font-size: 18px; line-height: 1.45; }
+.step.done { background: #fff; border-color: var(--line-soft); }
+.step.done .step-tick { background: var(--green); border-color: var(--green); color: #fff; }
+.mark-flag { display: block; width: fit-content; background: none; border: none; padding: 0; margin: 4px 0 0;
+    font-size: 14px; font-weight: 600; color: var(--amber-ink); border-radius: 0; }
+.branch { background: #fff; border: 1px solid var(--control); border-radius: 6px; padding: 14px 18px; margin: 10px 0 14px; }
+.branch-label { background: #171717; font-size: 14px; letter-spacing: .04em; }
+.branch-q { font-size: 18px; color: var(--ink); }
+.branch-row { font-size: 17px; }
+.branch-yesno { font-size: 14px; }
+.branch-yes, .branch-no { background: #fff; color: var(--ink); border: 1px solid var(--control); }
+.note-box { background: #f5f5f5; border: 1px solid var(--line); border-radius: 6px; color: var(--body); font-size: 17px; }
+.sop-btn { background: #171717; border-radius: 6px; min-height: 48px; font-size: 17px; padding: 8px 18px; }
+.sop-btn:hover { background: #000; }
+.sop-btn::after { font-size: 15px; }
+
+/* --- Lens Finder: same layout and colour key; text no smaller than 14px, no warning glyph */
+body.lens-mono, body.lens-mono main { background: #fff; }
+.lens-page .card { border: none; border-top: 1px solid var(--line); border-radius: 0; padding: 20px 0 24px; }
+.lens-page .btn { font-size: 17px; border-radius: 6px; }
+.lens-page .warn-note::before { content: ""; }
+.lens-page .chip-sup, .lens-page .chip-basis, .lens-page .chip-tier, .lens-page .ans-fact .k,
+.lens-page .opts-head, .lens-page .opt-type, .lens-page .opt-diff, .lens-page .opt-sell,
+.lens-page .opt-table th, .lens-page .opt-table .lens-sub, .lens-page .opt-table .cost-diff,
+.lens-page .lbl-cat, .lens-page .ans-more summary, .lens-page .colour-key, .lens-page .lf-radio span small,
+.lens-page .opt-table .warn-note, .lens-page .ans-word small, .lens-page .ans-tag, .lens-page .opt-table .c-lens .chip,
+.lens-page .sop-card-meta .chip, .lens-page .stock-table th, .lens-page .type-chip, .lib-table .unit,
+.add-tag, .code-sub, .cell-sub, .chip-sup, .chip-basis, .chip-tier, .ans-table .ans-alt-row .c-verdict small,
+.lens-page .ans-sibs, .lens-page .ans-notes, .lens-page .ans-why, .lens-page .helper-note, .lens-page .cell-sub,
+.lens-page .code-sub, .lens-page .opt-meta, .lens-page .opt-others, .lens-page .miss-item, .lens-page .rx-line {
+    font-size: 14px;
+}
+
+/* --- Check-in: keep its colour-coded chips; type to the scale --------------------------- */
+.ci-table th { font-size: 14px; }
+.ci-table { font-size: 17px; }
+.ci-chip { font-size: 14px; }
+.ci-banner { border-radius: 6px; font-size: 17px; padding: 10px 16px; }
+.ci-banner-sub { font-size: 14px; }
+.ci-slot, .ci-note, .ci-newpick { font-size: 17px; }
+.ci-muted { font-size: 14px; }
+.ci-answer { font-size: 28px; font-weight: 700; }
+.ci-box, .ci-notes, .ci-checkthese, .ci-slot-paused { border-radius: 6px; }
+.ci-fold summary { color: var(--ink); }
+
+/* --- Medicare: unchanged layout; flatter corners to match ------------------------------ */
+.mc-answer { font-size: 28px; font-weight: 700; }
+.mc-h2 { font-size: 22px; font-weight: 700; }
+.mc-g-title { font-size: 22px; font-weight: 700; }
+.mc-chip, .mc-group { border-radius: 6px; }
+
+/* --- Companion panel: the tick box needs an outline now the emoji square is gone -------- */
+.p-tick { width: 18px; height: 18px; border: 1.5px solid var(--p-line2); border-radius: 4px;
+    font-size: 14px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+    color: var(--p-accent); margin-top: 2px; }
+
+/* --- Footer ----------------------------------------------------------------------------- */
+.hub-footer { font-size: 14px; border-top: 1px solid var(--line-soft); }
+
+/* --- Phones (390px) ------------------------------------------------------------------- */
+@media (max-width: 760px) {
+    main { padding: 14px 16px 40px; }
+    .topbar { padding: 8px 16px; gap: 8px; }
+    .who label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .who select { min-width: 0; }
+    .page-title, .sop-title { font-size: 28px; }
+    .answer-line { font-size: 22px; }
+    .card { padding: 16px 0 20px; }
+
+    /* wide tables scroll inside their own box, with a cue */
+    .table-scroll:has(.rc-table, .stock-table, .opt-table)::before {
+        content: "Swipe sideways for more columns"; display: block; font-size: 14px; color: var(--muted);
+        padding: 2px 0 6px; position: sticky; left: 0; }
+    .rc-table { min-width: 640px; }
+
+    /* Home queue: each row stacks: area + count, what, open */
+    .attn-table thead { display: none; }
+    .attn-table, .attn-table tbody { display: block; }
+    .attn-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px;
+        padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .attn-table td { display: block; border: none; padding: 0; width: auto; }
+    .attn-table .attn-what, .attn-table .attn-open { grid-column: 1 / -1; }
+    .attn-table .attn-open { text-align: left; }
+    .attn-table .attn-n { grid-row: 1; grid-column: 2; }
+    .tool-list { grid-template-columns: 1fr; }
+
+    /* To-do / Credits: tick | text | remove; who (and amount) under the text */
+    .todo-row, .cr-row { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+    .todo-row .todo-text { grid-column: 2; grid-row: 1; }
+    .todo-row .todo-x { grid-column: 3; grid-row: 1; }
+    .todo-row > .todo-meta { grid-column: 2; grid-row: 2; }
+    .cr-row .cr-amt { grid-column: 2; grid-row: 2; justify-self: start; }
+    .cr-row > .todo-meta { grid-column: 2; grid-row: 3; }
+    .todo-addbar input[type="text"] { flex-basis: 100%; }
+    .todo-addbar .btn { flex: 1 1 auto; }
+    .credit-addbar select { flex: 1 1 100%; }
+
+    /* Payments: one stacked block per patient */
+    .stack-phone thead { display: none; }
+    .stack-phone, .stack-phone tbody { display: block; }
+    .stack-phone tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px;
+        padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+    .stack-phone td { display: block; border: none; padding: 0; text-align: left; }
+    .stack-phone td.num { text-align: right; }
+    .stack-phone td:nth-child(3), .stack-phone td:nth-child(4) { font-size: 14px; color: var(--muted); }
+
+    /* Check-in lists: each patient a stacked row, the button full width */
+    #ci-today .ci-table thead, #ci-found .ci-table thead { display: none; }
+    #ci-today .ci-table, #ci-today .ci-table tbody, #ci-found .ci-table, #ci-found .ci-table tbody,
+    #ci-waiting .ci-table, #ci-waiting .ci-table tbody { display: block; width: 100%; }
+    #ci-today .ci-table tr, #ci-found .ci-table tr, #ci-waiting .ci-table tr {
+        display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: center;
+        padding: 12px 0; border-bottom: 1px solid var(--line); }
+    #ci-today .ci-table td, #ci-found .ci-table td, #ci-waiting .ci-table td { display: block; border: none; padding: 0; }
+    #ci-today .ci-table td:nth-child(5), #ci-found .ci-table td:nth-child(5),
+    #ci-waiting .ci-table td:nth-child(5) { grid-column: 1 / -1; }
+    #ci-today .ci-table td:nth-child(5) .btn, #ci-found .ci-table td:nth-child(5) .btn,
+    #ci-waiting .ci-table td:nth-child(5) .btn { width: 100%; }
+    #ci-today, #ci-found, #ci-waiting .card { overflow-x: visible; }
+    .ci-find input { min-width: 0; flex: 1 1 100%; }
+    .ci-find .btn { flex: 1 1 auto; }
+
+    .rc-check input { min-width: 0; width: 100%; }
+    .cat-sidebar { gap: 6px; }
+    .cat-btn { flex: 0 1 auto; }
+}
+
+@media print {
+    .topbar, .hub-footer, .how, .btn-back { display: none !important; }
+    .step { border-bottom: 1pt solid #999; }
+}
+
+/* --- Fixes after reading the first screenshots (13 Oct 2026) ------------------------- */
+.mc-answer-sub, .mc-h2 .mc-g-sum, .lens-page .ans-word, .lens-page .ans-word small { font-family: var(--font); }
+body.lens-mono main { max-width: 1320px; }                 /* the option table fits again */
+.lens-table { width: auto; min-width: min(100%, 560px); }    /* columns sit together, not spread */
+.todo-addbar input.credit-amount { flex: 0 0 8em; width: 8em; }
+.answer-line + form, .answer-line + .updated-line + form { margin-top: 12px; }
+.tools-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;
+    margin: 36px 0 8px; }
+.tools-head .section-title { margin: 0; }
+.tools-head .home-edit-btn { min-height: 40px; font-size: 14px; padding: 4px 12px; }
+.sysmap > summary { display: block; }
+.rc-pickers label { max-width: 100%; }
+.rc-pickers select { max-width: 100%; }
+.rc-table td:nth-child(2), .rc-table td:last-child { white-space: nowrap; }
+@media (max-width: 760px) {
+    .rc-pickers label, .rc-pickers select { width: 100%; }
+    /* Lens Finder answer: lens, stock/grind, blank, cost and sell all on screen */
+    .lens-page .ans-table thead { display: none; }
+    .lens-page .ans-table, .lens-page .ans-table tbody { display: block; width: 100%; }
+    .lens-page .ans-table tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px;
+        padding: 10px 0; }
+    .lens-page .ans-table td { display: block; padding: 0; border: none; width: auto; }
+    .lens-page .ans-table td.c-lens { flex-basis: 100%; order: -1; }
+    .lens-page .ans-table td.c-blank::before { content: "Blank "; }
+    .lens-page .ans-table td.c-cost::before { content: "Cost/lens "; }
+    .lens-page .ans-table td.c-sell::before { content: "Sells/pair "; }
+    .lens-page .ans-table td.c-blank::before, .lens-page .ans-table td.c-cost::before,
+    .lens-page .ans-table td.c-sell::before { font-size: 14px; font-weight: 600; color: var(--muted); }
+    .lens-page .ans-table .chip-basis { display: inline-block; margin-left: 6px; }
+    .lens-page .lf-supplier { width: 100%; }
 }

@@ -112,10 +112,6 @@ async function renderHome() {
         view.innerHTML = errorPanel(e.message);
         return;
     }
-    const who = getStaff();
-    const hello = who ? `Hello ${esc(who)} — what do you need?`
-                      : "What do you need?";
-
     const all = data.tiles || [];
     // needs-attention tiles live in their own compact 2-across block up top
     // (2x2 when four of them); everything quiet stays in the normal grid below
@@ -125,47 +121,50 @@ async function renderHome() {
                         (attn[y.id].count - attn[x.id].count));
     const quiet = all.filter((t) => !hot.includes(t));
 
-    const hotTile = (t) => {
+    // Readability pass (13 Oct 2026): one queue of what needs a person, then a plain
+    // list of tools. Same tiles, same links, same order and edit mode as the old grid.
+    const hotRow = (t) => {
         const a = attn[t.id];
-        return `<a class="tile tile-attn${a.alert ? " tile-alert" : ""}" href="${esc(t.link)}">
-            <span class="tile-badge">${a.count > 9 ? "9+" : a.count}</span>
-            <span class="tile-icon" aria-hidden="true">${esc(t.icon)}</span>
-            <span class="tile-name">${esc(t.name)}</span>
-            <ul class="tile-attn-items">
-                ${(a.todos || []).map((td) => `<li>
-                    <span class="todo-do">${esc(td.do)}</span>
-                    <span class="todo-how">${esc(td.how)}</span>
-                </li>`).join("")}
-            </ul>
-            <span class="tile-more">open →</span>
-        </a>`;
+        return `<tr class="${a.alert ? "attn-alert" : ""}">
+            <td class="attn-area"><a href="${esc(t.link)}">${esc(t.name)}</a></td>
+            <td class="attn-what">${(a.todos || []).map((td) => `<div class="attn-item">
+                <span class="attn-do">${esc(td.do)}</span>
+                ${td.how ? `<span class="attn-how">${esc(td.how)}</span>` : ""}</div>`).join("")}</td>
+            <td class="attn-n num">${a.count > 9 ? "9+" : a.count}</td>
+            <td class="attn-open"><a class="btn btn-quiet" href="${esc(t.link)}">Open</a></td>
+        </tr>`;
     };
-    const quietTile = (t, i) => {
+    const toolRow = (t) => {
         const external = !!t.external;
-        const target = external ? ` target="_blank" rel="noopener"` : "";
+        const target = external && !homeEdit ? ` target="_blank" rel="noopener"` : "";
         const editBtns = homeEdit ? `<span class="tile-editbar">
-            <button data-move="-1" data-id="${esc(t.id)}" title="Move earlier">←</button>
-            <button data-move="1" data-id="${esc(t.id)}" title="Move later">→</button>
-            <button data-hide="${esc(t.id)}" title="Hide this tile">hide</button>
+            <button data-move="-1" data-id="${esc(t.id)}" title="Move earlier">Up</button>
+            <button data-move="1" data-id="${esc(t.id)}" title="Move later">Down</button>
+            <button data-hide="${esc(t.id)}" title="Hide this tool">Hide</button>
         </span>` : "";
-        return `<a class="tile${homeEdit ? " tile-editing" : ""}" href="${homeEdit ? "#" : esc(t.link)}"${target}>
+        return `<li class="tool-row${homeEdit ? " tool-editing" : ""}">
+            <a class="tool-name" href="${homeEdit ? "#" : esc(t.link)}"${target}>${esc(t.name)}</a>
+            <span class="tool-desc">${esc(t.description)}${external && !homeEdit
+                ? ` <span class="tool-ext">· opens in a new tab</span>` : ""}</span>
             ${editBtns}
-            <span class="tile-icon" aria-hidden="true">${esc(t.icon)}</span>
-            <span class="tile-name">${esc(t.name)}</span>
-            <span class="tile-desc">${esc(t.description)}</span>
-            ${external && !homeEdit ? `<span class="tile-external">Opens in a new tab</span>` : ""}
-        </a>`;
+        </li>`;
     };
+    const total = hot.reduce((s, t) => s + (attn[t.id].count || 0), 0);
 
     view.innerHTML = `
-        <div class="greeting">${hello}
-            <button class="btn btn-quiet home-edit-btn" id="home-edit">
-                ${homeEdit ? "✔ Done" : "✏ Edit layout"}</button>
+        <div class="home-head">
+            <h1 class="page-title">${hot.length ? `Needs attention <span class="home-count">${total}</span>` : "Nothing needs you"}</h1>
         </div>
-        ${hot.length ? `<div class="attn-head">Needs attention</div>
-            <div class="attn-grid">${hot.map(hotTile).join("")}</div>` : ""}
-        ${hot.length && quiet.length ? `<div class="attn-head attn-head-quiet">Everything else</div>` : ""}
-        <div class="tile-grid">${quiet.map(quietTile).join("")}</div>
+        ${hot.length ? `<p class="page-sub">Open a row to do the job.</p>
+            <div class="table-scroll attn-scroll"><table class="attn-table">
+                <thead><tr><th>Area</th><th>What</th><th class="num">Count</th><th></th></tr></thead>
+                <tbody>${hot.map(hotRow).join("")}</tbody></table></div>` : ""}
+        <div class="tools-head">
+            <h2 class="section-title">Tools</h2>
+            <button class="btn btn-quiet home-edit-btn" id="home-edit">
+                ${homeEdit ? "Done" : "Edit layout"}</button>
+        </div>
+        <ul class="tool-list">${quiet.map(toolRow).join("")}</ul>
         ${homeEdit && (data.hidden || []).length ? `<div class="hidden-bar">
             Hidden: ${(data.hidden || []).map((h) =>
                 `<button class="chip" data-show="${esc(h)}">${esc(h)} — show</button>`).join(" ")}
@@ -214,24 +213,23 @@ let homeEdit = false;
    each tool is owned by its own Windows Scheduled Task, not by Claude. */
 function sysMapPanel() {
     const tools = [
-        { icon: "📝", name: "Referral generator", port: "5678", owner: "CEC Referral Watchdog" },
-        { icon: "👁", name: "SightTrack",          port: "5681", owner: "CEC SightTrack Watchdog" },
-        { icon: "🧭", name: "CEC Hub (this page)",  port: "5680", owner: "CEC Hub Watchdog" },
+        { name: "Referral generator", port: "5678", owner: "CEC Referral Watchdog" },
+        { name: "SightTrack",          port: "5681", owner: "CEC SightTrack Watchdog" },
+        { name: "CEC Hub (this page)",  port: "5680", owner: "CEC Hub Watchdog" },
     ];
     const card = (t) => `<div class="sysmap-tool">
-        <span class="sysmap-tool-icon" aria-hidden="true">${t.icon}</span>
         <span class="sysmap-tool-name">${esc(t.name)}</span>
         <span class="sysmap-tool-port">port ${esc(t.port)}</span>
         <span class="sysmap-tool-owner">kept alive by<br><b>${esc(t.owner)}</b></span>
     </div>`;
     return `<details class="sysmap">
-        <summary><span class="sysmap-sum-icon">🔧</span> How the tools stay running
-            <span class="sysmap-sum-hint">— why closing Claude is safe</span></summary>
+        <summary>How the tools stay running
+            <span class="sysmap-sum-hint">· why closing Claude is safe</span></summary>
         <div class="sysmap-body">
             <div class="sysmap-owner-row">Windows Task Scheduler starts &amp; babysits each tool</div>
             <div class="sysmap-arrows" aria-hidden="true">▼&nbsp;&nbsp;&nbsp;&nbsp;▼&nbsp;&nbsp;&nbsp;&nbsp;▼</div>
             <div class="sysmap-tools">${tools.map(card).join("")}</div>
-            <div class="sysmap-safe">✓ Claude is <b>not</b> in this chain. Closing or restarting
+            <div class="sysmap-safe">Claude is <b>not</b> in this chain. Closing or restarting
                 Claude does <b>not</b> stop these tools — the Scheduled Tasks do.</div>
             <div class="sysmap-restart">
                 <b>When a tool needs a restart</b> (e.g. after new code): don't launch it from
@@ -247,6 +245,14 @@ function sysMapPanel() {
 /* --- SOP list -------------------------------------------------------------- */
 
 let sopCategory = "All";
+
+// The server cuts each summary at 140 characters, often mid-word; end it on a whole
+// word with an ellipsis instead (display only).
+function sopSummary(text) {
+    const t = String(text || "").trim();
+    if (t.length < 140) return t;
+    return t.replace(/\s+\S*$/, "").replace(/[\s,.;:—-]+$/, "") + "…";
+}
 
 async function renderSopList() {
     view.innerHTML = `<div class="loading-panel">Getting the guides…</div>`;
@@ -264,7 +270,7 @@ async function renderSopList() {
     view.innerHTML = `
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">How-To Guides</h1>
-        <p class="page-sub">Tap a guide and follow the steps. Use the search box if you know what you're after.</p>
+        <p class="page-sub">Search or choose a guide.</p>
         <div class="sops-layout">
             <nav class="cat-sidebar" aria-label="Guide categories">
                 ${cats.map((c) => `<button class="cat-btn${c === sopCategory ? " active" : ""}"
@@ -291,12 +297,10 @@ async function renderSopList() {
         resultsEl.innerHTML = visible.map((s) => `
             <a class="sop-card" href="#/sop/${esc(s.slug)}">
                 <div class="sop-card-title">${esc(s.title)}</div>
-                <div class="sop-card-summary">${esc(s.summary)}</div>
+                <div class="sop-card-summary">${esc(sopSummary(s.summary))}</div>
                 <div class="sop-card-meta">
-                    <span class="chip">${esc(s.category)}</span>
-                    ${s.updated ? `<span class="chip">Updated ${esc(s.updated)}</span>` : ""}
-                    ${s.owner ? `<span class="chip">Owner: ${esc(s.owner)}</span>` : ""}
-                    ${s.mark_count ? `<span class="chip chip-amber">Some details still being confirmed</span>` : ""}
+                    <span class="sop-cat">${esc(s.category)}</span>
+                    ${s.mark_count ? `<span class="sop-confirm">Some details still being confirmed</span>` : ""}
                 </div>
             </a>`).join("");
     }
@@ -315,7 +319,7 @@ async function renderSopList() {
                         <a class="sop-card" href="#/sop/${esc(r.slug)}">
                             <div class="sop-card-title">${esc(r.title)}</div>
                             <div class="sop-card-summary">${esc(r.snippet)}</div>
-                            <div class="sop-card-meta"><span class="chip">${esc(r.category)}</span></div>
+                            <div class="sop-card-meta"><span class="sop-cat">${esc(r.category)}</span></div>
                         </a>`).join("")
                     : `<div class="empty-panel">Nothing found for “${esc(q)}”.
                         Try a different word, or browse the categories on the left.</div>`;
@@ -397,9 +401,9 @@ async function renderSop(slug) {
                         ? `<span class="chip chip-amber">Some details still being confirmed — ask Mark if unsure</span>` : ""}
                 </div>
             </div>
-            <button class="btn btn-quiet" id="print-btn">🖨️ Print this guide</button>
+            <button class="btn btn-quiet" id="print-btn">Print guide</button>
         </div>
-        <p class="tick-hint">Tap each step as you do it. Ticks are just for you — they reset when you leave the page.</p>
+        <p class="tick-hint">Tick each step when done. Ticks reset when you leave.</p>
         <div class="sop-blocks">${(sop.blocks || []).map(blockHTML).join("")}</div>`;
 
     document.getElementById("print-btn").addEventListener("click", () => window.print());
@@ -431,7 +435,7 @@ async function renderReviews() {
     const head = `
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Google Reviews</h1>
-        <p class="page-sub">The review helper texts happy patients a link to leave us a Google review.</p>`;
+        <p class="page-sub">Review invitations texted to patients. Nothing to do unless it says so.</p>`;
 
     if (!data.connected) {
         view.innerHTML = head + `<div class="empty-panel">${esc(data.message)}</div>`;
@@ -440,7 +444,7 @@ async function renderReviews() {
     const n = data.sent_last_7_days;
     view.innerHTML = head + `
         ${data.alert ? `<div class="confirm-strip review-alert">
-            <p>⚠ ${esc(data.alert)}</p></div>` : ""}
+            <p>${esc(data.alert)}</p></div>` : ""}
         <div class="card stat-card${data.alert ? " stat-card-warn" : ""}">
             <div class="stat-number">${n == null ? "—" : esc(n)}</div>
             <div class="stat-label">review invitations sent in the last 7 days</div>
@@ -450,14 +454,14 @@ async function renderReviews() {
                 ${data.last_run ? `&nbsp; Last run ${esc(data.last_run)}${data.last_result ? ` — ${esc(data.last_result)}` : ""}` : ""}
             </div>
         </div>
-        <div class="card">
-            <h2>What this page tells you</h2>
+        <details class="how">
+            <summary>How it works</summary>
             <p>Nothing to do here day-to-day — it's just a window. If a patient mentions
             they got a review text, this is where it came from.</p>
             <p>You don't have to watch the number: if the helper stops running, gets
-            switched off, or hits errors, this page says so in amber at the top. If you
+            switched off, or hits errors, this page says so at the top. If you
             see that, tell Mark — otherwise it's working.</p>
-        </div>`;
+        </details>`;
 }
 
 /* --- Scanner (pages read live from the Second Brain clone) -------------------- */
@@ -521,8 +525,8 @@ const SUPPLIER_NAMES = {
     L4E: "Little 4 Eyes (frames)", AVIV: "Aviva Mann (frames)",
     BOLLE: "Bolle (safety eyewear)", SOS: "SOS Eyewear",
     SUN: "Sunshades (sunglasses)", CZ: "Carl Zeiss (lenses)",
-    INTAKE: "📥 To sort", HEALTH: "🩺 System check",
-    FRAMECHK: "🕶 Frame eInvoices to click", WATCHDOG: "🐕 Watchdog",
+    INTAKE: "To sort", HEALTH: "System check",
+    FRAMECHK: "Frame eInvoices to click", WATCHDOG: "Watchdog",
 };
 
 async function renderInvoices() {
@@ -537,8 +541,7 @@ async function renderInvoices() {
     const head = `
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Supplier Invoices</h1>
-        <p class="page-sub">Invoices enter Optomate by themselves overnight.
-        This page only lists the few that need a person.</p>`;
+        <p class="page-sub">Only invoices that need a person. The rest enter Optomate overnight.</p>`;
 
     if (!data.connected) {
         view.innerHTML = head + `<div class="empty-panel">${esc(data.message)}</div>`;
@@ -552,7 +555,9 @@ async function renderInvoices() {
         if (s.supplier === "FRAMECHK") {
             // "MAUIJIM: frame invoice 9116575311 (~$473.00) not in Optomate — ..."
             const m = n.match(/^([A-Z0-9]+):\s*frame invoice\s+(\S+)\s*(\(~?\$[\d,.]+\))?/);
-            frames.push(m ? `${SUPPLIER_NAMES[m[1]] || m[1]} — invoice ${m[2]} ${m[3] || ""}`.trim() : n);
+            // a row of the table (supplier | invoice | amount); an unparsed line keeps its full text
+            frames.push(m ? { sup: SUPPLIER_NAMES[m[1]] || m[1], inv: m[2],
+                              amt: (m[3] || "").replace(/[()]/g, "") } : { raw: n });
         } else {
             markPile.push(`${SUPPLIER_NAMES[s.supplier] || s.supplier}: ${n}`);
         }
@@ -560,31 +565,40 @@ async function renderInvoices() {
     const broken = data.alert && /error|hasn't|TRIAL/.test(data.alert);
 
     view.innerHTML = head + `
-        ${broken ? `<div class="card" style="border-left:6px solid #b05252">
-            <h2>🚨 Tell Mark</h2><p>${esc(data.alert)}</p></div>` : ""}
+        ${broken ? `<div class="card card-alert">
+            <h2>Tell Mark</h2><p>${esc(data.alert)}</p></div>` : ""}
         ${!frames.length && !markPile.length && !broken ? `
-        <div class="card" style="border-left:6px solid #438F73">
-            <h2>✅ Nothing to do</h2>
+        <div class="card">
+            <p class="answer-line">Nothing to do</p>
             <p>Every invoice is entered. Come back tomorrow.</p>
         </div>` : ""}
         ${frames.length ? `
         <div class="card">
-            <h2>🕶 Click ${frames.length} frame invoice${frames.length === 1 ? "" : "s"} in</h2>
-            <ol>
-                <li>Open Optomate → the <strong>ProAccounts</strong> button</li>
-                <li>Click each invoice below → choose <strong>Invoice</strong>
-                    (or <strong>Consignment Invoice</strong> for consignment) → Save</li>
-                <li>If it says <em>"item missing from eCat"</em> →
-                    press <strong>Report missing items to ProVision</strong></li>
-            </ol>
-            <ul class="plain-list">${frames.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
+            <p class="answer-line">Click ${frames.length} frame invoice${frames.length === 1 ? "" : "s"} in</p>
+            <div class="table-scroll"><table class="lens-table">
+                <thead><tr><th>Supplier</th><th>Invoice</th><th class="num">Amount</th></tr></thead>
+                <tbody>${frames.map((f) => f.raw
+                    ? `<tr><td colspan="3">${esc(f.raw)}</td></tr>`
+                    : `<tr><td><strong>${esc(f.sup)}</strong></td><td class="num-l">${esc(f.inv)}</td>
+                        <td class="num">${esc(f.amt || "—")}</td></tr>`).join("")}</tbody>
+            </table></div>
+            <details class="how">
+                <summary>How to click them in</summary>
+                <ol>
+                    <li>Open Optomate → the <strong>ProAccounts</strong> button</li>
+                    <li>Click each invoice above → choose <strong>Invoice</strong>
+                        (or <strong>Consignment Invoice</strong> for consignment) → Save</li>
+                    <li>If it says <em>"item missing from eCat"</em> →
+                        press <strong>Report missing items to ProVision</strong></li>
+                </ol>
+            </details>
         </div>` : ""}
         ${markPile.length ? `
-        <div class="card">
-            <h2>🧑‍⚕️ Mark's pile (${markPile.length}) — nothing for staff</h2>
-            <div class="log-text">${markPile.map(esc).join("\n")}</div>
-        </div>` : ""}
-        <p class="details-toggle"><button class="btn btn-quiet" id="inv-details">Show the detail (for Mark)</button></p>
+        <details class="how fold-card">
+            <summary>For Mark (${markPile.length}) · nothing for staff</summary>
+            <ul class="rec-list">${markPile.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+        </details>` : ""}
+        <p class="details-toggle"><button class="btn btn-quiet" id="inv-details">Supplier detail (for Mark)</button></p>
         <div id="inv-detail-panel" style="display:none"></div>`;
 
     document.getElementById("inv-details").addEventListener("click", () => {
@@ -594,18 +608,18 @@ async function renderInvoices() {
             .filter((s) => !NOT_SUPPLIERS.has(s.supplier)).map((s) => `<tr>
                 <td><strong>${esc(SUPPLIER_NAMES[s.supplier] || s.supplier)}</strong></td>
                 <td>${s.live ? "Entering" : "Trial only"}</td>
-                <td>${s.written} invoice${s.written === 1 ? "" : "s"}</td>
-                <td>$${s.value.toFixed(2)}</td>
+                <td class="num">${s.written}</td>
+                <td class="num">$${s.value.toFixed(2)}</td>
                 <td>${esc(s.last_run || "—")}</td>
             </tr>`).join("");
         panel.innerHTML = `<div class="card">
-            <h2>📋 Last run — each supplier</h2>
+            <h2>Last run, each supplier</h2>
             ${data.last_run ? `<div class="updated-line">Last checked ${esc(data.last_run)}</div>` : ""}
-            <table class="lens-table">
-                <thead><tr><th>Supplier</th><th>Mode</th><th>Entered</th><th>Value</th><th>Last run</th></tr></thead>
+            <div class="table-scroll"><table class="lens-table">
+                <thead><tr><th>Supplier</th><th>Mode</th><th class="num">Invoices</th><th class="num">Value</th><th>Last run</th></tr></thead>
                 <tbody>${rows}</tbody>
-            </table>
-            <p>Suppliers email invoices → the helper reads and enters them overnight,
+            </table></div>
+            <p class="note">Suppliers email invoices → the helper reads and enters them overnight,
             checks its own sums, and once a month reconciles against the suppliers'
             statements. Anything unclear lands on this page instead of being guessed.</p>
         </div>`;
@@ -627,9 +641,7 @@ async function renderFollowups() {
     const head = `
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Payment follow-ups</h1>
-        <p class="page-sub">Once a month the helper checks every recent sale against the
-        payments received. Patients whose sale is still unpaid after ${data.grace_days || 30}
-        days end up here — a short, friendly follow-up list, not a debt chase.</p>`;
+        <p class="page-sub">Mention the balance when the patient visits or collects their order.</p>`;
 
     if (!data.connected) {
         view.innerHTML = head + `<div class="empty-panel">${esc(data.message)}</div>`;
@@ -638,42 +650,44 @@ async function renderFollowups() {
 
     const chase = data.chase || [];
     const banner = data.alert
-        ? `<div class="card" style="border-left:6px solid #b8860b">
-             <h2>⚠️ Needs a look</h2><p>${esc(data.alert)}</p></div>`
+        ? `<div class="card card-alert">
+             <h2>Needs a look</h2><p>${esc(data.alert)}</p></div>`
         : (chase.length === 0
-            ? `<div class="card" style="border-left:6px solid #438F73">
-                 <h2>✅ Nothing to follow up</h2>
+            ? `<div class="card">
+                 <p class="answer-line">Nothing to follow up</p>
                  <p>Every recent sale is either paid or too new to worry about.</p></div>`
             : "");
 
     const rows = chase.map((e) => `<tr>
-        <td><strong>${esc(e.name)}</strong></td>
-        <td>$${Number(e.owed).toFixed(2)}</td>
-        <td>${esc(e.since)}</td>
-        <td>${e.days} days</td>
+        <td data-label="Patient"><strong>${esc(e.name)}</strong></td>
+        <td class="num" data-label="Owing">$${Number(e.owed).toFixed(2)}</td>
+        <td class="num-l" data-label="Sale date">${esc(e.since)}</td>
+        <td class="num" data-label="How long">${e.days} days</td>
     </tr>`).join("");
 
     view.innerHTML = head + banner + `
         ${chase.length ? `
         <div class="card">
-            <h2>💰 To follow up (${chase.length} — $${Number(data.chase_value).toFixed(2)})</h2>
+            <p class="answer-line">${chase.length} to mention · $${Number(data.chase_value).toFixed(2)}</p>
             ${data.last_run ? `<div class="updated-line">List refreshed ${esc(data.last_run)}</div>` : ""}
-            <table class="lens-table">
-                <thead><tr><th>Patient</th><th>Owing</th><th>Sale date</th><th>How long</th></tr></thead>
+            <table class="lens-table stack-phone">
+                <thead><tr><th>Patient</th><th class="num">Owing</th><th>Sale date</th><th class="num">How long</th></tr></thead>
                 <tbody>${rows}</tbody>
             </table>
-            <p>A gentle "just confirming how you'd like to settle the balance" when they're
-            next in (or when their order is collected) is all this needs.
-            <strong>If something looks wrong — e.g. you know they paid — tell Mark</strong>;
-            the payment may have been keyed against the wrong record.</p>
+            <p class="note"><strong>Looks wrong, e.g. they paid? Tell Mark.</strong> The payment may be keyed to the wrong record.</p>
         </div>` : ""}
-        <div class="card">
-            <h2>❓ What is this?</h2>
+        <details class="how">
+            <summary>How it works</summary>
+            <p>Once a month the helper checks every recent sale against the payments received.
+            Patients whose sale is still unpaid after ${data.grace_days || 30} days end up here:
+            a short, friendly follow-up list, not a debt chase. A gentle "just confirming how
+            you'd like to settle the balance" when they're next in (or when their order is
+            collected) is all this needs.</p>
             <p>Sales are entered in Optomate at the consult, but payment often happens
             later (deposits, pay-on-collection). Almost always that sorts itself out —
             this list only shows the few that didn't: ${data.fully_paid || 0} recent patients
             are fully paid, ${data.fresh_unpaid || 0} are simply not due yet.</p>
-        </div>`;
+        </details>`;
 }
 
 /* --- Specialist letters ----------------------------------------------------------- */
@@ -690,8 +704,7 @@ async function renderLetters() {
     const head = `
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Specialist letters</h1>
-        <p class="page-sub">When a specialist emails us a report about a patient, the helper
-        saves it, works out whose it is, and lists it here. You just link it into their file.</p>`;
+        <p class="page-sub">Link each letter to the patient's Optomate file.</p>`;
 
     if (!data.connected) {
         view.innerHTML = head + `<div class="empty-panel">${esc(data.message)}</div>`;
@@ -701,39 +714,42 @@ async function renderLetters() {
     const matched = data.matched || [];
     const unmatched = data.unmatched || [];
     const banner = (!matched.length && !unmatched.length)
-        ? `<div class="card" style="border-left:6px solid #438F73">
-             <h2>✅ Nothing waiting</h2><p>Every letter received has been dealt with.</p></div>`
+        ? `<div class="card">
+             <p class="answer-line">Nothing waiting</p><p>Every letter received has been dealt with.</p></div>`
         : "";
 
     view.innerHTML = head + banner + `
         ${matched.length ? `
         <div class="card">
-            <h2>📄 To link into the patient's file (${matched.length})</h2>
-            ${data.last_run ? `<div class="updated-line">Last checked ${esc(data.last_run)}</div>` : ""}
-            <p>Each file below is in <strong>C:\\CEC\\letters-inbox</strong>, already named
-            <em>Surname_First_patientnumber</em>. For each one:</p>
-            <ol>
-                <li>Open that patient in Optomate → <strong>Docs</strong> tab</li>
-                <li>Click <strong>[…]</strong> next to Document, pick the file from
-                    <strong>letters-inbox</strong>, then <strong>Add</strong></li>
-                <li>Delete the file from letters-inbox once it's linked</li>
-            </ol>
-            <div class="log-text">${matched.map((f) => esc(f)).join("\n")}</div>
+            <p class="answer-line">Link ${matched.length} letter${matched.length === 1 ? "" : "s"}</p>
+            ${data.last_run ? `<div class="updated-line">Last checked ${esc(data.last_run)} · in C:\\CEC\\letters-inbox</div>` : ""}
+            <ul class="rec-list">${matched.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
+            <details class="how">
+                <summary>How to link a letter</summary>
+                <p>Each file is in <strong>C:\\CEC\\letters-inbox</strong>, already named
+                <em>Surname_First_patientnumber</em>. For each one:</p>
+                <ol>
+                    <li>Open that patient in Optomate → <strong>Docs</strong> tab</li>
+                    <li>Click <strong>[…]</strong> next to Document, pick the file from
+                        <strong>letters-inbox</strong>, then <strong>Add</strong></li>
+                    <li>Delete the file from letters-inbox once it's linked</li>
+                </ol>
+            </details>
         </div>` : ""}
         ${unmatched.length ? `
         <div class="card">
-            <h2>❓ Couldn't tell whose these are (${unmatched.length})</h2>
-            <p>The helper couldn't confidently match a patient — open the file and check
-            the name yourself. <strong>Never guess</strong>; ask Mark if unsure.</p>
-            <div class="log-text">${unmatched.map((f) => esc(f)).join("\n")}</div>
+            <h2>Whose is it? (${unmatched.length})</h2>
+            <p>Open the file and read the name. <strong>Never guess</strong>; ask Mark if unsure.</p>
+            <ul class="rec-list">${unmatched.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
         </div>` : ""}
-        <div class="card">
-            <h2>❓ What is this?</h2>
+        <details class="how">
+            <summary>How it works</summary>
             <p>Ophthalmologists and clinics email reports about our patients to info@.
-            They used to sit in the inbox until someone found, downloaded, renamed and
-            filed them. The helper now does all of that — Optomate just needs a person
-            to do the final "Add" so the document is properly registered on the file.</p>
-        </div>`;
+            The helper saves each one, works out whose it is and lists it here. Optomate
+            just needs a person to do the final "Add" so the document is properly
+            registered on the file. When the helper can't confidently match a patient,
+            it lists the file under "Whose is it?".</p>
+        </details>`;
 }
 
 /* --- To-do list ------------------------------------------------------------------ */
@@ -763,19 +779,17 @@ async function renderTodo() {
     const done = tasks.filter((t) => t.done);
 
     const row = (t) => `<li class="todo-row${t.done ? " todo-done" : ""}" data-id="${esc(t.id)}">
-        <button class="todo-tick" data-act="toggle" title="${t.done ? "Not done after all" : "Done!"}">
-            ${t.done ? "✅" : "⬜"}</button>
+        <button class="todo-tick${t.done ? " is-done" : ""}" data-act="toggle" title="${t.done ? "Not done after all" : "Done!"}"
+            aria-label="${t.done ? "Mark not done" : "Mark done"}">${t.done ? "✓" : ""}</button>
         <span class="todo-text">${esc(t.text)}${dueChip(t)}${repeatChip(t)}</span>
         <span class="todo-meta">${esc(t.by || "")}${t.done ? " · done" : ""}</span>
-        <button class="todo-x" data-act="delete" title="Remove">✕</button>
+        <button class="todo-x" data-act="delete" title="Remove" aria-label="Remove">✕</button>
     </li>`;
 
     view.innerHTML = `
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
-        <h1 class="page-title">To-do list</h1>
-        <p class="page-sub">Shared between everyone. Add it here and it can't be forgotten —
-        open items show on the Hub's front page until someone ticks them. Give it a due date
-        or make it repeat, and it rolls over each day until it's ticked.</p>
+        <h1 class="page-title">To-do list <span class="title-count">${open.length} open</span></h1>
+        <p class="page-sub">Add a task. Tick it when done.</p>
         <div class="card">
             <form id="todo-add" class="todo-addbar">
                 <input id="todo-input" type="text" maxlength="200" autocomplete="off"
@@ -794,10 +808,16 @@ async function renderTodo() {
             <ul class="todo-list">${open.map(row).join("") ||
                 `<li class="todo-empty">Nothing to do — lovely.</li>`}</ul>
         </div>
-        ${done.length ? `<div class="card">
-            <h2>Done (${done.length})</h2>
+        ${done.length ? `<details class="how fold-card">
+            <summary>Done (${done.length})</summary>
             <ul class="todo-list">${done.slice(0, 20).map(row).join("")}</ul>
-        </div>` : ""}`;
+        </details>` : ""}
+        <details class="how">
+            <summary>How it works</summary>
+            <p>Shared between everyone. Open items show on the Hub's front page until someone
+            ticks them. Give it a due date or make it repeat, and it rolls over each day until
+            it's ticked.</p>
+        </details>`;
 
     document.getElementById("todo-add").addEventListener("submit", async (ev) => {
         ev.preventDefault();
@@ -872,7 +892,7 @@ async function panelTodo(body) {
     const open = tasks.filter((t) => !t.done);
     const done = tasks.filter((t) => t.done);
     const row = (t) => `<li class="p-row${t.done ? " p-done" : ""}" data-id="${esc(t.id)}">
-        <button class="p-tick" data-act="toggle" aria-label="${t.done ? "undo" : "done"}">${t.done ? "✅" : "⬜"}</button>
+        <button class="p-tick" data-act="toggle" aria-label="${t.done ? "undo" : "done"}">${t.done ? "✓" : ""}</button>
         <span class="p-text">${esc(t.text)}${dueChip(t)}${repeatChip(t)}</span>
         <button class="p-x" data-act="delete" aria-label="remove">✕</button>
     </li>`;
@@ -888,7 +908,7 @@ async function panelTodo(body) {
                 <button class="btn p-add-btn" type="submit">Add</button>
             </div>
         </form>
-        <ul class="p-list">${open.map(row).join("") || `<li class="p-empty">Nothing to do 🎉</li>`}</ul>
+        <ul class="p-list">${open.map(row).join("") || `<li class="p-empty">Nothing to do.</li>`}</ul>
         ${done.length ? `<details class="p-done-wrap"><summary>Done (${done.length})</summary>
             <ul class="p-list">${done.slice(0, 15).map(row).join("")}</ul></details>` : ""}`;
 
@@ -925,12 +945,12 @@ async function panelCredits(body) {
     const statusChip = (c) => {
         if (c.status === "arrived") return `<span class="p-chip p-chip-ok">✓ arrived — check statement, then tick</span>`;
         if (c.status === "possible") return `<span class="p-chip p-chip-warn">possible — check</span>`;
-        if (c.overdue) return `<span class="p-chip p-chip-crit">⚠ chase — ${c.days_open}d</span>`;
+        if (c.overdue) return `<span class="p-chip p-chip-crit">chase — ${c.days_open}d</span>`;
         if (typeof c.days_open === "number") return `<span class="p-chip">waiting ${c.days_open}d</span>`;
         return "";
     };
     const row = (c) => `<li class="p-row" data-id="${esc(c.id)}">
-        <button class="p-tick" data-act="done" title="On our statement — tick off">⬜</button>
+        <button class="p-tick" data-act="done" title="On our statement — tick off" aria-label="tick off"></button>
         <span class="p-text"><strong>${esc(sup[c.supplier] || c.supplier)}</strong> — ${esc(c.text)}
             ${Number(c.amount) ? `<span class="p-chip p-chip-amt">${money(c.amount)}</span>` : ""}
             ${statusChip(c)}</span>
@@ -946,7 +966,7 @@ async function panelCredits(body) {
                 <button class="btn p-add-btn" type="submit">Watch</button>
             </div>
         </form>
-        <ul class="p-list">${active.map(row).join("") || `<li class="p-empty">No credits outstanding 🎉</li>`}</ul>`;
+        <ul class="p-list">${active.map(row).join("") || `<li class="p-empty">No credits outstanding.</li>`}</ul>`;
 
     document.getElementById("credit-add").addEventListener("submit", async (ev) => {
         ev.preventDefault();
@@ -1040,67 +1060,63 @@ async function renderCredits() {
     const outstanding = active.reduce((s, c) => s + (Number(c.amount) || 0), 0);
     const overdueCount = active.filter((c) => c.overdue).length;
 
-    const amountChip = (c) => Number(c.amount)
-        ? `<span class="chip chip-on">${money(c.amount)}</span>` : "";
-
-    // How long it's been waiting — red + "chase" once overdue.
+    // Status line under each credit. Red = chase (needs action); everything else is
+    // neutral until it's confirmed on the statement and ticked off (Codex 13 Oct).
     const ageBadge = (c) => {
         const d = c.days_open;
-        if (c.overdue) {
-            return `<span class="chip" style="background:var(--danger-bg);border-color:var(--danger-ink);color:var(--danger-ink)"
-                >⚠ chase — waiting ${d} days</span>`;
-        }
-        if (typeof d === "number") return `<span class="chip">waiting ${d} day${d === 1 ? "" : "s"}</span>`;
-        return `<span class="chip">waiting since ${esc(c.added || "")}</span>`;
+        if (c.overdue) return `<span class="cr-status cr-chase">Chase · waiting ${d} days</span>`;
+        if (typeof d === "number") return `<span class="cr-status">Waiting ${d} day${d === 1 ? "" : "s"}</span>`;
+        return `<span class="cr-status">Waiting since ${esc(c.added || "")}</span>`;
     };
 
     const badge = (c) => c.status === "arrived"
-        ? `<span class="chip chip-green">✓ arrived${c.matched && c.matched.value ? ` — ${money(c.matched.value)}` : ""} — check your statement, then tick</span>`
+        ? `<span class="cr-status cr-arrived">Arrived${c.matched && c.matched.value ? ` · ${money(c.matched.value)}` : ""} · check your statement, then tick</span>`
         : c.status === "possible"
-            ? `<span class="chip chip-amber">possible match — check</span> ${ageBadge(c)}`
+            ? `<span class="cr-status cr-arrived">Possible match · check</span> ${ageBadge(c)}`
             : ageBadge(c);
 
-    const row = (c) => `<li class="todo-row" data-id="${esc(c.id)}">
-        <button class="todo-tick" data-act="done" title="On our statement — tick off">⬜</button>
-        <span class="todo-text"><strong>${esc(sup[c.supplier] || c.supplier)}</strong> — ${esc(c.text)}
-            ${amountChip(c)}
-            ${badge(c)}
-            ${c.matched && c.matched.cn ? `<span class="todo-meta">credit note ${esc(c.matched.cn)}</span>` : ""}
+    const row = (c) => `<li class="todo-row cr-row" data-id="${esc(c.id)}">
+        <button class="todo-tick" data-act="done" title="On our statement — tick off" aria-label="Tick off"></button>
+        <span class="todo-text"><strong>${esc(sup[c.supplier] || c.supplier)}</strong> · ${esc(c.text)}
+            <span class="cr-line">${badge(c)}${c.matched && c.matched.cn ? `<span class="cr-status">credit note ${esc(c.matched.cn)}</span>` : ""}</span>
         </span>
+        <span class="cr-amt num">${Number(c.amount) ? money(c.amount) : "—"}</span>
         <span class="todo-meta">${esc(c.by || "")}</span>
-        <button class="todo-x" data-act="delete" title="Remove">✕</button>
+        <button class="todo-x" data-act="delete" title="Remove" aria-label="Remove">✕</button>
     </li>`;
 
     view.innerHTML = `
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Credits we're owed</h1>
-        <p class="page-sub">Add it the moment you send something back. Every night the helper
-        watches Optomate for the supplier's credit — when it lands, the entry turns
-        <strong>✓ arrived</strong> by itself. Confirm it's on your statement, then tick it off.
-        Anything <strong style="color:var(--danger-ink)">⚠ chasing</strong> has been waiting over 4 weeks.</p>
+        <p class="page-sub">Add a return the moment it goes back. Tick it once the credit is on the statement.</p>
         <div class="card">
-            <div class="page-sub" style="margin-top:0">
-                <strong>${money(outstanding)}</strong> owed to us across ${active.length} credit${active.length === 1 ? "" : "s"}${overdueCount ? ` · <strong style="color:var(--danger-ink)">${overdueCount} to chase</strong>` : ""}.
-            </div>
-            <form id="credit-add" class="todo-addbar">
-                <select id="credit-sup">${Object.entries(sup).map(([k, v]) =>
+            <p class="answer-line">${money(outstanding)} owed · ${active.length} credit${active.length === 1 ? "" : "s"}${overdueCount ? ` · <span class="text-red">${overdueCount} to chase</span>` : ""}</p>
+            <form id="credit-add" class="todo-addbar credit-addbar">
+                <select id="credit-sup" aria-label="Supplier">${Object.entries(sup).map(([k, v]) =>
                     `<option value="${esc(k)}">${esc(v)}</option>`).join("")}</select>
                 <input id="credit-input" type="text" maxlength="200" autocomplete="off"
+                       aria-label="Who or what"
                        placeholder="Who / what — e.g. Mr John Smith, scratched lens returned">
                 <input id="credit-amount" type="text" inputmode="decimal" autocomplete="off"
-                       style="max-width:8em" placeholder="$ amount">
-                <button class="btn" type="submit">Watch for this credit</button>
+                       class="credit-amount" aria-label="Amount" placeholder="$ amount">
+                <button class="btn" type="submit">Add credit</button>
             </form>
             <ul class="todo-list">${active.map(row).join("") ||
                 `<li class="todo-empty">No credits outstanding.</li>`}</ul>
         </div>
-        ${settled.length ? `<div class="card">
-            <h2>Settled (${settled.length})</h2>
+        ${settled.length ? `<details class="how fold-card">
+            <summary>Settled (${settled.length})</summary>
             <ul class="todo-list">${settled.slice(0, 20).map((c) => `
-                <li class="todo-row todo-done"><span class="todo-tick">✅</span>
-                <span class="todo-text">${esc(sup[c.supplier] || c.supplier)} — ${esc(c.text)}</span>
+                <li class="todo-row todo-done"><span class="todo-tick is-done" aria-hidden="true">✓</span>
+                <span class="todo-text">${esc(sup[c.supplier] || c.supplier)} · ${esc(c.text)}</span>
                 <span class="todo-meta">${esc(c.done_date || "")}</span></li>`).join("")}</ul>
-        </div>` : ""}`;
+        </details>` : ""}
+        <details class="how">
+            <summary>How it works</summary>
+            <p>Every night the helper watches Optomate for the supplier's credit. When it lands,
+            the entry turns <strong>Arrived</strong> by itself. Confirm it's on your statement,
+            then tick it off. Anything marked <strong>Chase</strong> has been waiting over 4 weeks.</p>
+        </details>`;
 
     document.getElementById("credit-add").addEventListener("submit", async (ev) => {
         ev.preventDefault();
@@ -1138,8 +1154,7 @@ async function renderStock() {
     const head = `
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Stock Orders</h1>
-        <p class="page-sub">Suggested stock orders, one file each. Approving just flags it —
-        <strong>nothing is ordered or entered automatically.</strong></p>`;
+        <p class="page-sub">Check each list. Approving flags it for entry; <strong>it does not order stock.</strong></p>`;
 
     if (!data.connected) {
         view.innerHTML = head + `<div class="empty-panel">${esc(data.message)}</div>`;
@@ -1152,24 +1167,29 @@ async function renderStock() {
     }
 
     view.innerHTML = head + proposals.map((p, i) => {
+        // a column whose every cell is a plain number is right-aligned (layout only)
+        const isNum = (v) => /^[-+]?\d+(\.\d+)?$/.test(String(v == null ? "" : v).trim());
+        const numCol = p.error ? [] : (p.headers || []).map((_, j) =>
+            (p.rows || []).length > 0 && p.rows.every((r) => isNum(r[j])));
+        const cls = (j) => numCol[j] ? ` class="num"` : "";
         const table = p.error
             ? `<p class="status-msg error">${esc(p.error)}</p>`
             : `<div class="table-scroll"><table class="stock-table">
-                 <thead><tr>${p.headers.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>
+                 <thead><tr>${p.headers.map((h, j) => `<th${cls(j)}>${esc(h)}</th>`).join("")}</tr></thead>
                  <tbody>${p.rows.map((r) =>
-                     `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}
+                     `<tr>${r.map((c, j) => `<td${cls(j)}>${esc(c)}</td>`).join("")}</tr>`).join("")}
                  </tbody></table></div>
                ${p.truncated ? `<p class="updated-line">Showing the first rows — the full file has ${esc(p.row_count)} lines.</p>` : ""}`;
         const actions = p.approved
-            ? `<div class="approved-banner">✓ Approved — Mark/Claude will enter this into Optomate.</div>`
+            ? `<div class="approved-banner">Approved — Mark/Claude will enter this into Optomate.</div>`
             : `<div class="stock-actions">
                  <button class="btn" data-approve="${esc(p.filename)}" data-idx="${i}">
-                     ✓ Approved — mark for entry</button>
+                     Approve list</button>
                </div>
                <div id="confirm-${i}"></div>`;
         return `<div class="card">
-            <h2>${esc(p.filename)}</h2>
-            ${p.updated ? `<div class="updated-line">File date ${esc(p.updated)} · ${esc(p.row_count)} line${p.row_count === 1 ? "" : "s"}</div>` : ""}
+            <p class="answer-line">${p.approved ? "Approved" : "Awaiting review"} · ${esc(p.row_count)} line${p.row_count === 1 ? "" : "s"}</p>
+            <div class="updated-line">${esc(p.filename)}${p.updated ? ` · file date ${esc(p.updated)}` : ""}</div>
             ${table}
             ${actions}
         </div>`;
@@ -1181,8 +1201,8 @@ async function renderStock() {
             const holder = document.getElementById("confirm-" + btn.dataset.idx);
             holder.innerHTML = `<div class="confirm-strip">
                 <p>This tells Mark the list is checked and OK. Nothing is sent or ordered by itself.</p>
-                <button class="btn" data-yes="1">Yes, approve it</button>
-                <button class="btn btn-quiet" data-no="1">Go back</button>
+                <button class="btn" data-yes="1">Approve</button>
+                <button class="btn btn-quiet" data-no="1">Cancel</button>
                 <div class="status-msg" data-msg></div>
             </div>`;
             holder.querySelector("[data-no]").addEventListener("click", () => {
@@ -1239,7 +1259,8 @@ function dueChip(t) {
 }
 function repeatChip(t) {
     return t.repeat
-        ? `<span class="todo-repeat">🔁 ${esc(REPEAT_LABEL[t.repeat.kind] || "repeats")}</span>` : "";
+        ? `<span class="todo-repeat">${esc(REPEAT_LABEL[t.repeat.kind] && REPEAT_LABEL[t.repeat.kind] !== "repeats"
+            ? "repeats " + REPEAT_LABEL[t.repeat.kind] : "repeats")}</span>` : "";
 }
 
 // Supplier chip + price-basis chip, shared by the finder and the library.
@@ -1431,7 +1452,7 @@ function lensCatalogHTML(cat) {
         <div id="lens-lookup-results"></div>
         <div class="sop-card-meta" style="margin:14px 0 0">${files}</div>
         ${errors.length ? `<div class="confirm-strip"><p>Some rows couldn't be read:</p>
-            ${errors.map((e) => `<div class="warn-note">⚠ ${esc(e)}</div>`).join("")}</div>` : ""}
+            ${errors.map((e) => `<div class="warn-note">${esc(e)}</div>`).join("")}</div>` : ""}
     </div>`;
 }
 
@@ -1537,7 +1558,7 @@ function productRowHTML(p, preCoat, idx) {
 
     return `<tr data-pidx="${idx}" class="${p.preferred ? "pref-row" : ""} ${p.orderable === false ? "retired-row" : ""}">
         <td>${supplierChip(p.supplier)} <strong>${esc(p.name)}</strong>
-            ${p.preferred ? `<span class="chip chip-pref">★ we use</span>` : ""}${tierBadge(p.tier)}
+            ${p.preferred ? `<span class="chip chip-pref">we use</span>` : ""}${tierBadge(p.tier)}
             ${p.orderable === false ? `<span class="chip chip-off">not ordered any more</span>` : ""}${catWord}
             ${p.material && !/^clear$/i.test(p.material) ? `<div class="cell-sub">${esc(p.material)}</div>` : ""}
             ${p.min_fh_mm ? `<div class="cell-sub">min fitting height ${esc(p.min_fh_mm)}mm</div>` : ""}
@@ -1553,10 +1574,10 @@ function productRowHTML(p, preCoat, idx) {
 }
 
 const JOB_STATUS_CHIP = {
-    stock: `<span class="chip chip-on">✅ Stock covers it</span>`,
-    grind: `<span class="chip">🛠 Grind job</span>`,
-    check: `<span class="chip chip-amber">⚠ Worth a look</span>`,
-    none: `<span class="chip chip-amber">⚠ Outside the loaded ranges</span>`,
+    stock: `<span class="chip chip-on">Stock covers it</span>`,
+    grind: `<span class="chip">Grind job</span>`,
+    check: `<span class="chip chip-amber">Worth a look</span>`,
+    none: `<span class="chip chip-amber">Outside the loaded ranges</span>`,
     no_rx: `<span class="chip chip-off">No Rx on the job</span>`,
 };
 
@@ -1582,7 +1603,7 @@ async function renderLensJobs() {
                 .map((s) => `${s === "right" ? "R" : "L"} ${esc(c.eyes[s].rx)}`)
                 .join(" · ");
             const chosenNotes = ((c.chosen || {}).notes || []).map((n) =>
-                `<div class="warn-note">⚠ ${esc(n)}</div>`).join("");
+                `<div class="warn-note">${esc(n)}</div>`).join("");
             return `<div class="job-row">
                 <div class="job-head">
                     <strong>Job ${esc(j.job || "?")}</strong>
@@ -1899,18 +1920,10 @@ function renderRecalls() {
     view.innerHTML = `
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Recalls</h1>
-        <p class="page-sub">Everyone who would get a recall text, shown in full before
-        anything is sent. Un-tick anyone who shouldn't get one.</p>
-
-        <div class="card" style="border-left:6px solid #438F73">
-            <h2>✅ Nothing sends by itself</h2>
-            <p>Texts only go out when Mark presses the send button at the bottom —
-            and that button stays switched off until he turns sending on. Un-ticking
-            someone is remembered, so they'll be left out when the batch is sent.</p>
-        </div>
+        <p class="page-sub">Check the list. Untick anyone who shouldn't get a text; it's remembered.</p>
 
         <div class="card">
-            <div class="lens-form" style="gap:10px;flex-wrap:wrap">
+            <div class="rc-pickers">
                 <label>Due month
                     <select id="rc-month">${recallMonthOptions(thisMonth)}</select>
                 </label>
@@ -1920,16 +1933,16 @@ function renderRecalls() {
                     </select>
                 </label>
             </div>
-            <div id="rc-out" style="margin-top:12px">
+            <div id="rc-out" class="rc-out">
                 <div class="loading-panel">Working out who is due…</div>
             </div>
         </div>
 
         <div class="card">
-            <h2>📈 Did the recalls work?</h2>
-            <p style="color:#55636b;font-size:13px;margin:0 0 8px">
+            <h2>Did the recalls work?</h2>
+            <p class="note">
                 How many texted patients went on to book an appointment.
-                <label style="margin-left:8px">Period
+                <label class="rc-period">Period
                     <select id="rc-succ-months">
                         <option value="all">everything so far</option>
                         <option value="3">last 3 months</option>
@@ -1940,27 +1953,24 @@ function renderRecalls() {
         </div>
 
         <div class="card">
-            <h2>📨 What's been sent</h2>
-            <p style="color:#55636b;font-size:13px;margin:0 0 8px">Every recall text that
-            has gone out, by month — and a lookup so you can check any patient before
-            worrying about double-texting. (The system skips anyone already texted this
-            round automatically; this is that record, visible.)</p>
+            <h2>What's been sent</h2>
+            <p class="note">Every recall text sent, by month. Anyone already texted this
+            round is skipped automatically; check a patient below.</p>
             <div id="rc-history"><div class="loading-panel">Checking the send record…</div></div>
         </div>
 
         <div class="card">
-            <h2>☎️ Phone recall list</h2>
-            <p>The people due that month who were texted but still haven't booked —
-            most overdue first, grouped by family, with a box to tick off each call.
-            Prints on A4.</p>
-            <p style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <h2>Phone recall list</h2>
+            <p class="note">Texted but not booked, most overdue first, grouped by family.
+            Prints on A4 with a tick box per call.</p>
+            <p class="rc-pickers">
                 <label>Month
                     <select id="rc-chase-month">${recallMonthOptions(thisMonth)}</select>
                 </label>
-                <button class="btn" id="rc-chase-refresh">Make the list</button>
+                <button class="btn" id="rc-chase-refresh">Create list</button>
                 <a class="btn btn-quiet" id="rc-chase-open" href="/recall-chase-sheet"
-                   target="_blank">Open the last one</a>
-                <span id="rc-chase-note" style="color:#55636b;font-size:13px"></span>
+                   target="_blank">Open latest</a>
+                <span id="rc-chase-note" class="note"></span>
             </p>
         </div>`;
 
@@ -2011,7 +2021,7 @@ async function loadRecallBatch(out, quiet = false) {
     const touch = document.getElementById("rc-touch").value;
     if (!quiet) {
         out.innerHTML = `<div class="loading-panel">Working out who is due…
-            <br><span style="font-size:12px;color:#55636b">First look of the day takes
+            <br><span class="note">First look of the day takes
             up to a minute; after that it's quick.</span></div>`;
     }
     let d;
@@ -2045,13 +2055,13 @@ async function loadRecallBatch(out, quiet = false) {
         <tr data-pid="${r.pid}" class="${r.deselected ? "rc-off" : ""}"
             title="${esc(r.message)}">
             <td><input type="checkbox" class="rc-tick" data-pid="${r.pid}"
-                 ${r.deselected ? "" : "checked"}></td>
+                 aria-label="Send to ${esc(r.name)}" ${r.deselected ? "" : "checked"}></td>
             <td><strong>${esc(r.name)}</strong></td>
-            <td>${esc(r.mobile)}</td>
-            <td>${fmtD(r.last_exam)}</td>
-            <td>${fmtD(r.due)}</td>
+            <td class="num-l">${esc(r.mobile)}</td>
+            <td class="num">${fmtD(r.last_exam)}</td>
+            <td class="num">${fmtD(r.due)}</td>
             <td>${esc(r.optom || "")}</td>
-            <td>${r.household ? `👨‍👩‍👧 one text for ${r.household_size}` : ""}</td>
+            <td>${r.household ? `One text for ${r.household_size}` : ""}</td>
         </tr>`).join("");
 
     const freshness = d.data_age_seconds > 90
@@ -2059,33 +2069,28 @@ async function loadRecallBatch(out, quiet = false) {
         : " · numbers are current";
 
     out.innerHTML = `
-        <h2>${d.to_send} ${d.to_send === 1 ? "person" : "people"} · ${d.messages_to_send}
-            text message${d.messages_to_send === 1 ? "" : "s"}</h2>
+        <p class="answer-line">${d.to_send} ${d.to_send === 1 ? "person" : "people"} · ${d.messages_to_send}
+            text message${d.messages_to_send === 1 ? "" : "s"}</p>
         <div class="updated-line">${esc(d.month_label)} · reminder ${esc(d.touch)} · ${seg}${freshness}</div>
-        <p style="color:#55636b;font-size:13px;margin:4px 0 0">Hover a row to read that
-        person's exact text. Un-tick anyone who shouldn't get one — it saves itself.</p>
-        <p style="color:#55636b;font-size:13px">
+        <p class="note">Hover a row to read that person's exact text.
             ${d.due_in_month} due that month. Left out automatically:
             ${d.skipped_no_mobile} no mobile ·
             ${d.skipped_opted_out} asked for no recalls ·
             ${d.skipped_already_sent} already texted this round
             ${d.deselected ? ` · <strong>${d.deselected} un-ticked by you</strong>` : ""}</p>
-        ${sample ? `<p style="margin:6px 0 2px"><strong>The message:</strong></p>
-            <p style="font-family:Consolas,monospace;font-size:13px;background:#f6f8f9;
-               padding:8px 10px;border:1px solid #dde5e9">${esc(sample.message)}</p>` : ""}
-        ${hhSample ? `<p style="margin:6px 0 2px"><strong>Families sharing a mobile get one
-            combined text instead:</strong></p>
-            <p style="font-family:Consolas,monospace;font-size:13px;background:#f6f8f9;
-               padding:8px 10px;border:1px solid #dde5e9">${esc(hhSample.message)}</p>` : ""}
-        <table class="lens-table" style="margin-top:10px">
-            <thead><tr><th>Send?</th><th>Patient</th><th>Mobile</th><th>Last exam</th>
-            <th>Due</th><th>Optometrist</th><th></th></tr></thead>
+        ${sample ? `<p class="msg-label">The message</p>
+            <p class="msg-sample">${esc(sample.message)}</p>` : ""}
+        ${hhSample ? `<p class="msg-label">Families sharing a mobile get one combined text</p>
+            <p class="msg-sample">${esc(hhSample.message)}</p>` : ""}
+        <div class="table-scroll"><table class="lens-table rc-table">
+            <thead><tr><th>Send?</th><th>Patient</th><th>Mobile</th><th class="num">Last exam</th>
+            <th class="num">Due</th><th>Optometrist</th><th></th></tr></thead>
             <tbody>${tableRows}</tbody>
-        </table>
-        <p style="margin-top:8px">
+        </table></div>
+        <p class="rc-print">
             <a class="btn btn-quiet" target="_blank"
                href="/recall-preview/${encodeURIComponent(d.month)}/${encodeURIComponent(d.touch)}">
-               Print-friendly copy</a></p>
+               Print list</a></p>
         ${renderRecallSendArea(d)}`;
 
     wireRecallSendButton(out, d, month, touch);
@@ -2126,37 +2131,35 @@ async function loadRecallSuccess(box, months) {
         return;
     }
     const young = s.newest_batch_age_days !== null && s.newest_batch_age_days < 14
-        ? `<p style="background:#fff4e5;border-left:4px solid #b8860b;padding:8px 12px">
+        ? `<p class="callout">
              <strong>Too early to judge.</strong> The newest batch is only
              ${s.newest_batch_age_days} day${s.newest_batch_age_days === 1 ? "" : "s"} old —
              most bookings come in within a fortnight, so this figure will rise.</p>` : "";
     const timing = s.median_days !== null
-        ? `<p style="color:#55636b;font-size:13px">Typically booked
+        ? `<p class="note">Typically booked
              <strong>${s.median_days} days</strong> after the text ·
              ${s.within_7_days} within a week · ${s.within_14_days} within a fortnight.</p>`
         : "";
     const rows = s.batches.map((b) => `<tr>
         <td><strong>${esc(b.month_label)}</strong></td>
         <td>${esc(b.touch)}</td>
-        <td>${b.sent}</td>
-        <td>${b.booked}</td>
-        <td><strong>${b.pct}%</strong></td>
+        <td class="num">${b.sent}</td>
+        <td class="num">${b.booked}</td>
+        <td class="num"><strong>${b.pct}%</strong></td>
     </tr>`).join("");
     const byTouch = s.touches.map((t) =>
         `${esc(t.touch)}: <strong>${t.pct}%</strong>`).join(" &nbsp;·&nbsp; ");
 
     box.innerHTML = `
-        <p style="font-size:22px;margin:2px 0 2px">
-            <strong>${s.booked} of ${s.sent}</strong> booked
-            <span style="color:#438F73"><strong>(${s.pct}%)</strong></span></p>
+        <p class="answer-line">${s.booked} of ${s.sent} booked (${s.pct}%)</p>
         ${young}${timing}
-        <p style="color:#55636b;font-size:13px">By reminder — ${byTouch}</p>
-        <table class="lens-table" style="margin-top:6px">
-            <thead><tr><th>Due month</th><th>Reminder</th><th>Texted</th>
-            <th>Booked</th><th>Rate</th></tr></thead>
+        <p class="note">By reminder — ${byTouch}</p>
+        <div class="table-scroll"><table class="lens-table">
+            <thead><tr><th>Due month</th><th>Reminder</th><th class="num">Texted</th>
+            <th class="num">Booked</th><th class="num">Rate</th></tr></thead>
             <tbody>${rows}</tbody>
-        </table>
-        <p style="color:#55636b;font-size:12px;margin-top:8px">"Booked" = the patient has
+        </table></div>
+        <p class="note">"Booked" = the patient has
         an appointment dated on or after the day we texted them. A fair guide, not proof
         the text caused it — and it counts bookings, not attendance.</p>`;
 }
@@ -2180,19 +2183,18 @@ async function loadRecallHistory(box) {
     const batchRows = h.batches.map((b) => `<tr>
         <td><strong>${esc(b.month_label)}</strong></td>
         <td>${esc(b.touch)}</td>
-        <td>${b.people} people</td>
-        <td>${esc(b.dates.join(", "))}</td>
+        <td class="num">${b.people} people</td>
+        <td class="num-l">${esc(b.dates.join(", "))}</td>
     </tr>`).join("");
     box.innerHTML = `
-        <table class="lens-table">
-            <thead><tr><th>Due month</th><th>Reminder</th><th>Texted</th>
+        <div class="table-scroll"><table class="lens-table">
+            <thead><tr><th>Due month</th><th>Reminder</th><th class="num">Texted</th>
             <th>Sent on</th></tr></thead>
             <tbody>${batchRows}</tbody>
-        </table>
-        <p style="margin:12px 0 4px"><label><strong>Check a patient:</strong>
-            <input id="rc-hist-q" type="text" placeholder="start typing a name…"
-                   style="margin-left:6px;padding:4px 8px;min-width:220px"></label></p>
-        <div id="rc-hist-out" style="color:#55636b;font-size:13px">
+        </table></div>
+        <p class="rc-check"><label><strong>Check a patient</strong>
+            <input id="rc-hist-q" type="text" placeholder="start typing a name…"></label></p>
+        <div id="rc-hist-out" class="note">
             ${h.patients.length} texts on record.</div>`;
 
     const q = document.getElementById("rc-hist-q");
@@ -2208,14 +2210,14 @@ async function loadRecallHistory(box) {
             out2.innerHTML = `Nobody matching "${esc(s)}" has been sent a recall text.`;
             return;
         }
-        out2.innerHTML = `<table class="lens-table"><thead>
+        out2.innerHTML = `<div class="table-scroll"><table class="lens-table"><thead>
             <tr><th>Patient</th><th>Reminder</th><th>For due month</th><th>Sent</th></tr>
             </thead><tbody>` + hits.slice(0, 30).map((p) => `<tr>
                 <td><strong>${esc(p.name)}</strong></td>
                 <td>${esc(p.touch)}</td>
                 <td>${esc(p.month_label)}</td>
                 <td>${esc(p.sent)}</td>
-            </tr>`).join("") + `</tbody></table>`
+            </tr>`).join("") + `</tbody></table></div>`
             + (hits.length > 30 ? `<p>…and ${hits.length - 30} more — keep typing.</p>` : "");
     });
 }
@@ -2224,9 +2226,9 @@ function renderRecallSendArea(d) {
     const n = d.messages_to_send;
     if (!d.live_enabled) {
         return `
-        <div style="margin-top:14px;padding:12px;border:2px solid #c9d2d8;border-radius:8px">
+        <div class="rc-send rc-send-off">
             <button class="btn" disabled>Send these ${n} text messages</button>
-            <span style="font-size:13px;color:#55636b;margin-left:8px">
+            <span class="note">
                 Sending is <strong>switched off</strong>. It stays off until Mark
                 turns it on (two settings in the recall engine).</span>
         </div>`;
@@ -2238,10 +2240,9 @@ function renderRecallSendArea(d) {
         ? "First live send is a small test — check they arrive, then press again for the rest."
         : "Sends the exact list above, minus anyone un-ticked.";
     return `
-        <div style="margin-top:14px;padding:12px;border:2px solid #b3261e;border-radius:8px">
-            <button class="btn" id="rc-send"
-                style="background:#b3261e;border-color:#b3261e">${label}</button>
-            <span id="rc-send-note" style="font-size:13px;color:#55636b;margin-left:8px">
+        <div class="rc-send rc-send-live">
+            <button class="btn btn-danger" id="rc-send">${label}</button>
+            <span id="rc-send-note" class="note">
                 ${hint}</span>
         </div>`;
 }
