@@ -2965,72 +2965,138 @@ function mcFoldedHTML(g, d) {
         ${g.note ? `<p class="mc-g-note">${esc(g.note)}</p>` : ""}${mcTableHTML(rows, d)}</details>`;
 }
 
+/* Karen's worklist, grouped by claim batch (Mark, 13 Oct 2026: "the biggest barrier ... is
+   to know what to change the item into"). Matches her Optomate path: Adjust Batch -> claim
+   number -> line -> Change MBS Code. Oldest batch first; one tick per line (= Resubmitted,
+   or Written off for a write-off line, with the same confirm as before). Printable. */
+const MC_WRITE_OFF_CONFIRM = "Have you written this off in Optomate?\n\nIt moves to Written off.";
+
+function mcItemName(to) { return to === "write_off" ? "Write off" : to; }
+
+function mcBatches(rows) {
+    const by = new Map();
+    rows.forEach((i) => {
+        const k = i.claim || "-";
+        if (!by.has(k)) by.set(k, { claim: k, date: i.claim_date || "", first: i.service_date, rows: [] });
+        const b = by.get(k);
+        b.rows.push(i);
+        if (i.service_date < b.first) b.first = i.service_date;
+        if (!b.date && i.claim_date) b.date = i.claim_date;
+    });
+    const list = [...by.values()];
+    list.forEach((b) => b.rows.sort((a, c) => (a.service_date < c.service_date ? -1 : a.service_date > c.service_date ? 1 : 0)));
+    return list.sort((a, c) => ((a.date || a.first) < (c.date || c.first) ? -1 : (a.date || a.first) > (c.date || c.first) ? 1 : a.claim < c.claim ? -1 : 1));
+}
+
+function mcBatchRowHTML(i, d) {
+    const f = i.fix || { to: "same", why: "" };
+    const urgent = mcUrgent(i);
+    const to = f.to === "same" ? "same" : mcItemName(f.to);
+    const tickStatus = f.to === "write_off" ? "written_off" : "resubmitted";
+    const st = (i.status || {}).status || "";
+    const undo = d && d.is_mark && (/^accepted_/.test(st) || st === "not_eligible")
+        ? `<span class="mc-undo-one">${mcPinBtn("open", "Undo Mark's approval", true, d)}</span>` : "";
+    const more = [
+        esc(mcText(i.steps)),
+        i.flag ? `<span class="mc-red">${esc(mcText(i.flag))}</span>` : "",
+        `Resubmit by ${esc(mcDate(i.deadline)) || "—"}${mcLeft(i) ? ` (${esc(mcLeft(i))})` : ""}`,
+        i.code ? `Medicare code ${esc(i.code)}: ${esc(i.meaning)}` : esc(i.meaning),
+        i.fact ? esc(mcText(i.fact)) : "",
+    ].filter(Boolean);
+    return `<tr class="mc-bt-row${urgent ? " mc-urgent" : ""}" data-key="${esc(i.key)}" data-label="${esc(i.patient_label)}" data-status="${tickStatus}">
+        <td class="mc-tick"><input type="checkbox" class="mc-bt-tick" aria-label="Done: ${esc(i.patient_label)}"></td>
+        <td class="mc-pt"><strong>${esc(i.patient_label)}</strong></td>
+        <td class="mc-date">${esc(mcDate(i.service_date))}</td>
+        <td class="mc-chg"><span class="mc-from">${esc(i.item)}</span> → <strong class="mc-to${f.to === "write_off" ? " mc-to-off" : ""}">${esc(to)}</strong>
+            ${i.claim_note ? `<span class="mc-small mc-cn">Note: “${esc(i.claim_note)}”</span>` : ""}</td>
+        <td class="mc-num">${mcMoney(i.amount)}</td>
+        <td class="mc-why">${esc(mcText(f.why))}${urgent ? ` <span class="mc-red">· ${esc(mcLeft(i))}</span>` : ""}
+            <details class="mc-fold"><summary aria-label="Details">▸</summary>${more.map((x) => `<span class="mc-small">${x}</span>`).join("")}${undo}</details></td>
+    </tr>`;
+}
+
 function mcDoNowHTML(d) {
     const rows = (d.items || []).filter((i) => i.action_group === "do_now");
     const s = mcSum(d, ["do_now"]);
-    return `<section class="mc-now" id="mc-do_now">
-        <h2 class="mc-h2">Do now <span class="mc-g-sum">${mcPlural(s.n, "claim")} · ${mcMoney(s.amount)}</span></h2>
-        ${rows.length ? mcTableHTML(rows, d) : `<div class="empty-panel">Nothing to do. All clear.</div>`}
+    const batches = mcBatches(rows);
+    const body = batches.map((b) => {
+        const amt = b.rows.reduce((a, i) => a + (i.amount || 0), 0);
+        return `<tbody class="mc-bt-group" data-claim="${esc(b.claim)}">
+            <tr class="mc-bt-head"><th colspan="6"><span class="mc-bt-claim">${esc(b.claim)}</span>
+                <span class="mc-bt-meta">${b.date ? `Claimed ${esc(mcDate(b.date))} · ` : ""}${mcPlural(b.rows.length, "line")} · ${mcMoney(amt)}</span>
+                ${b.rows.length > 1 ? `<button class="btn btn-quiet mc-btn mc-bt-all" type="button">Tick all in ${esc(b.claim)}</button>` : ""}</th></tr>
+            ${b.rows.map((i) => mcBatchRowHTML(i, d)).join("")}</tbody>`;
+    }).join("");
+    return `<section class="mc-now mc-batch" id="mc-do_now">
+        <div class="mc-bt-top"><h2 class="mc-h2">Fix in Optomate, by batch
+            <span class="mc-g-sum">${batches.length} ${batches.length === 1 ? "batch" : "batches"} · ${mcPlural(s.n, "line")} · ${mcMoney(s.amount)}</span></h2>
+            ${rows.length ? `<button class="btn btn-quiet mc-btn" id="mc-print" type="button">Print</button>` : ""}</div>
+        <p class="mc-instr">Adjust Batch → claim number → line → Change MBS Code. Tick when Optomate confirms.</p>
+        <p class="mc-print-only">Medicare fixes by batch · printed ${esc(mcDate(new Date().toISOString().slice(0, 10)))}</p>
+        ${rows.length ? `<div class="mc-scroll"><table class="mc-table mc-bt">
+            <thead><tr><th class="mc-tick">Done</th><th>Patient</th><th>Visit</th><th>Item → Change to</th>
+            <th class="mc-num">$</th><th>Why</th></tr></thead>${body}</table></div>`
+            : `<div class="empty-panel">Nothing to do. All clear.</div>`}
     </section>`;
 }
 
-/* Codex #2 / #4: Mark's review as a compact table (stacked cards on phones). Labels say
-   where the word was, never how sure. Every item choice weighs the same. */
-function mcReviewRowHTML(i, d) {
+/* Mark's approval (Mark, 13 Oct 2026: "do it so that there's minimum input from myself").
+   ONE suggestion per line, all ticked; untick or change any line, then ONE PIN approves the
+   lot. Lines with no rule ("Mark") start unticked with nothing chosen. Nothing is ever
+   approved without his PIN; "Undo last approval" takes the whole approval back (PIN). */
+function mcApproveRowHTML(i) {
+    const s = i.suggestion || { to: "", why: "", options: [] };
     const r = i.review || {};
-    const sugs = r.suggestions || [];
     const urgent = mcUrgent(i);
-    const evidence = r.kind === "check" || r.kind === "check_short"
-        ? `<div class="mc-sug"><span class="mc-sug-item">Check eligibility</span>
-            <span class="mc-sug-why">${esc(mcText(r.check))}</span></div>`
-        : sugs.map((s) => `<div class="mc-sug">
-            <span class="mc-sug-item">${esc(s.item)} ${esc(s.name)}</span>
-            ${s.basis ? `<span class="mc-basis">${esc(s.basis)}</span>` : ""}
-            ${(s.snippets || []).map((x) => `<span class="mc-snip"><span class="mc-snip-sec">${esc(x.section)}</span>“${esc(x.text)}”</span>`).join("")}
-        </div>`).join("");
-    const facts = [
-        esc(mcText(r.why)),
-        r.minutes !== null && r.minutes !== undefined ? `Booked ${r.minutes} min` : "Booking length not on file",
-        r.age !== null && r.age !== undefined ? `Age ${r.age} at visit` : "Age not on file",
-        `${esc(i.item)} rejected, code 160 · ${mcMoney(i.amount)} · Claim ${esc(i.claim)}`,
-    ];
-    if (r.kind === "check_short") facts.push("Not with fields/OCT items (10938–10943) the same day; check before accepting");
-    const accept = (s, quiet) => mcPinBtn(`accepted_${s.item}`, `Accept ${s.item}`, quiet, d, s.claim_note);
-    let btns;
-    if (r.kind === "check") {
-        /* No evidence: Not eligible leads; accepting another item takes a deliberate extra step. */
-        btns = `<div class="mc-wide">${mcPinBtn("not_eligible", "Not eligible", false, d)}</div>`
-            + `<details class="mc-alt"><summary class="btn btn-quiet mc-btn">Another item…</summary>
-                <p class="mc-alt-note">Only if the full notes from that day show new symptoms or a progressive condition.</p>
-                <div class="mc-alt-btns">${sugs.map((s) => accept(s, true)).join("")}</div></details>`;
-    } else {
-        /* Evidence (unchanged), or a short booking (10916 only: the others need over 15 min). */
-        btns = sugs.map((s) => accept(s, false)).join("") + mcPinBtn("not_eligible", "Not eligible", true, d);
-    }
-    return `<tr class="${urgent ? "mc-urgent" : ""}" data-key="${esc(i.key)}" data-label="${esc(i.patient_label)}">
-        <td class="mc-rv-pt"><strong>${esc(i.patient_label)}</strong>
-            <span class="mc-small">Seen ${esc(mcDate(i.service_date))}</span>
-            <span class="mc-small${urgent ? " mc-red" : ""}">Resubmit by ${esc(mcDate(i.deadline))}</span></td>
-        <td class="mc-rv-ev">${evidence}
-            <details class="mc-more"><summary>Details</summary>${facts.map((x) => `<span class="mc-small">${x}</span>`).join("")}</details></td>
-        <td class="mc-rv-act"><div class="mc-rv-btns">${btns}</div></td>
+    const opts = (s.options || []).map((o) =>
+        `<option value="${esc(o)}"${o === s.to ? " selected" : ""}>${esc(mcItemName(o))}</option>`).join("");
+    const pick = `<select class="mc-ap-to" aria-label="Change ${esc(i.item)} to">${s.to ? "" : `<option value="" selected>Choose…</option>`}${opts}</select>`;
+    const snips = [];
+    (r.suggestions || []).forEach((x) => (x.snippets || []).forEach((sn) =>
+        snips.push(`<span class="mc-snip"><span class="mc-snip-sec">${esc(sn.section)}</span>“${esc(sn.text)}”</span>`)));
+    const more = [
+        ...snips,
+        r.why ? esc(mcText(r.why)) : (i.fact ? esc(mcText(i.fact)) : ""),
+        r.minutes !== null && r.minutes !== undefined ? `Booked ${r.minutes} min` : "",
+        r.age !== null && r.age !== undefined ? `Age ${r.age} at visit` : "",
+        `${i.code ? `Code ${esc(i.code)}: ${esc(i.meaning)}` : esc(i.meaning)} · Claim ${esc(i.claim)}`,
+        `Resubmit by ${esc(mcDate(i.deadline)) || "—"}`,
+        (s.options || []).includes("10916") ? "10916: not with fields/OCT items (10938–10943) the same day; check before approving" : "",
+    ].filter(Boolean);
+    return `<tr class="mc-ap-row${urgent ? " mc-urgent" : ""}" data-key="${esc(i.key)}">
+        <td class="mc-tick"><input type="checkbox" class="mc-ap-tick" aria-label="Approve ${esc(i.patient_label)}"${s.to ? " checked" : ""}></td>
+        <td class="mc-pt"><strong>${esc(i.patient_label)}</strong></td>
+        <td class="mc-date">${esc(mcDate(i.service_date))}</td>
+        <td class="mc-chg"><span class="mc-from">${esc(i.item)}</span> → ${pick}</td>
+        <td class="mc-num">${mcMoney(i.amount)}</td>
+        <td class="mc-why">${s.to ? "" : `<strong class="mc-flagmark">Mark:</strong> `}${esc(mcText(s.why))}${urgent ? ` <span class="mc-red">· ${esc(mcLeft(i))}</span>` : ""}
+            <details class="mc-fold"><summary aria-label="Details">▸</summary>${more.map((x) => `<span class="mc-small">${x}</span>`).join("")}</details></td>
     </tr>`;
 }
 
 function mcReviewHTML(d) {
     if (!d.is_mark) return "";
-    const rows = (d.items || []).filter((i) => i.action_group === "review");
-    if (!rows.length) return "";
+    const rows = (d.items || []).filter((i) => i.action_group === "review" && i.suggestion);
+    const last = d.last_approval;
+    const undo = last && last.undoable
+        ? `<button class="btn btn-quiet mc-btn" id="mc-undo-approval" type="button" data-batch="${esc(last.id)}"${d.pin_set ? "" : " disabled"}>Undo last approval (${mcPlural(last.undoable, "line")})</button>`
+        : "";
+    if (!rows.length) {
+        return undo ? `<section class="mc-review" id="mc-review"><div class="mc-ap-bar">${undo}</div></section>` : "";
+    }
+    const amt = rows.reduce((a, i) => a + (i.amount || 0), 0);
     const pin = d.pin_set ? ""
         : `<p class="mc-pin-needed">Mark: set your PIN at the server (one-off)
             <span class="mc-small">In the agent folder: python -m medicare.pin set</span></p>`;
     return `<section class="mc-review" id="mc-review">
-        <h2 class="mc-h2">Mark: review ${mcPlural(rows.length, "claim")} <span class="mc-g-sum">Mark's review</span></h2>
-        <p class="mc-instr">Confirm eligibility against the full notes from that day.</p>
+        <h2 class="mc-h2">Mark: approve ${mcPlural(rows.length, "suggestion")} <span class="mc-g-sum">${mcMoney(amt)}</span></h2>
+        <p class="mc-instr">Untick or change any line, then approve once with your PIN.</p>
         ${pin}
-        <div class="mc-scroll"><table class="mc-table mc-rv-t">
-            <thead><tr><th>Patient</th><th>Possible item + evidence</th><th>Decision</th></tr></thead>
-            <tbody>${rows.map((i) => mcReviewRowHTML(i, d)).join("")}</tbody></table></div>
+        <div class="mc-scroll"><table class="mc-table mc-ap-t">
+            <thead><tr><th class="mc-tick"><input type="checkbox" id="mc-ap-all" aria-label="Tick every line"></th>
+            <th>Patient</th><th>Visit</th><th>Item → Change to</th><th class="mc-num">$</th><th>Why</th></tr></thead>
+            <tbody>${rows.map(mcApproveRowHTML).join("")}</tbody></table></div>
+        <div class="mc-ap-bar"><button class="btn mc-btn" id="mc-approve" type="button"${d.pin_set ? "" : " disabled"}>Approve</button>${undo}</div>
     </section>`;
 }
 
@@ -3180,6 +3246,106 @@ async function renderMedicare() {
         }
         renderMedicare();
     }));
+    mcBindApprove(d);
+    mcBindBatch();
+}
+
+/* Mark's approval table: ticks, item changes, one PIN for the lot. */
+function mcBindApprove(d) {
+    const box = document.getElementById("mc-review");
+    if (!box) return;
+    const rows = () => [...box.querySelectorAll("tr.mc-ap-row")];
+    const btn = document.getElementById("mc-approve");
+    const all = document.getElementById("mc-ap-all");
+    const ticked = () => rows().filter((r) => r.querySelector(".mc-ap-tick").checked && r.querySelector(".mc-ap-to").value);
+    const refresh = () => {
+        const n = ticked().length;
+        if (btn) { btn.textContent = n ? `Approve ${mcPlural(n, "line")}` : "Approve"; btn.disabled = !n || !d.pin_set; }
+        if (all) all.checked = n > 0 && n === rows().length;
+    };
+    rows().forEach((r) => {
+        const tick = r.querySelector(".mc-ap-tick");
+        const sel = r.querySelector(".mc-ap-to");
+        sel.addEventListener("change", () => { if (sel.value) tick.checked = true; r.classList.add("mc-changed"); refresh(); });
+        tick.addEventListener("change", () => {
+            if (tick.checked && !sel.value) { tick.checked = false; sel.focus(); alert("Choose the item first."); }
+            refresh();
+        });
+    });
+    if (all) all.addEventListener("change", () => {
+        rows().forEach((r) => { r.querySelector(".mc-ap-tick").checked = all.checked && !!r.querySelector(".mc-ap-to").value; });
+        refresh();
+    });
+    refresh();
+    if (btn) btn.addEventListener("click", async () => {
+        if (!getStaff()) { alert("Pick your name at the top first."); return; }
+        const lines = ticked().map((r) => ({ key: r.dataset.key, to: r.querySelector(".mc-ap-to").value }));
+        if (!lines.length) return;
+        const count = {};
+        lines.forEach((l) => { const k = mcItemName(l.to); count[k] = (count[k] || 0) + 1; });
+        const parts = Object.keys(count).map((k) => `${count[k]} → ${k}`).join(", ");
+        const left = rows().length - lines.length;
+        const title = `Approve ${mcPlural(lines.length, "line")} (${parts})? Karen then fixes them in Optomate.`
+            + (left ? ` ${left} unticked stay here.` : "");
+        const saved = await mcAskPin(title, async (pin) => {
+            try { await postJSON("/api/medicare/approve", { pin, lines }); return true; }
+            catch (e) { return e.message; }
+        });
+        if (saved) renderMedicare();
+    });
+    const undo = document.getElementById("mc-undo-approval");
+    if (undo) undo.addEventListener("click", async () => {
+        if (!getStaff()) { alert("Pick your name at the top first."); return; }
+        const saved = await mcAskPin(`${undo.textContent.trim()}? Those lines come back here for you.`, async (pin) => {
+            try { await postJSON("/api/medicare/undo-approval", { pin, batch: undo.dataset.batch }); return true; }
+            catch (e) { return e.message; }
+        });
+        if (saved) renderMedicare();
+    });
+}
+
+/* Karen's batch worklist: one tick per line, "tick all in this batch", Print. */
+function mcBindBatch() {
+    const box = document.getElementById("mc-do_now");
+    if (!box) return;
+    const confirmFor = (status, n) => status === "written_off"
+        ? (n > 1 ? `Have you written off all ${n} in Optomate?\n\nThey move to Written off.` : MC_WRITE_OFF_CONFIRM)
+        : (n > 1 ? `Has Optomate confirmed the resubmission of all ${n}?\n\nPress OK only after Optomate shows the claim was sent. They move to Waiting for payment.`
+            : MC_RESUBMIT_CONFIRM);
+    box.querySelectorAll(".mc-bt-tick").forEach((t) => t.addEventListener("change", async () => {
+        const row = t.closest("tr");
+        if (!t.checked) return;
+        if (!getStaff()) { t.checked = false; alert("Pick your name at the top first."); return; }
+        if (!confirm(confirmFor(row.dataset.status, 1))) { t.checked = false; return; }
+        t.disabled = true;
+        try { await postJSON("/api/medicare/mark", { key: row.dataset.key, status: row.dataset.status }); }
+        catch (e) { alert(e.message); }
+        renderMedicare();
+    }));
+    box.querySelectorAll(".mc-bt-all").forEach((b) => b.addEventListener("click", async () => {
+        if (!getStaff()) { alert("Pick your name at the top first."); return; }
+        const group = b.closest("tbody");
+        const rows = [...group.querySelectorAll("tr.mc-bt-row")];
+        const byStatus = {};
+        rows.forEach((r) => { (byStatus[r.dataset.status] = byStatus[r.dataset.status] || []).push(r.dataset.key); });
+        const statuses = Object.keys(byStatus);
+        const msg = statuses.length === 1 ? confirmFor(statuses[0], rows.length)
+            : `Tick all ${rows.length} in ${group.dataset.claim}?\n\n${(byStatus.resubmitted || []).length} resubmitted (Optomate confirmed), ${(byStatus.written_off || []).length} written off in Optomate.`;
+        if (!confirm(msg)) return;
+        b.disabled = true;
+        b.textContent = "Saving…";
+        try {
+            for (const s of statuses) await postJSON("/api/medicare/mark-many", { keys: byStatus[s], status: s });
+        } catch (e) { alert(e.message); }
+        renderMedicare();
+    }));
+    const pr = document.getElementById("mc-print");
+    if (pr) pr.addEventListener("click", () => {
+        document.body.classList.add("mc-print-batch");
+        const done = () => { document.body.classList.remove("mc-print-batch"); window.removeEventListener("afterprint", done); };
+        window.addEventListener("afterprint", done);
+        window.print();
+    });
 }
 
 /* --- Go ---------------------------------------------------------------------------- */

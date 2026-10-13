@@ -37,13 +37,20 @@ from pathlib import Path
 
 TIMEOUT_S = 60
 KEY_RE = re.compile(r"^[0-9a-f]{12}$")
-ACCEPT_ITEMS = ("10913", "10914", "10915", "10916")   # 10916: short bookings only
+ACCEPT_ITEMS = ("10913", "10914", "10915", "10916", "10918")   # 10916 short bookings; 10918 the minimum
 STAFF_STATUSES = ("done", "resubmitted", "written_off", "open")
 MARK_STATUSES = ("not_eligible",) + tuple(f"accepted_{i}" for i in ACCEPT_ITEMS)
 LANES = ("review", "do_now", "mark", "waiting", "written_off", "expired", "recovered")
 ITEM_KEYS = ("key", "service_date", "deadline", "days_left", "patient_label", "item",
              "amount", "code", "meaning", "action_group", "steps", "fact", "claim", "flag",
-             "item_change", "claim_note")
+             "item_change", "claim_note", "claim_date")
+WRITE_OFF = "write_off"
+PICKS = ACCEPT_ITEMS + (WRITE_OFF,)
+CLAIM_RE = re.compile(r"^[\w-]{1,20}$")
+BATCH_RE = re.compile(r"^B\d{14}(-\d+)?$")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+ITEM_RE = re.compile(r"^\d{5}$")          # any MBS item, e.g. 10910 -> 10911 for an age fix
+MAX_PICKS = 300
 BASIS = ("Finding noted", "History only", "Symptom noted")
 PIN_RE = re.compile(r"^\d{4}$")
 CLAIM_NOTE_RE = re.compile(r"^[\w ,:/+'-]{1,80}$")
@@ -162,6 +169,22 @@ def clean_item(i: dict, mark_view: bool = False) -> dict | None:
     out["status"] = ({"status": str(s.get("status") or ""), "by": str(s.get("by") or "")[:40],
                       "at": str(s.get("at") or "")[:19]} if s else None)
     out["review"] = clean_review(i.get("review"), mark_view) if out["action_group"] == "review" else None
+    out["claim_date"] = str(out["claim_date"] or "")[:10]
+    if not DATE_RE.match(out["claim_date"]):
+        out["claim_date"] = ""
+    out["claim"] = out["claim"][:20]
+    f = i.get("fix") if isinstance(i.get("fix"), dict) else None
+    to = str((f or {}).get("to") or "")
+    out["fix"] = ({"to": to, "why": _s(f.get("why"), 60)}
+                  if f and out["action_group"] == "do_now"
+                  and (to in ("same", WRITE_OFF) or ITEM_RE.match(to)) else None)
+    s = i.get("suggestion") if isinstance(i.get("suggestion"), dict) else None
+    out["suggestion"] = None
+    if mark_view and s and out["action_group"] == "review":
+        opts = [o for o in (s.get("options") or []) if o in PICKS]
+        sto = str(s.get("to") or "")
+        out["suggestion"] = {"to": sto if sto in opts else "", "why": _s(s.get("why"), 60),
+                             "options": opts}
     return out
 
 
@@ -212,7 +235,81 @@ def worklist(cfg: dict, fixture: bool = False, mark_view: bool = False) -> dict:
         "today": clean_today(data.get("today")),
         "today_error": _s(data.get("today_error"), 80),
         "pin_set": bool(data.get("pin_set")),
+        "last_approval": _clean_batch(data.get("last_approval")) if mark_view else None,
     }
+
+
+def _clean_batch(b):
+    if not isinstance(b, dict) or not BATCH_RE.match(str(b.get("id") or "")):
+        return None
+    return {"id": str(b["id"]), "by": _s(b.get("by"), 40), "at": _s(b.get("at"), 19),
+            "n": _int_or_none(b.get("n")) or 0, "undoable": _int_or_none(b.get("undoable")) or 0}
+
+
+def _who(by) -> str:
+    return re.sub(r"[^\w .'\-]", "", str(by or "")).strip()[:40]
+
+
+def approve(cfg: dict, picks, by: str, fixture: bool = False, pin: str = "") -> dict:
+    """Mark's "Approve all suggestions" (13 Oct 2026): ONE PIN for every ticked line.
+    picks: [{"key", "to"}]. The agent re-checks each line against today's worklist and
+    saves all or none; the PIN goes on stdin, never on a command line, never logged."""
+    by = _who(by)
+    if not is_mark(by):
+        return {"ok": False, "error": "Only Mark can decide the item."}
+    pin = str(pin or "").strip()
+    if not PIN_RE.match(pin):
+        return {"ok": False, "error": "Enter your 4-digit PIN.", "pin": True}
+    if not isinstance(picks, list) or not picks:
+        return {"ok": False, "error": "Nothing ticked."}
+    clean = []
+    for p in picks[:MAX_PICKS + 1]:
+        if not isinstance(p, dict) or not KEY_RE.match(str(p.get("key") or "")) \
+                or str(p.get("to") or "") not in PICKS:
+            return {"ok": False, "error": "Unknown item."}
+        clean.append({"key": str(p["key"]), "to": str(p["to"])})
+    if len(clean) > MAX_PICKS:
+        return {"ok": False, "error": "Too many lines at once."}
+    data, err = _run(cfg, ["--approve", "--by", by], fixture,
+                     stdin=pin + "\n" + json.dumps(clean) + "\n")
+    if err:
+        return {"ok": False, "error": err.get("error") or err.get("message") or "Couldn't save."}
+    return {"ok": True, "n": _int_or_none(data.get("n")) or 0}
+
+
+def undo_approval(cfg: dict, batch: str, by: str, fixture: bool = False, pin: str = "") -> dict:
+    by = _who(by)
+    if not is_mark(by):
+        return {"ok": False, "error": "Only Mark can decide the item."}
+    pin = str(pin or "").strip()
+    if not PIN_RE.match(pin):
+        return {"ok": False, "error": "Enter your 4-digit PIN.", "pin": True}
+    batch = str(batch or "").strip()
+    if not BATCH_RE.match(batch):
+        return {"ok": False, "error": "Unknown approval."}
+    data, err = _run(cfg, ["--undo-approval", batch, "--by", by], fixture, stdin=pin + "\n")
+    if err:
+        return {"ok": False, "error": err.get("error") or err.get("message") or "Couldn't save."}
+    return {"ok": True, "undone": _int_or_none(data.get("undone")) or 0,
+            "kept": _int_or_none(data.get("kept")) or 0}
+
+
+def mark_many(cfg: dict, keys, status: str, by: str, fixture: bool = False) -> dict:
+    """Karen's "tick all in this batch". Staff ticks only."""
+    by = _who(by)
+    if not by:
+        return {"ok": False, "error": "Pick your name at the top first."}
+    status = str(status or "").strip().lower()
+    if status not in ("resubmitted", "written_off"):
+        return {"ok": False, "error": "Unknown action."}
+    if not isinstance(keys, list) or not keys or len(keys) > MAX_PICKS \
+            or not all(KEY_RE.match(str(k or "")) for k in keys):
+        return {"ok": False, "error": "Unknown item."}
+    data, err = _run(cfg, ["--mark-many", status, "--by", by], fixture,
+                     stdin=json.dumps([str(k) for k in keys]) + "\n")
+    if err:
+        return {"ok": False, "error": err.get("error") or err.get("message") or "Couldn't save."}
+    return {"ok": True, "n": _int_or_none(data.get("n")) or 0, "status": status}
 
 
 def mark(cfg: dict, key: str, status: str, by: str, fixture: bool = False,

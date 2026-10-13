@@ -565,6 +565,51 @@ def medicare_mark():
     return resp, (200 if result.get("ok") else 400)
 
 
+@app.route("/api/medicare/approve", methods=["POST"])
+def medicare_approve():
+    """Mark's "Approve all suggestions": one PIN for the ticked lines (Mark, 13 Oct 2026).
+    Body {pin, lines: [{key, to}]}. The PIN goes to the agent on stdin; never logged."""
+    from hub import medicare
+    data = request.get_json(silent=True) or {}
+    who = (request.cookies.get("hub_staff") or "").strip()
+    result = medicare.approve(_integrations(), data.get("lines"), who, _medicare_fixture(),
+                              pin=str(data.get("pin") or ""))
+    if result.get("ok"):
+        logger.info(f"Medicare: {result['n']} suggestions approved by {who[:60]}")
+    resp = jsonify(result)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp, (200 if result.get("ok") else 400)
+
+
+@app.route("/api/medicare/undo-approval", methods=["POST"])
+def medicare_undo_approval():
+    from hub import medicare
+    data = request.get_json(silent=True) or {}
+    who = (request.cookies.get("hub_staff") or "").strip()
+    result = medicare.undo_approval(_integrations(), str(data.get("batch") or ""), who,
+                                    _medicare_fixture(), pin=str(data.get("pin") or ""))
+    if result.get("ok"):
+        logger.info(f"Medicare: approval undone ({result['undone']} lines) by {who[:60]}")
+    resp = jsonify(result)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp, (200 if result.get("ok") else 400)
+
+
+@app.route("/api/medicare/mark-many", methods=["POST"])
+def medicare_mark_many():
+    """Karen's "tick all in this batch": resubmitted / written_off on several lines."""
+    from hub import medicare
+    data = request.get_json(silent=True) or {}
+    who = (request.cookies.get("hub_staff") or "").strip()
+    result = medicare.mark_many(_integrations(), data.get("keys"), str(data.get("status") or ""),
+                                who, _medicare_fixture())
+    if result.get("ok"):
+        logger.info(f"Medicare: {result['n']} items marked {result['status']} by {who[:60]}")
+    resp = jsonify(result)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp, (200 if result.get("ok") else 400)
+
+
 @app.route("/api/attention")
 def attention():
     return jsonify(integrations.attention_summary(_integrations()))

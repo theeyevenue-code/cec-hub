@@ -199,23 +199,13 @@ def test_short_booking_review_offers_10916_and_it_can_be_accepted(agent, calls):
 
 def test_10916_row_details_carry_the_same_day_caution():
     js = open("static/app.js", encoding="utf-8").read()
-    i = js.index('if (r.kind === "check_short") facts.push(')
-    assert "Not with fields/OCT items (10938–10943) the same day; check before accepting" in js[i:i + 200]
-
-
-def test_no_evidence_rows_lead_with_not_eligible():
-    js = open("static/app.js", encoding="utf-8").read()
-    assert 'r.kind === "check"' in js and "Another item…" in js
-    assert "Only if the full notes from that day show new symptoms or a progressive condition." in js
-    i = js.index('if (r.kind === "check") {')
-    block = js[i:js.index("} else {", i)]
-    assert block.index('"Not eligible", false') < block.index("Another item")   # primary first
-    assert "accept(s, true)" in block                                          # alternatives secondary
+    i = js.index('(s.options || []).includes("10916")')
+    assert "not with fields/OCT items (10938–10943) the same day; check before approving" in js[i:i + 200]
 
 
 def test_review_whitelist_trims_and_drops_odd_items():
     raw = dict(REVIEW["review"], suggestions=[
-        {"item": "10918", "name": "x", "snippets": []},
+        {"item": "10920", "name": "x", "snippets": []},
         {"item": "10913", "name": "n", "basis": "Very sure", "claim_note": "x; <script>",
          "snippets": [{"section": "Complaint", "text": "x" * 500}] * 4}])
     r = M.clean_review(raw, True)
@@ -252,7 +242,7 @@ def test_pin_set_flag_passes_through(agent, monkeypatch):
 def test_accept_and_not_eligible_are_mark_only_with_a_pin(agent, calls):
     assert M.mark(agent, "0123456789ab", "accepted_10914", "Karen", pin="2468")["error"] == "Only Mark can decide the item."
     assert M.mark(agent, "0123456789ab", "not_eligible", "Angie", pin="2468")["ok"] is False
-    assert M.mark(agent, "0123456789ab", "accepted_10918", "Mark", pin="2468")["ok"] is False
+    assert M.mark(agent, "0123456789ab", "accepted_10920", "Mark", pin="2468")["ok"] is False
     assert M.mark(agent, "0123456789ab", "accepted_10914", "Mark")["error"] == "Enter your 4-digit PIN."
     assert M.mark(agent, "0123456789ab", "accepted_10914", "Mark", pin="12a4")["ok"] is False
     assert M.mark(agent, "0123456789ab", "open", "Karen", pin="2468")["ok"] is False   # a PIN'd undo is Mark's
@@ -310,10 +300,10 @@ def test_endpoint_passes_pin_on_stdin_and_never_logs_it(client, calls, caplog):
 def test_page_wording_follows_the_codex_review():
     js = open("static/app.js", encoding="utf-8").read()
     for want in ("Pull reports in Optomate first", "awaiting Mark", "other decision", "item review",
-                 "Confirm eligibility against the full notes from that day.", "Mark's review",
+                 "Untick or change any line, then approve once with your PIN.",
                  "Mark: set your PIN at the server (one-off)", "Resubmitted",
-                 "Today's billing checks unavailable - check in Optomate", "Possible item + evidence",
-                 "Check eligibility"):
+                 "Today's billing checks unavailable - check in Optomate",
+                 "Fix in Optomate, by batch", "Adjust Batch → claim number → line → Change MBS Code."):
         assert want in js, want
     # Mark, 11 Oct 2026: Resubmitted only after Optomate confirms; "lodged, no report" says what to do
     assert "Has Optomate confirmed the resubmission?" in js
@@ -328,3 +318,108 @@ def test_page_wording_follows_the_codex_review():
     import re
     sizes = [int(x) for x in re.findall(r"font-size:\s*(\d+)px", mc)]
     assert sizes and min(sizes) >= 14
+
+
+# --- 13 Oct 2026: approve-all (Mark, one PIN) + Karen's batch worklist -----------------
+SUGG_ITEM = dict(REVIEW, key="bbbbbbbbbbbb", claim_date="2026-04-02",
+                 suggestion={"to": "10918", "why": "no new-symptom wording: minimum 10918",
+                             "options": ["10913", "10914", "10915", "10918", "write_off", "99999"]})
+FIX_ITEM = dict(ITEM, key="cccccccccccc", claim="A3615", claim_date="2026-05-02",
+                fix={"to": "same", "why": "same item, update card first"})
+
+
+def _with(monkeypatch, items):
+    body = dict(AGENT_OUT, items=items, last_approval={"id": "B20261013091200", "by": "Mark",
+                                                         "at": "2026-10-13T09:12:00", "n": 3, "undoable": 2})
+    monkeypatch.setattr(M.subprocess, "run", lambda a, **k: FakeProc(json.dumps(body)))
+
+
+def test_suggestion_only_for_mark_and_options_whitelisted(agent, monkeypatch):
+    _with(monkeypatch, [SUGG_ITEM, FIX_ITEM])
+    karen = M.worklist(agent, mark_view=False)
+    assert all(i["suggestion"] is None for i in karen["items"]) and karen["last_approval"] is None
+    assert "minimum 10918" not in json.dumps(karen)
+    mark = M.worklist(agent, mark_view=True)
+    s = mark["items"][0]["suggestion"]
+    assert s == {"to": "10918", "why": "no new-symptom wording: minimum 10918",
+                 "options": ["10913", "10914", "10915", "10918", "write_off"]}      # 99999 dropped
+    assert mark["last_approval"]["undoable"] == 2
+
+
+def test_fix_and_claim_date_reach_karen(agent, monkeypatch):
+    _with(monkeypatch, [FIX_ITEM, dict(FIX_ITEM, key="dddddddddddd", claim_date="13/10/26",
+                                       fix={"to": "<b>", "why": "x"})])
+    out = M.worklist(agent)
+    assert out["items"][0]["fix"] == {"to": "same", "why": "same item, update card first"}
+    assert out["items"][0]["claim"] == "A3615" and out["items"][0]["claim_date"] == "2026-05-02"
+    assert out["items"][1]["fix"] is None and out["items"][1]["claim_date"] == ""
+
+
+def test_approve_is_mark_only_pin_on_stdin_lines_as_json(agent, calls):
+    lines = [{"key": "bbbbbbbbbbbb", "to": "10918"}, {"key": "cccccccccccc", "to": "write_off"}]
+    assert M.approve(agent, lines, "Karen", pin="2468")["error"] == "Only Mark can decide the item."
+    assert M.approve(agent, lines, "Mark", pin="")["error"] == "Enter your 4-digit PIN."
+    assert M.approve(agent, [], "Mark", pin="2468")["error"] == "Nothing ticked."
+    assert M.approve(agent, [{"key": "bad", "to": "10918"}], "Mark", pin="2468")["ok"] is False
+    assert M.approve(agent, [{"key": "bbbbbbbbbbbb", "to": "10999"}], "Mark", pin="2468")["ok"] is False
+    assert calls == []
+    assert M.approve(agent, lines, "Mark", pin="2468")["ok"]
+    argv = calls[0]
+    assert argv[3:] == ["--approve", "--by", "Mark"] and "2468" not in argv
+    first, second = seen_input[0].split("\n")[:2]
+    assert first == "2468" and json.loads(second) == lines
+
+
+def test_approve_wrong_pin_from_agent_reaches_the_screen(agent, monkeypatch):
+    monkeypatch.setattr(M.subprocess, "run", lambda a, **k: FakeProc(
+        '{"ok": false, "error": "Wrong PIN. 4 tries left.", "pin": true}'))
+    out = M.approve(agent, [{"key": "bbbbbbbbbbbb", "to": "10918"}], "Mark", pin="1111")
+    assert out == {"ok": False, "error": "Wrong PIN. 4 tries left."}
+
+
+def test_undo_approval_validates_and_passes_pin(agent, calls):
+    assert M.undo_approval(agent, "B20261013091200", "Karen", pin="2468")["ok"] is False
+    assert M.undo_approval(agent, "B2026; x", "Mark", pin="2468")["ok"] is False
+    assert calls == []
+    assert M.undo_approval(agent, "B20261013091200", "Mark", pin="2468")["ok"]
+    assert calls[0][3:] == ["--undo-approval", "B20261013091200", "--by", "Mark"]
+    assert seen_input[0] == "2468\n"
+
+
+def test_mark_many_staff_ticks_only(agent, calls):
+    assert M.mark_many(agent, ["bbbbbbbbbbbb"], "accepted_10918", "Karen")["ok"] is False
+    assert M.mark_many(agent, ["bad"], "resubmitted", "Karen")["ok"] is False
+    assert M.mark_many(agent, ["bbbbbbbbbbbb"], "resubmitted", "")["ok"] is False
+    assert calls == []
+    assert M.mark_many(agent, ["bbbbbbbbbbbb", "cccccccccccc"], "resubmitted", "Karen")["ok"]
+    assert calls[0][3:] == ["--mark-many", "resubmitted", "--by", "Karen"]
+    assert json.loads(seen_input[0]) == ["bbbbbbbbbbbb", "cccccccccccc"]
+
+
+def test_approve_endpoints(client, calls, caplog):
+    client.set_cookie("hub_staff", "Karen")
+    assert client.post("/api/medicare/approve", json={"pin": "2468", "lines": [
+        {"key": "bbbbbbbbbbbb", "to": "10918"}]}).status_code == 400
+    client.set_cookie("hub_staff", "Mark")
+    with caplog.at_level("INFO"):
+        r = client.post("/api/medicare/approve", json={"pin": "2468", "lines": [
+            {"key": "bbbbbbbbbbbb", "to": "10918"}]})
+    assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
+    assert "2468" not in caplog.text
+    assert client.post("/api/medicare/undo-approval",
+                       json={"pin": "2468", "batch": "B20261013091200"}).status_code == 200
+    client.set_cookie("hub_staff", "Karen")
+    assert client.post("/api/medicare/mark-many", json={"keys": ["bbbbbbbbbbbb"],
+                                                        "status": "written_off"}).status_code == 200
+
+
+def test_page_groups_by_batch_and_prints_just_the_table():
+    js = open("static/app.js", encoding="utf-8").read()
+    assert "function mcBatches(rows)" in js and 'class="mc-bt-group"' in js
+    assert "Tick all in" in js and 'id="mc-print"' in js and "mc-print-batch" in js
+    assert 'id="mc-approve"' in js and "Undo last approval" in js
+    # ticking is the existing Resubmitted / Written off state, with its confirm
+    assert "confirm(confirmFor(row.dataset.status, 1))" in js and "MC_RESUBMIT_CONFIRM" in js
+    css = open("static/style.css", encoding="utf-8").read()
+    i = css.index("body.mc-print-batch .mc-page > :not(#mc-do_now)")
+    assert "display: none" in css[i:i + 80]
