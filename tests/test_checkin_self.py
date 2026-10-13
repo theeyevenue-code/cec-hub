@@ -28,8 +28,13 @@ class SelfEngine(FakeEngine):
             ok = sur == "zztest" and (a.get("--dob") == "15/03/1980"
                                       or a.get("--mobile", "").endswith("400000001"))
             if sur == "twin":
-                out = {"matches": [{"patient_id": 1, "appointment_id": 1},
-                                   {"patient_id": 2, "appointment_id": 2}], "count": 2}
+                out = {"matches": [{"patient_id": 99001, "appointment_id": 1001},
+                                   {"patient_id": 99002, "appointment_id": 1002}], "count": 2}
+            elif sur == "same":
+                out = {"matches": [{"patient_id": 99001, "appointment_id": 1001},
+                                   {"patient_id": 99001, "appointment_id": 1001}], "count": 2}
+            elif sur == "crowd":
+                out = {"matches": [{"patient_id": 1, "appointment_id": 1}] * 3, "count": 4}
             elif ok:
                 out = {"matches": [{"patient_id": 99001, "appointment_id": 1001}], "count": 1}
             else:
@@ -105,10 +110,37 @@ def test_no_match_says_nothing_about_who(w):
     assert st == 200 and out == {"found": False, "many": False}
 
 
-def test_two_matches_go_to_reception(w):
-    st, out = _self(w, surname="twin", dob="01/01/2015")
-    assert out == {"found": False, "many": True}
-    assert checkin.ipad_current(w["cfg"])["state"] == "idle"
+def test_family_on_one_mobile_picks_by_first_name(w):
+    st, out = _self(w, surname="twin", mobile="0400 000 001")
+    assert st == 200 and [c["name"] for c in out["choose"]] == ["Adultone", "Childone"]
+    assert set(out) == {"choose", "pick"}                       # first names only
+    assert checkin.ipad_current(w["cfg"])["state"] == "idle"     # nothing opened yet
+    st, opened = checkin.ipad_pick(w["cfg"], {"pick": out["pick"], "n": 1})
+    assert st == 200 and opened["ok"]
+    assert checkin.load_session(w["cfg"], opened["token"])["appointment_id"] == 1002
+    # the choice is single-use
+    assert checkin.ipad_pick(w["cfg"], {"pick": out["pick"], "n": 0})[1]["expired"] is True
+
+
+def test_family_pick_expires_and_rejects_bad_input(w, monkeypatch):
+    out = _self(w, surname="twin", mobile="0400 000 001")[1]
+    assert checkin.ipad_pick(w["cfg"], {"pick": out["pick"], "n": 5})[0] == 400
+    out = _self(w, surname="twin", mobile="0400 000 001")[1]
+    t0 = checkin.time.time()
+    monkeypatch.setattr(checkin.time, "time", lambda: t0 + checkin.PICK_TTL_S + 1)
+    assert checkin.ipad_pick(w["cfg"], {"pick": out["pick"], "n": 0})[1]["expired"] is True
+    assert checkin.ipad_pick(w["cfg"], {"pick": "nope", "n": 0})[1]["expired"] is True
+
+
+def test_same_first_name_or_too_many_go_to_reception(w):
+    assert _self(w, surname="same", mobile="0400 000 001")[1] == {"found": False, "many": True}
+    assert _self(w, surname="crowd", mobile="0400 000 001")[1] == {"found": False, "many": True}
+
+
+def test_family_pick_never_replaces_a_form_on_the_ipad(w):
+    out = _self(w, surname="twin", mobile="0400 000 001")[1]
+    checkin.send(w["cfg"], {"kind": "new", "audience": "adult"})
+    assert checkin.ipad_pick(w["cfg"], {"pick": out["pick"], "n": 0})[0] == 409
 
 
 def test_guessing_is_slowed_down(w):
