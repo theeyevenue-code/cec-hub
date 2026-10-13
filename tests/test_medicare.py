@@ -30,7 +30,7 @@ AGENT_OUT = {"ok": True, "generated_at": "2026-10-13 09:00", "last_report_pull":
              "items": [ITEM, REVIEW],
              "pin_set": True,
              "today": [{"time": "09:00", "patient_label": "Ruby H",
-                        "lines": [{"text": "Comprehensive limit used: ask Mark which item applies.",
+                        "lines": [{"text": "Comprehensive limit used: bill 10918 unless the notes show new symptoms (10913) or a progressive condition (10914).",
                                    "sub": "10910 on 15 Aug 2025 (36-month rule)"}]}]}
 
 
@@ -207,7 +207,7 @@ def test_review_whitelist_trims_and_drops_odd_items():
 def test_today_lines_pass_through_cleaned(agent, calls):
     t = M.worklist(agent, fixture=True)["today"]
     assert t[0]["time"] == "09:00" and t[0]["patient_label"] == "Ruby H"
-    assert t[0]["lines"][0] == {"text": "Comprehensive limit used: ask Mark which item applies.",
+    assert t[0]["lines"][0] == {"text": "Comprehensive limit used: bill 10918 unless the notes show new symptoms (10913) or a progressive condition (10914).",
                                 "sub": "10910 on 15 Aug 2025 (36-month rule)"}
     assert M.clean_today([{"time": "9", "lines": ["old plain line"]}])[0]["lines"] == [
         {"text": "old plain line", "sub": ""}]
