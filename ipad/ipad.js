@@ -93,22 +93,26 @@
     }
 
     /* Idle = "Check in here" when self check-in is on (Mark, 13 Oct 2026,
-       option A): surname + date of birth, or surname + mobile. The server says
-       only "found / not found / see reception" - it never shows a name, so a
-       wrong guess learns nothing. What was typed lives in the page only and is
-       cleared after SELF_IDLE_MS untouched. Otherwise: "Please see reception". */
+       option A): surname + mobile (the default since 14 Oct), or surname + date
+       of birth as the fallback. The server says only "found / not found / see
+       reception" - it never shows a name to a wrong guess. A family on one
+       mobile booked the same day gets "Who's checking in?" with first names
+       only. What was typed lives in the page only and is cleared after
+       SELF_IDLE_MS untouched. Otherwise: "Please see reception". */
     const SELF_IDLE_MS = 60 * 1000;
     const NOTE_MS = 8000;
     let selfOn = false;
     let selfMiss = 0;          // no-match tries on this screen
-    let selfMobile = false;    // showing the mobile box instead of the birth date
+    let selfMobile = true;     // mobile box (default) or the birth-date fallback
     let noteTimer = null;
+    let selfPick = null;       // {pick, choose} while "Who's checking in?" is showing
 
     function renderIdle() {
         wipe();
         if (noteTimer) { clearTimeout(noteTimer); noteTimer = null; }
         selfMiss = 0;
-        selfMobile = false;
+        selfMobile = true;
+        selfPick = null;
         if (selfOn) { renderSelf(""); return; }
         mode = "idle";
         app.innerHTML = `<div class="center"><p class="big">Concord Eyecare</p>
@@ -134,7 +138,7 @@
                </div>`;
         app.innerHTML = `<form class="self" id="self-form" autocomplete="off">
             <p class="big">Check in here</p>
-            <p class="mid">For a child, use the child's details.</p>
+            <p class="mid">For a child: the child's surname and your mobile.</p>
             ${err ? `<p class="err" role="alert">${esc(err)}</p>` : ""}
             <label class="lab" for="self-surname">Surname</label>
             <input id="self-surname" type="text" autocomplete="off" autocapitalize="words"
@@ -142,7 +146,7 @@
             ${second}
             <button class="btn primary" type="submit" data-act="self-go">Check in</button>
             <button class="btn quiet" type="button" data-act="self-swap">${selfMobile
-                ? "Use date of birth instead" : "Use mobile number instead"}</button>
+                ? "No mobile? Use date of birth" : "Use mobile number instead"}</button>
             </form>`;
         setBar("");
         lastTouch = Date.now();
@@ -177,39 +181,65 @@
         app.innerHTML = `<div class="center"><p class="big">Finding your booking...</p></div>`;
         let r;
         try { r = await api("/self", body); } catch (e) { renderSelf("Couldn't connect. Tap Check in again.", k); return; }
+        await selfAnswer(r, k);
+    }
+
+    /* What the server said to a look-up or a family pick. */
+    async function selfAnswer(r, k) {
         const d = r.data || {};
         if (r.status === 200 && d.ok && d.token) {
+            selfPick = null;
             mode = "idle";
             await start(d.token);
             if (mode === "idle") renderIdle();      // the form didn't open: start again
             return;
         }
         if (d.done) { renderNote("You're already checked in.", "Please take a seat."); return; }
-        if (r.status === 400 && d.error) { renderSelf(d.error, k); return; }
-        if (r.status === 200 && d.found === false && !d.many) {
+        if (r.status === 200 && Array.isArray(d.choose) && d.pick) { renderChoose(d); return; }
+        if (r.status === 400 && d.error && k) { renderSelf(d.error, k); return; }
+        if (r.status === 200 && d.found === false && !d.many && k) {
             selfMiss += 1;
             if (selfMiss >= 3) { renderNote("Please see reception.", ""); return; }
-            if (!selfMobile && selfMiss >= 1) {
-                selfMobile = true;
-                renderSelf("We couldn't find a booking today with those details. Try your mobile number.",
-                           { surname: k.surname });
-                return;
-            }
-            renderSelf("We couldn't find a booking today with those details. Check and try again.", k);
+            renderSelf(selfMobile
+                ? "No booking today with that surname and mobile. Check them, or use date of birth."
+                : "No booking today with those details. Check and try again.", k);
             return;
         }
         renderNote("Please see reception.", "");
+    }
+
+    /* A family on one mobile: tap your own first name. */
+    function renderChoose(d) {
+        mode = "choose";
+        selfPick = { pick: d.pick };
+        app.innerHTML = `<div class="self">
+            <p class="big">Who's checking in?</p>
+            <p class="mid">Tap one. Each person checks in separately.</p>
+            ${d.choose.map((c) => `<button type="button" class="btn" data-act="self-pick"
+                data-n="${esc(c.n)}">${esc(c.name)}</button>`).join("")}
+            <button type="button" class="btn quiet" data-act="self-none">Someone else</button></div>`;
+        setBar("");
+        lastTouch = Date.now();
+    }
+
+    async function selfPicked(n) {
+        const pick = selfPick && selfPick.pick;
+        if (!pick) { renderIdle(); return; }
+        mode = "sending";
+        app.innerHTML = `<div class="center"><p class="big">Opening your form...</p></div>`;
+        let r;
+        try { r = await api("/self/pick", { pick: pick, n: n }); } catch (e) { renderNote("Please see reception.", ""); return; }
+        await selfAnswer(r, null);
     }
 
     app.addEventListener("submit", (ev) => {
         if (ev.target && ev.target.id === "self-form") { ev.preventDefault(); selfGo(); }
     });
 
-    setInterval(() => {      // a half-typed check-in is cleared, never left on show
-        if (mode === "self" && Date.now() - lastTouch >= SELF_IDLE_MS) {
-            const k = selfTyped();
-            if (k.surname || k.d || k.y || k.mobile || k.m) renderIdle();
-        }
+    setInterval(() => {      // a half-typed check-in or an open family list is cleared
+        if (!["self", "choose"].includes(mode) || Date.now() - lastTouch < SELF_IDLE_MS) return;
+        const k = selfTyped();
+        if (mode === "choose" || k.surname || k.d || k.y || k.mobile || k.m) renderIdle();
     }, 5000);
 
     function renderWelcome() {
@@ -363,8 +393,8 @@
             }
             return;
         }
-        if (["idle", "self", "note"].includes(mode) && cur.state === "paused") { renderPaused(); return; }
-        if (["self", "note"].includes(mode) && cur.token) {   // reception sent a form: it wins
+        if (["idle", "self", "note", "choose"].includes(mode) && cur.state === "paused") { renderPaused(); return; }
+        if (["self", "note", "choose"].includes(mode) && cur.token) {   // reception sent a form: it wins
             if (noteTimer) { clearTimeout(noteTimer); noteTimer = null; }
             mode = "idle";
             await start(cur.token);
@@ -841,6 +871,8 @@
             renderSelf("", { surname: k.surname });
             return;
         }
+        if (t && t.dataset.act === "self-pick" && mode === "choose") { selfPicked(Number(t.dataset.n)); return; }
+        if (t && t.dataset.act === "self-none" && mode === "choose") { renderNote("Please see reception.", ""); return; }
         if (!t || !S && t.dataset.act !== "retry") return;
         const act = t.dataset.act;
         if (act === "continue") {

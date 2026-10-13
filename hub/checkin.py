@@ -1018,9 +1018,11 @@ SEE_RECEPTION = "Please see reception."
 
 
 def ipad_self(cfg: dict, body: dict) -> tuple[int, dict]:
-    """The patient's own look-up on the iPad. body: surname + dob (dd/mm/yyyy)
-    or surname + mobile. Answers carry no patient data except, on a match, the
-    form's token (the form greets them by first name as it always has)."""
+    """The patient's own look-up on the iPad. body: surname + mobile (the
+    default, Mark 14 Oct 2026) or surname + dob (dd/mm/yyyy, the fallback).
+    Answers carry no patient data except, on a match, the form's token (the
+    form greets them by first name as it always has), or - for a family on one
+    mobile - their first names to tap."""
     body = body if isinstance(body, dict) else {}
     if not self_checkin_on(cfg):
         return 403, {"error": SEE_RECEPTION}
@@ -1048,18 +1050,71 @@ def ipad_self(cfg: dict, body: dict) -> tuple[int, dict]:
             return 400, {"error": "Check the date of birth.", "field": "dob"}
         return 200, {"error": SEE_RECEPTION}
     count = int(m.get("count") or 0)
-    if count != 1:
+    hits = [(_int(h.get("appointment_id")), _int(h.get("patient_id"))) for h in m.get("matches") or []]
+    hits = [(a, p) for a, p in hits if a and p]
+    if count == 0:
         with _lock:
-            if count == 0:
-                _self_fails.append(now)
-        logger.info("Check-in: iPad self check-in - %s", "no booking matched" if count == 0
-                    else "more than one booking matched")
-        # No match: let them try again (or the mobile route). Two or more: reception.
-        return 200, {"found": False, "many": count > 1}
-    hit = (m.get("matches") or [{}])[0]
-    aid, pid = _int(hit.get("appointment_id")), _int(hit.get("patient_id"))
-    if aid is None or pid is None:
-        return 200, {"error": SEE_RECEPTION}
+            _self_fails.append(now)
+        logger.info("Check-in: iPad self check-in - no booking matched")
+        return 200, {"found": False, "many": False}
+    if count == 1 and len(hits) == 1:
+        return _self_open(cfg, *hits[0])
+    if 2 <= count <= PICK_MAX and len(hits) == count:
+        return _offer_choice(cfg, hits, now)
+    logger.info("Check-in: iPad self check-in - %d bookings matched, sent to reception", count)
+    return 200, {"found": False, "many": True}
+
+
+# A family on one mobile, booked the same day (14 Oct 2026: 2 of 22 patients' families):
+# "Who's checking in?" with each person's FIRST name only - shown only to someone who
+# already typed that family's surname AND mobile. The choice lives here, never on the iPad.
+PICK_MAX = 3
+PICK_TTL_S = 3 * 60
+_picks: dict[str, dict] = {}
+
+
+def _offer_choice(cfg: dict, hits: list, now: float) -> tuple[int, dict]:
+    names = []
+    for _aid, pid in hits:
+        p = run_engine(cfg, "patient", "--id", str(pid))
+        d = p.get("details") or {}
+        first = str(d.get("preferred_name") or "").strip() or \
+            (str(d.get("given_name") or "").split() or [""])[0]
+        if p.get("error") or not first:
+            return 200, {"found": False, "many": True}
+        names.append(first)
+    if len(set(n.casefold() for n in names)) != len(names):     # two "Sam"s: can't tell apart
+        return 200, {"found": False, "many": True}
+    pick = secrets.token_hex(16)
+    with _lock:
+        for k in [k for k, v in _picks.items() if now - v["at"] > PICK_TTL_S]:
+            _picks.pop(k, None)
+        _picks[pick] = {"at": now, "hits": hits}
+    logger.info("Check-in: iPad self check-in - %d family members matched, asked who", len(hits))
+    return 200, {"choose": [{"n": i, "name": n} for i, n in enumerate(names)], "pick": pick}
+
+
+def ipad_pick(cfg: dict, body: dict) -> tuple[int, dict]:
+    """The family member tapped on "Who's checking in?". body: pick, n."""
+    body = body if isinstance(body, dict) else {}
+    if not self_checkin_on(cfg):
+        return 403, {"error": SEE_RECEPTION}
+    pick = str(body.get("pick") or "")
+    n = body.get("n")
+    with _lock:
+        p = _picks.pop(pick, None) if TOKEN_RE.match(pick) else None
+    if p is None or time.time() - p["at"] > PICK_TTL_S:
+        return 200, {"error": SEE_RECEPTION, "expired": True}
+    if not isinstance(n, int) or not 0 <= n < len(p["hits"]):
+        return 400, {"error": SEE_RECEPTION}
+    with _lock:
+        if current_slot(cfg):
+            return 409, {"error": SEE_RECEPTION, "busy": True}
+    return _self_open(cfg, *p["hits"][n])
+
+
+def _self_open(cfg: dict, aid: int, pid: int) -> tuple[int, dict]:
+    """Open this booking's form on the iPad (or say it's already done today)."""
     day = _now().date().isoformat()
     done = [s for s in all_sessions(cfg) if str(s.get("created") or "")[:10] == day
             and s.get("appointment_id") == aid and s.get("state") in ("submitted", "saved")]

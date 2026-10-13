@@ -502,6 +502,15 @@ def checkin_ipad_self():
     return _json(checkin.ipad_self(cfg, request.get_json(silent=True) or {}))
 
 
+@app.route("/api/checkin/ipad/self/pick", methods=["POST"])
+def checkin_ipad_self_pick():
+    """A family on one mobile: which of them is checking in."""
+    cfg, bad = _ipad_cfg()
+    if bad:
+        return bad
+    return _json(checkin.ipad_pick(cfg, request.get_json(silent=True) or {}))
+
+
 @app.route("/api/checkin/ipad/session/<token>")
 def checkin_ipad_session(token):
     cfg, bad = _ipad_cfg()
