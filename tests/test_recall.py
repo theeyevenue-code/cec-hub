@@ -51,9 +51,9 @@ def test_valid_touches_are_accepted_case_insensitively(cfg, monkeypatch):
         return P()
 
     monkeypatch.setattr(recall.subprocess, "run", fake_run)
-    out = recall.preview(cfg, "2026-08", "t-4")
+    out = recall.preview(cfg, "2026-08", "t+6")
     assert out["to_send"] == 3
-    assert "T-4" in seen["argv"]
+    assert "T+6" in seen["argv"]
 
 
 # --- not-connected paths ----------------------------------------------------
@@ -134,13 +134,13 @@ def test_patient_rows_pass_through_for_the_full_list(cfg, monkeypatch):
 # --- deselection ------------------------------------------------------------
 
 def test_set_deselected_writes_the_agent_file(cfg):
-    out = recall.set_deselected(cfg, "2026-08", "T-4", [3, 1, 2, 2])
+    out = recall.set_deselected(cfg, "2026-08", "T+6", [3, 1, 2, 2])
     assert out == {"ok": True, "deselected": 3}
     f = (recall.agent_dir(cfg) / "local-reports"
-         / "recall-deselect-202608-Tminus4.json")
+         / "recall-deselect-202608-Tplus6.json")
     saved = json.loads(f.read_text(encoding="utf-8"))
     assert saved["pids"] == [1, 2, 3]          # deduped + sorted
-    assert saved["month"] == "2026-08" and saved["touch"] == "T-4"
+    assert saved["month"] == "2026-08" and saved["touch"] == "T+6"
 
 
 def test_set_deselected_empty_list_clears(cfg):
@@ -179,8 +179,6 @@ def test_preview_file_finds_the_generated_file(cfg):
 
 def test_preview_file_encodes_touch_safely(cfg):
     d = recall.agent_dir(cfg) / "local-reports"
-    (d / "recall-sms-preview-202608-Tminus4.html").write_text("x", encoding="utf-8")
-    assert recall.preview_file(cfg, "2026-08", "T-4") is not None
     (d / "recall-sms-preview-202608-Tplus6.html").write_text("x", encoding="utf-8")
     assert recall.preview_file(cfg, "2026-08", "T+6") is not None
 
@@ -386,3 +384,10 @@ def test_success_bad_period_rejected(cfg, monkeypatch):
 
 def test_success_not_connected_without_agent():
     assert recall.success({}, None)["connected"] is False
+
+
+def test_t4_early_reminder_is_gone(cfg):
+    """Mark, 15 Oct 2026: no T-4 early reminder - T0, T+6, then a phone call."""
+    assert recall.TOUCHES == ("T0", "T+6")
+    out = recall.preview(cfg, "2026-08", "T-4")
+    assert out.get("error") and "T-4" not in recall.TOUCHES
