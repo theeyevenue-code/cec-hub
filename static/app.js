@@ -1869,10 +1869,10 @@ async function renderLenses() {
 
 /* --- Recalls (v1: look only — nothing can be sent from here) ----------------------- */
 
-// T-4 goes out about a month BEFORE the due month, T+6 about six weeks after,
-// so Mark routinely wants next month's or last month's cohort, not just this one.
+// T+6 goes out about six weeks after the due month, so Mark routinely wants last
+// month's cohort as well as this one. No T-4 early reminder (Mark, 15 Oct 2026:
+// patients respond to being late, not early) - recalls are T0, T+6, then a call.
 const RECALL_TOUCHES = [
-    { code: "T-4", label: "First reminder — about a month before they're due" },
     { code: "T0", label: "Due now" },
     { code: "T+6", label: "Overdue nudge — about six weeks after they were due" },
 ];

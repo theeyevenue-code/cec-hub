@@ -1,6 +1,7 @@
 """Recall tile — ask the Optomate agent to build a recall batch PREVIEW.
 
-Mark picks a month and a touch (T-4 a month early / T0 due now / T+6 overdue)
+Mark picks a month and a touch (T0 due now / T+6 overdue; no T-4 early
+reminder since 15 Oct 2026 - Mark: patients respond to being late, not early)
 and gets back the full batch: every patient, the exact message, and tick boxes
 to pull individuals out of the batch (his request, 2026-07-30 — the list shows
 in full from the start, like the Payment follow-ups tile shows names).
@@ -22,7 +23,7 @@ from pathlib import Path
 
 # Only ever pass a validated month/touch to the subprocess.
 MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
-TOUCHES = ("T-4", "T0", "T+6")
+TOUCHES = ("T0", "T+6")
 
 TIMEOUT_S = 120  # the agent pulls the whole exam/appointment history
 
