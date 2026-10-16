@@ -2801,7 +2801,7 @@ async function renderCheckinCheck(token, flash) {
 
 const MC_FOLDED = [
     { id: "written_off", title: "Written off", note: "Done in Optomate. Off the list." },
-    { id: "expired", title: "Expired", note: "Past the 1-year limit. Medicare won't pay." },
+    { id: "expired", title: "Expired", note: "Past the time limit (2 yrs before 5 Sep 2025, 1 yr after). Medicare won't pay." },
     { id: "waiting", title: "Waiting for payment", note: "Resubmitted. Closes itself when Medicare pays." },
     { id: "recovered", title: "Paid since", note: "Medicare has paid. Nothing to do." },
 ];
