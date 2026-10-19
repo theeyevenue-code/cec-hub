@@ -71,6 +71,7 @@ const routes = [
     { re: /^#\/stock$/, fn: renderStock },
     { re: /^#\/lenses$/, fn: renderLenses },
     { re: /^#\/recalls$/, fn: renderRecalls },
+    { re: /^#\/healthfund$/, fn: renderHealthFund },
     { re: /^#\/medicare$/, fn: renderMedicare },
     { re: /^#\/checkin$/, fn: renderCheckin },
     { re: /^#\/checkin\/([0-9a-f]{32})$/, fn: (m) => renderCheckinCheck(m[1]) },
@@ -1909,6 +1910,8 @@ function renderRecalls() {
             someone is remembered, so they'll be left out when the batch is sent.</p>
         </div>
 
+        <p><a class="btn btn-quiet" href="#/healthfund">Health fund texts (Nov / Dec) →</a></p>
+
         <div class="card">
             <div class="lens-form" style="gap:10px;flex-wrap:wrap">
                 <label>Due month
@@ -2270,6 +2273,144 @@ function wireRecallSendButton(out, d, month, touch) {
         }
         loadRecallBatch(out, true);
     });
+}
+
+/* --- Health fund texts (end-of-year "use your optical extras") ---------------------- */
+/* Same pattern as Recalls: the whole list first, tick boxes, send exactly what was
+   reviewed. The agent refuses a changed list, caps each run and starts with a pilot. */
+
+const HF_TOUCHES = [
+    { code: "HF1", label: "November - extras reset 31 Dec" },
+    { code: "HF2", label: "December - last reminder" },
+];
+
+function renderHealthFund() {
+    const dec = new Date().getMonth() === 11;
+    view.innerHTML = `
+        <a class="btn btn-quiet btn-back" href="#/recalls">← Recalls</a>
+        <h1 class="page-title">Health fund texts</h1>
+        <p class="page-sub">Patients with a health fund who haven't bought glasses or
+        contacts this year. Shown in full before anything is sent.</p>
+        <div class="card">
+            <label>Which text
+                <select id="hf-touch">${HF_TOUCHES.map((t) =>
+                    `<option value="${t.code}"${(t.code === "HF2") === dec ? " selected" : ""}>${esc(t.label)}</option>`).join("")}
+                </select></label>
+            <div id="hf-out" style="margin-top:12px">
+                <div class="loading-panel">Working out who qualifies…</div></div>
+        </div>`;
+    const out = document.getElementById("hf-out");
+    const load = () => loadHealthFund(out);
+    document.getElementById("hf-touch").addEventListener("change", load);
+    load();
+}
+
+async function loadHealthFund(out, quiet = false) {
+    const touch = document.getElementById("hf-touch").value;
+    if (!quiet) out.innerHTML = `<div class="loading-panel">Working out who qualifies… (about 20 seconds)</div>`;
+    let d;
+    try {
+        d = await postJSON("/api/fundsms/preview", { touch });
+    } catch (e) {
+        out.innerHTML = errorPanel(e.message);
+        return;
+    }
+    if (d.connected === false || d.error) {
+        out.innerHTML = `<div class="empty-panel">${esc(d.message || d.error)}</div>`;
+        return;
+    }
+    const rows = d.rows || [];
+    const sk = d.skipped || {};
+    const one = rows.find((r) => r.household_size === 1 && !r.deselected);
+    const fam = rows.find((r) => r.household_size > 1 && !r.deselected);
+    const funds = Object.entries(d.by_fund || {}).slice(0, 5)
+        .map(([k, v]) => `${esc(k)} ${v}`).join(" · ");
+    const msgBox = (m) => `<p style="font-family:Consolas,monospace;font-size:14px;background:#f6f8f9;
+        padding:8px 10px;border:1px solid #dde5e9">${esc(m)}</p>`;
+    out.innerHTML = `
+        <h2>${d.messages} texts · ${d.people} people</h2>
+        <div class="updated-line">${esc(d.label)} · ${funds}</div>
+        <p style="color:#55636b;font-size:14px">Left out automatically:
+            ${sk.bought_this_year || 0} bought glasses or contacts this year ·
+            ${sk.booked || 0} already booked (next 8 weeks) ·
+            ${sk.opted_out || 0} asked for no marketing ·
+            ${sk.reset_1_july || 0} on funds that reset 1 July ·
+            ${sk.other_practitioner || 0} another practitioner's patients ·
+            ${sk.no_mobile || 0} no mobile ·
+            ${sk.already_sent || 0} already sent this text
+            ${d.deselected ? ` · <strong>${d.deselected} un-ticked by you</strong>` : ""}</p>
+        ${one ? `<p style="margin:6px 0 2px"><strong>The text:</strong></p>${msgBox(one.message)}` : ""}
+        ${fam ? `<p style="margin:6px 0 2px"><strong>Families on one mobile get one text:</strong></p>${msgBox(fam.message)}` : ""}
+        <table class="lens-table" style="margin-top:10px">
+            <thead><tr><th>Send?</th><th>Patient</th><th>Mobile</th><th>Fund</th><th></th></tr></thead>
+            <tbody>${rows.map((r) => `
+                <tr class="${r.deselected ? "rc-off" : ""}" title="${esc(r.message)}">
+                    <td><input type="checkbox" class="hf-tick" data-pid="${r.pid}" ${r.deselected ? "" : "checked"}></td>
+                    <td><strong>${esc(r.name)}</strong></td>
+                    <td>${esc(r.mobile)}</td>
+                    <td>${esc(r.fund)}</td>
+                    <td>${r.household_size > 1 ? `one text for ${r.household_size}` : ""}</td>
+                </tr>`).join("")}</tbody>
+        </table>
+        ${renderHealthFundSend(d)}`;
+
+    const year = Number(String(d.generated || "").slice(0, 4)) || new Date().getFullYear();
+    out.querySelectorAll(".hf-tick").forEach((box) => {
+        box.addEventListener("change", async () => {
+            box.closest("tr").classList.toggle("rc-off", !box.checked);
+            out.querySelectorAll(".hf-tick").forEach((b) => { b.disabled = true; });
+            const pids = [...out.querySelectorAll(".hf-tick")].filter((b) => !b.checked)
+                .map((b) => Number(b.dataset.pid));
+            try {
+                await postJSON("/api/fundsms/deselect", { touch, year, pids });
+            } catch (e) {
+                out.insertAdjacentHTML("afterbegin", errorPanel(e.message));
+            }
+            loadHealthFund(out, true);
+        });
+    });
+
+    const btn = document.getElementById("hf-send");
+    if (!btn) return;
+    const note = document.getElementById("hf-send-note");
+    btn.addEventListener("click", async () => {
+        const n = Math.max(1, Math.min(Number(document.getElementById("hf-limit").value) || 0, d.messages));
+        if (!window.confirm(`Send ${n} real text messages now? This cannot be undone.`)) return;
+        btn.disabled = true;
+        note.textContent = "Sending…";
+        try {
+            const r = await postJSON("/api/fundsms/send", { touch, hash: d.batch_hash, limit: n });
+            note.textContent = r.error ? r.error
+                : (r.dry_run ? `Dry run: ${r.would_send} texts would go. Nothing sent.`
+                   : `Done: ${r.sent} sent, ${r.failed || 0} failed. ${r.note || ""}`);
+            window.alert(note.textContent);
+        } catch (e) {
+            note.textContent = e.message;
+        }
+        loadHealthFund(out, true);
+    });
+}
+
+function renderHealthFundSend(d) {
+    if (!d.messages) return "";
+    if (!d.live_enabled) {
+        return `<div style="margin-top:14px;padding:12px;border:2px solid #c9d2d8;border-radius:8px">
+            <button class="btn" disabled>Send</button>
+            <span style="font-size:14px;color:#55636b;margin-left:8px">Sending is
+            <strong>switched off</strong> until Mark turns on live health-fund sends.</span></div>`;
+    }
+    if (!d.can_send_now) {
+        return `<div style="margin-top:14px;padding:12px;border:2px solid #c9d2d8;border-radius:8px">
+            <span style="font-size:14px;color:#55636b">These texts only go out in November and December.</span></div>`;
+    }
+    const chunk = Math.min(d.messages, d.max_sends_per_run || 400);
+    return `<div style="margin-top:14px;padding:12px;border:2px solid #b3261e;border-radius:8px">
+        <label>Send the first <input id="hf-limit" type="number" min="1" max="${chunk}" value="${chunk}"
+            style="width:80px"> of ${d.messages} texts</label>
+        <button class="btn" id="hf-send" style="background:#b3261e;border-color:#b3261e;margin-left:8px">Send</button>
+        <span id="hf-send-note" style="font-size:14px;color:#55636b;margin-left:8px">
+            Up to ${d.max_sends_per_run || 400} per press. The very first live send is a 25-text test.</span>
+    </div>`;
 }
 
 /* --- Check-in (iPad registration form) ---------------------------------------------- */
