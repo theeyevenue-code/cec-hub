@@ -620,7 +620,8 @@
         switch (q.type) {
             case "text":
             case "number":
-                return `<input id="${id}" type="text" data-q="${esc(q.id)}"
+                // none_option on a typed box too (v5.1: Email -> "No email address")
+                return `${noneTile(q, v)}<input id="${id}" type="text" data-q="${esc(q.id)}"
                     value="${esc(v || "")}" ${inputAttrs(q)}${q.type === "number" ? ` class="short"` : ""}>`;
             case "longtext":
                 return `${noneTile(q, v)}<textarea id="${id}" data-q="${esc(q.id)}"
