@@ -2280,12 +2280,13 @@ function wireRecallSendButton(out, d, month, touch) {
    reviewed. The agent refuses a changed list, caps each run and starts with a pilot. */
 
 const HF_TOUCHES = [
-    { code: "HF1", label: "November - extras reset 31 Dec" },
-    { code: "HF2", label: "December - last reminder" },
+    { code: "HF1", label: "From 27 Oct - first reminder" },
+    { code: "HF2", label: "Mid Nov - last reminder" },
 ];
 
 function renderHealthFund() {
-    const dec = new Date().getMonth() === 11;
+    const nowD = new Date();
+    const dec = nowD.getMonth() === 10 && nowD.getDate() >= 14;   // from mid-Nov show the last reminder
     view.innerHTML = `
         <a class="btn btn-quiet btn-back" href="#/recalls">← Recalls</a>
         <h1 class="page-title">Health fund texts</h1>
@@ -2401,7 +2402,7 @@ function renderHealthFundSend(d) {
     }
     if (!d.can_send_now) {
         return `<div style="margin-top:14px;padding:12px;border:2px solid #c9d2d8;border-radius:8px">
-            <span style="font-size:14px;color:#55636b">These texts only go out in November and December.</span></div>`;
+            <span style="font-size:14px;color:#55636b">These texts only go out from 27 Oct to 30 Nov.</span></div>`;
     }
     const chunk = Math.min(d.messages, d.max_sends_per_run || 400);
     return `<div style="margin-top:14px;padding:12px;border:2px solid #b3261e;border-radius:8px">
