@@ -2072,7 +2072,9 @@ async function loadRecallBatch(out, quiet = false) {
             ${d.skipped_no_mobile} no mobile ·
             ${d.skipped_opted_out} asked for no recalls ·
             ${d.skipped_already_sent} already texted this round
+            ${d.optomate_texted_days ? ` · ${d.skipped_optomate_texted || 0} Optomate texted in last ${d.optomate_texted_days} days` : ""}
             ${d.deselected ? ` · <strong>${d.deselected} un-ticked by you</strong>` : ""}</p>
+        ${d.optomate_check_error ? `<p class="warn" style="color:#b26a00;font-weight:600">${esc(d.optomate_check_error)}</p>` : ""}
         ${sample ? `<p style="margin:6px 0 2px"><strong>The message:</strong></p>
             <p style="font-family:Consolas,monospace;font-size:13px;background:#f6f8f9;
                padding:8px 10px;border:1px solid #dde5e9">${esc(sample.message)}</p>` : ""}
@@ -2339,7 +2341,9 @@ async function loadHealthFund(out, quiet = false) {
             ${sk.other_practitioner || 0} another practitioner's patients ·
             ${sk.no_mobile || 0} no mobile ·
             ${sk.already_sent || 0} already sent this text
+            ${d.optomate_texted_days ? ` · ${sk.optomate_texted || 0} Optomate texted in last ${d.optomate_texted_days} days` : ""}
             ${d.deselected ? ` · <strong>${d.deselected} un-ticked by you</strong>` : ""}</p>
+        ${d.optomate_check_error ? `<p class="warn" style="color:#b26a00;font-weight:600">${esc(d.optomate_check_error)}</p>` : ""}
         ${one ? `<p style="margin:6px 0 2px"><strong>The text:</strong></p>${msgBox(one.message)}` : ""}
         ${fam ? `<p style="margin:6px 0 2px"><strong>Families on one mobile get one text:</strong></p>${msgBox(fam.message)}` : ""}
         <table class="lens-table" style="margin-top:10px">
