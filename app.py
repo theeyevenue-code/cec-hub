@@ -276,6 +276,40 @@ def recall_send():
     return jsonify(result), status
 
 
+@app.route("/api/fundsms/preview", methods=["POST"])
+def fundsms_preview():
+    """Health-fund texts: the full list for HF1 (Nov) or HF2 (Dec). Sends nothing."""
+    from hub import fundsms
+    data = request.get_json(silent=True) or {}
+    return jsonify(fundsms.preview(_integrations(), data.get("touch", "HF1")))
+
+
+@app.route("/api/fundsms/deselect", methods=["POST"])
+def fundsms_deselect():
+    from hub import fundsms
+    data = request.get_json(silent=True) or {}
+    result = fundsms.set_deselected(_integrations(), data.get("touch", ""), data.get("year"),
+                                    data.get("pids", []))
+    if result.get("ok"):
+        logger.info(f"Health-fund texts {data.get('touch')}: {result['deselected']} "
+                    f"patient(s) un-ticked by {_staff_name()}")
+    return jsonify(result), (400 if result.get("error") else 200)
+
+
+@app.route("/api/fundsms/send", methods=["POST"])
+def fundsms_send():
+    """Send the reviewed health-fund list. The agent's own gate (off = dry run),
+    the list fingerprint, the cap, the pilot and the crash journal all apply."""
+    from hub import fundsms
+    data = request.get_json(silent=True) or {}
+    result = fundsms.send(_integrations(), data.get("touch", ""), data.get("hash", ""),
+                          data.get("limit"))
+    if result.get("sent"):
+        logger.info(f"HEALTH-FUND SEND by {_staff_name()}: {data.get('touch')} -> "
+                    f"{result.get('sent')} sent, {result.get('failed', 0)} failed")
+    return jsonify(result), (400 if result.get("error") else 200)
+
+
 @app.route("/api/recall/success")
 def recall_success():
     """How many texted patients went on to book (optionally ?months=N)."""
