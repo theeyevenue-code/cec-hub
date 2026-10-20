@@ -2072,7 +2072,9 @@ async function loadRecallBatch(out, quiet = false) {
             ${d.skipped_no_mobile} no mobile ·
             ${d.skipped_opted_out} asked for no recalls ·
             ${d.skipped_already_sent} already texted this round
+            ${d.optomate_texted_days ? ` · ${d.skipped_optomate_texted || 0} Optomate texted in last ${d.optomate_texted_days} days` : ""}
             ${d.deselected ? ` · <strong>${d.deselected} un-ticked by you</strong>` : ""}</p>
+        ${d.optomate_check_error ? `<p class="warn" style="color:#b26a00;font-weight:600">${esc(d.optomate_check_error)}</p>` : ""}
         ${sample ? `<p style="margin:6px 0 2px"><strong>The message:</strong></p>
             <p style="font-family:Consolas,monospace;font-size:13px;background:#f6f8f9;
                padding:8px 10px;border:1px solid #dde5e9">${esc(sample.message)}</p>` : ""}
@@ -2280,12 +2282,13 @@ function wireRecallSendButton(out, d, month, touch) {
    reviewed. The agent refuses a changed list, caps each run and starts with a pilot. */
 
 const HF_TOUCHES = [
-    { code: "HF1", label: "November - extras reset 31 Dec" },
-    { code: "HF2", label: "December - last reminder" },
+    { code: "HF1", label: "From 27 Oct - first reminder" },
+    { code: "HF2", label: "Mid Nov - last reminder" },
 ];
 
 function renderHealthFund() {
-    const dec = new Date().getMonth() === 11;
+    const nowD = new Date();
+    const dec = nowD.getMonth() === 10 && nowD.getDate() >= 14;   // from mid-Nov show the last reminder
     view.innerHTML = `
         <a class="btn btn-quiet btn-back" href="#/recalls">← Recalls</a>
         <h1 class="page-title">Health fund texts</h1>
@@ -2338,7 +2341,9 @@ async function loadHealthFund(out, quiet = false) {
             ${sk.other_practitioner || 0} another practitioner's patients ·
             ${sk.no_mobile || 0} no mobile ·
             ${sk.already_sent || 0} already sent this text
+            ${d.optomate_texted_days ? ` · ${sk.optomate_texted || 0} Optomate texted in last ${d.optomate_texted_days} days` : ""}
             ${d.deselected ? ` · <strong>${d.deselected} un-ticked by you</strong>` : ""}</p>
+        ${d.optomate_check_error ? `<p class="warn" style="color:#b26a00;font-weight:600">${esc(d.optomate_check_error)}</p>` : ""}
         ${one ? `<p style="margin:6px 0 2px"><strong>The text:</strong></p>${msgBox(one.message)}` : ""}
         ${fam ? `<p style="margin:6px 0 2px"><strong>Families on one mobile get one text:</strong></p>${msgBox(fam.message)}` : ""}
         <table class="lens-table" style="margin-top:10px">
@@ -2401,7 +2406,7 @@ function renderHealthFundSend(d) {
     }
     if (!d.can_send_now) {
         return `<div style="margin-top:14px;padding:12px;border:2px solid #c9d2d8;border-radius:8px">
-            <span style="font-size:14px;color:#55636b">These texts only go out in November and December.</span></div>`;
+            <span style="font-size:14px;color:#55636b">These texts only go out from 27 Oct to 30 Nov.</span></div>`;
     }
     const chunk = Math.min(d.messages, d.max_sends_per_run || 400);
     return `<div style="margin-top:14px;padding:12px;border:2px solid #b3261e;border-radius:8px">

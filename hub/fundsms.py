@@ -48,7 +48,7 @@ def _run(cfg: dict, args: list, timeout: int = TIMEOUT_S) -> dict:
 def preview(cfg: dict, touch: str) -> dict:
     touch = str(touch or "").strip().upper()
     if touch not in TOUCHES:
-        return {"connected": True, "error": "Pick November or December."}
+        return {"connected": True, "error": "Pick the first or last reminder."}
     return _run(cfg, ["preview", "--touch", touch])
 
 
@@ -56,7 +56,7 @@ def send(cfg: dict, touch: str, batch_hash: str, limit=None) -> dict:
     touch = str(touch or "").strip().upper()
     batch_hash = str(batch_hash or "").strip().lower()
     if touch not in TOUCHES:
-        return {"error": "Pick November or December."}
+        return {"error": "Pick the first or last reminder."}
     if not HASH_RE.match(batch_hash):
         return {"error": "Missing list fingerprint - refresh the list first."}
     args = ["send", "--touch", touch, "--expect-hash", batch_hash]
