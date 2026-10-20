@@ -1912,6 +1912,8 @@ function renderRecalls() {
 
         <p><a class="btn btn-quiet" href="#/healthfund">Health fund texts (Nov / Dec) →</a></p>
 
+        ${contactLogCardHtml()}
+
         <div class="card">
             <div class="lens-form" style="gap:10px;flex-wrap:wrap">
                 <label>Due month
@@ -1966,6 +1968,8 @@ function renderRecalls() {
                 <span id="rc-chase-note" style="color:#55636b;font-size:13px"></span>
             </p>
         </div>`;
+
+    wireContactLog();
 
     const out = document.getElementById("rc-out");
     const load = () => loadRecallBatch(out);
@@ -2273,6 +2277,120 @@ function wireRecallSendButton(out, d, month, touch) {
         }
         loadRecallBatch(out, true);
     });
+}
+
+/* --- Who got what (Mark, 20 Oct 2026) ------------------------------------------------ */
+/* One patient, every text and email we sent them, from every lane, plus Optomate's own
+   texts. Read-only. POST so the name never sits in a URL. */
+
+const CL_LANES = ["recall", "healthfund", "review", "optomate", "orders", "lapsed", "desk"];
+const CL_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function clDate(d) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || "");
+    return m ? `${Number(m[3])} ${CL_MONTHS[Number(m[2]) - 1]} ${m[1]}` : "—";
+}
+
+function clChip(lane, label) {
+    return `<span class="cl-chip cl-${esc(lane)}">${esc(label)}</span>`;
+}
+
+function contactLogCardHtml() {
+    return `
+        <div class="card cl-card">
+            <h2>Who got what</h2>
+            <p class="cl-how">Type surname and first name. Shows every text and email we sent them.</p>
+            <form id="cl-form" class="cl-form" autocomplete="off">
+                <input id="cl-q" type="search" maxlength="60" placeholder="e.g. Smith John"
+                       aria-label="Patient name">
+                <button class="btn" type="submit">Find</button>
+            </form>
+            <div id="cl-results"></div>
+            <div id="cl-out"></div>
+        </div>`;
+}
+
+function wireContactLog() {
+    const form = document.getElementById("cl-form");
+    if (!form) return;
+    const qBox = document.getElementById("cl-q");
+    const results = document.getElementById("cl-results");
+    const out = document.getElementById("cl-out");
+    form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        out.innerHTML = "";
+        results.innerHTML = `<div class="loading-panel">Looking…</div>`;
+        let d;
+        try {
+            d = await postJSON("/api/contactlog/search", { q: qBox.value });
+        } catch (e) {
+            results.innerHTML = errorPanel(e.message);
+            return;
+        }
+        if (d.connected === false) { results.innerHTML = `<p class="cl-note">${esc(d.message)}</p>`; return; }
+        if (d.error) { results.innerHTML = errorPanel(d.error); return; }
+        const rows = d.results || [];
+        if (!rows.length) {
+            results.innerHTML = `<p class="cl-note">${esc(d.note || "No patient by that name.")}</p>`;
+            return;
+        }
+        results.innerHTML = `
+            <ul class="cl-pick">${rows.map((r) => `
+                <li><button type="button" class="cl-pick-btn" data-pid="${Number(r.id)}"
+                        data-name="${esc(r.name)}">
+                    <strong>${esc(r.surname)}${r.given ? ", " + esc(r.given) : ""}</strong>
+                    <span>${r.dob_year ? "born " + esc(r.dob_year) : ""}${r.mobile_last3 ? " · mobile …" + esc(r.mobile_last3) : ""}</span>
+                </button></li>`).join("")}
+            </ul>
+            ${d.more ? `<p class="cl-note">More than ${rows.length} match — add the first name to narrow it.</p>` : ""}`;
+        results.querySelectorAll(".cl-pick-btn").forEach((b) => b.addEventListener("click", () => {
+            results.querySelectorAll(".cl-pick-btn").forEach((x) => x.classList.toggle("on", x === b));
+            loadContactTimeline(out, Number(b.dataset.pid), b.dataset.name);
+        }));
+        if (rows.length === 1) results.querySelector(".cl-pick-btn").click();
+    });
+}
+
+async function loadContactTimeline(out, pid, name) {
+    out.innerHTML = `<div class="loading-panel">Gathering every text and email…</div>`;
+    let d;
+    try {
+        d = await postJSON("/api/contactlog/timeline", { pid });
+    } catch (e) {
+        out.innerHTML = errorPanel(e.message);
+        return;
+    }
+    if (d.connected === false) { out.innerHTML = `<p class="cl-note">${esc(d.message)}</p>`; return; }
+    if (d.error || !d.ok) { out.innerHTML = errorPanel(d.error || "The lookup failed."); return; }
+    const lanes = d.lanes || {};
+    const events = d.events || [];
+    const sources = d.sources || {};
+    const used = CL_LANES.filter((k) => (d.counts || {})[k]);
+    const key = used.length > 1
+        ? `<p class="cl-key">${used.map((k) => clChip(k, lanes[k] || k)).join(" ")}</p>` : "";
+    const table = events.length ? `
+        <div class="table-scroll"><table class="cl-table">
+            <thead><tr><th>Date</th><th>Lane</th><th>What</th><th>Detail</th></tr></thead>
+            <tbody>${events.map((e) => `
+                <tr class="${e.failed ? "cl-failed" : ""}${e.draft ? " cl-draft" : ""}">
+                    <td class="cl-date">${esc(clDate(e.date))}</td>
+                    <td>${clChip(e.lane, e.lane_label || lanes[e.lane] || e.lane)}</td>
+                    <td>${esc(e.what)}</td>
+                    <td>${e.detail ? `<div>${esc(e.detail)}</div>` : ""}${e.text ? `<div class="cl-text">“${esc(e.text)}”</div>` : ""}</td>
+                </tr>`).join("")}
+            </tbody></table></div>`
+        : `<p class="cl-note">Nothing on record for this patient.</p>`;
+    const missing = CL_LANES.filter((k) => sources[k] && !sources[k].available);
+    const notes = CL_LANES.filter((k) => sources[k] && sources[k].available && sources[k].note);
+    out.innerHTML = `
+        <p class="cl-who">${esc(name || "")}</p>
+        <p class="cl-answer">${esc(d.summary || "")}</p>
+        ${key}
+        ${table}
+        ${(missing.length || notes.length) ? `<ul class="cl-sources">
+            ${notes.map((k) => `<li><strong>${esc(lanes[k] || k)}:</strong> ${esc(sources[k].note)}</li>`).join("")}
+            ${missing.map((k) => `<li><strong>${esc(lanes[k] || k)}:</strong> not available — ${esc(sources[k].note)}</li>`).join("")}
+        </ul>` : ""}`;
 }
 
 /* --- Health fund texts (end-of-year "use your optical extras") ---------------------- */

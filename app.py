@@ -310,6 +310,23 @@ def fundsms_send():
     return jsonify(result), (400 if result.get("error") else 200)
 
 
+@app.route("/api/contactlog/search", methods=["POST"])
+def contactlog_search():
+    """Who got what: find a patient by name. POST so the name never sits in a URL
+    or a log line; nothing about the patient is logged; read-only."""
+    from hub import contactlog
+    data = request.get_json(silent=True) or {}
+    return _no_store(jsonify(contactlog.search(_integrations(), data.get("q", ""))))
+
+
+@app.route("/api/contactlog/timeline", methods=["POST"])
+def contactlog_timeline():
+    """Who got what: every text and email one patient got, newest first. Read-only."""
+    from hub import contactlog
+    data = request.get_json(silent=True) or {}
+    return _no_store(jsonify(contactlog.timeline(_integrations(), data.get("pid"))))
+
+
 @app.route("/api/recall/success")
 def recall_success():
     """How many texted patients went on to book (optionally ?months=N)."""

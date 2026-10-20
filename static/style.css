@@ -1787,6 +1787,7 @@ body.lens-mono main { background: #fafafa; }
     body.mc-print-batch .mc-to-off { background: none; border: 1pt solid #000; }
     body.mc-print-batch .mc-to-pick { appearance: none; -webkit-appearance: none; border: none; padding: 0;
         min-height: 0; font-size: 12pt; background: none; }
+}   /* closes @media print - missing until 20 Oct 2026, so every rule below applied only when printing */
 
 /* --- Bug fixes on the existing design (13 Oct 2026, from Codex's review) -------------
    1. .lens-table (Recalls, Payment follow-ups, invoice detail) had no rule at all, so
@@ -1816,3 +1817,44 @@ body.lens-mono main { background: #fafafa; }
 
 /* Check-in: why a form waits for a person (self check-in, 13 Oct 2026) */
 .ci-why { font-size: 14px; color: var(--amber-ink); margin-top: 4px; }
+
+/* --- Who got what (Recalls page) — one colour per lane ----------------------- */
+.cl-how { font-size: 17px; color: var(--muted); margin: 0 0 10px; }
+.cl-form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.cl-form input { flex: 1 1 260px; min-width: 0; font-size: 19px; padding: 10px 14px;
+    border: 1.5px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--body); }
+.cl-pick { list-style: none; display: grid; gap: 6px; margin: 0 0 10px; }
+.cl-pick-btn { width: 100%; text-align: left; font: inherit; font-size: 18px; cursor: pointer;
+    display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; padding: 10px 14px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 10px; color: var(--body); }
+.cl-pick-btn span { color: var(--muted); font-size: 17px; font-variant-numeric: tabular-nums; }
+.cl-pick-btn:hover, .cl-pick-btn.on { border-color: var(--green); background: var(--mint-soft); }
+.cl-note { font-size: 17px; color: var(--muted); margin: 6px 0; }
+.cl-who { font-size: 17px; color: var(--muted); margin: 14px 0 0; }
+.cl-answer { font-size: 24px; font-weight: 700; color: var(--ink); line-height: 1.3; margin: 2px 0 10px; }
+.cl-key { margin: 0 0 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+.cl-table { border-collapse: collapse; width: 100%; font-size: 17px; }
+.cl-table th { text-align: left; font-size: 14px; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.cl-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.cl-table tr:last-child td { border-bottom: none; }
+.cl-date { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cl-text { color: var(--muted); font-size: 15px; margin-top: 2px; }
+.cl-failed td { color: var(--danger-ink); }
+.cl-draft td:not(:nth-child(2)) { color: var(--muted); font-style: italic; }
+.cl-sources { font-size: 15px; color: var(--muted); margin: 10px 0 0 18px; }
+.cl-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 15px;
+    font-weight: 600; white-space: nowrap; border: 1px solid transparent; }
+.cl-recall     { background: #dff0e8; color: #1d5741; border-color: #438F73; }
+.cl-healthfund { background: #e3eefb; color: #1f4f8a; border-color: #7aa6dc; }
+.cl-review     { background: #fbefdd; color: #7a4f0e; border-color: #d9a54e; }
+.cl-optomate   { background: #eceff3; color: #36424e; border-color: #9aa6b2; }
+.cl-orders     { background: #dcf3f3; color: #0f5f60; border-color: #5fb3b3; }
+.cl-lapsed     { background: #efe7fb; color: #5b3a92; border-color: #a98bd6; }
+.cl-desk       { background: #fbe6ec; color: #8a2944; border-color: #d98aa1; }
+@media (max-width: 640px) {
+    .cl-table thead { display: none; }
+    .cl-table, .cl-table tbody, .cl-table tr, .cl-table td { display: block; width: 100%; }
+    .cl-table tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .cl-table td { border: none; padding: 2px 4px; }
+}
