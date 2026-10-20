@@ -1680,6 +1680,23 @@ body.lens-mono main { background: #fafafa; }
 .mc-btn { font-size: 17px; padding: 10px 16px; min-height: 46px; margin: 0 0 6px 6px; }
 .mc-btn[disabled] { opacity: .45; cursor: not-allowed; }
 .mc-who { display: block; font-size: 15px; color: var(--muted); margin: 2px 0 6px; }
+/* 21 Oct 2026: Optomate vs Hub checks. Red = fix it; amber = reminder. */
+.mc-checks { margin-top: 30px; border-top: 1px solid var(--line); padding-top: 16px; }
+.mc-check { display: block; font-size: 17px; font-weight: 600; margin-top: 4px; }
+.mc-check-red { color: var(--danger-ink); }
+.mc-check-amber { color: var(--amber-ink); }
+.mc-check-cell { min-width: 320px; }
+.mc-check-cell .mc-check:first-child { margin-top: 0; }
+.mc-small-cell { font-size: 15px; color: var(--muted); white-space: nowrap; }
+.mc-check-err { font-size: 17px; color: var(--amber-ink); margin-top: 8px; }
+.mc-opt { display: block; font-size: 15px; color: var(--body); margin-top: 4px; }
+.mc-left { display: block; font-size: 15px; color: var(--muted); }
+.mc-left.mc-red { color: var(--danger-ink); }
+.mc-c-check { border-color: var(--danger-ink); background: var(--danger-bg); }
+.mc-login-note { font-size: 17px; color: var(--info-ink); background: var(--info-bg); border: 1px solid var(--info-line);
+    border-radius: 12px; padding: 10px 14px; margin-top: 14px; }
+.mc-table tr.mc-expired td { color: var(--muted); }
+.mc-table tr.mc-expired td strong, .mc-table tr.mc-expired .mc-step { color: var(--muted); font-weight: 600; }
 .mc-foot { font-size: 15px; color: var(--muted); margin-top: 22px; }
 @media (max-width: 760px) {
     .mc-answer { font-size: 25px; }

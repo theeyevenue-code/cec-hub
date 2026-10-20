@@ -373,3 +373,45 @@ def test_page_is_one_list_by_batch_with_a_dropdown_and_print():
     css = open("static/style.css", encoding="utf-8").read()
     i = css.index("body.mc-print-batch .mc-page > :not(#mc-do_now)")
     assert "display: none" in css[i:i + 80]
+
+
+# --- 21 Oct 2026: Optomate leads; checks, who did it, other-login note ---
+OPT_ITEM = dict(ITEM, key="eeeeeeeeeeee", action_group="waiting",
+                checks=[{"level": "red", "text": "10918 can't be paid with 10940, already paid that day (MBS)."},
+                        {"level": "purple", "text": "dropped"}, {"level": "amber", "text": ""}, "junk"],
+                optomate={"what": "Changed to 10918 and resubmitted", "at": "2026-10-20 13:16",
+                          "login": "AG<b>", "who": "AG (Angela)", "patient_id": 77})
+NOTE = {"n": 18, "days": 30, "hub_name": "Karen", "login": "AG", "login_name": "Angela"}
+
+
+def test_checks_and_optomate_are_whitelisted(agent, monkeypatch):
+    body = dict(AGENT_OUT, items=[OPT_ITEM], checks={"red": 1, "amber": 0}, optomate_read=True)
+    monkeypatch.setattr(M.subprocess, "run", lambda a, **k: FakeProc(json.dumps(body)))
+    out = M.worklist(agent)
+    it = out["items"][0]
+    assert it["checks"] == [{"level": "red", "text": "10918 can't be paid with 10940, already paid that day (MBS)."}]
+    assert it["optomate"] == {"what": "Changed to 10918 and resubmitted", "at": "2026-10-20 13:16",
+                              "login": "AGb", "who": "AG (Angela)"}
+    assert out["checks"] == {"red": 1, "amber": 0} and out["optomate_read"] is True
+
+
+def test_login_note_only_for_mark_and_karen(agent, monkeypatch):
+    body = dict(AGENT_OUT, login_note=NOTE)
+    monkeypatch.setattr(M.subprocess, "run", lambda a, **k: FakeProc(json.dumps(body)))
+    assert M.worklist(agent, viewer="Karen")["login_note"] == NOTE
+    assert M.worklist(agent, viewer="mark")["login_note"] == NOTE
+    for other in ("Angie", "Nikki", ""):
+        assert M.worklist(agent, viewer=other)["login_note"] is None
+
+
+def test_page_shows_checks_who_and_greys_expired():
+    js = open("static/app.js", encoding="utf-8").read()
+    for want in ("Check these first", "function mcChecksHTML(d)", "function mcLoginNoteHTML(d)",
+                 "Logging in as yourself keeps Optomate's record of who did what accurate.",
+                 "mc-expired", "Moves to Paid only when Medicare's report shows it paid.",
+                 "Do it in Optomate too.", "login ${o.who || o.login}"):
+        assert want in js, want
+    css = open("static/style.css", encoding="utf-8").read()
+    assert ".mc-table tr.mc-expired td" in css and ".mc-check-red" in css
+    src = open("app.py", encoding="utf-8").read()
+    assert "medicare.is_mark(who), viewer=who)" in src

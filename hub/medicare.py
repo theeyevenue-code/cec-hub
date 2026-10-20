@@ -1,5 +1,12 @@
 """Medicare — rejected and short-paid claims, and what to do about each.
 
+21 Oct 2026 (Mark: "if there's any fixes based upon what Karen is doing, can you make the fixes"):
+status follows OPTOMATE, not the Hub ticks. The agent (medicare.actions) reads Adjust Batch,
+new claim batches and write-offs: resubmitted -> Waiting, Paid only on Medicare's report, rejected
+again -> back on the list. Each line may carry red/amber "checks" (Optomate vs Hub) and "optomate"
+(what was done, under which login). "login_note" (changes saved under another person's login) is
+passed to the page only when the name picked is Mark or Karen.
+
 OPTION C (Mark, 13 Oct 2026) supersedes the review/approval design below: "find out yourself
 from the consult notes and give suggestions to Karen. If there's nothing, build it as a 10918."
 Every line reaches Karen in ONE list grouped by claim batch, with a suggested item (or write off)
@@ -184,7 +191,40 @@ def clean_item(i: dict, mark_view: bool = False) -> dict | None:
     out["claim"] = out["claim"][:20]
     f = i.get("fix") if isinstance(i.get("fix"), dict) else None
     out["fix"] = clean_fix(f) if f and out["action_group"] == "do_now" else None
+    out["checks"] = clean_checks(i.get("checks"))
+    out["optomate"] = clean_optomate(i.get("optomate"))
     return out
+
+
+def clean_checks(rows) -> list:
+    """Red / amber checks the agent found by comparing Optomate with the Hub (21 Oct 2026)."""
+    out = []
+    for c in (rows if isinstance(rows, list) else [])[:6]:
+        if isinstance(c, dict) and c.get("level") in ("red", "amber") and c.get("text"):
+            out.append({"level": c["level"], "text": _s(c.get("text"), 200)})
+    return out
+
+
+def clean_optomate(o):
+    """What Optomate shows done to the line, and under which login (21 Oct 2026)."""
+    if not isinstance(o, dict) or not o.get("what"):
+        return None
+    return {"what": _s(o.get("what"), 60), "at": _s(o.get("at"), 16),
+            "login": re.sub(r"[^\w]", "", _s(o.get("login"), 8)), "who": _s(o.get("who"), 40)}
+
+
+LOGIN_NOTE_FOR = ("mark", "karen")       # Mark, 21 Oct 2026: the other-login note is for Mark and Karen
+
+
+def clean_login_note(n, viewer: str):
+    if not isinstance(n, dict) or str(viewer or "").strip().lower() not in LOGIN_NOTE_FOR:
+        return None
+    count = _int_or_none(n.get("n"))
+    if not count:
+        return None
+    return {"n": count, "days": _int_or_none(n.get("days")) or 30,
+            "hub_name": _s(n.get("hub_name"), 40), "login": re.sub(r"[^\w]", "", _s(n.get("login"), 8)),
+            "login_name": _s(n.get("login_name"), 40)}
 
 
 def _line(x) -> dict:
@@ -206,7 +246,7 @@ def clean_today(rows) -> list:
     return out
 
 
-def worklist(cfg: dict, fixture: bool = False, mark_view: bool = False) -> dict:
+def worklist(cfg: dict, fixture: bool = False, mark_view: bool = False, viewer: str = "") -> dict:
     """The page's data. Never raises. Note snippets only for Mark; everyone else sees
     the review lines as "Mark to review the item" under Awaiting Mark (Codex #5)."""
     # Option C (13 Oct 2026): no review step, so no note snippets for anyone (--review not sent)
@@ -235,6 +275,11 @@ def worklist(cfg: dict, fixture: bool = False, mark_view: bool = False) -> dict:
         "today": clean_today(data.get("today")),
         "today_error": _s(data.get("today_error"), 80),
         "pin_set": bool(data.get("pin_set")),
+        "checks": {"red": _int_or_none((data.get("checks") or {}).get("red")) or 0,
+                   "amber": _int_or_none((data.get("checks") or {}).get("amber")) or 0},
+        "optomate_read": bool(data.get("optomate_read")),
+        "optomate_error": _s(data.get("optomate_error"), 120),
+        "login_note": clean_login_note(data.get("login_note"), viewer),
     }
 
 
