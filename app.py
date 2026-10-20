@@ -594,7 +594,7 @@ def medicare_list():
     is logged. Item review cards (note snippets) only when the name picked is Mark."""
     from hub import medicare
     who = request.cookies.get("hub_staff") or ""
-    resp = jsonify(medicare.worklist(_integrations(), _medicare_fixture(), medicare.is_mark(who)))
+    resp = jsonify(medicare.worklist(_integrations(), _medicare_fixture(), medicare.is_mark(who), viewer=who))
     resp.headers["Cache-Control"] = "no-store"
     return resp
 

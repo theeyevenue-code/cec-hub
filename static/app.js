@@ -2946,10 +2946,10 @@ async function renderCheckinCheck(token, flash) {
    written off or accepted automatically. Given name + surname initial only. */
 
 const MC_FOLDED = [
-    { id: "written_off", title: "Written off", note: "Done in Optomate. Off the list." },
+    { id: "waiting", title: "Waiting for Medicare", note: "Resubmitted in Optomate. Moves to Paid only when Medicare's report shows it paid." },
+    { id: "written_off", title: "Written off", note: "Amber: written off on the Hub only. Do it in Optomate too." },
     { id: "expired", title: "Expired", note: "Past the time limit (2 yrs before 5 Sep 2025, 1 yr after). Medicare won't pay." },
-    { id: "waiting", title: "Waiting for payment", note: "Resubmitted. Closes itself when Medicare pays." },
-    { id: "recovered", title: "Paid since", note: "Medicare has paid. Nothing to do." },
+    { id: "recovered", title: "Paid since", note: "Medicare's report shows it paid. Nothing to do." },
 ];
 const MC_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MC_URGENT_DAYS = 31;
@@ -3010,6 +3010,47 @@ function mcAnswerHTML(d) {
     return html + unrep;
 }
 
+/* 21 Oct 2026: Optomate vs the Hub. Red = act on it; amber = a reminder. One line per patient. */
+const MC_LANE_WORD = { do_now: "Do now", waiting: "Waiting", written_off: "Written off", expired: "Expired",
+    recovered: "Paid", mark: "Mark", review: "Mark" };
+function mcCheckList(i) {
+    return (i.checks || []).map((c) => `<span class="mc-check mc-check-${c.level === "red" ? "red" : "amber"}">${esc(mcText(c.text))}</span>`).join("");
+}
+function mcOptText(o) {
+    return `Optomate: ${o.what} · ${mcDate(o.at)}${o.at.length > 10 ? " " + o.at.slice(11, 16) : ""} · login ${o.who || o.login}`;
+}
+function mcChecksHTML(d) {
+    const rows = (d.items || []).filter((i) => (i.checks || []).length);
+    const red = (i) => ((i.checks || []).some((c) => c.level === "red") ? 1 : 0);
+    const left = (i) => (i.days_left === null || i.days_left === undefined ? 99999 : i.days_left);
+    rows.sort((a, b) => (red(b) - red(a)) || (left(a) - left(b)));
+    const err = d.optomate_error ? `<p class="mc-check-err">${esc(d.optomate_error)}</p>` : "";
+    if (!rows.length) return err;
+    const nRed = rows.filter(red).length;
+    const nAmb = rows.length - nRed;
+    const sum = [nRed ? `${nRed} red` : "", nAmb ? mcPlural(nAmb, "reminder") : ""].filter(Boolean).join(" · ");
+    return `${err}<section class="mc-checks" id="mc-checks">
+        <h2 class="mc-h2">Check these first <span class="mc-g-sum">${esc(sum)}</span></h2>
+        <p class="mc-instr">Optomate and the Hub don't agree on these. Red: fix it in Optomate.</p>
+        <div class="mc-scroll"><table class="mc-table mc-check-t">
+        <thead><tr><th>Patient</th><th>Visit</th><th class="mc-num">Item</th><th>Check</th><th>List</th></tr></thead><tbody>
+        ${rows.map((i) => `<tr>
+            <td class="mc-pt"><strong>${esc(i.patient_label)}</strong></td>
+            <td class="mc-date">${esc(mcDate(i.service_date))}</td>
+            <td class="mc-num"><strong>${esc(i.item)}</strong></td>
+            <td class="mc-check-cell">${mcCheckList(i)}${i.optomate ? `<span class="mc-opt">${esc(mcOptText(i.optomate))}</span>` : ""}</td>
+            <td class="mc-small-cell">${esc(MC_LANE_WORD[i.action_group] || "")}</td></tr>`).join("")}
+        </tbody></table></div></section>`;
+}
+/* Neutral wording, for Mark and Karen only (the server sends it to nobody else). */
+function mcLoginNoteHTML(d) {
+    const n = d.login_note;
+    if (!n) return "";
+    const login = n.login_name ? `${n.login} (${n.login_name})` : n.login;
+    return `<p class="mc-login-note">${n.n} Medicare changes in the last ${n.days} days were saved under Optomate login ${esc(login)}
+        while ${esc(n.hub_name)} was ticking this list. <span class="mc-small">Logging in as yourself keeps Optomate's record of who did what accurate.</span></p>`;
+}
+
 /* Tiles, zero ones hidden. Each one leads somewhere on the page. */
 function mcChipsHTML(d) {
     const now = mcSum(d, ["do_now"]);
@@ -3023,7 +3064,8 @@ function mcChipsHTML(d) {
     const tiles = [
         now.n ? chip("mc-c-now", "do_now", `Do now · ${mcMoney(now.amount)}`, mcPlural(now.n, "claim")) : "",
         aw.n ? chip("mc-c-mark", markJump, `${aw.n} awaiting Mark`, aw.parts) : "",
-        wait.n ? chip("mc-c-wait", "waiting", `${wait.n} waiting for payment`, mcMoney(wait.amount)) : "",
+        (d.checks || {}).red ? chip("mc-c-check", "checks", `${d.checks.red} to check`, "Optomate vs Hub") : "",
+        wait.n ? chip("mc-c-wait", "waiting", `${wait.n} waiting for Medicare`, mcMoney(wait.amount)) : "",
     ].join("");
     return tiles ? `<div class="mc-chips">${tiles}</div>` : "";
 }
@@ -3046,7 +3088,7 @@ function mcButtons(i, d) {
     const st = i.status || {};
     const who = st.by ? `<span class="mc-who">${esc(st.by)} · ${esc(mcDate(st.at))}</span>` : "";
     if (g === "waiting" || g === "written_off") {
-        return `${who}<button class="btn btn-quiet mc-btn" data-mc="open">Undo</button>`;
+        return st.status ? `${who}<button class="btn btn-quiet mc-btn" data-mc="open">Undo</button>` : "";
     }
     if (g === "expired") return `<button class="btn btn-quiet mc-btn" data-mc="written_off">Written off</button>`;
     const writeOff = (i.code === "" && !i.item_change) || st.status === "not_eligible";
@@ -3070,7 +3112,8 @@ function mcRowHTML(i, d) {
         i.code ? `Medicare code ${esc(i.code)}: ${esc(i.meaning)}` : esc(i.meaning),
         i.fact ? esc(mcText(i.fact)) : "",
     ].filter(Boolean);
-    return `<tr class="${urgent ? "mc-urgent" : ""}" data-key="${esc(i.key)}">
+    const cls = [urgent ? "mc-urgent" : "", i.action_group === "expired" ? "mc-expired" : ""].filter(Boolean).join(" ");
+    return `<tr class="${cls}" data-key="${esc(i.key)}">
         <td class="mc-pt"><strong>${esc(i.patient_label)}</strong></td>
         <td class="mc-num mc-item"><strong>${item}</strong></td>
         <td class="mc-date"><strong>${esc(mcDate(i.deadline)) || "—"}</strong>
@@ -3079,6 +3122,8 @@ function mcRowHTML(i, d) {
         <td class="mc-todo"><span class="mc-step">${esc(mcText(i.steps))}</span>
             ${i.claim_note ? `<span class="mc-note">Claim note: “${esc(i.claim_note)}”</span>` : ""}
             ${i.flag ? `<span class="mc-flag">${esc(mcText(i.flag))}</span>` : ""}
+            ${mcCheckList(i)}
+            ${i.optomate ? `<span class="mc-opt">${esc(mcOptText(i.optomate))}</span>` : ""}
             <span class="mc-small">Seen ${esc(mcDate(i.service_date))} · Claim ${esc(i.claim)}</span>
             ${details.length ? `<details class="mc-more"><summary>Details</summary>${details.map((x) => `<span class="mc-small">${x}</span>`).join("")}</details>` : ""}</td>
         <td class="mc-act">${mcButtons(i, d)}</td>
@@ -3159,7 +3204,8 @@ function mcRowHTMLOne(i, d) {
         <td class="mc-chg"><span class="mc-from">${esc(i.item)}</span> → ${pick}
             <span class="mc-small mc-cn"${note ? "" : " hidden"}>Note: “<span class="mc-cn-text">${esc(note)}</span>”</span></td>
         <td class="mc-num">${mcMoney(i.amount)}</td>
-        <td class="mc-why">${esc(mcText(f.why))}${urgent ? ` <span class="mc-red">· ${esc(mcLeft(i))}</span>` : ""}
+        <td class="mc-why">${esc(mcText(f.why))}
+            <span class="mc-left${urgent ? " mc-red" : ""}">${esc(mcLeft(i))}</span>${mcCheckList(i)}
             <details class="mc-fold"><summary aria-label="Details">▸</summary>${more.map((x) => `<span class="mc-small">${x}</span>`).join("")}${undo}</details></td>
     </tr>`;
 }
@@ -3281,11 +3327,13 @@ async function renderMedicare() {
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Medicare${d.fixture ? ` <span class="chip chip-amber">Test data, not real patients</span>` : ""}</h1>
         ${mcAnswerHTML(d)}
+        ${mcLoginNoteHTML(d)}
         ${mcChipsHTML(d)}
+        ${mcChecksHTML(d)}
         ${mcDoNowHTML(d)}
         ${mcTodayHTML(d)}
         ${MC_FOLDED.map((g) => mcFoldedHTML(g, d)).join("")}
-        <p class="mc-foot">Read from Optomate ${esc(d.generated_at)}. Red: resubmit within a month. Patients show first name and initial only.</p>
+        <p class="mc-foot">Read from Optomate ${esc(d.generated_at)}. Red date: resubmit within a month. Status follows Optomate; Paid follows Medicare's report.</p>
     </div>`;
     if (openNow) {
         view.querySelectorAll("details.mc-group").forEach((x) => { x.open = openNow.includes(x.id); });
