@@ -662,6 +662,76 @@ def stock_approve():
     })
 
 
+# --- Frame stocktake (TEST MODE: counts only, nothing goes into Optomate) ----------
+# Sessions live in data\stocktake\ (git-ignored): barcodes, areas, counts, staff first
+# names. Frame details come from the agent's read-only catalogue (hub/stocktake.py).
+
+def _st_cat(force=False):
+    from hub import stocktake
+    return stocktake.get_catalogue(_integrations(), force=force)
+
+
+def _st_call(fn, *args):
+    try:
+        out = fn(*args)
+    except (FileNotFoundError, ValueError):
+        return _json((404, {"error": "That stocktake session isn't there any more. Go back and pick one."}))
+    return _json((200 if out.get("ok") or "sessions" in out or "rows" in out else 400, out))
+
+
+@app.route("/api/stocktake/sessions", methods=["GET", "POST"])
+def stocktake_sessions():
+    from hub import stocktake
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        return _st_call(stocktake.create_session, data.get("name"), request.cookies.get("hub_staff"))
+    return _st_call(stocktake.list_sessions)
+
+
+@app.route("/api/stocktake/session/<sid>")
+def stocktake_session(sid):
+    from hub import stocktake
+    return _st_call(lambda: stocktake.session_view(sid, _st_cat()))
+
+
+@app.route("/api/stocktake/session/<sid>/<action>", methods=["POST"])
+def stocktake_action(sid, action):
+    from hub import stocktake
+    data = request.get_json(silent=True) or {}
+    by = request.cookies.get("hub_staff")
+    if action == "scan":
+        return _st_call(stocktake.scan, sid, data.get("barcode"), data.get("area"), by, _st_cat)
+    if action == "adjust":
+        try:
+            delta = int(data.get("delta"))
+        except (TypeError, ValueError):
+            delta = 0
+        return _st_call(stocktake.adjust, sid, data.get("barcode"), data.get("area"), delta, by)
+    if action == "undo":
+        return _st_call(stocktake.undo, sid, by)
+    if action == "unlabelled":
+        return _st_call(stocktake.add_unlabelled, sid, data, by)
+    if action == "unlabelled-remove":
+        return _st_call(stocktake.remove_unlabelled, sid, str(data.get("id") or ""), by)
+    return _json((404, {"error": "Unknown stocktake action."}))
+
+
+@app.route("/api/stocktake/suppliers")
+def stocktake_suppliers():
+    """Optomate supplier codes + names for the unlabelled form's pick list."""
+    cat = _st_cat()
+    sups = sorted(({"id": k, "name": v} for k, v in (cat.get("suppliers") or {}).items()),
+                  key=lambda s: s["id"])
+    return _json((200, {"suppliers": sups}))
+
+
+@app.route("/api/stocktake/refresh", methods=["POST"])
+def stocktake_refresh():
+    cat = _st_cat(force=True)
+    return _json((200, {"ok": not cat.get("error"), "frames": len(cat["frames"]),
+                        "loaded": cat.get("loaded"), "error": cat.get("error")}))
+
+
 # --- Scanner card (read live from the Second Brain clone) -------------------
 
 @app.route("/api/scanner-card")

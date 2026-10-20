@@ -9,6 +9,13 @@
       "link": "#/checkin"
     },
     {
+      "id": "stocktake",
+      "icon": "",
+      "name": "Stocktake",
+      "description": "Scan every frame on the shelves. Counting only - Optomate is not changed",
+      "link": "#/stocktake"
+    },
+    {
       "id": "todo",
       "icon": "✅",
       "name": "To-do list",

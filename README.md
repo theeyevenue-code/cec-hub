@@ -229,6 +229,25 @@ Pressing "Approved — mark for entry" renames the proposal file from
 pressed it. **That's all.** The actual entry into Optomate stays a
 supervised/CLI step run by Mark/Claude. Nothing is ordered automatically.
 
+## Stocktake (frames) - built 21 Oct 2026, TEST MODE
+
+`#/stocktake` (home tile "Stocktake"). Staff start a count, type an area ("Wall 1",
+"Drawer 3") and scan every frame: the big box keeps focus, the scanner types the barcode
++ Enter, each scan adds one. Rows show the frame, supplier, Sell and Optomate's stock at
+MJ; amber = barcode not in Optomate. Undo last scan, +1 / -1 per row, and a form for
+frames with no label (supplier, model, colour, size, qty). Counting can stop and resume:
+pick the count again, tap an area.
+
+- Sessions: `data\stocktake\<id>.json` (git-ignored; barcodes, areas, counts, staff first
+  names - no patient data). `CEC_HUB_STOCKTAKE_DIR` repoints it (tests, the 5699 copy).
+- Frame details: the agent's read-only `python -m inventory.stocktake catalogue --json`,
+  run once and cached 30 min (Refresh button forces it). If the agent can't be reached,
+  scans are still saved and rows say "Optomate not connected".
+- **Nothing here changes Optomate.** The agent reconciles (`python -m inventory.stocktake
+  reconcile`) into a page Mark approves; any stock write is a separate gated step there.
+- Needs a Hub restart after merge (the running Hub is started elevated by the "CEC Hub
+  Watchdog" task).
+
 ## For developers / future Claude sessions
 
 ```

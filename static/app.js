@@ -75,6 +75,8 @@ const routes = [
     { re: /^#\/medicare$/, fn: renderMedicare },
     { re: /^#\/checkin$/, fn: renderCheckin },
     { re: /^#\/checkin\/([0-9a-f]{32})$/, fn: (m) => renderCheckinCheck(m[1]) },
+    { re: /^#\/stocktake$/, fn: renderStocktakeList },
+    { re: /^#\/stocktake\/(\d{8}-\d{4}-[0-9a-f]{4})$/, fn: (m) => renderStocktake(m[1]) },
     { re: /^#\/scanner$/, fn: renderScanner },
     { re: /^#\/scanner-settings$/, fn: renderScanner },   // old link, same page
     { re: /^#\/scanner-help$/, fn: renderScannerHelp },
@@ -3390,6 +3392,311 @@ function mcBindList(d) {
         window.addEventListener("afterprint", done);
         window.print();
     });
+}
+
+/* --- Frame stocktake (#/stocktake) --------------------------------------------------
+   TEST MODE: counts only. The scanner types the barcode + Enter into the big box, which
+   keeps focus. Each scan is saved on the server first, then the row shows what Optomate
+   says. Nothing on this page changes Optomate. */
+
+function stWhen(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleString("en-AU", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+}
+
+function stMoney(v) { return v == null || v === "" ? "" : "$" + Number(v).toFixed(2); }
+
+async function renderStocktakeList() {
+    view.innerHTML = `<div class="loading-panel">Getting the counts…</div>`;
+    let d;
+    try { d = await getJSON("/api/stocktake/sessions"); } catch (e) { view.innerHTML = errorPanel(e.message); return; }
+    const rows = (d.sessions || []).map((s) => `<tr>
+        <td class="st-num">${esc(s.frames + s.unlabelled)}</td>
+        <td><a href="#/stocktake/${esc(s.id)}">${esc(s.name)}</a></td>
+        <td>${esc(stWhen(s.updated))}</td></tr>`).join("");
+    view.innerHTML = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Stocktake</h1>
+        <p class="page-sub">Scan every frame on the shelves. Counting only — Optomate is not changed.</p>
+        <div class="card">
+            <h2>Start a count</h2>
+            <div class="st-new">
+                <input id="st-name" class="st-input" maxlength="60" placeholder="Name, e.g. Frames Oct 2026">
+                <button class="btn" id="st-start">Start</button>
+            </div>
+            <div class="status-msg" id="st-msg"></div>
+        </div>
+        ${rows ? `<div class="card"><h2>Carry on a count</h2><div class="table-scroll"><table class="st-table">
+            <thead><tr><th class="st-num">Frames</th><th>Count</th><th>Last scan</th></tr></thead>
+            <tbody>${rows}</tbody></table></div></div>` : ""}`;
+    document.getElementById("st-start").addEventListener("click", async () => {
+        const msg = document.getElementById("st-msg");
+        try {
+            const r = await postJSON("/api/stocktake/sessions", { name: document.getElementById("st-name").value });
+            location.hash = "#/stocktake/" + r.id;
+        } catch (e) { msg.className = "status-msg error"; msg.textContent = e.message; }
+    });
+}
+
+const ST = { sid: null, rows: [], queue: Promise.resolve(), busy: 0 };
+
+function stArea() { const a = document.getElementById("st-area"); return a ? a.value.trim() : ""; }
+
+function stFocus() {
+    const box = document.getElementById("st-scan");
+    if (!box) return;
+    const a = document.activeElement;
+    // leave the area box and the unlabelled form alone while someone is typing there
+    if (a && a !== box && a.closest && a.closest(".st-keepfocus")) return;
+    box.focus();
+}
+
+function stSaveArea(sid, area) { try { localStorage.setItem("st-area-" + sid, area); } catch (e) { /* optional */ } }
+function stLoadArea(sid) { try { return localStorage.getItem("st-area-" + sid) || ""; } catch (e) { return ""; } }
+
+function stRowClass(r) {
+    if (r.state === "unknown") return "st-unknown";
+    if (r.state === "offline") return "st-offline";
+    return "";
+}
+
+function stNote(r) {
+    if (r.state === "unknown") return `<span class="chip chip-amber">Not in Optomate</span>`;
+    if (r.kind === "sunglass") return `<span class="chip st-chip-note">Sunglass</span>`;
+    if (r.status && r.status !== "C") return `<span class="chip st-chip-note">Not current (${esc(r.status)})</span>`;
+    return "";
+}
+
+function stRowsHTML() {
+    if (!ST.rows.length) return `<tr><td colspan="7" class="st-empty">Nothing scanned yet.</td></tr>`;
+    return ST.rows.map((r) => `<tr class="${stRowClass(r)}" data-bc="${esc(r.barcode)}">
+        <td class="st-num st-count">${esc(r.count)}</td>
+        <td><span class="st-desc">${esc(r.state === "unknown" ? "" : r.description || "")}</span> ${stNote(r)}<br>
+            <span class="st-bc">${esc(r.barcode)}</span></td>
+        <td>${esc(r.supplier || "")}</td>
+        <td class="st-num">${esc(stMoney(r.sell))}</td>
+        <td class="st-num">${r.qoh == null ? "" : esc(r.qoh)}</td>
+        <td>${esc((r.areas || []).join(", "))}</td>
+        <td class="st-pm"><button class="st-btn" data-d="-1" aria-label="One less">−1</button>
+            <button class="st-btn" data-d="1" aria-label="One more">+1</button></td></tr>`).join("");
+}
+
+function stDraw(d) {
+    if (d) {
+        document.getElementById("st-total").textContent = d.totals.frames + d.totals.unlabelled;
+        document.getElementById("st-undo").disabled = !d.can_undo;
+    }
+    document.getElementById("st-rows").innerHTML = stRowsHTML();
+}
+
+function stLast(r, err) {
+    const box = document.getElementById("st-last");
+    if (err) {
+        box.className = "st-last st-last-err";
+        box.innerHTML = `<b>${esc(err)}</b>`;
+        return;
+    }
+    box.className = "st-last " + (r.state === "ok" ? "st-last-ok" : r.state === "unknown" ? "st-last-unknown" : "st-last-offline");
+    const opt = r.state === "ok" ? ` · Optomate ${esc(r.qoh)} · ${esc(stMoney(r.sell))}` : "";
+    box.innerHTML = `<span class="st-last-count">${esc(r.count)}</span>
+        <span><b>${esc(r.description || "")}</b><br><small>${esc(r.barcode)} ${esc(r.supplier || "")}${opt}</small></span>`;
+}
+
+function stUpsert(r) {
+    const i = ST.rows.findIndex((x) => x.barcode === r.barcode);
+    const old = i >= 0 ? ST.rows.splice(i, 1)[0] : { areas: [] };
+    const areas = old.areas || [];
+    const area = stArea() || "No area";
+    if (!areas.includes(area)) areas.push(area);
+    ST.rows.unshift({ ...old, ...r, areas });
+}
+
+function stScan(code) {
+    const sid = ST.sid;
+    ST.busy++;
+    ST.queue = ST.queue.then(async () => {
+        try {
+            const r = await postJSON(`/api/stocktake/session/${sid}/scan`, { barcode: code, area: stArea() });
+            if (ST.sid !== sid) return;
+            stUpsert(r);
+            stLast(r);
+            document.getElementById("st-total").textContent = r.totals.frames + r.totals.unlabelled;
+            document.getElementById("st-undo").disabled = false;
+            stDraw();
+        } catch (e) {
+            if (ST.sid === sid) stLast(null, `Not saved: ${code} — ${e.message} Scan it again.`);
+        } finally { ST.busy--; }
+    });
+}
+
+async function stReload() {
+    const d = await getJSON(`/api/stocktake/session/${ST.sid}`);
+    ST.rows = d.rows || [];
+    stDraw(d);
+    stDrawSide(d);
+    return d;
+}
+
+function stDrawSide(d) {
+    document.getElementById("st-areas").innerHTML = (d.areas || []).map((a) =>
+        `<tr><td class="st-num">${esc(a.frames)}</td><td><button class="st-linkbtn" data-area="${esc(a.area)}">${esc(a.area)}</button></td>
+         <td>${esc(stWhen(a.last))}</td></tr>`).join("") || `<tr><td colspan="3" class="st-empty">No areas yet.</td></tr>`;
+    document.getElementById("st-ul-rows").innerHTML = (d.unlabelled || []).map((u) =>
+        `<tr><td class="st-num">${esc(u.qty)}</td><td>${esc([u.supplier, u.model, u.colour, u.size].filter(Boolean).join(" · "))}</td>
+         <td>${esc(u.area)}</td><td><button class="st-linkbtn" data-ul="${esc(u.id)}">Remove</button></td></tr>`).join("")
+        || `<tr><td colspan="4" class="st-empty">None yet.</td></tr>`;
+    const c = d.catalogue || {};
+    document.getElementById("st-cat").textContent = c.error
+        ? c.error : `Optomate frame list read ${stWhen(c.loaded)} (${c.frames} items).`;
+}
+
+async function renderStocktake(sid) {
+    ST.sid = sid;
+    ST.rows = [];
+    view.innerHTML = `
+        <a class="btn btn-quiet btn-back" href="#/stocktake">← All counts</a>
+        <h1 class="page-title" id="st-title">Stocktake</h1>
+        <div class="card st-top">
+            <div class="st-bar">
+                <label class="st-keepfocus st-arealabel">Area
+                    <input id="st-area" class="st-input" maxlength="40" placeholder="Wall 1"></label>
+                <label class="st-scanlabel">Scan
+                    <input id="st-scan" class="st-input st-scan" autocomplete="off" spellcheck="false"
+                        placeholder="Scan a frame…" aria-label="Scan a frame barcode"></label>
+                <div class="st-totalbox"><span id="st-total">0</span><small>counted</small></div>
+            </div>
+            <div id="st-last" class="st-last"><span class="st-hint">Each scan adds one. Same frame twice = 2.</span></div>
+            <div class="st-actions">
+                <button class="btn btn-quiet" id="st-undo" disabled>Undo last scan</button>
+                <button class="btn btn-quiet" id="st-refresh">Refresh from Optomate</button>
+                <span class="st-cat" id="st-cat"></span>
+            </div>
+        </div>
+        <p class="st-key"><span class="chip chip-amber">Not in Optomate</span> check the label
+            <span class="chip st-chip-note">Sunglass / Not current</span> counted, but note it</p>
+        <div class="card"><div class="table-scroll"><table class="st-table">
+            <thead><tr><th class="st-num">Count</th><th>Frame</th><th>Supplier</th><th class="st-num">Sell</th>
+            <th class="st-num">Optomate</th><th>Area</th><th></th></tr></thead>
+            <tbody id="st-rows"><tr><td colspan="7" class="st-empty">Loading…</td></tr></tbody></table></div></div>
+        <div class="card st-keepfocus">
+            <h2>No label? Add it here</h2>
+            <div class="st-ulform">
+                <label>Supplier<input id="st-ul-supplier" class="st-input" list="st-suppliers" maxlength="60"></label>
+                <label>Model<input id="st-ul-model" class="st-input" maxlength="60"></label>
+                <label>Colour<input id="st-ul-colour" class="st-input" maxlength="60"></label>
+                <label>Size<input id="st-ul-size" class="st-input" maxlength="20" placeholder="52-18"></label>
+                <label>Qty<input id="st-ul-qty" class="st-input" type="number" min="1" max="99" value="1"></label>
+                <button class="btn" id="st-ul-add">Add</button>
+            </div>
+            <datalist id="st-suppliers"></datalist>
+            <div class="status-msg" id="st-ul-msg"></div>
+            <div class="table-scroll"><table class="st-table"><thead><tr><th class="st-num">Qty</th><th>Frame</th><th>Area</th><th></th></tr></thead>
+                <tbody id="st-ul-rows"></tbody></table></div>
+        </div>
+        <div class="card"><h2>Areas</h2><p class="st-small">Tap an area to carry on counting it.</p>
+            <div class="table-scroll"><table class="st-table"><thead><tr><th class="st-num">Frames</th><th>Area</th><th>Last scan</th></tr></thead>
+            <tbody id="st-areas"></tbody></table></div></div>`;
+
+    const scan = document.getElementById("st-scan");
+    const area = document.getElementById("st-area");
+    let d;
+    try {
+        d = await stReload();
+    } catch (e) { view.innerHTML = errorPanel(e.message); return; }
+    document.getElementById("st-title").textContent = d.name || "Stocktake";
+    area.value = stLoadArea(sid) || ((d.areas || [])[0] || {}).area || "";
+    if (!ST.clickWired) {
+        // a click on empty page space puts the cursor back in the scan box
+        ST.clickWired = true;
+        document.addEventListener("click", (e) => {
+            if (!location.hash.startsWith("#/stocktake/")) return;
+            if (e.target.closest("input, select, textarea, a, label")) return;
+            setTimeout(stFocus, 0);
+        });
+    }
+
+    scan.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== "Tab") return;
+        e.preventDefault();
+        const code = scan.value.trim();
+        scan.value = "";
+        if (code) stScan(code);
+    });
+    scan.addEventListener("blur", () => setTimeout(() => {
+        const a = document.activeElement;
+        if (location.hash === "#/stocktake/" + sid && (!a || a === document.body)) stFocus();
+    }, 200));
+    area.addEventListener("change", () => stSaveArea(sid, area.value.trim()));
+    area.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); stSaveArea(sid, area.value.trim()); scan.focus(); }
+    });
+    document.getElementById("st-undo").addEventListener("click", async () => {
+        await ST.queue;
+        try {
+            const r = await postJSON(`/api/stocktake/session/${sid}/undo`, {});
+            stLast(null, `Undone: one scan of ${r.barcode}`);
+            await stReload();
+        } catch (e) { stLast(null, e.message); }
+        stFocus();
+    });
+    document.getElementById("st-refresh").addEventListener("click", async (e) => {
+        e.target.disabled = true;
+        document.getElementById("st-cat").textContent = "Reading Optomate…";
+        try { await postJSON("/api/stocktake/refresh", {}); await stReload(); }
+        catch (err) { document.getElementById("st-cat").textContent = err.message; }
+        e.target.disabled = false;
+        stFocus();
+    });
+    document.getElementById("st-rows").addEventListener("click", async (e) => {
+        const b = e.target.closest("button[data-d]");
+        if (!b) return;
+        const bc = b.closest("tr").dataset.bc;
+        await ST.queue;
+        try {
+            const r = await postJSON(`/api/stocktake/session/${sid}/adjust`, { barcode: bc, area: stArea(), delta: Number(b.dataset.d) });
+            const row = ST.rows.find((x) => x.barcode === bc);
+            if (row) row.count = r.count;
+            document.getElementById("st-total").textContent = r.totals.frames + r.totals.unlabelled;
+            stDraw();
+        } catch (err) { stLast(null, err.message); }
+        stFocus();
+    });
+    document.getElementById("st-areas").addEventListener("click", (e) => {
+        const b = e.target.closest("button[data-area]");
+        if (!b) return;
+        area.value = b.dataset.area;
+        stSaveArea(sid, area.value);
+        stFocus();
+        window.scrollTo(0, 0);
+    });
+    document.getElementById("st-ul-rows").addEventListener("click", async (e) => {
+        const b = e.target.closest("button[data-ul]");
+        if (!b || !confirm("Remove this unlabelled frame from the count?")) return;
+        try { await postJSON(`/api/stocktake/session/${sid}/unlabelled-remove`, { id: b.dataset.ul }); await stReload(); }
+        catch (err) { document.getElementById("st-ul-msg").textContent = err.message; }
+    });
+    document.getElementById("st-ul-add").addEventListener("click", async () => {
+        const msg = document.getElementById("st-ul-msg");
+        const val = (id) => document.getElementById(id).value;
+        try {
+            await postJSON(`/api/stocktake/session/${sid}/unlabelled`, {
+                supplier: val("st-ul-supplier"), model: val("st-ul-model"), colour: val("st-ul-colour"),
+                size: val("st-ul-size"), qty: val("st-ul-qty"), area: stArea() });
+            msg.className = "status-msg ok";
+            msg.textContent = "Added.";
+            ["st-ul-model", "st-ul-colour", "st-ul-size"].forEach((id) => { document.getElementById(id).value = ""; });
+            document.getElementById("st-ul-qty").value = "1";
+            await stReload();
+        } catch (err) { msg.className = "status-msg error"; msg.textContent = err.message; }
+        scan.focus();
+    });
+    try {
+        const s = await getJSON("/api/stocktake/suppliers");
+        document.getElementById("st-suppliers").innerHTML = (s.suppliers || []).map((x) =>
+            `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("");
+    } catch (e) { /* the list is a convenience only */ }
+    stFocus();
 }
 
 /* --- Go ---------------------------------------------------------------------------- */

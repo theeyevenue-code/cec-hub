@@ -1787,6 +1787,8 @@ body.lens-mono main { background: #fafafa; }
     body.mc-print-batch .mc-to-off { background: none; border: 1pt solid #000; }
     body.mc-print-batch .mc-to-pick { appearance: none; -webkit-appearance: none; border: none; padding: 0;
         min-height: 0; font-size: 12pt; background: none; }
+}   /* closes @media print - lost in the 13 Oct conflict cleanup (96dd065), which left every rule
+       below (lens-table, phone to-do rows, .ci-why) applying only when printing */
 
 /* --- Bug fixes on the existing design (13 Oct 2026, from Codex's review) -------------
    1. .lens-table (Recalls, Payment follow-ups, invoice detail) had no rule at all, so
@@ -1816,3 +1818,57 @@ body.lens-mono main { background: #fafafa; }
 
 /* Check-in: why a form waits for a person (self check-in, 13 Oct 2026) */
 .ci-why { font-size: 14px; color: var(--amber-ink); margin-top: 4px; }
+
+/* --- Frame stocktake (#/stocktake) ---------------------------------------------------
+   Answer first: the count and the last scan are the biggest things. Amber = not in
+   Optomate; violet = counted but worth a note (sunglass / not current); grey = offline. */
+.st-input { font: inherit; font-size: 19px; padding: 10px 14px; border: 2px solid var(--line);
+    border-radius: 12px; background: var(--paper); color: var(--body); width: 100%; min-height: 52px; }
+.st-input:focus { outline: none; border-color: var(--green-deep); }
+.st-new { display: flex; gap: 12px; flex-wrap: wrap; }
+.st-new .st-input { flex: 1 1 260px; }
+.st-bar { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(220px, 3fr) auto; gap: 16px; align-items: end; }
+.st-bar label { display: flex; flex-direction: column; gap: 4px; font-size: 17px; font-weight: 600; color: var(--muted); }
+.st-scan { font-size: 26px; min-height: 64px; border-color: var(--green); }
+.st-totalbox { text-align: right; line-height: 1.1; }
+.st-totalbox span { display: block; font-size: 48px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.st-totalbox small { font-size: 16px; color: var(--muted); }
+.st-last { display: flex; gap: 18px; align-items: center; margin-top: 16px; padding: 12px 16px;
+    border-radius: 12px; border: 2px solid var(--line); min-height: 72px; font-size: 20px; }
+.st-last-count { font-size: 40px; font-weight: 800; min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+.st-last-ok { border-color: var(--green); background: #f1f8f4; }
+.st-last-unknown { border-color: var(--amber-line); background: var(--amber-bg); color: var(--amber-ink); }
+.st-last-offline { border-color: #bbb; background: #f2f2f2; }
+.st-last-err { border-color: var(--danger-ink); background: var(--danger-bg); color: var(--danger-ink); }
+.st-hint { color: var(--muted); font-size: 18px; }
+.st-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.st-actions .btn { min-height: 48px; font-size: 18px; padding: 8px 18px; }
+.st-cat, .st-small { font-size: 15px; color: var(--muted); }
+.st-key { font-size: 16px; color: var(--muted); margin: 0 0 12px; }
+.st-key .chip { margin: 0 4px 0 12px; }
+.st-table { width: 100%; border-collapse: collapse; font-size: 17px; }
+.st-table th { text-align: left; font-size: 15px; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 2px solid var(--line); }
+.st-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.st-num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.st-count { font-size: 22px; font-weight: 800; color: var(--ink); }
+.st-desc { font-weight: 600; }
+.st-bc { font-size: 15px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.st-unknown td { background: var(--amber-bg); }
+.st-offline td { background: #f4f4f4; }
+.st-table .chip { font-size: 14px; padding: 2px 10px; }
+.st-chip-note { background: #f1ecfb; border-color: #9b87d0; color: #3f2a78; font-size: 14px; padding: 2px 10px; }
+.st-pm { white-space: nowrap; text-align: right; }
+.st-btn { font: inherit; font-size: 17px; font-weight: 700; min-width: 48px; min-height: 40px; border-radius: 10px;
+    border: 2px solid var(--green-deep); background: var(--paper); color: var(--green-deep); cursor: pointer; }
+.st-btn:hover { background: var(--mint-soft); }
+.st-linkbtn { font: inherit; background: none; border: none; color: var(--green-deep); text-decoration: underline; cursor: pointer; padding: 0; }
+.st-empty { color: var(--muted); text-align: center; padding: 18px; }
+.st-ulform { display: grid; grid-template-columns: 2fr 2fr 1.5fr 1fr 0.8fr auto; gap: 12px; align-items: end; margin-bottom: 8px; }
+.st-ulform label { display: flex; flex-direction: column; gap: 4px; font-size: 17px; font-weight: 600; color: var(--muted); }
+.st-ulform .btn { min-height: 52px; }
+@media (max-width: 760px) {
+    .st-bar { grid-template-columns: 1fr; }
+    .st-totalbox { text-align: left; }
+    .st-ulform { grid-template-columns: 1fr 1fr; }
+    .st-table th:nth-child(6), .st-table td:nth-child(6) { display: none; }
+}
