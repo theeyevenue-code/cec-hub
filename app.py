@@ -743,9 +743,22 @@ def lenses_find():
                 if str(l.get("supplier") or l.get("brand") or "").lower() == "hoya"]
     elif which != "all":
         rows = [l for l in rows if l.get("orderable", True)]
+    # Optional other eye (lsph / lcyl): a lens is only offered when BOTH
+    # eyes fit it. Absent, the finder answers for the one Rx as before.
+    left = None
+    lsph = _arg("lsph")
+    if (request.args.get("lsph") or "").strip():
+        if lsph is None or not -30 <= lsph <= 30:
+            return jsonify({"error": "The left sphere doesn't look right — "
+                                     "e.g. -2.75 (or leave it empty)."}), 400
+        lcyl = _arg("lcyl")
+        if (request.args.get("lcyl") or "").strip() and (lcyl is None or abs(lcyl) > 10):
+            return jsonify({"error": "The left cyl doesn't look right — "
+                                     "e.g. -1.25 (or leave it empty)."}), 400
+        left = {"sph": lsph, "cyl": lcyl or 0.0}
     result = lenses.find_options(rows, sph, cyl or 0.0, min_blank,
                                  add=add, kind=kind, fh=fh, tint=tint,
-                                 pricing=_pricing())
+                                 pricing=_pricing(), left=left)
     result["supplier"] = which
     if which == "hoya" and result.get("verdict"):
         result["verdict"] = "HOYA (old supplier, for comparison) — " + result["verdict"]

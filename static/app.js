@@ -1315,6 +1315,7 @@ function answerCardHTML(data, sells) {
         + (best.under_index ? `<li>One step thicker than ideal for this power</li>` : "");
     return `<div class="answer ${stock ? "answer-stock" : "answer-grind"} ${hoya ? "answer-hoya" : ""}">
         ${tag}
+        ${rangeHeadHTML(data, best)}
         <table class="opt-table ans-table"><thead><tr>
             <th class="c-verdict"></th><th class="c-lens">Lens</th><th class="c-sup">Supplier</th>
             <th class="c-blank">Blank</th><th class="c-cost">Cost / lens</th><th class="c-sell">Sells / pair</th></tr></thead>
@@ -1322,6 +1323,29 @@ function answerCardHTML(data, sells) {
         ${notes ? `<ul class="ans-notes">${notes}</ul>` : ""}
         <details class="ans-more"><summary>Why</summary><ul class="ans-why">${whyBullets(data.verdict)}</ul></details>
     </div>`;
+}
+
+// The first thing on the card, biggest: the power range the pick is judged on.
+// Both lines are the ENGINE's strings (data.headline, option.band_text /
+// range_text) — the same ones the table prints — so the card and the table
+// can never show different numbers.
+function rangeHeadHTML(data, best) {
+    const stock = best.type === "stock";
+    const head = data.headline || "";
+    const sub = stock
+        ? (best.band && best.band.unproven ? "Blank size not confirmed — see the note below" : "")
+        : `Grind lens: ${fmtIndex(best.index)} ${String(best.name || "").replace(/\s+1\.\d\d$/, "")} · ${best.band_text || ""}`;
+    const left = data.rx_left && best.band_text_l
+        ? `<div class="ans-range-sub">Left ${esc(data.rx_left.display)}: ${esc(best.band_text_l)}</div>` : "";
+    const poss = (data.possible || []).filter((p) => !p.eye || p.eye === "right" || p.eye === "left");
+    const possHTML = poss.length ? `<div class="ans-possible">
+        <div class="ans-possible-head">Not confirmed as stock — confirm with ZEISS</div>
+        <ul>${poss.map((p) => `<li><b>${esc(fmtIndex(p.index))} ${esc(p.name)}${p.blank_mm ? " · " + esc(fmtMM(p.blank_mm)) : ""}</b>${p.eye === "left" ? " (left eye)" : ""} — ${esc(p.why)}</li>`).join("")}</ul>
+    </div>` : "";
+    return `<div class="ans-range ${stock ? "ans-range-stock" : "ans-range-grind"}">
+        <div class="ans-range-main">${esc(head)}</div>
+        ${sub ? `<div class="ans-range-sub">${esc(sub)}</div>` : ""}${left}
+    </div>${possHTML}`;
 }
 
 // A lens as staff say it: "1.74 · Single vision · ClearView FSV". The index leads
@@ -1337,8 +1361,8 @@ function lensLabelHTML(l, big) {
 // --- The options table: fixed columns, index first, one lens per row ---------------
 const OPT_TABLE_HEAD = `<tr>
     <th class="c-lens">Lens</th><th class="c-sup">Supplier</th>
-    <th class="c-type">Stock / grind</th><th class="c-blank">Blank</th><th class="c-range">Range</th>
-    <th class="c-cyl">Cyl</th><th class="c-cost">Cost / lens</th><th class="c-sell">Sells / pair</th></tr>`;
+    <th class="c-type">Stock / grind</th><th class="c-blank">Blank</th><th class="c-range">Power range</th>
+    <th class="c-cost">Cost / lens</th><th class="c-sell">Sells / pair</th></tr>`;
 
 function optionRowHTML(g, best, sells) {
     const l = g.lead;
@@ -1370,8 +1394,7 @@ function optionRowHTML(g, best, sells) {
         <td class="c-sup ${supCls}">${supplierCell(l.supplier)}</td>
         <td class="c-type">${l.type === "stock" ? "Stock" : "Grind"}</td>
         <td class="c-blank">${esc(blanks)}</td>
-        <td class="c-range">${l.sph_min != null ? `${esc(fmtPower(l.sph_min))} to ${esc(fmtPower(l.sph_max))}` : "not in file"}</td>
-        <td class="c-cyl">${l.cyl_max != null ? "−" + Number(l.cyl_max).toFixed(2) : "—"}</td>
+        <td class="c-range">${esc(l.range_text || "not in file")}${l.band_text_l ? `<div class="cell-sub">left: ${esc(l.band_text_l)}</div>` : ""}</td>
         <td class="c-cost">${l.price_now != null ? esc(fmtMoney(l.price_now)) : "—"}
             ${basisChip(l.basis)}${diff != null && diff !== 0 ? `<span class="cost-diff">${diff > 0 ? "+" : "−"}${esc(fmtMoney(Math.abs(diff)))}</span>` : ""}</td>
         <td class="c-sell">${sellPrice != null ? "$" + esc(sellPrice) : "—"}</td>
@@ -1740,6 +1763,10 @@ async function renderLenses() {
                     <input id="lf-sph" inputmode="text" placeholder="-2.75" autocomplete="off"></div>
                 <div class="field"><label for="lf-cyl">Cyl (optional)</label>
                     <input id="lf-cyl" inputmode="text" placeholder="-1.25" autocomplete="off"></div>
+                <div class="field"><label for="lf-lsph">Left sphere (optional)</label>
+                    <input id="lf-lsph" inputmode="text" placeholder="same lens both eyes" autocomplete="off"></div>
+                <div class="field"><label for="lf-lcyl">Left cyl</label>
+                    <input id="lf-lcyl" inputmode="text" placeholder="-0.75" autocomplete="off"></div>
                 <div class="field"><label for="lf-blank">Min blank (optional)</label>
                     <input id="lf-blank" inputmode="numeric" placeholder="e.g. 68" autocomplete="off"></div>
                 <label class="lf-check"><input type="checkbox" id="lf-tint"> Tint</label>
@@ -1787,6 +1814,12 @@ async function renderLenses() {
         params.set("kind", "Single vision");     // the finder is the stock-vs-grind question
         params.set("supplier", supplierPick());
         if (cylEl.value.trim()) params.set("cyl", cylEl.value.trim());
+        const lsphEl = document.getElementById("lf-lsph");
+        const lcylEl = document.getElementById("lf-lcyl");
+        if (lsphEl && lsphEl.value.trim()) {
+            params.set("lsph", lsphEl.value.trim());
+            if (lcylEl && lcylEl.value.trim()) params.set("lcyl", lcylEl.value.trim());
+        }
         if (blankEl.value.trim()) params.set("blank", blankEl.value.trim());
         if (tintEl.checked) params.set("tint", "1");
         resultsEl.innerHTML = `<div class="loading-panel">Checking the catalogue…</div>`;
@@ -1802,7 +1835,8 @@ async function renderLenses() {
             return;
         }
         const supWord = { current: `${ZEISS_LOGO} + Synchrony`, hoya: "Hoya", all: "all suppliers" }[data.supplier] || "";
-        const rxLine = `<strong>${esc(data.rx.display)}</strong>` +
+        const rxLine = (data.rx_left ? "R " : "") + `<strong>${esc(data.rx.display)}</strong>` +
+            (data.rx_left ? ` · L <strong>${esc(data.rx_left.display)}</strong>` : "") +
             (supWord ? ` · ${supWord}` : "") +
             (data.rx.tint ? ` · tinted` : "") +
             (data.rx.transposed ? ` <span class="chip chip-amber">plus cyl transposed</span>` : "") +
@@ -1842,7 +1876,8 @@ async function renderLenses() {
     }
 
     document.getElementById("lf-go").addEventListener("click", runFind);
-    [sphEl, cylEl, blankEl].forEach((el) => el.addEventListener("keydown", (e) => {
+    [sphEl, cylEl, blankEl, document.getElementById("lf-lsph"), document.getElementById("lf-lcyl")]
+        .filter(Boolean).forEach((el) => el.addEventListener("keydown", (e) => {
         if (e.key === "Enter") runFind();
     }));
     // Switching supplier re-runs the same Rx, so a comparison is one click.

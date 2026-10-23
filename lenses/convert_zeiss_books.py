@@ -52,7 +52,8 @@ ONGOING, PROMO = "L25", "L50"
 
 COLUMNS = ["supplier", "brand", "lens", "code", "category", "index", "material",
            "form", "type", "blank_mm", "sph_min", "sph_max", "cyl_max",
-           "combined_max", "range_basis", "add_min", "add_max", "add_range", "price",
+           "combined_max", "range_basis", "check_sph_min", "check_sph_max",
+           "check_cyl_max", "add_min", "add_max", "add_range", "price",
            "price_promo", "price_basis", "coating", "min_fh_mm", "notes"]
 
 NUM = r"[-+]?\d+(?:\.\d+)?"
@@ -668,6 +669,105 @@ def guide_check(rows):
     return report
 
 
+# --- Cross-check the STOCK bands against the product guide ---------------------
+#
+# Hand-transcribed from the RENDERED Product Portfolio pages (not the text
+# layer: page 31's text layer also carries an older, invisible table — that is
+# where the "-6.25 to +2.00" misprint lives; the printed page says +6.25).
+# Checked against the page images, 23 Oct 2026. Each band:
+# (page, index, family, materials, coatings, blank, sph_lo, sph_hi, cyl, starred)
+_CV = "ClearView FSV"
+_GP = ("DuraVision Gold UV", "DuraVision Platinum UV")
+_P = ("DuraVision Platinum UV",)
+GUIDE_STOCK = [
+    (29, 1.50, "FSV", ("Clear",), ("Hardcoat UV",), 65, 2.00, 6.00, 2.00, False),
+    (29, 1.50, "FSV", ("Clear",), ("Hardcoat UV",), 70, -6.00, 4.00, 2.00, True),
+    (29, 1.60, "Sph FSV", ("Clear",), ("DuraVision Chrome UV",), 65, 0.25, 6.00, 2.00, False),
+    (29, 1.60, "Sph FSV", ("Clear",), ("DuraVision Chrome UV",), 70, 0.25, 4.00, 2.00, False),
+    (29, 1.60, "Sph FSV", ("Clear",), ("DuraVision Chrome UV",), 75, -6.00, 0.00, 2.00, False),
+    (31, 1.50, _CV, ("Clear", "Clear BluePro"), _GP, 65, 2.00, 6.00, 2.00, False),
+    (31, 1.50, _CV, ("Clear", "Clear BluePro"), _GP, 70, -6.00, 4.00, 2.00, True),
+    (31, 1.50, _CV, ("PhotoFusionX",), _P, 65, 0.25, 4.00, 2.00, False),
+    (31, 1.50, _CV, ("PhotoFusionX",), _P, 70, -6.00, 0.00, 2.00, True),
+    (31, 1.60, _CV, ("Clear",), _GP, 65, 2.00, 6.25, 2.00, False),
+    (31, 1.60, _CV, ("Clear",), _GP, 70, 0.25, 4.00, 2.00, False),
+    (31, 1.60, _CV, ("Clear",), _GP, 70, -8.00, -6.25, 2.00, True),
+    (31, 1.60, _CV, ("Clear",), _GP, 75, -6.00, 0.00, 3.00, False),
+    (31, 1.60, _CV, ("Clear BluePro",), _P, 65, 2.00, 6.25, 2.00, False),
+    (31, 1.60, _CV, ("Clear BluePro",), _P, 70, 0.25, 4.00, 2.00, False),
+    (31, 1.60, _CV, ("Clear BluePro",), _P, 70, -8.00, -6.25, 3.00, True),
+    (31, 1.60, _CV, ("Clear BluePro",), _P, 75, -6.00, 0.00, 3.00, True),
+    (31, 1.60, _CV, ("PhotoFusionX",), _P, 65, 0.25, 4.00, 2.00, False),
+    (31, 1.60, _CV, ("PhotoFusionX",), _P, 70, -8.00, -6.25, 2.00, True),
+    (31, 1.60, _CV, ("PhotoFusionX",), _P, 75, -6.00, 0.00, 2.00, True),
+    (31, 1.67, _CV, ("Clear",), _P, 65, 2.25, 6.00, 2.00, False),
+    (31, 1.67, _CV, ("Clear",), _P, 70, 0.25, 2.00, 2.00, False),
+    (31, 1.67, _CV, ("Clear",), _P, 70, -10.00, -6.25, 4.00, True),
+    (31, 1.67, _CV, ("Clear",), _P, 75, -6.00, 0.00, 4.00, True),
+    (31, 1.74, _CV, ("Clear",), _P, 70, -12.00, -8.25, 2.00, True),
+    (31, 1.74, _CV, ("Clear",), _P, 75, -8.00, -3.00, 2.00, True),
+]
+
+
+def _band_text(lo, hi, cyl, star=False):
+    return f"{fmt_power(hi)} to {fmt_power(lo)}{'*' if star else ''} (cyl -{cyl:.2f})"
+
+
+def stock_guide_check(rows):
+    """Compare every ZEISS STOCK band with the product guide's printed band
+    (same family / index / material / coating / blank, overlapping range).
+
+    Agree -> note "confirmed". Disagree -> do NOT pick a side: the row keeps
+    the NARROWER range and cyl (what both sources allow), the wider one goes
+    in check_sph_min / check_sph_max / check_cyl_max, and the note says
+    CHECK. The Finder treats a script that only fits the wider range as
+    "confirm with ZEISS", never as stock. Returns (report lines, mismatches)."""
+    report, mismatches = [], []
+    for r in rows:
+        if r["supplier"] != "ZEISS" or r["type"] != "stock":
+            continue
+        cands = [g for g in GUIDE_STOCK
+                 if g[1] == r["index"] and r["material"] in g[3]
+                 and (r["family"] == g[2] or r["family"].startswith(g[2] + " "))
+                 and r["coating"] in g[4] and g[5] == r["blank_mm"]
+                 and g[6] <= r["sph_max"] and r["sph_min"] <= g[7]]
+        label = f"{r['lens']} {r['coating']} {r['blank_mm']}mm"
+        if len(cands) != 1:
+            report.append(f"STOCK NOT IN GUIDE ({len(cands)} candidates): {label}")
+            mismatches.append((label, "not printed in the guide", "", ""))
+            continue
+        page, _, _, _, _, _, glo, ghi, gcyl, gstar = cands[0]
+        book_star = r["combined_max"] is not None
+        book = _band_text(r["sph_min"], r["sph_max"], r["cyl_max"], book_star)
+        guide = _band_text(glo, ghi, gcyl, gstar)
+        same_range = (r["sph_min"], r["sph_max"], r["cyl_max"]) == (glo, ghi, gcyl)
+        if same_range and book_star == gstar:
+            r["notes"] += f"; range confirmed by ZEISS product guide p{page}"
+            continue
+        if same_range:
+            # Only the star differs. Keep the book's cap (the stricter of
+            # the two); the band's own minus end caps the lens either way.
+            r["notes"] += (f"; product guide p{page} prints the same band without/with a "
+                           f"different * ({guide}) — the stricter is used")
+            mismatches.append((label, "star (max combined) only", book, guide))
+            continue
+        lo, hi = max(r["sph_min"], glo), min(r["sph_max"], ghi)
+        cyl = min(r["cyl_max"], gcyl)
+        r["check"] = (min(r["sph_min"], glo), max(r["sph_max"], ghi), max(r["cyl_max"], gcyl))
+        if book_star and lo > r["sph_min"] and lo < 0:
+            r["combined_max"] = min(r["combined_max"], abs(lo))
+        r["sph_min"], r["sph_max"], r["cyl_max"] = lo, hi, cyl
+        r["notes"] += (f"; CHECK — book p3 prints {book}, product guide p{page} prints "
+                       f"{guide}; the Finder uses only what both allow "
+                       f"({_band_text(lo, hi, cyl)}) — confirm the rest with ZEISS")
+        mismatches.append((label, "range", book, guide))
+    report.append(f"stock bands: {len(mismatches)} differ between book p3 and the product guide "
+                  "(narrowed + marked CHECK)")
+    for m in mismatches:
+        report.append(f"   {m[0]}: {m[1]} — book {m[2]} / guide {m[3]}")
+    return report, mismatches
+
+
 # --- Output ------------------------------------------------------------------
 
 def to_csv_rows(rows):
@@ -693,6 +793,9 @@ def to_csv_rows(rows):
             # (they tile that axis in 0.25 steps); made-to-order tables are
             # sphere ranges with a separate combined cap.
             "range_basis": "combined" if r["type"] == "stock" else "sphere",
+            "check_sph_min": fmt_power(r["check"][0]) if r.get("check") else "",
+            "check_sph_max": fmt_power(r["check"][1]) if r.get("check") else "",
+            "check_cyl_max": f"-{r['check'][2]:.2f}" if r.get("check") else "",
             "add_min": f"{add[0]:.2f}" if add else "", "add_max": f"{add[1]:.2f}" if add else "",
             "add_range": f"Add {add[0]:.2f} to {add[1]:.2f}" if add else "",
             "price": money(price), "price_promo": money(promo), "price_basis": basis,
@@ -720,6 +823,7 @@ def main(argv):
     print("\n".join(report))
     print()
     print("\n".join(guide_check(rows)))
+    print("\n".join(stock_guide_check(rows)[0]))
     print()
     for name, part in (("zeiss", z), ("synchrony", s)):
         c = Counter((r["category"], r["type"]) for r in part)
