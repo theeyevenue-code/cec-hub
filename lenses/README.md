@@ -76,7 +76,8 @@ aliases work — e.g. `diameter` for `blank_mm`, `cost` for `price`).
 | `sph_range` | *alt* | *instead of the two above*: one cell like `+4.00 to -4.00` |
 | `cyl_max` | no | biggest cyl it can do, e.g. `-2.00` (sign doesn't matter) |
 | `combined_max` | no | the supplier's **maximum minus combined power** (the starred number in the books): sphere + cyl in minus-cyl form. Only ever limits a minus prescription, and only on `sphere`-basis rows |
-| `range_basis` | no | `sphere` (default) or `combined` — see "How ranges are read" |
+| `range_basis` | no | `sphere` (default) or `combined` (stock bands: both readings, see "How ranges are read") |
+| `check_sph_min` / `check_sph_max` / `check_cyl_max` | no | the WIDER range a second source prints where the book and the product guide disagree — never stock, only "confirm with ZEISS" |
 | `add_min` / `add_max` | no | add range for multifocal-type lenses, e.g. `0.75` / `3.50` — the Finder checks the typed add against it |
 | `add_range` | no | free text shown on the card (`Add 0.75 to 3.50`); parsed into the two above when they are blank |
 | `min_fh_mm` | no | minimum fitting height for the design (Superb / Individual 3 = 13, Pure = 14) — a warning when the typed fitting height is under it |
@@ -90,36 +91,63 @@ aliases work — e.g. `diameter` for `blank_mm`, `cost` for `price`).
 Numbers shrug off `$`, `mm` and `+` signs, so `$18.50`, `65mm`, `+4.00`
 are all fine.
 
-## How ranges are read — two readings, one flag
+## How ranges are read — stock only when the script fits one band
 
-The supplier books print a power range, a cyl limit and a starred number
-("*maximum combined power"). They never say whether the range is the
-**sphere** or the **whole lens**. The catalogue carries the reading per row
-in `range_basis`:
+Rebuilt 23 Oct 2026 after Mark found +2.00/-3.00 recommended as 1.60 stock.
+Stock bands are printed in **minus-cyl form**: a sphere range, a cyl limit,
+and a starred number that is the **maximum minus combined power** (sph + cyl;
+book p3 footnote "Rx Range restrictions and maximum minus combined
+prescriptions"). A plus cyl is transposed first.
 
-| `range_basis` | Used for | A row fits when |
+A stock row is stock for a script only when it fits **that band**:
+
+| Reading | A band fits when | Status |
 |---|---|---|
-| `sphere` (default; Hoya, every made-to-order table) | sphere range + separate cyl cap + starred combined cap | sphere inside the range, \|cyl\| ≤ cyl_max, and sphere+cyl not beyond the combined cap |
-| `combined` (ZEISS and synchrony **stock** bands, set by the converter) | the band is a range of the lens's **strongest-meridian power** — sphere+cyl for a minus lens, the sphere for a plus lens; the diameter changes as that power grows | that power inside the band and \|cyl\| ≤ the band's cyl_max |
+| **A — printed** | sphere inside the band's range, \|cyl\| within the band's cyl limit, and sph + cyl not past the starred maximum | what the page literally says |
+| **B — ZEISS tiling** | the lens's key power inside the band: the **sphere for any plus sphere**, sph + cyl for a minus sphere | **unproven** — the bands tile that axis with no gaps, which suggests it |
 
-Why the stock bands are read as `combined`: ClearView 1.60/1.67/1.74 bands
-tile one axis in 0.25 steps with no gaps (−8.00 to −6.25 on 70 mm, −6.00 to
-0.00 on 75 mm, +0.25 to +4.00 on 70 mm …). Under a sphere-only reading every
-cyl script near a band edge would fall into a hole ZEISS does not have.
-Worked examples, ClearView 1.74 (75 mm −3.00 to −8.00, 70 mm −8.25 to −12.00,
-cyl to −2.00): −6.50/−2.00 is a −8.50 lens → **stock, 70 mm blank**;
-−10.00/−2.00 (−12.00) → stock, 70 mm; −10.25/−2.00 → grind; −12.00 plain →
-stock. **So "1.74 stock to −12.00" means −12.00 in the strongest meridian:
-−12.00 sphere with no cyl, or −10.00 with −2.00 cyl.**
+Until `stock_combined_confirmed` is `true` in `config/lens_pricing.json`, a
+lens is stock only when **both** readings agree. The unproven reading can only
+take a lens away, never add one. A lens that fits one reading only is shown
+under **"Not confirmed as stock — confirm with ZEISS"**, never as stock.
 
-⚠ This is an interpretation, not a printed rule. The one-line check that
-settles it: key −6.50/−2.00 in ClearView FSV 174 into VISUSTORE. If it is
-refused, change the converter to write `sphere` for stock rows and rebuild.
+Every plus band (1.50 / 1.60 / 1.67, ZEISS and synchrony) is cyl to -2.00, so
+a plus sphere with more than -2.00 cyl is a grind at every index; 1.74 has no
+plus stock at all. **1.60 takes -3.00 cyl only on the minus side** (75 mm
+0.00 to -6.00*, and BluePro 70 mm -6.25 to -8.00*) — book p3, portfolio p31.
+
+Worked examples (ClearView, both readings):
+
+| Script | Result |
+|---|---|
+| +2.00 / -3.00 | grind everywhere (plus sphere: cyl limit -2.00) |
+| -2.00 / -3.00 | 1.60 75 mm, 1.67 75 mm; 1.50 grind (cyl limit -2.00) |
+| -6.50 / -2.00 | 1.67 70 mm; 1.60 grind (-8.50 past -8.00*); 1.74 70 mm **only under B** -> "confirm" |
+| -4.00 / -4.00 | 1.67 75 mm is out (-8.00 past the 75 mm band's -6.00*); 70 mm **only under B** -> "confirm" |
+
+**The one-line check that settles B:** key -4.00/-4.00 ClearView FSV 167 into
+VISUSTORE. If it is accepted on the 70 mm blank, set
+`"stock_combined_confirmed": true` and B alone decides (plus spheres are still
+judged on the sphere).
+
+### Where the two sources disagree
+
+The converter cross-checks every ZEISS stock band against the **rendered**
+Product Portfolio pp29/31 (not its text layer — page 31 hides an older
+table, which is where the "-6.25 to +2.00" misprint lives). Where they
+differ, the row keeps the **narrower** range (what both allow) and the wider
+one goes in `check_sph_min` / `check_sph_max` / `check_cyl_max`; a script in
+the disputed strip shows "confirm with ZEISS". As of Oct 2026: 1.60 ClearView
+(Gold, Platinum, BluePro) 65 mm top is +6.00 in the book, +6.25 in the
+portfolio; Sph FSV 1.60 Chrome differs on all three bands.
+
+The answer card's first line and the table's Power range column are the same
+engine string (`band_text` / `range_text`), so they cannot disagree.
 
 ## How the Finder decides (so the data means what you think)
 
 - Cyl is checked in **minus-cyl form**. A plus cyl is transposed first.
-- A row fits when its power is inside the range (see "How ranges are
+- A row fits when the script fits that band (see "How ranges are
   read"), |cyl| ≤ `cyl_max`, `blank_mm` covers the frame's blank (when
   typed), and for multifocal kinds the add is inside `add_min`–`add_max`.
 - Order of the results: still-ordered lenses → the **right thickness** for

@@ -1474,6 +1474,21 @@ body.lens-mono main { background: #fafafa; }
 .lens-page .opt-table th.c-sell { color: var(--c-stock); }
 @media (max-width: 760px) { .lens-page .ans-table .c-verdict { width: 70px; font-size: 20px; } }
 
+/* Lens Finder: the power range leads the answer card (Mark, 23 Oct 2026 —
+   "the first box should have very boldly the power range"). Same strings as
+   the table's Power range column. */
+.lens-page .ans-range { padding: 6px 4px 12px; border-bottom: 1px solid var(--lp-rule-soft); margin-bottom: 6px; }
+.lens-page .ans-range-main { font-size: 26px; font-weight: 800; line-height: 1.25; color: var(--lp-ink); font-variant-numeric: tabular-nums; }
+.lens-page .ans-range-stock .ans-range-main { color: var(--c-stock); }
+.lens-page .ans-range-grind .ans-range-main { color: var(--c-grind); }
+.lens-page .ans-range-sub { font-size: 18px; font-weight: 600; color: var(--lp-text); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.lens-page .ans-possible { margin: 4px 4px 10px; font-size: 17px; color: var(--lp-text); }
+.lens-page .ans-possible-head { font-weight: 700; color: var(--c-grind); }
+.lens-page .ans-possible ul { margin: 4px 0 0; padding-left: 20px; }
+.lens-page .ans-possible li { margin: 2px 0; }
+.lens-page .opt-table .c-range { font-variant-numeric: tabular-nums; font-size: 16px; }
+@media (max-width: 760px) { .lens-page .ans-range-main { font-size: 21px; } .lens-page .ans-range-sub { font-size: 16px; } }
+
 /* --- Check-in tile (#/checkin, #/checkin/<token>) -------------------------------
    Readability standard: the answer first and biggest, tables, one colour = one
    meaning (blue = on the iPad, amber = ready to check / a change to look at,

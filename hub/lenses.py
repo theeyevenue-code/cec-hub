@@ -66,6 +66,8 @@ HEADER_ALIASES = {
     "min_fitting_height": "min_fh_mm", "fitting_height_min": "min_fh_mm",
     "coating": "coating", "coat": "coating",
     "range_basis": "range_basis", "basis_of_range": "range_basis",
+    "check_sph_min": "check_sph_min", "check_sph_max": "check_sph_max",
+    "check_cyl_max": "check_cyl_max",
     "notes": "notes", "note": "notes", "comments": "notes",
 }
 
@@ -222,6 +224,16 @@ def parse_csv_text(text: str, source: str):
         if add_min is not None and add_max is not None and add_min > add_max:
             add_min, add_max = add_max, add_min
 
+        # The wider range a second source prints where the two disagree
+        # (converter: book vs product guide). Never used to call a lens
+        # stock — only to say "confirm with ZEISS".
+        chk_lo, chk_hi = _num(cells.get("check_sph_min")), _num(cells.get("check_sph_max"))
+        chk_cyl = _num(cells.get("check_cyl_max"))
+        check = None
+        if chk_lo is not None and chk_hi is not None:
+            check = {"sph_min": min(chk_lo, chk_hi), "sph_max": max(chk_lo, chk_hi),
+                     "cyl_max": abs(chk_cyl) if chk_cyl is not None else None}
+
         blank_mm = _blank(cells.get("blank_mm"))
         cyl_max = _num(cells.get("cyl_max"))
         combined_max = _num(cells.get("combined_max"))
@@ -253,6 +265,7 @@ def parse_csv_text(text: str, source: str):
             "orderable": orderable_raw not in NO_WORDS,
             "range_basis": ("combined" if str(cells.get("range_basis", "")).strip().lower()
                             in ("combined", "meridian", "power") else "sphere"),
+            "check": check,
             "coating": cells.get("coating", ""),
             "notes": cells.get("notes", ""),
             "source": source,
@@ -672,11 +685,69 @@ def is_hard_coat(coating: str) -> bool:
     return any(w in c for w in HARD_COAT_WORDS) and "hmc" not in c
 
 
+def _fmt_band_power(v):
+    return "0.00" if abs(v) < 0.005 else f"{v:+.2f}"
+
+
+def band_text(lens: dict) -> str:
+    """One row's power range as staff read it, the SAME string on the
+    answer card and the table: '75 mm · 0.00 to -6.00, cyl to -3.00'.
+    The end nearer zero comes first (as ZEISS prints it); a stock band
+    leads with its blank; a starred maximum combined power is added
+    when it is tighter than the range itself."""
+    lo, hi = lens.get("sph_min"), lens.get("sph_max")
+    if lo is None:
+        rng = "range not in the file"
+    else:
+        if lo < 0 < hi:
+            a, b = lo, hi            # spans plano: minus end first, as the books print
+        else:
+            a, b = (lo, hi) if abs(lo) <= abs(hi) else (hi, lo)
+        rng = f"{_fmt_band_power(a)} to {_fmt_band_power(b)}"
+    if lens.get("cyl_max") is not None:
+        rng += f", cyl to -{lens['cyl_max']:.2f}"
+    cm = lens.get("combined_max")
+    if cm is not None and lo is not None and cm < abs(min(lo, 0)) - 0.001:
+        rng += f", sph + cyl to -{cm:.2f}"
+    if lens.get("type") == "stock" and lens.get("blank_mm"):
+        return f"{lens['blank_mm']:g} mm · {rng}"
+    return rng
+
+
+def range_text(lens: dict) -> str:
+    """band_text without the blank: the table's Range column (the blank has
+    its own column). Same numbers, same wording."""
+    t = band_text(lens)
+    return t.split(" · ", 1)[1] if lens.get("type") == "stock" and lens.get("blank_mm") else t
+
+
+def _rx_num(value):
+    """A power as a script writes it: -2.75, "+1.50", "PL" / "plano" (0)."""
+    if str(value or "").strip().upper() in ("PL", "PLANO", "PLAN"):
+        return 0.0
+    return _num(value)
+
+
+def _product_of(lens: dict):
+    """A lens as ordered, whatever its blank band: same supplier, name,
+    index, material, coating, stock/grind."""
+    return (lens.get("supplier") or lens.get("brand", ""), lens.get("name", ""),
+            lens.get("index"), lens.get("material", ""), lens.get("coating", ""),
+            lens.get("type", ""))
+
+
+def _transpose(sph: float, cyl: float):
+    cyl = cyl or 0.0
+    if cyl > 0:
+        return sph + cyl, -cyl, True
+    return sph, cyl, False
+
+
 def find_options(lenses: list, sph: float, cyl: float = 0.0,
                  min_blank: float | None = None, add: float | None = None,
                  kind: str | None = None, fh: float | None = None,
                  tint: bool = False, today=None,
-                 pricing: dict | None = None) -> dict:
+                 pricing: dict | None = None, left: dict | None = None) -> dict:
     """Which lenses can make this Rx, in the order the practice would reach
     for them, and in plain words why.
 
@@ -694,7 +765,24 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
     fitting height, checked against a design's minimum (warning only).
     kind narrows to one category (None = the rows as given). tint: the job
     is being tinted, so a hard-coat row is the standard and coloured
-    materials (BluePro, photochromic, polarised) are out.
+    materials (BluePro, photochromic, polarised) are out. left: the other
+    eye ({"sph", "cyl"}); a lens is only an option when BOTH eyes fit it,
+    and each option then carries both eyes' bands.
+
+    STOCK BANDS (lenses/README.md, "How ranges are read"). A stock row is
+    stock for this Rx only when the script fits that one band:
+      A (printed reading) — the sphere, in minus-cyl form, inside the band's
+        range, |cyl| within the band's cyl limit, and sphere + cyl not past
+        a starred maximum combined power;
+      B (ZEISS tiling reading, UNPROVEN) — the lens's key power (the sphere
+        for any plus sphere; sphere + cyl for a minus sphere) inside the band.
+    Until pricing["stock_combined_confirmed"] is true (someone has checked
+    VISUSTORE), a lens is stock only when BOTH readings say so — the unproven
+    reading can only take a lens away, never add one. A lens that fits one
+    reading only is listed under "possible" ("confirm with ZEISS"), never as
+    stock. Same for a band where the price book and the product guide
+    disagree: the row holds the narrower range, and a script in the disputed
+    strip is "confirm with ZEISS".
 
     Coatings: every coating column in the price file is a row, but the
     practice orders one as standard (pricing["preferred_coatings"], default
@@ -704,6 +792,7 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
     """
     pricing = pricing or {}
     prefer_stock = bool(pricing.get("prefer_stock", True))
+    confirmed = bool(pricing.get("stock_combined_confirmed", False))
     preferred = [str(c).lower() for c in
                  pricing.get("preferred_coatings") or DEFAULT_PREFERRED_COATINGS]
     # Lenses on the practice's own sheet (lens_filter "preferred" names) win
@@ -717,67 +806,63 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
             if n in label:
                 return i
         return len(pref_names)
-    cyl = cyl or 0.0
-    transposed = False
-    if cyl > 0:
-        sph, cyl, transposed = sph + cyl, -cyl, True
+
+    sph, cyl, transposed = _transpose(sph, cyl)
     rec_index = recommended_index(sph, cyl)
+
+    # The other eye first: its fits decide which products survive here.
+    left_result = None
+    if left is not None and _rx_num(left.get("sph")) is not None:
+        left_result = find_options(lenses, _rx_num(left.get("sph")),
+                                   _rx_num(left.get("cyl")) or 0.0, min_blank, add=add,
+                                   kind=kind, fh=fh, tint=tint, today=today,
+                                   pricing=pricing)
+        rec_index = max(rec_index, left_result["rec_index"])
+
     combined = sph + cyl          # the minus meridian in minus-cyl form
+    key_power = sph if sph > 0 else combined   # reading B's key power
 
     rows = of_kind(lenses, kind)
-    # Two readings of a row's power range (lenses/README.md, "How ranges are
-    # read"):
-    #  sphere   — the range is the SPHERE, the cyl is capped separately, and
-    #             the starred number is a cap on sphere+cyl. Hoya's charts,
-    #             and every made-to-order table, work this way.
-    #  combined — the range is the lens's power in its strongest meridian:
-    #             sphere+cyl for a minus lens, the sphere for a plus lens.
-    #             ZEISS/synchrony STOCK bands tile that axis in 0.25 steps
-    #             (-8.00 to -6.25 on 70mm, -6.00 to 0.00 on 75mm, +0.25 up on
-    #             70mm…), so a -6.50/-2.00 is a -8.50 lens and comes as the
-    #             70mm blank. The converter marks those rows range_basis=combined.
-    plus_lens = sph > 0 and (sph + cyl) >= 0        # both meridians plus
-    key_power = sph if plus_lens else sph + cyl     # the meridian a stock band is about
-
-    options, misses = [], []
+    entries, possible = [], []
     for lens in rows:
         reasons, warnings = [], []
         cat = normalise_category(lens.get("category", ""))
         needs_add = cat in ADD_CATEGORIES
-        by_combined = lens.get("range_basis") == "combined" and lens["type"] == "stock"
-
+        stock_band = (lens.get("range_basis") == "combined" and lens["type"] == "stock"
+                      and lens["sph_min"] is not None)
+        cap = lens.get("combined_max")
+        a_ok = b_ok = None
+        range_reason = None
         if lens["sph_min"] is None:
             warnings.append("power range isn't in the file — check the "
                             "supplier guide before ordering")
-        elif by_combined:
-            if not (lens["sph_min"] <= key_power <= lens["sph_max"]):
-                reasons.append(
-                    f"its power {_fmt_power(key_power)} ({'sphere' if plus_lens else 'sphere + cyl'}) "
-                    f"is outside this band ({_fmt_power(lens['sph_min'])} to "
-                    f"{_fmt_power(lens['sph_max'])}, {_fmt_mm(lens['blank_mm']) if lens['blank_mm'] else 'stock'})")
-        elif not (lens["sph_min"] <= sph <= lens["sph_max"]):
-            reasons.append(
-                f"sphere {_fmt_power(sph)} is outside its range "
-                f"({_fmt_power(lens['sph_min'])} to {_fmt_power(lens['sph_max'])})")
+        else:
+            in_sph = lens["sph_min"] <= sph <= lens["sph_max"]
+            cap_ok = not (cap is not None and combined < 0 and abs(combined) > cap + 1e-9)
+            a_ok = in_sph and cap_ok
+            if stock_band:
+                b_ok = lens["sph_min"] <= key_power <= lens["sph_max"]
+            if not in_sph:
+                range_reason = (f"sphere {_fmt_power(sph)} is outside "
+                                f"{'this band' if lens['type'] == 'stock' else 'its range'} "
+                                f"({band_text(lens)})")
+            elif not cap_ok:
+                range_reason = (f"sphere + cyl {_fmt_power(combined)} is past "
+                                f"{'this band' if lens['type'] == 'stock' else 'its'} maximum "
+                                f"combined power (-{cap:.2f})")
+        cyl_reason = None
         if cyl != 0:
             if lens["cyl_max"] is None:
                 warnings.append("cyl limit isn't in the file — check the "
                                 "supplier guide before ordering")
-            elif abs(cyl) > lens["cyl_max"]:
-                reasons.append(
-                    f"cyl {_fmt_power(cyl)} is beyond its limit "
-                    f"(-{lens['cyl_max']:.2f})")
+            elif abs(cyl) > lens["cyl_max"] + 1e-9:
+                cyl_reason = (f"cyl {_fmt_power(cyl)} is beyond "
+                              f"{'this band' if lens['type'] == 'stock' else 'its'} "
+                              f"limit (-{lens['cyl_max']:.2f})")
+                reasons.append(cyl_reason)
             elif abs(cyl) >= CYL_SURCHARGE_FROM and lens["type"] == "grind":
                 warnings.append(f"cyl {_fmt_power(cyl)} — the lab's high-cyl "
                                 "surcharge applies")
-        # The starred number in the supplier books is the maximum MINUS
-        # combined power (sphere + cyl, minus-cyl form). It never limits a
-        # plus prescription.
-        if (not by_combined and lens["combined_max"] is not None and combined < 0
-                and abs(combined) > lens["combined_max"]):
-            reasons.append(
-                f"sphere and cyl combined ({_fmt_power(combined)}) is beyond "
-                f"its limit (-{lens['combined_max']:.2f})")
         if min_blank is not None:
             if lens["blank_mm"] is None:
                 if lens["type"] == "stock":
@@ -820,23 +905,140 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
             standard = (not coating or
                         any(p in c for p in preferred) and "back surface" not in c)
 
-        # How many index steps thinner than the table's pick. One step under
-        # on a STOCK lens is a live option (the practice would rather a 1.67
-        # off the shelf than a 1.74 grind); two steps, or any grind that is
-        # thinner than the table, is "too thick" and sinks.
+        # Where the book and the product guide disagree, the row holds the
+        # narrower range; a script in the disputed strip is "confirm".
+        disputed = False
+        chk = lens.get("check")
+        if chk and range_reason and not reasons:
+            chk_cyl = chk.get("cyl_max") if chk.get("cyl_max") is not None else lens["cyl_max"]
+            # the wider source's own starred cap still applies
+            chk_cap = cap
+            if cap is not None and chk["sph_min"] < 0:
+                chk_cap = max(cap, abs(chk["sph_min"]))
+            if (chk["sph_min"] <= sph <= chk["sph_max"]
+                    and (chk_cyl is None or abs(cyl) <= chk_cyl + 1e-9)
+                    and not (chk_cap is not None and combined < 0
+                             and abs(combined) > chk_cap + 1e-9)):
+                disputed = True
+        if chk and cyl_reason and not range_reason and chk.get("cyl_max") is not None \
+                and abs(cyl) <= chk["cyl_max"] + 1e-9 and len(reasons) == 1:
+            disputed = True
+
         steps_under = (index_step(rec_index) - index_step(lens["index"])
                        if lens["index"] is not None else 0)
         under = steps_under >= 1
         hard_under = steps_under >= 2 or (steps_under == 1 and lens["type"] != "stock")
         price, basis = price_now(lens, today, pricing)
-        entry = {**lens, "warnings": warnings, "under_index": under,
-                 "hard_under": hard_under, "steps_under": max(steps_under, 0),
-                 "price_now": price, "basis": basis, "orderable": orderable,
-                 "standard_coating": standard, "plain": plain}
-        if reasons:
-            misses.append({**entry, "reasons": reasons})
+        entries.append({
+            **lens, "warnings": warnings, "reasons": reasons,
+            "range_reason": range_reason, "a_ok": a_ok, "b_ok": b_ok,
+            "stock_band": stock_band, "disputed": disputed,
+            "under_index": under, "hard_under": hard_under,
+            "steps_under": max(steps_under, 0), "price_now": price, "basis": basis,
+            "orderable": orderable, "standard_coating": standard, "plain": plain,
+            "band_text": band_text(lens), "range_text": range_text(lens),
+        })
+
+    # Decide each row. Ordinary rows: in range + no other reason. Stock
+    # bands: per product, both readings must find a band (unless confirmed).
+    by_product = {}
+    for e in entries:
+        if e["stock_band"]:
+            by_product.setdefault(_product_of(e), []).append(e)
+
+    options, misses = [], []
+    for e in entries:
+        if e["stock_band"] or e["a_ok"] is None:
+            continue
+        if e["a_ok"] and not e["reasons"]:
+            options.append(e)
         else:
-            options.append(entry)
+            if e["range_reason"]:
+                e["reasons"] = [e["range_reason"]] + e["reasons"]
+            misses.append(e)
+    for e in entries:          # rows with no range at all: kept, with a warning
+        if e["a_ok"] is None and not e["stock_band"]:
+            (options if not e["reasons"] else misses).append(e)
+
+    for prod, band_rows in by_product.items():
+        clean = [e for e in band_rows if not e["reasons"]]
+        a_rows = [e for e in clean if e["a_ok"]]
+        b_rows = [e for e in clean if e["b_ok"]]
+        both = [e for e in a_rows if e["b_ok"]]
+        if confirmed:
+            chosen = b_rows
+        else:
+            # A band both readings agree on; failing that (both readings say
+            # stock but on different blanks) the printed band, flagged.
+            chosen = both or (a_rows if b_rows else [])
+        chosen = sorted(chosen, key=lambda e: e["blank_mm"] or 0)
+        chosen_ids = {id(e) for e in chosen}
+        for e in chosen:
+            if not confirmed and not e["b_ok"]:
+                other = ", ".join(_fmt_mm(b["blank_mm"]) for b in b_rows if b["blank_mm"])
+                e["warnings"].append(
+                    f"blank unproven: read as ZEISS's combined power this comes on the "
+                    f"{other} blank — confirm in VISUSTORE")
+                e["unproven"] = True
+            e["band"] = {"blank": e["blank_mm"], "sph_min": e["sph_min"],
+                         "sph_max": e["sph_max"], "cyl_max": e["cyl_max"],
+                         "combined_max": e.get("combined_max"),
+                         "unproven": bool(e.get("unproven"))}
+        options.extend(chosen)
+        one_reading = (not confirmed and bool(a_rows) != bool(b_rows))
+        for e in band_rows:
+            if id(e) in chosen_ids:
+                continue
+            if one_reading and (e["a_ok"] or e["b_ok"]) and not e["reasons"]:
+                e["reasons"] = ["stock only under ONE reading of ZEISS's range (unproven) — "
+                                "confirm in VISUSTORE"]
+                if e["b_ok"] and not e["a_ok"]:
+                    e["possible_why"] = (f"stock {_fmt_mm(e['blank_mm'])} only if ZEISS counts "
+                                         f"sphere + cyl ({_fmt_power(key_power)}); by the printed "
+                                         "sphere range it is not")
+                else:
+                    e["possible_why"] = (f"sphere fits the {_fmt_mm(e['blank_mm'])} band, but "
+                                         f"sphere + cyl ({_fmt_power(key_power)}) is outside it")
+                possible.append(e)
+            else:
+                if e["range_reason"] and not e["a_ok"]:
+                    e["reasons"] = [e["range_reason"]] + e["reasons"]
+                elif e["a_ok"] and e["b_ok"] is False and not e["reasons"]:
+                    e["reasons"] = [f"its power {_fmt_power(key_power)} (sphere + cyl) is "
+                                    f"outside this band ({e['band_text']})"]
+                if e["disputed"]:
+                    e["possible_why"] = ("the price book and the product guide disagree on this "
+                                         f"band ({e.get('notes', '').split('CHECK — ')[-1].split(';')[0]})")
+                    possible.append(e)
+                if not e["reasons"]:
+                    e["reasons"] = ["another band of this lens covers the script"]
+                misses.append(e)
+    # disputed rows on ordinary (grind) rows too
+    possible_ids = {id(p) for p in possible}
+    for e in misses:
+        if e["disputed"] and id(e) not in possible_ids:
+            e["possible_why"] = "the price book and the product guide disagree on this range"
+            possible.append(e)
+
+    # The other eye: keep only products that fit it too, and carry its band.
+    if left_result is not None:
+        left_bands = {}
+        for o in left_result["options"]:
+            left_bands.setdefault(_product_of(o), o)
+        kept = []
+        for o in options:
+            lo = left_bands.get(_product_of(o))
+            if lo is None:
+                o["reasons"] = [f"the left eye ({left_result['rx']['display']}) doesn't fit this lens"]
+                misses.append(o)
+                continue
+            o["band_l"] = lo.get("band")
+            o["band_text_l"] = lo.get("band_text")
+            o["warnings"] = list(dict.fromkeys(o["warnings"] + [
+                "left: " + w for w in lo.get("warnings", []) if "no longer ordered" not in w]))
+            kept.append(o)
+        options = kept
+        possible += [{**p, "eye": "left"} for p in left_result.get("possible_rows", [])]
 
     def sort_key(o):
         return (not o["orderable"], o["hard_under"],
@@ -844,7 +1046,7 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
                 o["under_index"],
                 not o["standard_coating"], not o["plain"],
                 o["price_now"] is None, o["price_now"] or 0, pref_rank(o),
-                o["index"] or 0)
+                o["index"] or 0, o.get("blank_mm") or 0)
 
     options.sort(key=sort_key)
     appropriate = [o for o in options
@@ -859,20 +1061,99 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
             if o is not best and o["price_now"] is not None:
                 o["dearer_by"] = round(o["price_now"] - best["price_now"], 2)
 
+    made_to_order = (normalise_category(kind) != "Single vision") if kind else False
+    rx_display = ((f"{_fmt_power(sph)} / {_fmt_power(cyl)}" if cyl else _fmt_power(sph))
+                  + (f" add {add:+.2f}" if add is not None else ""))
+    stock_why = _stock_why(entries, sph, cyl, combined)
+    if left_result is not None and left_result.get("stock_why") and not stock_why:
+        stock_why = "left eye: " + left_result["stock_why"]
+    possible_out = _possible_list(possible)
     return {
         "rx": {"sph": sph, "cyl": cyl, "add": add, "tint": tint, "transposed": transposed,
-               "display": (f"{_fmt_power(sph)} / {_fmt_power(cyl)}" if cyl
-                           else _fmt_power(sph))
-                          + (f" add {add:+.2f}" if add is not None else "")},
+               "display": rx_display},
+        "rx_left": left_result["rx"] if left_result else None,
         "kind": normalise_category(kind) if kind else "",
         "rec_index": rec_index,
         "min_blank": min_blank,
         "options": options,
         "misses": misses,
+        "possible": possible_out,
+        "possible_rows": [p for p in possible if p.get("eye") != "left"],
+        "stock_why": stock_why,
+        "stock_reading": "confirmed" if confirmed else "strict",
+        "headline": _headline(best, stock_why, made_to_order, possible_out),
         "verdict": _verdict(options, best, rec_index, prefer_stock,
-                            made_to_order=(normalise_category(kind) != "Single vision")
-                            if kind else False),
+                            made_to_order=made_to_order, stock_why=stock_why,
+                            possible=possible_out),
     }
+
+
+def _short_name(lens):
+    """'ClearView FSV 1.60' -> 'ClearView FSV' (the index is said separately)."""
+    return re.sub(r"\s+1\.\d\d$", "", str(lens.get("name", ""))).strip()
+
+
+def _stock_why(entries, sph, cyl, combined):
+    """Why no stock band takes this Rx, in plain words, from the orderable
+    clear stock bands: '' when one does. Feeds 'GRIND: outside stock range
+    (plus sphere: cyl limit -2.00)'."""
+    stock = [e for e in entries if e["type"] == "stock" and e["orderable"]
+             and e.get("sph_min") is not None and e["plain"]]
+    if not stock:
+        return ""
+    side = "plus sphere" if sph > 0 else "minus sphere" if sph < 0 else "plano sphere"
+    holding = [e for e in stock if e["sph_min"] <= sph <= e["sph_max"]]
+    if not holding:
+        hi = max(e["sph_max"] for e in stock)
+        lo = min(e["sph_min"] for e in stock)
+        return (f"sphere {_fmt_power(sph)} is past every stock band "
+                f"(stock runs {_fmt_band_power(lo)} to {_fmt_band_power(hi)})")
+    lim = max(e["cyl_max"] or 0 for e in holding)
+    if abs(cyl) > lim + 1e-9:
+        return f"{side}: cyl limit -{lim:.2f}"
+    holding = [e for e in holding if e["cyl_max"] is None or abs(cyl) <= e["cyl_max"] + 1e-9]
+    caps = [e for e in holding if e.get("combined_max") is not None and combined < 0
+            and abs(combined) > e["combined_max"] + 1e-9]
+    if caps and len(caps) == len(holding):
+        cap = max(e["combined_max"] for e in caps)
+        return f"sphere + cyl {_fmt_power(combined)} is past the stock limit -{cap:.2f}"
+    return ""
+
+
+def _possible_list(possible):
+    """'Confirm with ZEISS' lines: one per lens + blank, plain words."""
+    out, seen = [], set()
+    for p in possible:
+        if not p.get("orderable", True) or not p.get("plain", True):
+            continue
+        key = (p.get("eye", "right"), _product_of(p)[:3], p.get("blank_mm"))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"eye": p.get("eye", ""), "index": p.get("index"),
+                    "name": _short_name(p), "supplier": p.get("supplier", ""),
+                    "blank_mm": p.get("blank_mm"), "band_text": p.get("band_text", ""),
+                    "why": p.get("possible_why", "")})
+    return out[:6]
+
+
+def _headline(best, stock_why, made_to_order, possible):
+    """The first box's big line, built from the same row data the table
+    shows (band_text), so the two can never disagree."""
+    if best is None:
+        return "No lens loaded covers this Rx"
+    idx = _fmt_index(best["index"]) if best.get("index") is not None else ""
+    name = _short_name(best)
+    if made_to_order:
+        return f"{idx} {name} · {best['band_text']}".strip()
+    if best["type"] == "stock":
+        line = f"{idx} {name} stock · {best['band_text']}"
+        if best.get("band_text_l") and best["band_text_l"] != best["band_text"]:
+            line += f" (left: {best['band_text_l']})"
+        return line
+    why = stock_why or ("no stock band takes this Rx at a sensible index"
+                        if not possible else "stock not confirmed — see below")
+    return f"GRIND: outside stock range ({why})"
 
 
 def _label(lens):
@@ -890,7 +1171,8 @@ def _price_tag(o):
     return f"${o['price_now']:.2f} a lens" + (f", {tag}" if tag else "")
 
 
-def _verdict(options, best, rec_index=None, prefer_stock=True, made_to_order=False):
+def _verdict(options, best, rec_index=None, prefer_stock=True, made_to_order=False,
+             stock_why="", possible=None):
     """The plain-words line at the top of the results: STOCK or GRIND first,
     then the lens, then what the other route would have cost. Multifocal-type
     lenses are always made to order, so they skip the stock/grind framing."""
@@ -942,7 +1224,9 @@ def _verdict(options, best, rec_index=None, prefer_stock=True, made_to_order=Fal
                          f"is ${-diff:.2f} a lens less, but stock comes first by practice rule.")
     else:
         line = "GRIND — no stock lens covers this"
-        if rec_index is not None:
+        if stock_why:
+            line += f" ({stock_why})"
+        elif rec_index is not None:
             line += f" at {_fmt_index(rec_index)} or higher"
         thin_stock = next((o for o in live if o["type"] == "stock" and o.get("under_index")), None)
         if thin_stock:
@@ -964,6 +1248,10 @@ def _verdict(options, best, rec_index=None, prefer_stock=True, made_to_order=Fal
         line += f" Comes as the {_fmt_mm(best['blank_mm'])} blank."
     if best["warnings"]:
         line += " Check its amber notes first."
+    if possible:
+        p = possible[0]
+        line += (f" Possibly stock, NOT confirmed: {_fmt_index(p['index'])} {p['name']}"
+                 f"{' ' + _fmt_mm(p['blank_mm']) if p.get('blank_mm') else ''} — confirm with ZEISS.")
     return line
 
 
