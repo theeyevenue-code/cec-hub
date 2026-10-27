@@ -175,3 +175,17 @@ def test_api_headline_and_table_share_one_string(hub_client_lenses):
     best = next((o for o in data["options"] if o.get("best")), None)
     if best and best["type"] == "stock":
         assert best["band_text"] in data["headline"]
+
+
+def test_same_lens_same_price_takes_the_larger_blank(rows):
+    # synchrony book p3: FSV Clear 1.67 HMC+ is +2.25 to +6.00 on 65 mm AND 0.00 to +6.00 on
+    # 75 mm, one price. Before 27 Oct 2026 the finder led with the 65; now the 75 (Mark).
+    for sph in (4.25, 5.0, 6.0):
+        r = _find(rows, sph, -1.5)
+        best = next(o for o in r["options"] if o.get("best"))
+        assert (best["supplier"], best["index"], best["blank_mm"]) == ("Synchrony", 1.67, 75), sph
+    # ClearView 1.60 Platinum: +2.00 to +4.00 on 65 AND 70 mm at the deal price -> 70 first
+    r = _find(rows, 3.0)
+    cv = [o["blank_mm"] for o in r["options"]
+          if o["name"] == "ClearView FSV 1.60" and o["coating"] == "DuraVision Platinum UV"]
+    assert cv[:2] == [70, 65]

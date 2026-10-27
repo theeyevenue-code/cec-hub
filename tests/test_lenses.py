@@ -875,3 +875,29 @@ def test_plus_script_prefers_synchrony_150_hmc_70_over_156_65():
     # per-machine override: [] turns the rule off (cheapest first again)
     best = pick(sph=2.0, pricing={"plus_preferred": []})
     assert (best["index"], best["blank_mm"]) == (1.56, 65)
+
+
+def test_larger_blank_wins_a_dead_heat_but_never_beats_price_or_index():
+    # Mark, 27 Oct 2026: "I always prefer larger diameter lenses". One lens on two blanks at
+    # one price (synchrony 1.67: +2.25 to +6.00 on 65 mm, 0.00 to +6.00 on 75 mm) -> the 75.
+    rows = ("supplier,lens,type,index,blank_mm,sph_min,sph_max,cyl_max,range_basis,price,price_basis,coating\n"
+            "Synchrony,FSV Clear 1.67,stock,1.67,65,+2.25,+6.00,-2.00,combined,21.44,L25,HMC+\n"
+            "Synchrony,FSV Clear 1.67,stock,1.67,70,+0.25,+2.00,-2.00,combined,21.44,L25,HMC+\n"
+            "Synchrony,FSV Clear 1.67,stock,1.67,75,+0.00,+6.00,-2.00,combined,21.44,L25,HMC+\n")
+    parsed, errors = lenses.parse_csv_text(rows, "synchrony.csv")
+    assert errors == []
+    for sph, cyl in ((4.5, 0.0), (6.0, -2.0), (2.25, -0.75)):
+        r = lenses.find_options(parsed, sph=sph, cyl=cyl)
+        best = next(o for o in r["options"] if o.get("best"))
+        assert best["blank_mm"] == 75, (sph, cyl)
+        assert "75 mm" in r["headline"]
+    # a cheaper lens on a smaller blank still wins: diameter never outranks price
+    cheap = rows + "Other,Cheap FSV 1.67,stock,1.67,65,+2.25,+6.00,-2.00,combined,20.00,deal,HMC+\n"
+    parsed, _ = lenses.parse_csv_text(cheap, "x.csv")
+    best = next(o for o in lenses.find_options(parsed, sph=4.5)["options"] if o.get("best"))
+    assert (best["name"], best["blank_mm"]) == ("Cheap FSV 1.67", 65)
+    # ...nor the thickness rule: a 1.50 on a bigger blank does not displace the 1.67 at +4.50
+    thin = rows + "Other,Big FSV 1.50,stock,1.50,80,-6.00,+6.00,-2.00,combined,21.44,deal,HMC+\n"
+    parsed, _ = lenses.parse_csv_text(thin, "x.csv")
+    best = next(o for o in lenses.find_options(parsed, sph=4.5)["options"] if o.get("best"))
+    assert (best["index"], best["blank_mm"]) == (1.67, 75)
