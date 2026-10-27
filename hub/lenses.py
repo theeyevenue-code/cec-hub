@@ -690,6 +690,30 @@ DEFAULT_PLUS_PREFERRED = [
 ]
 
 
+# Plus band +2.25 to +4.00 (Mark, 27 Oct 2026): at 1.60 the cheaper Synchrony stock lens is a
+# 65 mm blank; the ZEISS ClearView 1.60 stock lens comes on 70 mm for $2.60/lens more. Rule: for
+# a plus Rx inside the band, within the ZEISS/Synchrony stock family and the same index step, the
+# larger blank beats the smaller even at a higher price. Index, thickness and coating rules still
+# come first; outside the band (and for minus/plano) nothing changes.
+# pricing["plus_larger_blank"] overrides this list per machine ([] turns the rule off).
+DEFAULT_PLUS_LARGER_BLANK = [
+    {"suppliers": ["ZEISS", "Synchrony"], "index": 1.60, "sph_min": 2.25, "sph_max": 4.00,
+     "why": "Plus Rx: 70 mm blank"},
+]
+
+
+def _plus_blank_rule(rules: list, sph: float, left_sph):
+    """The larger-blank rule that applies to this Rx, or None. Every plus eye must sit inside
+    the rule's band (a minus eye is ignored); no plus eye at all means no rule."""
+    plus = [v for v in (sph, left_sph) if v is not None and v > 0]
+    if not plus:
+        return None
+    for r in rules:
+        if all(float(r["sph_min"]) - 1e-9 <= v <= float(r["sph_max"]) + 1e-9 for v in plus):
+            return r
+    return None
+
+
 def _plus_pick(lens: dict, rules: list):
     """The matching plus_preferred rule's 'why' for this stock row, or None."""
     if lens.get("type") != "stock":
@@ -1076,6 +1100,29 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
         if why:
             o["pick_why"] = why
 
+    # Plus band larger-blank rule (DEFAULT_PLUS_LARGER_BLANK): within the rule's stock family
+    # and index step, rows on a smaller blank than the largest on offer rank behind it.
+    blank_rules = pricing.get("plus_larger_blank")
+    blank_rules = DEFAULT_PLUS_LARGER_BLANK if blank_rules is None else blank_rules
+    left_sph = _rx_num(left.get("sph")) if left is not None else None
+    brule = _plus_blank_rule(blank_rules, sph, left_sph)
+
+    def in_blank_family(o):
+        return (brule is not None and o.get("type") == "stock" and o.get("blank_mm") is not None
+                and o["orderable"] and not o["hard_under"] and o["price_now"] is not None
+                and str(o.get("supplier") or "").lower() in [x.lower() for x in brule["suppliers"]]
+                and abs((o["index"] or 0) - float(brule["index"])) < 0.005)
+
+    fam = [o for o in options if in_blank_family(o)]
+    top_blank = max((o["blank_mm"] for o in fam), default=None)
+    for o in options:
+        o["small_blank"] = bool(top_blank is not None and in_blank_family(o)
+                                and o["blank_mm"] < top_blank - 0.01)
+        if (top_blank is not None and in_blank_family(o) and not o["small_blank"]
+                and any(f["blank_mm"] < top_blank - 0.01 for f in fam) and not o.get("pick_why")):
+            o["plus_pick"] = True
+            o["pick_why"] = str(brule.get("why") or "Plus Rx: larger blank")
+
     # Larger blank wins a dead heat (Mark, 27 Oct 2026: "I always prefer larger diameter
     # lenses"). It is the LAST key, so it only separates rows already equal on everything
     # above - ordered, thickness, stock, coating, price, the practice's own list and index.
@@ -1087,7 +1134,7 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
                 (o["type"] != "stock") if prefer_stock else False,
                 o["under_index"],
                 not o["standard_coating"], not o["plain"],
-                o["price_now"] is None, not o["plus_pick"], o["price_now"] or 0, pref_rank(o),
+                o["price_now"] is None, o["small_blank"], not o["plus_pick"], o["price_now"] or 0, pref_rank(o),
                 o["index"] or 0, -(o.get("blank_mm") or 0))
 
     options.sort(key=sort_key)
