@@ -1333,7 +1333,7 @@ function rangeHeadHTML(data, best) {
     const stock = best.type === "stock";
     const head = data.headline || "";
     const sub = stock
-        ? (best.band && best.band.unproven ? "Blank size not confirmed — see the note below" : "")
+        ? (best.band && best.band.unproven ? "Blank size not confirmed — see the note below" : (best.pick_why || ""))
         : `Grind lens: ${fmtIndex(best.index)} ${String(best.name || "").replace(/\s+1\.\d\d$/, "")} · ${best.band_text || ""}`;
     const left = data.rx_left && best.band_text_l
         ? `<div class="ans-range-sub">Left ${esc(data.rx_left.display)}: ${esc(best.band_text_l)}</div>` : "";

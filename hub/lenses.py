@@ -677,6 +677,31 @@ def index_step(idx) -> int:
 
 
 DEFAULT_PREFERRED_COATINGS = ["Platinum", "HMC+"]
+
+# Plus scripts (Mark, 27 Oct 2026): the Synchrony 1.50 HMC+ stock lens on its 70 mm blank is
+# the pick over the Synchrony 1.56, whose plus band only comes on a 65 mm blank - too small for
+# many frames. "Plus" = a plus sphere in minus-cyl form, the same split the price book uses
+# (the 1.56 is 65 mm for a plus sphere, 73 mm for plano/minus), so minus and plano scripts keep
+# the 1.56. It ranks ahead on price only; index, stock-first and coating rules still come first.
+# pricing["plus_preferred"] overrides this list per machine ([] turns the rule off).
+DEFAULT_PLUS_PREFERRED = [
+    {"supplier": "Synchrony", "name": "FSV Clear 1.50", "coating": "HMC+", "blank_mm": 70,
+     "why": "Plus Rx: 70 mm blank. The 1.56 plus lens is only 65 mm"},
+]
+
+
+def _plus_pick(lens: dict, rules: list):
+    """The matching plus_preferred rule's 'why' for this stock row, or None."""
+    if lens.get("type") != "stock":
+        return None
+    for r in rules:
+        if (str(lens.get("supplier") or "").lower() == str(r.get("supplier", "")).lower()
+                and str(lens.get("name") or "").lower() == str(r.get("name", "")).lower()
+                and str(lens.get("coating") or "").lower() == str(r.get("coating", "")).lower()
+                and lens.get("blank_mm") is not None and r.get("blank_mm") is not None
+                and abs(lens["blank_mm"] - float(r["blank_mm"])) < 0.01):
+            return str(r.get("why") or "preferred for plus scripts")
+    return None
 HARD_COAT_WORDS = ("hard coat", "hardcoat", "dshc", " hc")
 
 
@@ -1040,12 +1065,23 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
         options = kept
         possible += [{**p, "eye": "left"} for p in left_result.get("possible_rows", [])]
 
+    # Plus script (either eye): the preferred plus lens ranks ahead of cheaper rows at the
+    # same index step, stock status and coating (DEFAULT_PLUS_PREFERRED).
+    plus_rules = pricing.get("plus_preferred")
+    plus_rules = DEFAULT_PLUS_PREFERRED if plus_rules is None else plus_rules
+    is_plus = sph > 0 or (left_result is not None and left_result["rx"]["sph"] > 0)
+    for o in options:
+        why = _plus_pick(o, plus_rules) if is_plus else None
+        o["plus_pick"] = bool(why)
+        if why:
+            o["pick_why"] = why
+
     def sort_key(o):
         return (not o["orderable"], o["hard_under"],
                 (o["type"] != "stock") if prefer_stock else False,
                 o["under_index"],
                 not o["standard_coating"], not o["plain"],
-                o["price_now"] is None, o["price_now"] or 0, pref_rank(o),
+                o["price_now"] is None, not o["plus_pick"], o["price_now"] or 0, pref_rank(o),
                 o["index"] or 0, o.get("blank_mm") or 0)
 
     options.sort(key=sort_key)
@@ -1202,6 +1238,8 @@ def _verdict(options, best, rec_index=None, prefer_stock=True, made_to_order=Fal
             line += f" Next: {_label(runner)}, {_price_tag(runner)}."
     elif best["type"] == "stock":
         line = f"STOCK covers this — {_label(best)}, {_price_tag(best)}."
+        if best.get("pick_why"):
+            line += f" {best['pick_why']}."
         if rec_index is not None and best["index"] and index_step(best["index"]) > index_step(rec_index):
             line += (f" No {_fmt_index(rec_index)} stock lens covers this cyl, so it "
                      f"goes up to {_fmt_index(best['index'])} stock rather than a grind.")

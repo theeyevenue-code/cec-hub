@@ -844,3 +844,34 @@ def test_sphere_basis_rows_keep_the_hoya_reading():
     assert parsed[0]["range_basis"] == "sphere"
     assert len(lenses.find_options(parsed, sph=-6.0, cyl=-2.0)["options"]) == 1   # -8.00 combined ok
     assert lenses.find_options(parsed, sph=-6.5, cyl=-2.0)["options"] == []        # -8.50 over the cap
+
+
+def test_plus_script_prefers_synchrony_150_hmc_70_over_156_65():
+    # Mark, 27 Oct 2026: for plus scripts the Synchrony 1.50 HMC+ 70 mm is the pick, not the
+    # 1.56 - its plus band is a 65 mm blank, too small for many frames. Minus/plano keep the 1.56.
+    rows = ("supplier,lens,code,type,index,blank_mm,sph_min,sph_max,cyl_max,combined_max,range_basis,price,price_basis,coating\n"
+            "Synchrony,FSV Clear 1.50,SMC70.,stock,1.50,70,-6.00,+6.00,-2.00,6.00,combined,6.80,deal,HMC+\n"
+            "Synchrony,FSV Clear 1.56,SA56HM,stock,1.56,65,+0.25,+6.00,-2.00,,combined,4.55,deal,HMC+\n"
+            "Synchrony,FSV Clear 1.56,SA56HM,stock,1.56,73,-6.00,+0.00,-2.00,6.00,combined,4.55,deal,HMC+\n")
+    parsed, errors = lenses.parse_csv_text(rows, "synchrony.csv")
+    assert errors == []
+    pick = lambda **kw: next(o for o in lenses.find_options(parsed, **kw)["options"] if o.get("best"))
+    for sph, cyl in ((2.0, 0.0), (0.25, 0.0), (0.5, -2.0), (-1.5, 2.0)):   # last = +0.50/-2.00 in plus cyl
+        best = pick(sph=sph, cyl=cyl)
+        assert (best["index"], best["blank_mm"]) == (1.50, 70), (sph, cyl)
+        assert best["plus_pick"] and "70 mm" in best["pick_why"]
+    r = lenses.find_options(parsed, sph=1.0)
+    assert "70 mm blank" in r["verdict"] and r["headline"].startswith("1.50 FSV Clear stock · 70 mm")
+    # minus and plano keep the cheaper 1.56 (73 mm), with no plus note
+    for sph, cyl in ((-2.0, -0.5), (0.0, -1.0)):
+        best = pick(sph=sph, cyl=cyl)
+        assert (best["index"], best["blank_mm"]) == (1.56, 73), (sph, cyl)
+        assert not best.get("pick_why")
+    # either eye plus counts: right minus, left plus -> the 70 mm 1.50 for both
+    best = pick(sph=-1.0, left={"sph": 1.5, "cyl": 0})
+    assert (best["index"], best["blank_mm"]) == (1.50, 70)
+    # a frame needing more than 70 mm rules it out (no 1.56 plus band is big enough either)
+    assert lenses.find_options(parsed, sph=2.0, min_blank=72)["options"] == []
+    # per-machine override: [] turns the rule off (cheapest first again)
+    best = pick(sph=2.0, pricing={"plus_preferred": []})
+    assert (best["index"], best["blank_mm"]) == (1.56, 65)
