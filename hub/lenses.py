@@ -1076,13 +1076,19 @@ def find_options(lenses: list, sph: float, cyl: float = 0.0,
         if why:
             o["pick_why"] = why
 
+    # Larger blank wins a dead heat (Mark, 27 Oct 2026: "I always prefer larger diameter
+    # lenses"). It is the LAST key, so it only separates rows already equal on everything
+    # above - ordered, thickness, stock, coating, price, the practice's own list and index.
+    # In practice that is one lens offered on two blanks at one price (synchrony 1.67 covers
+    # +2.25 to +6.00 on both 65 and 75 mm; ClearView 1.60 +2.00 to +4.00 on 65 and 70 mm).
+    # It never trades price, index or supplier for diameter - those are Mark's calls.
     def sort_key(o):
         return (not o["orderable"], o["hard_under"],
                 (o["type"] != "stock") if prefer_stock else False,
                 o["under_index"],
                 not o["standard_coating"], not o["plain"],
                 o["price_now"] is None, not o["plus_pick"], o["price_now"] or 0, pref_rank(o),
-                o["index"] or 0, o.get("blank_mm") or 0)
+                o["index"] or 0, -(o.get("blank_mm") or 0))
 
     options.sort(key=sort_key)
     appropriate = [o for o in options
