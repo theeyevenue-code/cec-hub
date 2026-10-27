@@ -901,3 +901,43 @@ def test_larger_blank_wins_a_dead_heat_but_never_beats_price_or_index():
     parsed, _ = lenses.parse_csv_text(thin, "x.csv")
     best = next(o for o in lenses.find_options(parsed, sph=4.5)["options"] if o.get("best"))
     assert (best["index"], best["blank_mm"]) == (1.67, 75)
+
+
+_CV160_ROWS = (
+    "supplier,lens,code,type,index,blank_mm,sph_min,sph_max,cyl_max,combined_max,range_basis,price,price_basis,coating\n"
+    "ZEISS,ClearView FSV 1.60,343867,stock,1.60,70,+0.25,+4.00,-2.00,,combined,22.50,deal,DuraVision Platinum UV\n"
+    "Synchrony,FSV Clear 1.60,SA60HM,stock,1.60,65,+0.25,+6.00,-2.00,,combined,19.90,deal,HMC+\n"
+    "Synchrony,FSV Clear 1.60,SA60HM,stock,1.60,70,-8.00,+0.00,-3.00,8.00,combined,19.90,deal,HMC+\n"
+    "Synchrony,FSV Clear 1.50,SMC70.,stock,1.50,70,-6.00,+6.00,-2.00,6.00,combined,6.80,deal,HMC+\n"
+    "Synchrony,FSV Clear 1.67,SA67HM,stock,1.67,65,+2.25,+6.00,-2.00,,combined,40.00,deal,HMC+\n"
+    "Synchrony,FSV Clear 1.67,SA67HM,stock,1.67,75,+2.25,+6.00,-2.00,,combined,40.00,deal,HMC+\n")
+
+
+def _cv160_best(sph, cyl=0.0, **kw):
+    parsed, errors = lenses.parse_csv_text(_CV160_ROWS, "mix.csv")
+    assert errors == []
+    r = lenses.find_options(parsed, sph=sph, cyl=cyl, **kw)
+    return next(o for o in r["options"] if o.get("best")), r
+
+
+def test_plus_225_to_400_picks_clearview_160_on_70_mm():
+    # Mark, 27 Oct 2026: +2.25..+4.00 -> ZEISS ClearView 1.60 70 mm over Synchrony 1.60 65 mm.
+    for sph in (2.25, 3.0, 4.0):
+        best, r = _cv160_best(sph, -0.5)
+        assert (best["supplier"], best["index"], best["blank_mm"]) == ("ZEISS", 1.60, 70), sph
+        assert best["pick_why"] == "Plus Rx: 70 mm blank"
+    # both eyes plus inside the band: same pick
+    best, _ = _cv160_best(3.0, 0.0, left={"sph": 2.5, "cyl": 0})
+    assert (best["supplier"], best["blank_mm"]) == ("ZEISS", 70)
+
+
+def test_plus_blank_rule_leaves_other_bands_alone():
+    best, _ = _cv160_best(2.0, 0.0)             # still Synchrony 1.50 70
+    assert (best["supplier"], best["index"], best["blank_mm"]) == ("Synchrony", 1.50, 70)
+    best, _ = _cv160_best(4.25, 0.0)            # still 1.67 on 75 mm
+    assert (best["index"], best["blank_mm"]) == (1.67, 75)
+    best, _ = _cv160_best(-3.0, -0.5)           # minus: cheaper Synchrony 1.60 70, no plus note
+    assert best["supplier"] == "Synchrony" and not best.get("pick_why")
+    # rule off per machine: cheaper 65 mm Synchrony 1.60 again
+    best, _ = _cv160_best(3.0, 0.0, pricing={"plus_larger_blank": []})
+    assert (best["supplier"], best["blank_mm"]) == ("Synchrony", 65)
