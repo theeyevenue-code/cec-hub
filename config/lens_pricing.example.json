@@ -4,6 +4,7 @@
   "prefer_stock": true,
   "stock_combined_confirmed": false,
   "_stock_combined_confirmed": "false until VISUSTORE confirms ZEISS stock bands read as sphere + cyl (key -4.00/-4.00 ClearView FSV 167: accepted on 70 mm?). While false, a stock band needs the printed sphere reading AND the combined reading to agree (lenses/README.md).",
+  "_plus_preferred": "Optional list. Leave it out to use the built-in rule (Mark, 27 Oct 2026): for a plus sphere the Synchrony FSV Clear 1.50 HMC+ 70 mm is the stock pick over the 1.56 (65 mm plus blank). Each entry: supplier, name, coating, blank_mm, why. [] turns the rule off.",
   "levels": { "L50": 0.625, "L25": 0.9375, "_note": "multipliers on the L20 book; L50 21 Oct 2026 - 20 Apr 2027, then L25: Trisha written summary 20 Oct 2026" },
   "zeiss_mix_suppliers": ["ZEISS", "Synchrony"]
 }
