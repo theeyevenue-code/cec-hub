@@ -1786,9 +1786,11 @@ async function renderLenses() {
                         <input id="lf-dbl" inputmode="numeric" placeholder="18"></div>
                     <div class="field"><label for="lf-pd">Patient PD</label>
                         <input id="lf-pd" inputmode="numeric" placeholder="62"></div>
+                    <div class="field"><label for="lf-ed">Longest axis (ED), optional</label>
+                        <input id="lf-ed" inputmode="numeric" placeholder="58"></div>
                     <div class="helper-out" id="lf-suggest"></div>
                 </div>
-                <p class="helper-note">Rough rule: eye size + (frame PD − patient PD) + a few mm
+                <p class="helper-note">Rough rule: eye size (or longest axis, if you have it) + (frame PD − patient PD) + a few mm
                 spare. Big decentration or a wide ED frame needs more — when in doubt, size up.</p>
             </details>
             <div id="lens-results"></div>
@@ -1884,23 +1886,27 @@ async function renderLenses() {
     document.querySelectorAll('input[name="lf-sup"]').forEach((el) =>
         el.addEventListener("change", () => { if (sphEl.value.trim()) runFind(); }));
 
-    // Blank-size helper: eye size + total decentration + 2mm spare.
+    // Blank-size helper: (ED, else eye size + 2) + total decentration + 2mm spare.
     const aEl = document.getElementById("lf-a");
     const dblEl = document.getElementById("lf-dbl");
     const pdEl = document.getElementById("lf-pd");
+    const edEl = document.getElementById("lf-ed");
     const suggestEl = document.getElementById("lf-suggest");
     function suggest() {
         const a = parseFloat(aEl.value), dbl = parseFloat(dblEl.value),
               pd = parseFloat(pdEl.value);
         if (!(a > 0) || !(dbl >= 0) || !(pd > 0)) { suggestEl.innerHTML = ""; return; }
-        const size = Math.ceil((a + 2) + Math.max(a + dbl - pd, 0) + 2);
+        // Optional ED (frame effective diameter) replaces eye size + 2; ignored unless 30-90 mm.
+        const ed = parseFloat(edEl.value);
+        const base = (ed >= 30 && ed <= 90) ? ed : a + 2;
+        const size = Math.ceil(base + Math.max(a + dbl - pd, 0) + 2);
         suggestEl.innerHTML = `<span>Suggested: <strong>${esc(size)}mm</strong></span>
             <button class="btn btn-quiet" id="lf-usesize" type="button">Use it</button>`;
         document.getElementById("lf-usesize").addEventListener("click", () => {
             blankEl.value = size;
         });
     }
-    [aEl, dblEl, pdEl].forEach((el) => el.addEventListener("input", suggest));
+    [aEl, dblEl, pdEl, edEl].forEach((el) => el.addEventListener("input", suggest));
 }
 
 /* --- Recalls (v1: look only — nothing can be sent from here) ----------------------- */
