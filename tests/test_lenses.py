@@ -254,6 +254,13 @@ def test_min_blank_from_frame():
     # ED wins over eye-size guess when given.
     assert lenses.min_blank_from_frame({"a": 52, "dbl": 18, "pd": 62,
                                         "ed": 56}) == 66
+    # Blank/zero ED is ignored (falls back to eye size + 2).
+    assert lenses.min_blank_from_frame({"a": 52, "dbl": 18, "pd": 62,
+                                        "ed": 0}) == 64
+    # Example: A54 DBL16 PD64 -> 64 without ED, 66 with ED 58.
+    assert lenses.min_blank_from_frame({"a": 54, "dbl": 16, "pd": 64}) == 64
+    assert lenses.min_blank_from_frame({"a": 54, "dbl": 16, "pd": 64,
+                                        "ed": 58}) == 66
     assert lenses.min_blank_from_frame({"a": 52}) is None
     assert lenses.min_blank_from_frame({}) is None
 
