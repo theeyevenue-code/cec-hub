@@ -72,6 +72,8 @@ GUIDE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_FILE_RE = re.compile(r"^[A-Za-z0-9 ._()\-]{1,120}\.pdf$")
 IDEM_RE = re.compile(r"^[A-Za-z0-9-]{16,64}$")
+LANG_RE = re.compile(r"^[a-z]{2}(-[A-Za-z]{2,4})?$")    # en, zh, ko, zh-Hant ...
+LANG_NAMES = {"en": "English", "zh": "Chinese", "ko": "Korean"}
 EMAIL_RE = re.compile(r"^[^@\s,;<>\"']+@[^@\s,;<>\"']+\.[^@\s,;<>\"']+$")
 
 # The live gate is read ONLY by the bridge, from the agent's .env. The Hub
@@ -151,6 +153,7 @@ def load_manifest(cfg: dict) -> list[dict]:
               and SAFE_FILE_RE.match(str(g.get("email_filename") or ""))
               and HEX64_RE.match(str(g.get("sha256") or ""))
               and str(g.get("approval_ref") or "").strip()
+              and LANG_RE.match(str(g.get("language") or ""))
               and isinstance(g.get("active"), bool))
         if not ok:
             logger.warning("Send guide: manifest entry %r ignored (incomplete)", gid[:40])
@@ -180,6 +183,10 @@ def guide_bytes(cfg: dict, g: dict) -> tuple[bytes | None, str]:
     return data, ""
 
 
+def _lang_name(code: str) -> str:
+    return LANG_NAMES.get(code.split("-")[0], code)
+
+
 def guides_for_page(cfg: dict) -> list[dict]:
     out = []
     for g in load_manifest(cfg):
@@ -187,7 +194,8 @@ def guides_for_page(cfg: dict) -> list[dict]:
             continue
         _, problem = guide_bytes(cfg, g)
         out.append({"id": g["id"], "title": g["title"], "version": g.get("version") or "",
-                    "stage": str(g.get("stage") or "").title(), "language": g.get("language") or "en",
+                    "stage": str(g.get("stage") or "").title(), "language": g["language"],
+                    "language_name": _lang_name(g["language"]),
                     "ok": not problem, "problem": problem})
     return out
 
@@ -528,6 +536,7 @@ def _review(cfg: dict, pid: int, ids: list[str], today_d: date, now: datetime) -
             continue
         data_bytes, problem = guide_bytes(cfg, g)
         guides.append({"id": gid, "title": g["title"], "version": g.get("version") or "",
+                       "language": g["language"], "language_name": _lang_name(g["language"]),
                        "ok": not problem, "problem": problem})
         if not problem:
             ready.append((g, data_bytes))

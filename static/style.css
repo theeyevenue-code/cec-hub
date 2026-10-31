@@ -1817,6 +1817,7 @@ body.lens-mono main { background: #fafafa; }
 .sg-guide input { width: 26px; height: 26px; accent-color: var(--green-deep); }
 .sg-guide-title { font-weight: 700; color: var(--ink); }
 .sg-stage { font-size: 15px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+.sg-lang { color: var(--info-ink); border-color: var(--info-line); background: var(--info-bg); }
 .sg-guide-off { opacity: 0.7; cursor: not-allowed; }
 .sg-problem { flex-basis: 100%; font-size: 17px; color: var(--danger-ink); font-weight: 600; }
 .sg-panel { border-collapse: collapse; width: 100%; font-size: 18px; margin-bottom: 14px; }

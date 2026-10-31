@@ -485,3 +485,33 @@ def test_staff_guard_applies(client, world):
     assert r.status_code == 403
     r = client.get("/api/sendguide/setup", environ_base={"REMOTE_ADDR": "192.168.1.50"})
     assert r.status_code == 403
+
+
+# --- manifest upkeep: one-line guide update, other languages --------------------
+
+def test_one_line_update_swaps_file_version_and_hash(world, tmp_path):
+    from hub import guide_manifest
+    new = tmp_path / "CEC-Test-Guide-A-rev8.pdf"
+    new.write_bytes(PDF_A + b" rev 8")
+    entry = guide_manifest.update(world["cfg"], "guide-a", new, "rev 8, Nov 2026", "Mark approved rev 8 (test)")
+    assert entry["sha256"] == hashlib.sha256(PDF_A + b" rev 8").hexdigest()
+    assert (world["gdir"] / new.name).read_bytes() == PDF_A + b" rev 8"
+    page = {g["id"]: g for g in sendguide.guides_for_page(world["cfg"])}
+    assert page["guide-a"]["ok"] and page["guide-a"]["version"] == "rev 8, Nov 2026"
+    assert page["guide-b"]["ok"]                              # nothing else touched
+    with pytest.raises(SystemExit):
+        guide_manifest.update(world["cfg"], "guide-a", new, "rev 9", "  ")   # approval required
+
+
+def test_chinese_guide_entry_is_accepted_and_labelled(world):
+    m = json.loads(open(sendguide.manifest_path(world["cfg"]), encoding="utf-8").read())
+    zh = dict(m["guides"][0], id="guide-a-zh", title="Test Guide A (Chinese)", language="zh",
+              email_filename="Concord Eyecare - Test Guide A (Chinese).pdf")
+    bad = dict(m["guides"][0], id="guide-bad-lang", language="Chinese")
+    m["guides"] += [zh, bad]
+    sendguide.manifest_path(world["cfg"]).write_text(json.dumps(m), encoding="utf-8")
+    page = {g["id"]: g for g in sendguide.guides_for_page(world["cfg"])}
+    assert page["guide-a-zh"]["ok"] and page["guide-a-zh"]["language_name"] == "Chinese"
+    assert "guide-bad-lang" not in page                       # malformed language: dropped
+    _, r = sendguide.review(world["cfg"], {"patient_id": 1001, "guide_ids": ["guide-a", "guide-a-zh"]})
+    assert r["can_send"] and [g["language"] for g in r["guides"]] == ["en", "zh"]

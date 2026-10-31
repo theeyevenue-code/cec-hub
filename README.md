@@ -229,8 +229,14 @@ into the Hub), `hub\guide_search.py` (the agent's full-name search rule, ported)
 - **Privacy:** staff guard as Check-in (server, or a computer unlocked with the staff code);
   searches and names in POST bodies; every answer no-store; `hub.log` gets op id, patient id
   and outcome only.
-- **Adding a guide:** copy the approved final export into `guides_dir`, add its entry with
-  `sha256` and `approval_ref`, set `active: true`, commit. Withdraw: `active: false`.
+- **Replacing a guide with a new approved revision (one line):**
+  `python -m hub.guide_manifest update orthok-collecting <new.pdf> --version "rev 8, Nov 2026" --approval "Mark approved rev 8 FINAL <date>"`
+  copies the PDF into `guides_dir`, rehashes it and rewrites that one entry; then commit
+  the manifest. `python -m hub.guide_manifest list` shows every guide and whether it matches.
+- **Adding a guide** (e.g. a Chinese version): copy the approved export into `guides_dir`, add
+  an entry with its own `id`, `language` (`zh`, `ko`... shown as a label to staff and in the
+  panel), `sha256`, `approval_ref`, `active: true`, commit. Withdraw: `active: false`.
+  The covering email stays the English template.
 - The tile is in `tiles.example.json`, so it appears (in draft mode) after merge + RESTART-HUB.
 - Test copy with fake ZZTEST patients (Gmail never touched): `RUN-SENDGUIDE-TEST.bat`
   (127.0.0.1:5699).

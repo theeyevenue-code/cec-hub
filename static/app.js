@@ -3587,6 +3587,7 @@ async function sgLoadSetup() {
             <input type="checkbox" value="${esc(g.id)}"${g.ok ? "" : " disabled"}>
             <span class="sg-guide-title">${esc(g.title)}</span>
             <span class="sg-stage">${esc(g.stage)}</span>
+            ${g.language !== "en" ? `<span class="sg-stage sg-lang">${esc(g.language_name)}</span>` : ""}
             ${g.ok ? "" : `<span class="sg-problem">${esc(g.problem)}</span>`}
         </label>`).join("")}</div>`;
     box.querySelectorAll("input[type=checkbox]").forEach((c) => c.addEventListener("change", () => {
@@ -3652,7 +3653,7 @@ async function sgReview() {
             ? `<strong class="sg-big sg-email">${esc(d.to.email)}</strong><div><span class="sg-chip${p.minor ? " sg-chip-parent" : ""}">${esc(d.to.label)}</span></div>`
             : `<span class="sg-none">No email to send to</span>`)}
         ${sgRow("Guides", guides.length
-            ? `<ul class="sg-list">${guides.map((g) => `<li>${esc(g.title)}${g.version ? ` <span class="sg-sub">· ${esc(g.version)}</span>` : ""}</li>`).join("")}</ul>`
+            ? `<ul class="sg-list">${guides.map((g) => `<li>${esc(g.title)}${g.language && g.language !== "en" ? ` <strong>(${esc(g.language_name)})</strong>` : ""}${g.version ? ` <span class="sg-sub">· ${esc(g.version)}</span>` : ""}</li>`).join("")}</ul>`
             : `<span class="sg-none">Tick at least one guide</span>`)}
         </tbody></table>
         ${(d.repeats || []).length ? `<div class="sg-warn"><strong>Already sent in the last 30 days:</strong>
