@@ -5,11 +5,13 @@
 #   {first_name}        adult patient's first (or preferred) name
 #   {child_first_name}  child's first (or preferred) name; the child is never greeted
 #   {guide_list}        one line per guide: "- <guide title>"
-#   {attached_line}     the [attached_one] or [attached_many] line below
+#   {intro}             the [intro_one] or [intro_many] block below
+#   {guide_title}       the one guide's title (intro_one)
+#   {for_child}         " for <child first name>" for a child, empty for an adult
 # Change the version line whenever the wording changes; every send records it.
 
 [version]
-send-guide-email v1 (1 Nov 2026, draft for Mark)
+send-guide-email v2 (1 Nov 2026, Mark's edits: 'Please find attached', no PDF line)
 
 [subject]
 Your guide from Concord Eyecare
@@ -17,30 +19,24 @@ Your guide from Concord Eyecare
 [adult]
 Hello {first_name},
 
-As we discussed, here is the information from Concord Eyecare:
-
-{guide_list}
-
-{attached_line}
+{intro}
 
 If you have any questions, reply to this email or call us on (02) 8765 9600.
 
 [child]
 Hello,
 
-As we discussed, here is the information from Concord Eyecare for {child_first_name}:
-
-{guide_list}
-
-{attached_line}
+{intro}
 
 If you have any questions, reply to this email or call us on (02) 8765 9600.
 
-[attached_one]
-It is attached as a PDF, so you can read it again at home whenever you need it.
+[intro_one]
+Please find attached the {guide_title}{for_child}.
 
-[attached_many]
-They are attached as PDFs, so you can read them again at home whenever you need them.
+[intro_many]
+Please find attached the following guides{for_child}:
+
+{guide_list}
 
 [signature]
 Kind regards,

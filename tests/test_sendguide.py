@@ -43,9 +43,9 @@ PATIENTS = {
     1007: {"patient_id": 1007, "given": "Nodob", "surname": "Zztest", "nickname": "",
            "dob": "", "email": "nodob@example.invalid", "noemail": False, "bademail": False},
     1008: {"patient_id": 1008, "given": "Seventeen", "surname": "Zztest", "nickname": "",
-           "dob": _yrs_ago(18, days=-1), "email": "teen@example.invalid", "noemail": False, "bademail": False},
+           "dob": _yrs_ago(16, days=-1), "email": "teen@example.invalid", "noemail": False, "bademail": False},
     1009: {"patient_id": 1009, "given": "Eighteen", "surname": "Zztest", "nickname": "",
-           "dob": _yrs_ago(18), "email": "adult18@example.invalid", "noemail": False, "bademail": False},
+           "dob": _yrs_ago(16), "email": "adult16@example.invalid", "noemail": False, "bademail": False},
 }
 
 
@@ -205,14 +205,14 @@ def test_child_never_greeted_parent_label_and_child_named(world):
     body = world["fake"].delivered[0]["body"]
     assert body.startswith("Hello,\n")
     assert "Hello Kiddo" not in body
-    assert "from Concord Eyecare for Kiddo:" in body
+    assert "Please find attached the Test Guide A for Kiddo." in body
 
 
 def test_preferred_name_and_age_boundary(world):
     t = date.today()
-    assert sendguide.compose(PATIENTS[1003], [{"title": "G"}], t)["body"].count("for Sib:") == 1
-    assert sendguide.compose(PATIENTS[1008], [{"title": "G"}], t)["minor"] is True     # 17 (18 tomorrow)
-    assert sendguide.compose(PATIENTS[1009], [{"title": "G"}], t)["minor"] is False    # 18 today
+    assert sendguide.compose(PATIENTS[1003], [{"title": "G"}], t)["body"].count("the G for Sib.") == 1
+    assert sendguide.compose(PATIENTS[1008], [{"title": "G"}], t)["minor"] is True     # 15 (16 tomorrow)
+    assert sendguide.compose(PATIENTS[1009], [{"title": "G"}], t)["minor"] is False    # 16 today
 
 
 def test_subject_neutral_and_body_only_names_guides(world):
@@ -223,7 +223,8 @@ def test_subject_neutral_and_body_only_names_guides(world):
     for word in ("myopia", "ortho", "diagnos", "prescription", "unsubscribe"):
         assert word not in low
     assert "- Test Guide A\n- Test Guide B" in spec["body"]
-    assert "They are attached as PDFs" in spec["body"]
+    assert "Please find attached the following guides:\n\n- Test Guide A\n- Test Guide B" in spec["body"]
+    assert "attached as PDF" not in spec["body"]
     assert spec["body"].rstrip().endswith("concordeyecare.com.au")
     assert "Concord Eyecare\n161 Concord Rd" in spec["body"]
     assert [a["filename"] for a in spec["attachments"]] == [

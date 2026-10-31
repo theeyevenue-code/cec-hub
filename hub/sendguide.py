@@ -13,7 +13,7 @@ on the exact bytes attached; a mismatch refuses that guide (fail closed).
 WHO IT GOES TO. Always the email on the Optomate record, read fresh on Send
 (the browser's copy is never trusted). Optomate's NOEMAIL ("no email") or
 IS_BADEMAIL flag, a missing email or a missing date of birth blocks the send.
-Under 18 on the day = the address is shown as the parent/guardian's and the
+Under 16 on the day = the address is shown as the parent/guardian's and the
 email greets the parent neutrally, naming the child (never greeting the child).
 
 REVIEW, NOT A TICK (Mark, 1 Nov). No confirm box: the same screen shows a
@@ -65,7 +65,7 @@ DEFAULT_GUIDES_DIR = r"C:\CEC\runtime\hub-guides"
 DEFAULT_HISTORY_DB = r"C:\CEC\runtime\hub-send-guide\send-history.sqlite3"
 
 REPEAT_DAYS = 30
-ADULT_AGE = 18
+ADULT_AGE = 16   # Mark 1 Nov 2026: child = under 16, same as Check-in
 MAX_GUIDES = 6
 SEND_CLASSES = ("care", "decision")          # never "marketing" / "print-only"
 GUIDE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
@@ -313,14 +313,14 @@ def compose(p: dict, guides: list[dict], today: date, template: dict | None = No
     titles only."""
     t = template or load_template()
     minor = (age_on(p.get("dob"), today) or 0) < ADULT_AGE
-    fills = {
-        "first_name": first_name(p),
-        "child_first_name": first_name(p),
+    intro_fills = {
+        "guide_title": guides[0]["title"] if guides else "",
         "guide_list": "\n".join(f"- {g['title']}" for g in guides),
-        "attached_line": t["attached_many"] if len(guides) > 1 else t["attached_one"],
+        "for_child": f" for {first_name(p)}" if minor else "",
     }
+    intro = (t["intro_many"] if len(guides) > 1 else t["intro_one"]).format(**intro_fills)
     main = t["child"] if minor else t["adult"]
-    body = main.format(**fills) + "\n\n" + t["signature"] + "\n"
+    body = main.format(first_name=first_name(p), intro=intro) + "\n\n" + t["signature"] + "\n"
     return {"subject": t["subject"], "body": body, "version": t.get("version", ""),
             "minor": minor}
 

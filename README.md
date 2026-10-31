@@ -212,7 +212,7 @@ into the Hub), `hub\guide_search.py` (the agent's full-name search rule, ported)
   print-only file is refused with plain words. No folder is scanned. The referral flyer and
   the collecting print pack are print-only and never go in the manifest.
 - **The panel on the same screen** (no confirm tick, Mark 1 Nov): name + date of birth, the
-  email and whose it is (under 18 = "Parent/guardian's email"), guide titles + versions, and
+  email and whose it is (under 16 = "Parent/guardian's email"), guide titles + versions, and
   "Already sent in the last 30 days" (same patient + same guide). The email address is
   always re-read from Optomate on Send; the browser's copy is never used.
 - **Blocks:** Optomate `NOEMAIL` (no email) or `IS_BADEMAIL`, no email, no date of birth.
