@@ -1,0 +1,10 @@
+{
+  "_readme": "TEST COPY ONLY (RUN-SENDGUIDE-TEST.bat, 127.0.0.1:5699, CHECKIN_FIXTURE=1 = fake ZZTEST patients, Gmail never touched). Its send history is a separate throw-away file, never the real one.",
+  "optomate_agent": {
+    "agent_dir": "C:\\CEC\\CEC-Optomate-Agent"
+  },
+  "send_guide": {
+    "guides_dir": "C:\\CEC\\runtime\\hub-guides",
+    "history_db": "C:\\CEC\\runtime\\hub-send-guide-test\\send-history-TEST.sqlite3"
+  }
+}

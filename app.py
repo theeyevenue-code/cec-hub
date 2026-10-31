@@ -20,7 +20,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from hub import checkin, integrations, lenses, sop_parser
+from hub import checkin, integrations, lenses, sendguide, sop_parser
 
 logging.basicConfig(
     level=logging.INFO,
@@ -491,6 +491,43 @@ def checkin_discard(token):
 def checkin_resume(token):
     """A form the iPad locked (left untouched) goes back on the iPad."""
     return _json(checkin.resume(_integrations(), token))
+
+
+# --- Send guide (hub/sendguide.py) -------------------------------------------
+# Same staff guard as Check-in. Names and searches go in POST bodies, every
+# answer is no-store, and only ids reach hub.log.
+
+@app.route("/api/sendguide/setup")
+@staff_only
+def sendguide_setup():
+    return _no_store(jsonify(sendguide.setup(_integrations())))
+
+
+@app.route("/api/sendguide/today")
+@staff_only
+def sendguide_today():
+    return _no_store(jsonify(sendguide.today(_integrations())))
+
+
+@app.route("/api/sendguide/search", methods=["POST"])
+@staff_only
+def sendguide_search():
+    data = request.get_json(silent=True) or {}
+    out = sendguide.search(_integrations(), data.get("q", ""))
+    return _no_store(jsonify(out)), (400 if out.get("error") else 200)
+
+
+@app.route("/api/sendguide/review", methods=["POST"])
+@staff_only
+def sendguide_review():
+    return _json(sendguide.review(_integrations(), request.get_json(silent=True) or {}))
+
+
+@app.route("/api/sendguide/send", methods=["POST"])
+@staff_only
+def sendguide_send():
+    return _json(sendguide.send(_integrations(), request.get_json(silent=True) or {},
+                                _staff_name()))
 
 
 # iPad: its own page and files, every API call needs the device key header.

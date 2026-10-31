@@ -192,6 +192,49 @@ that form.
 To try it with fake patients: double-click `RUN-CHECKIN-TEST.bat` (port 5699, ZZTEST
 fixtures, nothing written anywhere near Optomate).
 
+## Send guide (email a patient guide) - built 1 Nov 2026, DRAFT MODE
+
+Item GUIDE-SEND-AFTER-COLLECTION-1101. Staff pick a patient (Today's list, or a full-name
+search: surname + first name either way round), tick one or more guides, press the button.
+The family gets ONE email from info@ with the guide PDF(s) attached. Code: `hub\sendguide.py`
+(rules, history, review), `hub\guide_bridge.py` (runs in the agent folder: Optomate GET +
+info@ Gmail via the agent's own `optomate.client` and `gmailer.auth`; no secret is copied
+into the Hub), `hub\guide_search.py` (the agent's full-name search rule, ported).
+
+- **Draft mode until Mark says "turn on live guide sends".** The button reads **Make draft
+  in info@** and the page says Draft mode. Live needs BOTH lines in the AGENT's `.env`:
+  `GUIDE_DRAFT_MODE=false` and `GUIDE_LIVE_SEND=true`. Only the bridge reads them; the Hub
+  strips both names from what it hands the bridge. Mark checks the first 5 real drafts.
+- **What can be sent:** only `config\guides.manifest.json` (id, title, version, stage,
+  language, path, sha256, approval_ref, classification, active). The PDFs live in
+  `send_guide.guides_dir` (default `C:\CEC\runtime\hub-guides`, outside every repo and sync
+  folder). Every send re-hashes the bytes it attaches; a changed, missing, withdrawn or
+  print-only file is refused with plain words. No folder is scanned. The referral flyer and
+  the collecting print pack are print-only and never go in the manifest.
+- **The panel on the same screen** (no confirm tick, Mark 1 Nov): name + date of birth, the
+  email and whose it is (under 18 = "Parent/guardian's email"), guide titles + versions, and
+  "Already sent in the last 30 days" (same patient + same guide). The email address is
+  always re-read from Optomate on Send; the browser's copy is never used.
+- **Blocks:** Optomate `NOEMAIL` (no email) or `IS_BADEMAIL`, no email, no date of birth.
+- **Email wording:** fixed template `hub\templates\send-guide-email.txt` (versioned; every
+  send records the version). Adults: "Hello <first name>,". Children: "Hello," and the child
+  is named in the body. Neutral subject "Your guide from Concord Eyecare".
+- **Send history:** private SQLite at `send_guide.history_db` (default
+  `C:\CEC\runtime\hub-send-guide\send-history.sqlite3`, made on first use; refused inside
+  the Hub or agent folders or a sync folder). One row per send: op id, idempotency key,
+  patient id, destination, guide ids + hashes, template version, staff name, mode, outcome,
+  Gmail id. Written before Gmail is called; a timeout is "unknown" (check info@ before
+  sending again). Never deleted by the Hub (health-record retention).
+- **Double clicks:** each Send carries a one-off key; the same key returns the first result.
+- **Privacy:** staff guard as Check-in (server, or a computer unlocked with the staff code);
+  searches and names in POST bodies; every answer no-store; `hub.log` gets op id, patient id
+  and outcome only.
+- **Adding a guide:** copy the approved final export into `guides_dir`, add its entry with
+  `sha256` and `approval_ref`, set `active: true`, commit. Withdraw: `active: false`.
+- The tile is in `tiles.example.json`, so it appears (in draft mode) after merge + RESTART-HUB.
+- Test copy with fake ZZTEST patients (Gmail never touched): `RUN-SENDGUIDE-TEST.bat`
+  (127.0.0.1:5699).
+
 ## Medicare (rejected claims) - built 9 Oct 2026 (v2 same day), not live yet
 
 Karen's Tuesday page. She pulls the Medicare processing + payment reports in Optomate Touch first;
@@ -238,6 +281,10 @@ hub\integrations.py     read-only views of the other systems, all graceful
 hub\lenses.py           lens catalogue CSVs -> best-option finder (stock vs grind)
 hub\recall.py           Recalls tile -> the agent's recall engine (subprocess)
 hub\checkin.py          Check-in tile -> the agent's checkin engine; form store, iPad slot
+hub\sendguide.py        Send guide tile: manifest, review panel, send history, idempotency
+hub\guide_bridge.py     runs in the agent folder: Optomate GET + info@ Gmail (draft/live gate)
+hub\guide_search.py     full-name patient search rule (ported from the agent tracker)
+hub\templates\          fixed patient email wording (send-guide-email.txt)
 ipad\                   the iPad form page (own HTML/CSS/JS, no Hub links, served no-store)
 config\*.json           tiles, integration paths, staff names
 sops\                   the guides + README.md (authoring contract) + images\

@@ -1,0 +1,50 @@
+# Send guide email - FIXED TEMPLATE COPY (never model-written at send time).
+# Wording needs Mark's approval before the first real draft goes out.
+# Lines starting with # are notes and are ignored. Each [section] runs until the next one.
+# Fill-ins, put in by code from Optomate and the guide list only:
+#   {first_name}        adult patient's first (or preferred) name
+#   {child_first_name}  child's first (or preferred) name; the child is never greeted
+#   {guide_list}        one line per guide: "- <guide title>"
+#   {attached_line}     the [attached_one] or [attached_many] line below
+# Change the version line whenever the wording changes; every send records it.
+
+[version]
+send-guide-email v1 (1 Nov 2026, draft for Mark)
+
+[subject]
+Your guide from Concord Eyecare
+
+[adult]
+Hello {first_name},
+
+As we discussed, here is the information from Concord Eyecare:
+
+{guide_list}
+
+{attached_line}
+
+If you have any questions, reply to this email or call us on (02) 8765 9600.
+
+[child]
+Hello,
+
+As we discussed, here is the information from Concord Eyecare for {child_first_name}:
+
+{guide_list}
+
+{attached_line}
+
+If you have any questions, reply to this email or call us on (02) 8765 9600.
+
+[attached_one]
+It is attached as a PDF, so you can read it again at home whenever you need it.
+
+[attached_many]
+They are attached as PDFs, so you can read them again at home whenever you need them.
+
+[signature]
+Kind regards,
+Concord Eyecare
+161 Concord Rd, North Strathfield NSW 2137
+(02) 8765 9600 · info@concordeyecare.com.au
+concordeyecare.com.au

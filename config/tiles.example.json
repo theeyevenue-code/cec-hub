@@ -9,6 +9,13 @@
       "link": "#/checkin"
     },
     {
+      "id": "sendguide",
+      "icon": "",
+      "name": "Send guide",
+      "description": "Email a patient their guide from info@ after the visit",
+      "link": "#/sendguide"
+    },
+    {
       "id": "todo",
       "icon": "✅",
       "name": "To-do list",

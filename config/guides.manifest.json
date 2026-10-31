@@ -1,0 +1,58 @@
+{
+  "_readme": "The ONLY guides the Send guide tile can email. No folder is ever scanned. Each PDF lives in send_guide.guides_dir (default C:\\CEC\\runtime\\hub-guides, outside every repo and sync folder) at 'path', and is refused at send time unless its SHA-256 still matches. To add or replace a guide: copy the approved final export from second-brain handouts\\exports\\ into guides_dir, put its sha256 here with the approval reference, set active true, commit. To withdraw one: active false. Care and decision guides only: the referral flyer and the collecting print pack (guide + flyer) are PRINT-ONLY and never go in this list (Codex 1 Nov 2026, commercial-message rules).",
+  "version": 1,
+  "guides": [
+    {
+      "id": "orthok-collecting",
+      "title": "Ortho-K Collecting Guide",
+      "version": "rev 7, Nov 2026",
+      "stage": "COLLECTING",
+      "language": "en",
+      "path": "CEC-OrthoK-Collecting-Guide-A4.pdf",
+      "email_filename": "Concord Eyecare - Ortho-K Collecting Guide.pdf",
+      "sha256": "e6c116cf263ac97f6373b18db57146b15cb6c38d25d784bf327134aae0089bb2",
+      "approval_ref": "Mark approved rev 7 FINAL 1 Nov 2026 (second-brain wiki/log.md; export commit 13fb5d5c handouts/exports/CEC-OrthoK-Collecting-Guide-A4.pdf). Standalone guide, NOT the print pack.",
+      "classification": "care",
+      "active": true
+    },
+    {
+      "id": "orthok-program",
+      "title": "Ortho-K Program Guide",
+      "version": "Nov 2026",
+      "stage": "DECIDING",
+      "language": "en",
+      "path": "CEC-OrthoK-Deciding-Guide-A4.pdf",
+      "email_filename": "Concord Eyecare - Ortho-K Program Guide.pdf",
+      "sha256": "e020974960998e3f470ffab721e95b97d0e3c65521a9d6eb78497d9eb2131a8e",
+      "approval_ref": "Mark approved the DECIDING guide FINAL 1 Nov 2026 (second-brain wiki/log.md; export commit f818e5ea, printer-safe rev 4). Drive: DECIDING - Ortho-K - Program Guide (Nov 2026).",
+      "classification": "decision",
+      "active": true
+    },
+    {
+      "id": "miyosmart-iq-program",
+      "title": "MiyoSmart iQ Program Guide",
+      "version": "Nov 2026",
+      "stage": "DECIDING",
+      "language": "en",
+      "path": "CEC-MiyoSmart-iQ-Program-Guide-A4.pdf",
+      "email_filename": "Concord Eyecare - MiyoSmart iQ Program Guide.pdf",
+      "sha256": "dc6671f121ec031207eaae4e30dda07611f6b711a9ed32bdce8f3a06432770d8",
+      "approval_ref": "Mark approved 29 Oct 2026; republished print-safe 1 Nov 2026, Mark yes (second-brain tools/drive-publish/README.md; export commit 6c16c184).",
+      "classification": "decision",
+      "active": true
+    },
+    {
+      "id": "adult-myopia",
+      "title": "Adult Myopia Guide",
+      "version": "Nov 2026",
+      "stage": "GENERAL",
+      "language": "en",
+      "path": "CEC-Adult-Myopia-Guide-A4-v2-design.pdf",
+      "email_filename": "Concord Eyecare - Adult Myopia Guide.pdf",
+      "sha256": "b3eb63325136527291323d63276d424a14066dd71a305554668e9cbccee9c0ef",
+      "approval_ref": "Mark approved 26 Oct 2026 (v4 design); republished print-safe 1 Nov 2026, Mark yes (second-brain tools/drive-publish/README.md; export commit 6c16c184).",
+      "classification": "care",
+      "active": true
+    }
+  ]
+}

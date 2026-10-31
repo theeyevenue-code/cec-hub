@@ -75,6 +75,7 @@ const routes = [
     { re: /^#\/medicare$/, fn: renderMedicare },
     { re: /^#\/checkin$/, fn: renderCheckin },
     { re: /^#\/checkin\/([0-9a-f]{32})$/, fn: (m) => renderCheckinCheck(m[1]) },
+    { re: /^#\/sendguide$/, fn: renderSendGuide },
     { re: /^#\/scanner$/, fn: renderScanner },
     { re: /^#\/scanner-settings$/, fn: renderScanner },   // old link, same page
     { re: /^#\/scanner-help$/, fn: renderScannerHelp },
@@ -2480,12 +2481,12 @@ function ciLocked(r) {
     return r && r.status === 403 && r.data && r.data.staff_needed;
 }
 
-function ciUnlockPanel(d, after) {
+function ciUnlockPanel(d, after, title = "Check-in") {
     view.innerHTML = `
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
-        <h1 class="page-title">Check-in</h1>
+        <h1 class="page-title">${esc(title)}</h1>
         <div class="card ci-unlock">
-            <h2>Unlock Check-in on this computer</h2>
+            <h2>Unlock ${esc(title)} on this computer</h2>
             ${d.code_set === false
                 ? `<p>No staff code is set up yet. Ask Mark, or use the Hub on the server.</p>`
                 : `<p>Type the staff code once. This computer then stays unlocked.</p>
@@ -3479,6 +3480,221 @@ function mcBindList(d) {
         window.addEventListener("afterprint", done);
         window.print();
     });
+}
+
+/* --- Send guide (email approved guides from info@) ----------------------------------- */
+/* Pick a patient, tick guides, press Send. The panel on the same screen shows exactly
+   what will happen; there is no confirm box (Mark, 1 Nov 2026). Nothing about the
+   patient is kept in the browser: no storage, no names in a URL, searches in a POST
+   body. Each Send carries a one-off key so a double click makes ONE email. */
+
+const sg = { patient: null, guides: new Set(), key: "", seq: 0, live: false, busy: false };
+
+function sgNewKey() {
+    const b = new Uint8Array(16);
+    crypto.getRandomValues(b);              // works on plain-http LAN pages too
+    sg.key = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+}
+
+function sgReset() {
+    sg.patient = null;
+    sg.guides = new Set();
+    sgNewKey();
+}
+
+function sgSendLabel() {
+    return sg.live ? "Send email" : "Make draft in info@";
+}
+
+function renderSendGuide() {
+    sgReset();
+    view.innerHTML = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <div id="sg-banner"></div>
+        <h1 class="page-title">Send guide</h1>
+        <p class="page-sub">Pick the patient, tick the guides, press Send. One email from info@.</p>
+        <div id="sg-note"></div>
+        <div class="sg-grid">
+            <div>
+                <div class="card">
+                    <h2>1 · Patient</h2>
+                    <form id="sg-find" class="ci-find">
+                        <input id="sg-q" type="text" autocomplete="off" spellcheck="false"
+                               placeholder="Surname and first name" aria-label="Find a patient: surname and first name">
+                        <button class="btn" type="submit">Find</button>
+                    </form>
+                    <div id="sg-found"></div>
+                    <h3 class="sg-h3">Today</h3>
+                    <div id="sg-today"><div class="ci-muted">Getting today's appointments…</div></div>
+                </div>
+            </div>
+            <div>
+                <div class="card">
+                    <h2>2 · Guides</h2>
+                    <div id="sg-guides"><div class="ci-muted">Loading…</div></div>
+                </div>
+                <div class="card sg-review-card">
+                    <h2>3 · Check, then send</h2>
+                    <div id="sg-review"></div>
+                    <button class="btn sg-send" id="sg-send" disabled>${esc(sgSendLabel())}</button>
+                    <div id="sg-send-msg" class="sg-send-msg"></div>
+                </div>
+            </div>
+        </div>`;
+    sgReview();
+    sgLoadSetup();
+    sgLoadToday();
+
+    const found = document.getElementById("sg-found");
+    document.getElementById("sg-find").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        found.innerHTML = `<div class="ci-muted">Searching…</div>`;
+        const r = await ciCall("/api/sendguide/search", { q: document.getElementById("sg-q").value });
+        if (ciLocked(r)) { ciUnlockPanel(r.data, renderSendGuide, "Send guide"); return; }
+        if (r.status !== 200 || r.data.error) {
+            found.innerHTML = `<div class="ci-muted">${esc(r.data.error || "Search didn't work.")}</div>`;
+            return;
+        }
+        const ps = r.data.patients || [];
+        found.innerHTML = ps.length ? `<table class="ci-table">
+            <thead><tr><th>Patient</th><th>Born</th><th></th></tr></thead>
+            <tbody>${ps.map((p) => `<tr>
+                <td><strong>${esc(p.surname)}</strong>, ${esc(p.given)}</td>
+                <td class="ci-num">${esc(p.dob)}</td>
+                <td><button class="btn" data-pick="${esc(p.id)}" data-name="${esc(p.given + " " + p.surname)}">Pick</button></td></tr>`).join("")}
+            </tbody></table>
+            ${r.data.more ? `<div class="ci-more">More matches - type more of the name</div>` : ""}`
+            : `<div class="ci-muted">Nobody found. Check the spelling.</div>`;
+        sgWirePicks(found);
+    });
+    document.getElementById("sg-send").addEventListener("click", sgSend);
+}
+
+async function sgLoadSetup() {
+    const r = await ciCall("/api/sendguide/setup");
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderSendGuide, "Send guide"); return; }
+    const d = r.data || {};
+    sg.live = !!d.live;
+    document.getElementById("sg-banner").innerHTML = sg.live ? "" :
+        `<div class="ci-banner">Draft mode - Send makes a draft in info@, nothing is emailed${
+            d.fixture ? ` <span class="ci-banner-sub">· fake ZZTEST patients</span>` : ""}</div>`;
+    document.getElementById("sg-send").textContent = sgSendLabel();
+    const box = document.getElementById("sg-guides");
+    const gs = d.guides || [];
+    if (!gs.length) { box.innerHTML = `<div class="ci-muted">No approved guides yet. Ask Mark.</div>`; return; }
+    box.innerHTML = `<div class="sg-guide-list">${gs.map((g) => `
+        <label class="sg-guide${g.ok ? "" : " sg-guide-off"}">
+            <input type="checkbox" value="${esc(g.id)}"${g.ok ? "" : " disabled"}>
+            <span class="sg-guide-title">${esc(g.title)}</span>
+            <span class="sg-stage">${esc(g.stage)}</span>
+            ${g.ok ? "" : `<span class="sg-problem">${esc(g.problem)}</span>`}
+        </label>`).join("")}</div>`;
+    box.querySelectorAll("input[type=checkbox]").forEach((c) => c.addEventListener("change", () => {
+        if (c.checked) sg.guides.add(c.value); else sg.guides.delete(c.value);
+        sgNewKey();
+        sgReview();
+    }));
+}
+
+async function sgLoadToday() {
+    const box = document.getElementById("sg-today");
+    const r = await ciCall("/api/sendguide/today");
+    if (ciLocked(r)) return;
+    const d = r.data || {};
+    if (d.connected === false || d.error) {
+        box.innerHTML = `<div class="ci-muted">${esc(d.message || d.error)}</div>`;
+        return;
+    }
+    const rows = d.appointments || [];
+    box.innerHTML = rows.length ? `<table class="ci-table"><tbody>${rows.map((a) => `<tr>
+        <td class="ci-num"><strong>${esc(a.time)}</strong></td><td>${esc(a.name)}</td>
+        <td><button class="btn btn-quiet ci-small" data-pick="${esc(a.patient_id)}" data-name="${esc(a.name)}">Pick</button></td></tr>`).join("")}
+        </tbody></table>` : `<div class="ci-muted">No appointments today.</div>`;
+    sgWirePicks(box);
+}
+
+function sgWirePicks(root) {
+    root.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => {
+        sg.patient = { id: Number(b.dataset.pick), name: b.dataset.name };
+        sgNewKey();
+        document.getElementById("sg-note").innerHTML = "";
+        sgReview();
+        document.querySelector(".sg-review-card").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }));
+}
+
+function sgRow(label, html) {
+    return `<tr><th scope="row">${esc(label)}</th><td>${html}</td></tr>`;
+}
+
+async function sgReview() {
+    const box = document.getElementById("sg-review");
+    const btn = document.getElementById("sg-send");
+    if (!box) return;
+    btn.disabled = true;
+    const ids = Array.from(sg.guides);
+    if (!sg.patient) {
+        box.innerHTML = `<div class="ci-muted sg-empty">Pick a patient${ids.length ? "" : " and tick a guide"}.</div>`;
+        return;
+    }
+    const seq = ++sg.seq;
+    box.innerHTML = `<div class="ci-muted">Checking ${esc(sg.patient.name)} in Optomate…</div>`;
+    const r = await ciCall("/api/sendguide/review", { patient_id: sg.patient.id, guide_ids: ids });
+    if (seq !== sg.seq) return;                     // a newer pick replaced this one
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderSendGuide, "Send guide"); return; }
+    const d = r.data || {};
+    if (r.status !== 200 || d.error) { box.innerHTML = errorPanel(d.error || "Couldn't check the patient."); return; }
+    const p = d.patient || {};
+    const guides = d.guides || [];
+    box.innerHTML = `<table class="sg-panel"><tbody>
+        ${sgRow("Patient", `<strong class="sg-big">${esc(p.name)}</strong><div class="sg-sub">Born ${esc(p.dob || "not recorded")}${p.age != null ? ` · age ${esc(p.age)}` : ""}</div>`)}
+        ${sgRow("Email to", d.to && d.to.email
+            ? `<strong class="sg-big sg-email">${esc(d.to.email)}</strong><div><span class="sg-chip${p.minor ? " sg-chip-parent" : ""}">${esc(d.to.label)}</span></div>`
+            : `<span class="sg-none">No email to send to</span>`)}
+        ${sgRow("Guides", guides.length
+            ? `<ul class="sg-list">${guides.map((g) => `<li>${esc(g.title)}${g.version ? ` <span class="sg-sub">· ${esc(g.version)}</span>` : ""}</li>`).join("")}</ul>`
+            : `<span class="sg-none">Tick at least one guide</span>`)}
+        </tbody></table>
+        ${(d.repeats || []).length ? `<div class="sg-warn"><strong>Already sent in the last 30 days:</strong>
+            <ul class="sg-list">${d.repeats.map((x) => `<li>${esc(x.title)} - ${esc(x.when)}${
+                x.outcome === "draft" ? " (draft)" : x.outcome === "unknown" ? " (not sure it went)" : ""}</li>`).join("")}</ul>
+            Only send again if they asked for it.</div>` : ""}
+        ${(d.blocks || []).length ? `<div class="sg-block"><strong>Can't send:</strong>
+            <ul class="sg-list">${d.blocks.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}`;
+    btn.disabled = !d.can_send;
+    if (d.live !== undefined) { sg.live = !!d.live; btn.textContent = sgSendLabel(); }
+}
+
+async function sgSend() {
+    const btn = document.getElementById("sg-send");
+    const msg = document.getElementById("sg-send-msg");
+    if (sg.busy || !sg.patient || !sg.guides.size) return;
+    sg.busy = true;
+    btn.disabled = true;
+    msg.innerHTML = `<div class="ci-muted">${sg.live ? "Sending…" : "Making the draft…"}</div>`;
+    let r;
+    try {
+        r = await ciCall("/api/sendguide/send", {
+            idempotency_key: sg.key, patient_id: sg.patient.id, guide_ids: Array.from(sg.guides) });
+    } catch (e) {
+        // Same key on purpose: pressing Send again returns the first result, never a second email.
+        msg.innerHTML = errorPanel("The Hub didn't answer. Press the button again - it won't send twice.");
+        sg.busy = false; btn.disabled = false;
+        return;
+    }
+    sg.busy = false;
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderSendGuide, "Send guide"); return; }
+    const d = r.data || {};
+    if (d.ok) {
+        const who = sg.patient.name;
+        renderSendGuide();              // clears the patient and the ticks
+        document.getElementById("sg-note").innerHTML =
+            `<div class="sg-done"><strong>${esc(who)}:</strong> ${esc(d.message)}</div>`;
+        return;
+    }
+    msg.innerHTML = errorPanel(d.error || d.message || "That didn't go through.");
+    if (d.outcome) sgNewKey();          // a final answer: the next press is a new, deliberate send
+    if (d.review) sgReview(); else btn.disabled = false;
 }
 
 /* --- Go ---------------------------------------------------------------------------- */
