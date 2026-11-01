@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import html
 import json
 import logging
 import os
@@ -61,6 +62,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 BRIDGE = Path(__file__).resolve().with_name("guide_bridge.py")
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "send-guide-email.txt"
 DEFAULT_MANIFEST = BASE_DIR / "config" / "guides.manifest.json"
+LOGO_PATH = BASE_DIR / "static" / "img" / "cec-logo-email.png"   # brand circle logo, 128 px
+LOGO_CID = "cec-logo"
 DEFAULT_GUIDES_DIR = r"C:\CEC\runtime\hub-guides"
 DEFAULT_HISTORY_DB = r"C:\CEC\runtime\hub-send-guide\send-history.sqlite3"
 
@@ -71,6 +74,13 @@ SEND_CLASSES = ("care", "decision")          # never "marketing" / "print-only"
 GUIDE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_FILE_RE = re.compile(r"^[A-Za-z0-9 ._()\-]{1,120}\.pdf$")
+# A guide title is used verbatim in the subject, the body AND the attachment
+# name, so it must be safe as all three: no control characters (header
+# injection), nothing Windows/Gmail refuse in a file name, no leading/trailing
+# space or dot. Letters of any script, apostrophes and "&" are fine.
+TITLE_RE = re.compile(r"^(?![ .])[^\x00-\x1f\x7f<>:\"/\\|?*]{1,100}(?<![ .])$")
+ATTACH_PREFIX = "Concord Eyecare - "
+SUBJECT_MAX = 120
 IDEM_RE = re.compile(r"^[A-Za-z0-9-]{16,64}$")
 LANG_RE = re.compile(r"^[a-z]{2}(-[A-Za-z]{2,4})?$")    # en, zh, ko, zh-Hant ...
 LANG_NAMES = {"en": "English", "zh": "Chinese", "ko": "Korean"}
@@ -134,9 +144,17 @@ def history_path(cfg: dict) -> Path:
 # Manifest
 # ---------------------------------------------------------------------------
 
+def email_filename(g: dict) -> str:
+    """The attachment name, made from the manifest title and nothing else, so
+    subject, body and file name can never drift apart (1 Nov 2026: a separate
+    email_filename field still said 'Collecting' after the title changed)."""
+    return f"{ATTACH_PREFIX}{g['title']}.pdf"
+
+
 def load_manifest(cfg: dict) -> list[dict]:
     """Validated manifest entries (active and inactive). A malformed entry is
-    dropped, never guessed at."""
+    dropped, never guessed at. The title is the ONE name for the guide: an old
+    'email_filename' field, if present, is ignored."""
     try:
         data = json.loads(manifest_path(cfg).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -148,9 +166,8 @@ def load_manifest(cfg: dict) -> list[dict]:
             continue
         gid = str(g.get("id") or "")
         ok = (GUIDE_ID_RE.match(gid) and gid not in seen
-              and str(g.get("title") or "").strip()
+              and isinstance(g.get("title"), str) and TITLE_RE.match(g["title"])
               and SAFE_FILE_RE.match(str(g.get("path") or ""))
-              and SAFE_FILE_RE.match(str(g.get("email_filename") or ""))
               and HEX64_RE.match(str(g.get("sha256") or ""))
               and str(g.get("approval_ref") or "").strip()
               and LANG_RE.match(str(g.get("language") or ""))
@@ -308,9 +325,37 @@ def load_template(path: Path | None = None) -> dict:
     return {k: "\n".join(v).strip() for k, v in sections.items()}
 
 
+_P = "margin:0 0 14px 0;"
+
+
+def _html_paragraphs(text: str) -> str:
+    """The plain-text body as HTML, word for word: blank-line paragraphs become
+    <p>, a paragraph made only of "- " lines becomes a list. Every character is
+    escaped, so a name or title can never become markup."""
+    out = []
+    for para in text.split("\n\n"):
+        lines = [ln for ln in para.split("\n")]
+        if lines and all(ln.startswith("- ") for ln in lines):
+            items = "".join(f'<li style="margin:0 0 4px 0;">{html.escape(ln[2:])}</li>' for ln in lines)
+            out.append(f'<ul style="margin:0 0 14px 0;padding:0 0 0 22px;">{items}</ul>')
+        else:
+            out.append(f'<p style="{_P}">' + "<br>".join(html.escape(ln) for ln in lines) + "</p>")
+    return "\n".join(out)
+
+
+def subject_for(guides: list[dict], t: dict) -> str:
+    """Guide titles in the order ticked, then ' | Concord Eyecare' (Mark,
+    1 Nov 2026); the neutral fallback when that would pass 120 characters."""
+    subject = t["subject"].format(guide_titles=", ".join(g["title"] for g in guides))
+    if not guides or len(subject) > SUBJECT_MAX:
+        return t["subject_fallback"]
+    return subject
+
+
 def compose(p: dict, guides: list[dict], today: date, template: dict | None = None) -> dict:
-    """Subject + body from the fixed template. Code fills in names and guide
-    titles only."""
+    """Subject, plain-text body and HTML body from the fixed template. Code
+    fills in names and guide titles only; the HTML is the same words, escaped,
+    then the house signature."""
     t = template or load_template()
     minor = (age_on(p.get("dob"), today) or 0) < ADULT_AGE
     intro_fills = {
@@ -319,10 +364,27 @@ def compose(p: dict, guides: list[dict], today: date, template: dict | None = No
         "for_child": f" for {first_name(p)}" if minor else "",
     }
     intro = (t["intro_many"] if len(guides) > 1 else t["intro_one"]).format(**intro_fills)
-    main = t["child"] if minor else t["adult"]
-    body = main.format(first_name=first_name(p), intro=intro) + "\n\n" + t["signature"] + "\n"
-    return {"subject": t["subject"], "body": body, "version": t.get("version", ""),
-            "minor": minor}
+    main = (t["child"] if minor else t["adult"]).format(first_name=first_name(p), intro=intro)
+    body = main + "\n\n" + t["closing"] + "\n\n" + t["signature"] + "\n"
+    html_body = (
+        '<!DOCTYPE html>\n<html><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1"></head>\n'
+        '<body style="margin:0;padding:0;">\n'
+        '<div style="max-width:560px;font-family:Arial,Helvetica,sans-serif;font-size:15px;'
+        'line-height:22px;color:#222222;">\n'
+        + _html_paragraphs(main) + "\n"
+        + f'<p style="margin:0 0 18px 0;">{html.escape(t["closing"])}</p>\n'
+        + t["signature_html"] + "\n</div>\n</body></html>\n")
+    return {"subject": subject_for(guides, t), "body": body, "html": html_body,
+            "version": t.get("version", ""), "minor": minor}
+
+
+def logo_inline() -> dict:
+    """The signature logo as an inline (CID) image for the bridge."""
+    data = LOGO_PATH.read_bytes()
+    return {"cid": LOGO_CID, "filename": "concord-eyecare-logo.png",
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "data_b64": base64.b64encode(data).decode("ascii")}
 
 
 # ---------------------------------------------------------------------------
@@ -621,6 +683,10 @@ def send(cfg: dict, body: dict, staff: str) -> tuple[int, dict]:
 
     p, ready = r["_p"], r["_ready"]
     mail = compose(p, [g for g, _ in ready], date.today())
+    try:
+        logo = logo_inline()
+    except OSError:
+        return 500, {"error": "The email logo file is missing from the Hub. Nothing was sent. Ask Mark."}
     rec = {"op_id": uuid.uuid4().hex, "idem_key": key, "patient_id": pid,
            "dest_email": p["email"], "recipient": "parent/guardian" if r["patient"]["minor"] else "patient",
            "template_version": mail["version"],
@@ -633,7 +699,8 @@ def send(cfg: dict, body: dict, staff: str) -> tuple[int, dict]:
             return 200, {**_result_from_row(prior or {}), "repeat_submit": True}
 
     spec = {"op_id": rec["op_id"], "to": p["email"], "subject": mail["subject"], "body": mail["body"],
-            "attachments": [{"filename": g["email_filename"], "sha256": g["sha256"],
+            "html": mail["html"], "inline": [logo],
+            "attachments": [{"filename": email_filename(g), "sha256": g["sha256"],
                              "data_b64": base64.b64encode(b).decode("ascii")} for g, b in ready]}
     out = run_bridge(cfg, "deliver", stdin=json.dumps(spec))
     if out.get("timeout") or out.get("unreadable"):

@@ -216,9 +216,19 @@ into the Hub), `hub\guide_search.py` (the agent's full-name search rule, ported)
   "Already sent in the last 30 days" (same patient + same guide). The email address is
   always re-read from Optomate on Send; the browser's copy is never used.
 - **Blocks:** Optomate `NOEMAIL` (no email) or `IS_BADEMAIL`, no email, no date of birth.
-- **Email wording:** fixed template `hub\templates\send-guide-email.txt` (versioned; every
-  send records the version). Adults: "Hello <first name>,". Children: "Hello," and the child
-  is named in the body. Neutral subject "Your guide from Concord Eyecare".
+- **Email wording:** fixed template `hub\templates\send-guide-email.txt` (v3; every send
+  records the version). Adults: "Hello <first name>,". Children: "Hello," and the child is
+  named in the body. Subject = the guide titles in the order ticked, then
+  " | Concord Eyecare" (over 120 characters: "Your guides from Concord Eyecare").
+- **One title everywhere:** the manifest `title` is the subject, the body line and the
+  attachment name ("Concord Eyecare - <title>.pdf"). There is no separate file-name field
+  (a stale one sent "Ortho-K Collecting Guide.pdf" on 1 Nov). Titles may not contain
+  control characters or `< > : " / \ | ? *`.
+- **HTML + plain text:** multipart/alternative (same words; every merged value
+  HTML-escaped), the PDFs attached, and the house signature (logo, green bar, P/E/W/A in
+  brand green #438F73, matching Drive `5 Admin\Email signatures`) with the logo
+  `static\img\cec-logo-email.png` sent inline (cid:cec-logo). Gmail API drafts do not add
+  info@'s own signature, so the email carries its own.
 - **Send history:** private SQLite at `send_guide.history_db` (default
   `C:\CEC\runtime\hub-send-guide\send-history.sqlite3`, made on first use; refused inside
   the Hub or agent folders or a sync folder). One row per send: op id, idempotency key,

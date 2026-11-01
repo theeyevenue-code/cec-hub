@@ -50,7 +50,12 @@ for p in (str(AGENT), str(HUB_ROOT)):
         sys.path.insert(0, p)
 
 EMAIL_RE = re.compile(r"^[^@\s,;<>\"']+@[^@\s,;<>\"']+\.[^@\s,;<>\"']+$")
-FILENAME_RE = re.compile(r"^[A-Za-z0-9 ._()\-]{1,120}\.pdf$")
+# "Concord Eyecare - <manifest title>.pdf": any script, no control characters,
+# nothing a file system or mail client refuses (matches sendguide.TITLE_RE).
+FILENAME_RE = re.compile(r"^(?![ .])[^\x00-\x1f\x7f<>:\"/\\|?*]{1,120}\.pdf$")
+CID_RE = re.compile(r"^[a-z0-9-]{1,40}$")
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+MAX_INLINE = 200_000
 PATIENT_FIELDS = ("ID", "GIVEN", "SURNAME", "NICKNAME", "BIRTHDATE", "EMAIL",
                   "NOEMAIL", "IS_BADEMAIL")
 
@@ -157,15 +162,34 @@ def cmd_patient(pid: int) -> dict:
 # Gmail
 # ---------------------------------------------------------------------------
 
+def _b64_checked(a: dict, what: str) -> bytes:
+    try:
+        data = base64.b64decode(str(a.get("data_b64") or ""), validate=True)
+    except ValueError:
+        raise BridgeError(f"A {what} didn't arrive whole.")
+    if hashlib.sha256(data).hexdigest() != str(a.get("sha256") or ""):
+        raise BridgeError(f"A {what} changed on the way. Nothing was sent.")
+    return data
+
+
 def build_message(spec: dict) -> EmailMessage:
-    """The email exactly as composed by the Hub's fixed template, with each PDF
-    attached after its SHA-256 is checked once more on the bytes attached."""
+    """The email exactly as composed by the Hub's fixed template:
+
+        multipart/mixed
+          multipart/alternative
+            text/plain                  (the plain-text fallback)
+            multipart/related
+              text/html                 (same words + the house signature)
+              image/png  cid:cec-logo   (signature logo, inline)
+          application/pdf ...           (each guide, hash-checked again here)
+    """
     to = str(spec.get("to") or "").strip()
     subject = str(spec.get("subject") or "")
     body = str(spec.get("body") or "")
+    html_body = str(spec.get("html") or "")
     if not EMAIL_RE.match(to):
         raise BridgeError("The email address doesn't look right.")
-    if not subject or "\n" in subject or "\r" in subject:
+    if not subject or "\n" in subject or "\r" in subject or len(subject) > 200:
         raise BridgeError("The email subject is missing.")
     atts = spec.get("attachments") or []
     if not body or not atts:
@@ -174,16 +198,24 @@ def build_message(spec: dict) -> EmailMessage:
     msg["To"] = to
     msg["Subject"] = subject
     msg.set_content(body)
+    if html_body:
+        msg.add_alternative(html_body, subtype="html")
+        html_part = msg.get_payload()[-1]
+        for im in spec.get("inline") or []:
+            cid = str(im.get("cid") or "")
+            if not CID_RE.match(cid) or f'src="cid:{cid}"' not in html_body:
+                raise BridgeError("The email logo isn't set up right.")
+            data = _b64_checked(im, "logo")
+            if not data.startswith(PNG_MAGIC) or len(data) > MAX_INLINE:
+                raise BridgeError("The email logo isn't set up right.")
+            html_part.add_related(data, maintype="image", subtype="png", cid=f"<{cid}>",
+                                  filename=str(im.get("filename") or f"{cid}.png"),
+                                  disposition="inline")
     for a in atts:
         name = str(a.get("filename") or "")
         if not FILENAME_RE.match(name):
             raise BridgeError("A guide file name isn't valid.")
-        try:
-            data = base64.b64decode(str(a.get("data_b64") or ""), validate=True)
-        except ValueError:
-            raise BridgeError("A guide file didn't arrive whole.")
-        if hashlib.sha256(data).hexdigest() != str(a.get("sha256") or ""):
-            raise BridgeError("A guide file changed on the way. Nothing was sent.")
+        data = _b64_checked(a, "guide file")
         msg.add_attachment(data, maintype="application", subtype="pdf", filename=name)
     return msg
 

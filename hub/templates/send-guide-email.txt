@@ -3,18 +3,28 @@
 # Lines starting with # are notes and are ignored. Each [section] runs until the next one.
 # Fill-ins, put in by code from Optomate and the guide list only:
 #   {first_name}        adult patient's first (or preferred) name
-#   {child_first_name}  child's first (or preferred) name; the child is never greeted
 #   {guide_list}        one line per guide: "- <guide title>"
 #   {intro}             the [intro_one] or [intro_many] block below
 #   {guide_title}       the one guide's title (intro_one)
 #   {for_child}         " for <child first name>" for a child, empty for an adult
+#   {guide_titles}      every guide title in the order ticked, joined by ", " (subject)
+# The guide title is the manifest "title" - the same words in the subject, the body
+# and the attachment name ("Concord Eyecare - <title>.pdf").
+# The HTML version of the email is the same text as below (code escapes every
+# merged value), then [closing] and [signature_html]. [signature] is the
+# plain-text fallback. The signature matches the practice's house signature
+# (Drive 5 Admin\Email signatures + the agent's gmailer\signatures), in the
+# brand green #438F73 (style guide PMS 6157).
 # Change the version line whenever the wording changes; every send records it.
 
 [version]
-send-guide-email v2 (1 Nov 2026, Mark's edits: 'Please find attached', no PDF line)
+send-guide-email v3 (1 Nov 2026, Mark: subject = guide titles; HTML house signature)
 
 [subject]
-Your guide from Concord Eyecare
+{guide_titles} | Concord Eyecare
+
+[subject_fallback]
+Your guides from Concord Eyecare
 
 [adult]
 Hello {first_name},
@@ -38,9 +48,32 @@ Please find attached the following guides{for_child}:
 
 {guide_list}
 
-[signature]
+[closing]
 Kind regards,
+
+[signature]
 Concord Eyecare
-161 Concord Rd, North Strathfield NSW 2137
-(02) 8765 9600 · info@concordeyecare.com.au
-concordeyecare.com.au
+Optometrists
+P (02) 8765 9600
+E info@concordeyecare.com.au
+W concordeyecare.com.au
+A 161 Concord Rd, North Strathfield NSW 2137
+
+[signature_html]
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:480px;font-family:Arial,Helvetica,sans-serif;">
+  <tr>
+    <td width="64" style="width:64px;padding:2px 14px 2px 0;vertical-align:middle;">
+      <img src="cid:cec-logo" alt="Concord Eyecare" width="64" height="64" style="display:block;width:64px;height:64px;border:0;">
+    </td>
+    <td style="border-left:3px solid #438F73;padding:2px 0 2px 14px;vertical-align:middle;">
+      <div style="margin:0;font-size:17px;line-height:22px;font-weight:bold;color:#222222;">Concord Eyecare</div>
+      <div style="margin:0 0 8px 0;font-size:13px;line-height:18px;font-weight:bold;color:#438F73;">Optometrists</div>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border-top:1px solid #DDDDDD;font-size:13px;line-height:20px;color:#444444;">
+        <tr><td style="padding:6px 8px 0 0;font-weight:bold;color:#438F73;vertical-align:top;">P</td><td style="padding:6px 0 0 0;"><a href="tel:+61287659600" style="color:#444444;text-decoration:none;">(02) 8765 9600</a></td></tr>
+        <tr><td style="padding:0 8px 0 0;font-weight:bold;color:#438F73;vertical-align:top;">E</td><td><a href="mailto:info@concordeyecare.com.au" style="color:#444444;text-decoration:none;">info@concordeyecare.com.au</a></td></tr>
+        <tr><td style="padding:0 8px 0 0;font-weight:bold;color:#438F73;vertical-align:top;">W</td><td><a href="https://concordeyecare.com.au" style="color:#438F73;text-decoration:none;">concordeyecare.com.au</a></td></tr>
+        <tr><td style="padding:0 8px 0 0;font-weight:bold;color:#438F73;vertical-align:top;">A</td><td>161 Concord Rd, North Strathfield NSW 2137</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>

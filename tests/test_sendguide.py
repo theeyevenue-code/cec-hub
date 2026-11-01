@@ -87,15 +87,15 @@ def world(tmp_path, monkeypatch):
     manifest = tmp_path / "guides.manifest.json"
     manifest.write_text(json.dumps({"guides": [
         {"id": "guide-a", "title": "Test Guide A", "version": "rev 1", "stage": "COLLECTING",
-         "language": "en", "path": "a.pdf", "email_filename": "Concord Eyecare - Test Guide A.pdf",
+         "language": "en", "path": "a.pdf",
          "sha256": hashlib.sha256(PDF_A).hexdigest(), "approval_ref": "test", "classification": "care",
          "active": True},
         {"id": "guide-b", "title": "Test Guide B", "version": "rev 2", "stage": "DECIDING",
-         "language": "en", "path": "b.pdf", "email_filename": "Concord Eyecare - Test Guide B.pdf",
+         "language": "en", "path": "b.pdf",
          "sha256": hashlib.sha256(PDF_B).hexdigest(), "approval_ref": "test", "classification": "decision",
          "active": True},
         {"id": "flyer", "title": "Referral Flyer", "version": "", "stage": "MARKETING",
-         "language": "en", "path": "a.pdf", "email_filename": "Flyer.pdf",
+         "language": "en", "path": "a.pdf",
          "sha256": hashlib.sha256(PDF_A).hexdigest(), "approval_ref": "test",
          "classification": "marketing", "active": True},
     ]}), encoding="utf-8")
@@ -215,20 +215,208 @@ def test_preferred_name_and_age_boundary(world):
     assert sendguide.compose(PATIENTS[1009], [{"title": "G"}], t)["minor"] is False    # 16 today
 
 
-def test_subject_neutral_and_body_only_names_guides(world):
-    _send(world, 1001, ["guide-a", "guide-b"])
+PLAIN_SIGNATURE = ("Kind regards,\n\n"
+                   "Concord Eyecare\n"
+                   "Optometrists\n"
+                   "P (02) 8765 9600\n"
+                   "E info@concordeyecare.com.au\n"
+                   "W concordeyecare.com.au\n"
+                   "A 161 Concord Rd, North Strathfield NSW 2137\n")
+
+
+def test_subject_titles_body_only_names_guides(world):
+    _send(world, 1001, ["guide-b", "guide-a"])                 # order ticked: B then A
     spec = world["fake"].delivered[0]
-    assert spec["subject"] == "Your guide from Concord Eyecare"
+    assert spec["subject"] == "Test Guide B, Test Guide A | Concord Eyecare"
     low = spec["body"].lower()
     for word in ("myopia", "ortho", "diagnos", "prescription", "unsubscribe"):
         assert word not in low
-    assert "- Test Guide A\n- Test Guide B" in spec["body"]
-    assert "Please find attached the following guides:\n\n- Test Guide A\n- Test Guide B" in spec["body"]
+    assert "Please find attached the following guides:\n\n- Test Guide B\n- Test Guide A" in spec["body"]
     assert "attached as PDF" not in spec["body"]
-    assert spec["body"].rstrip().endswith("concordeyecare.com.au")
-    assert "Concord Eyecare\n161 Concord Rd" in spec["body"]
+    assert spec["body"].endswith(PLAIN_SIGNATURE)
     assert [a["filename"] for a in spec["attachments"]] == [
-        "Concord Eyecare - Test Guide A.pdf", "Concord Eyecare - Test Guide B.pdf"]
+        "Concord Eyecare - Test Guide B.pdf", "Concord Eyecare - Test Guide A.pdf"]
+
+
+# --- v3: subject, one title everywhere, HTML + house signature ----------------------
+
+T = sendguide.load_template()
+
+
+def test_subject_forms():
+    one = [{"title": "Ortho-K Collection Guide"}]
+    two = one + [{"title": "MiyoSmart iQ Program Guide"}]
+    assert sendguide.subject_for(one, T) == "Ortho-K Collection Guide | Concord Eyecare"
+    assert sendguide.subject_for(two, T) == \
+        "Ortho-K Collection Guide, MiyoSmart iQ Program Guide | Concord Eyecare"
+    four = two + [{"title": "Ortho-K Program Guide"}, {"title": "Adult Myopia Guide"}]
+    assert len(sendguide.subject_for(four, T)) == 113          # all four current guides still fit
+    five = four + [{"title": "Dry Eye Care Guide"}]
+    assert len(", ".join(g["title"] for g in five) + " | Concord Eyecare") > 120
+    assert sendguide.subject_for(five, T) == "Your guides from Concord Eyecare"
+    # exactly 120 still uses the titles; 121 falls back
+    pad = "x" * (120 - len(" | Concord Eyecare"))
+    assert sendguide.subject_for([{"title": pad}], T) == pad + " | Concord Eyecare"
+    assert sendguide.subject_for([{"title": pad + "y"}], T) == "Your guides from Concord Eyecare"
+    assert "v3" in T["version"]
+
+
+def test_body_wording_unchanged_adult_one_guide():
+    mail = sendguide.compose(PATIENTS[1001], [{"title": "Test Guide A"}], date.today())
+    assert mail["body"] == (
+        "Hello Zzadult,\n\n"
+        "Please find attached the Test Guide A.\n\n"
+        "If you have any questions, reply to this email or call us on (02) 8765 9600.\n\n"
+        + PLAIN_SIGNATURE)
+
+
+def test_body_wording_unchanged_child_two_guides():
+    mail = sendguide.compose(PATIENTS[1002], [{"title": "Test Guide A"}, {"title": "Test Guide B"}],
+                             date.today())
+    assert mail["body"] == (
+        "Hello,\n\n"
+        "Please find attached the following guides for Kiddo:\n\n"
+        "- Test Guide A\n- Test Guide B\n\n"
+        "If you have any questions, reply to this email or call us on (02) 8765 9600.\n\n"
+        + PLAIN_SIGNATURE)
+    h = mail["html"]
+    assert "<p" in h and "Please find attached the following guides for Kiddo:</p>" in h
+    assert '<li style="margin:0 0 4px 0;">Test Guide A</li>' in h
+    assert "If you have any questions, reply to this email or call us on (02) 8765 9600.</p>" in h
+    assert "Hello Kiddo" not in h
+
+
+def test_html_signature_is_the_house_signature():
+    h = sendguide.compose(PATIENTS[1001], [{"title": "G"}], date.today())["html"]
+    for bit in ('src="cid:cec-logo"', 'width="64"', "#438F73", "Concord Eyecare", "Optometrists",
+                'href="tel:+61287659600"', 'href="mailto:info@concordeyecare.com.au"',
+                'href="https://concordeyecare.com.au"', "161 Concord Rd, North Strathfield NSW 2137",
+                "max-width:480px", "Kind regards,"):
+        assert bit in h, bit
+    for no in ("<style", "class=", "facebook", "instagram", "http://"):
+        assert no not in h.lower(), no
+
+
+def test_html_escapes_every_merged_value():
+    p = dict(PATIENTS[1001], given="<b>Jo</b>&Co", nickname="")
+    mail = sendguide.compose(p, [{"title": "Care & Wear 'Lenses'"}], date.today())
+    h = mail["html"]
+    assert "<b>" not in h.lower() and "&lt;b&gt;jo&lt;/b&gt;&amp;co," in h.lower()
+    assert "Care &amp; Wear &#x27;Lenses&#x27;" in h
+    kid = dict(PATIENTS[1002], given="<img src=x onerror=alert(1)>")
+    h2 = sendguide.compose(kid, [{"title": "A"}, {"title": "B<i>"}], date.today())["html"]
+    assert "<img src=x" not in h2.lower() and "<i>" not in h2 and "B&lt;i&gt;" in h2
+
+
+@pytest.mark.parametrize("title,ok", [
+    ("Ortho-K Collection Guide", True), ("Children's Vision Guide", True), ("Care & Wear", True),
+    ("角膜塑形镜 指南", True), ("Bad\nBcc: x@y.z", False), ("a/b", False), ("a:b", False),
+    ("Trailing.", False), (" lead", False), ("x" * 101, False), ("", False)])
+def test_title_rule(world, title, ok):
+    m = json.loads(open(sendguide.manifest_path(world["cfg"]), encoding="utf-8").read())
+    m["guides"][0]["title"] = title
+    sendguide.manifest_path(world["cfg"]).write_text(json.dumps(m), encoding="utf-8")
+    ids = [g["id"] for g in sendguide.load_manifest(world["cfg"])]
+    assert ("guide-a" in ids) is ok
+
+
+def test_stale_email_filename_field_is_ignored(world):
+    """The 1 Nov slip: a second name field said 'Collecting' after the title
+    changed. Any such field is now ignored; the file name comes from the title."""
+    m = json.loads(open(sendguide.manifest_path(world["cfg"]), encoding="utf-8").read())
+    m["guides"][0]["email_filename"] = "Concord Eyecare - Something Else.pdf"
+    sendguide.manifest_path(world["cfg"]).write_text(json.dumps(m), encoding="utf-8")
+    _send(world, 1001, ["guide-a"])
+    assert world["fake"].delivered[0]["attachments"][0]["filename"] == "Concord Eyecare - Test Guide A.pdf"
+
+
+def _shipped_guides():
+    return json.loads(sendguide.DEFAULT_MANIFEST.read_text(encoding="utf-8"))["guides"]
+
+
+def test_shipped_manifest_has_one_name_per_guide(monkeypatch):
+    monkeypatch.delenv("CEC_HUB_GUIDE_MANIFEST", raising=False)
+    shipped = _shipped_guides()
+    for g in shipped:
+        assert "email_filename" not in g, g["id"]
+    assert len(sendguide.load_manifest({})) == len(shipped)        # every entry valid
+    assert any(g["title"] == "Ortho-K Collection Guide" for g in shipped)
+
+
+@pytest.mark.parametrize("gid", [g["id"] for g in _shipped_guides()])
+def test_title_identical_in_subject_body_and_attachment(world, gid):
+    """End to end for every shipped guide: the manifest title is the subject,
+    is in the plain and HTML bodies, and is the attachment's file name."""
+    g = next(x for x in _shipped_guides() if x["id"] == gid)
+    pdf = b"%PDF-1.7 synthetic " + gid.encode()
+    (world["gdir"] / "real.pdf").write_bytes(pdf)
+    entry = dict(g, path="real.pdf", sha256=hashlib.sha256(pdf).hexdigest())
+    sendguide.manifest_path(world["cfg"]).write_text(json.dumps({"guides": [entry]}), encoding="utf-8")
+    status, out = _send(world, 1001, [gid])
+    assert out["ok"], out
+    msg = guide_bridge.build_message(world["fake"].delivered[0])
+    title = g["title"]
+    assert msg["Subject"] == f"{title} | Concord Eyecare"
+    plain = msg.get_body(("plain",)).get_content()
+    html_part = msg.get_body(("html",)).get_content()
+    assert f"Please find attached the {title}." in plain
+    assert f"Please find attached the {sendguide.html.escape(title)}." in html_part
+    names = [a.get_filename() for a in msg.iter_attachments() if a.get_content_type() == "application/pdf"]
+    assert names == [f"Concord Eyecare - {title}.pdf"]
+
+
+def test_multipart_structure(world):
+    _send(world, 1002, ["guide-a", "guide-b"])
+    msg = guide_bridge.build_message(world["fake"].delivered[0])
+    tree = [(p.get_content_type(), p.get("Content-ID")) for p in msg.walk()]
+    assert tree == [("multipart/mixed", None), ("multipart/alternative", None),
+                    ("text/plain", None), ("multipart/related", None), ("text/html", None),
+                    ("image/png", "<cec-logo>"), ("application/pdf", None), ("application/pdf", None)]
+    logo = [p for p in msg.walk() if p.get_content_type() == "image/png"][0]
+    assert logo.get_content() == sendguide.LOGO_PATH.read_bytes()
+    assert logo.get_content_disposition() == "inline"
+    pdfs = [p.get_content() for p in msg.iter_attachments() if p.get_content_type() == "application/pdf"]
+    assert pdfs == [PDF_A, PDF_B]
+    assert msg.get_body(("plain",)).get_content().endswith(PLAIN_SIGNATURE)
+
+
+def test_bridge_refuses_a_tampered_or_unreferenced_logo(world):
+    _send(world, 1001, ["guide-a"])
+    spec = world["fake"].delivered[0]
+    bad = dict(spec, inline=[dict(spec["inline"][0], data_b64=base64.b64encode(b"\x89PNG\r\n\x1a\nzz").decode())])
+    with pytest.raises(guide_bridge.BridgeError):
+        guide_bridge.build_message(bad)
+    with pytest.raises(guide_bridge.BridgeError):
+        guide_bridge.build_message(dict(spec, html=spec["html"].replace("cid:cec-logo", "cid:other")))
+    not_png = b"GIF89a" + b"0" * 20
+    with pytest.raises(guide_bridge.BridgeError):
+        guide_bridge.build_message(dict(spec, inline=[{"cid": "cec-logo", "sha256": hashlib.sha256(not_png).hexdigest(),
+                                                       "data_b64": base64.b64encode(not_png).decode()}]))
+
+
+def test_missing_logo_fails_closed_before_history(world, monkeypatch):
+    monkeypatch.setattr(sendguide, "LOGO_PATH", world["tmp"] / "nope.png")
+    status, out = _send(world, 1001, ["guide-a"], key="m" * 20)
+    assert status == 500 and "logo" in out["error"] and world["fake"].delivered == []
+    assert not world["hist"].exists() or sqlite3.connect(world["hist"]).execute(
+        "SELECT COUNT(*) FROM sends").fetchone()[0] == 0
+
+
+def test_shipped_logo_is_a_small_png():
+    data = sendguide.LOGO_PATH.read_bytes()
+    assert data.startswith(guide_bridge.PNG_MAGIC) and len(data) < guide_bridge.MAX_INLINE
+
+
+AGENT_SIGS = sendguide.Path(r"C:\CEC\CEC-Optomate-Agent\gmailer\signatures\signatures.json")
+
+
+@pytest.mark.skipif(not AGENT_SIGS.is_file(), reason="agent repo not on this machine")
+def test_signature_details_match_the_agents_house_signature():
+    practice = json.loads(AGENT_SIGS.read_text(encoding="utf-8"))["practice"]
+    sig = T["signature"] + T["signature_html"]
+    assert practice["address"] in sig and practice["email"] in sig and practice["website"] in sig
+    digits = "".join(c for c in practice["phone"] if c.isdigit())
+    assert digits == "".join(c for c in "(02) 8765 9600" if c.isdigit())
 
 
 # --- repeat warning ---------------------------------------------------------------
@@ -506,8 +694,7 @@ def test_one_line_update_swaps_file_version_and_hash(world, tmp_path):
 
 def test_chinese_guide_entry_is_accepted_and_labelled(world):
     m = json.loads(open(sendguide.manifest_path(world["cfg"]), encoding="utf-8").read())
-    zh = dict(m["guides"][0], id="guide-a-zh", title="Test Guide A (Chinese)", language="zh",
-              email_filename="Concord Eyecare - Test Guide A (Chinese).pdf")
+    zh = dict(m["guides"][0], id="guide-a-zh", title="Test Guide A (Chinese)", language="zh")
     bad = dict(m["guides"][0], id="guide-bad-lang", language="Chinese")
     m["guides"] += [zh, bad]
     sendguide.manifest_path(world["cfg"]).write_text(json.dumps(m), encoding="utf-8")
