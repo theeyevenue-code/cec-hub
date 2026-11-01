@@ -5,13 +5,13 @@
     {
       "id": "orthok-collecting",
       "title": "Ortho-K Collecting Guide",
-      "version": "rev 7, Nov 2026",
+      "version": "rev 8, Nov 2026",
       "stage": "COLLECTING",
       "language": "en",
       "path": "CEC-OrthoK-Collecting-Guide-A4.pdf",
       "email_filename": "Concord Eyecare - Ortho-K Collecting Guide.pdf",
-      "sha256": "e6c116cf263ac97f6373b18db57146b15cb6c38d25d784bf327134aae0089bb2",
-      "approval_ref": "Mark approved rev 7 FINAL 1 Nov 2026 (second-brain wiki/log.md; export commit 13fb5d5c handouts/exports/CEC-OrthoK-Collecting-Guide-A4.pdf). Standalone guide, NOT the print pack.",
+      "sha256": "3b5ff9abd783a61ff382f54e6081933c8ada75551b6cdb96c4603ef020ab454c",
+      "approval_ref": "Mark approved rev 8 in chat 1 Nov 2026 (lost-lens + one-breakage wording)",
       "classification": "care",
       "active": true
     },
