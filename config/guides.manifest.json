@@ -49,6 +49,18 @@
       "approval_ref": "Mark approved 26 Oct 2026 (v4 design); republished print-safe 1 Nov 2026, Mark yes (second-brain tools/drive-publish/README.md; export commit 6c16c184).",
       "classification": "care",
       "active": true
+    },
+    {
+      "id": "warm-compress",
+      "title": "Warm Compress Instructions",
+      "version": "rev 4, Nov 2026",
+      "stage": "INSTRUCTIONS",
+      "language": "en",
+      "path": "CEC-Warm-Compress-Instructions-A4.pdf",
+      "sha256": "ae33265e0ae88f3e3e92b57b5cbd0cc96ef2567633136aa44299eeeedda8cc68",
+      "approval_ref": "Mark approved rev 4 FINAL in chat 2 Nov 2026 (\"let's lock it in\"; paper-towel step, smaller Take care). Drive: Instruction sheets.",
+      "classification": "care",
+      "active": true
     }
   ]
 }
