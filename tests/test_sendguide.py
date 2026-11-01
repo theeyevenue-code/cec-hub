@@ -302,13 +302,30 @@ def test_html_signature_is_the_house_signature(style, logo, width):
         assert no not in h.lower(), no
 
 
-def test_default_signature_is_the_shallow_three_line_one():
-    assert sendguide.SIGNATURE_STYLE == "a"
+def test_default_signature_is_c2_with_the_long_wordmark():
+    assert sendguide.SIGNATURE_STYLE == "c2"
+    assert sendguide.LOGO_PATH.name == "cec-logo-long.png"
     h = sendguide.compose(PATIENTS[1001], [{"title": "G"}], date.today())["html"]
-    assert 'width="44"' in h and h.count('src="cid:cec-logo"') == 1
+    assert 'width="186"' in h and h.count('src="cid:cec-logo"') == 1
+    assert 'alt="Concord Eyecare"' in h          # the name survives image blocking
+    assert "#438F73" not in h                       # green lives in the logo only
+    text = sendguide.html.unescape(re.sub(r"<[^>]+>", "", h)).replace("\xa0", " ")
+    for bit in ("(02) 8765 9600", "info@concordeyecare.com.au", "concordeyecare.com.au",
+                "161 Concord Rd, North Strathfield NSW 2137"):
+        assert bit in text, bit
+    for bit in ('href="tel:+61287659600"', 'href="mailto:info@concordeyecare.com.au"',
+                'href="https://concordeyecare.com.au"'):
+        assert bit in h, bit
 
 
-@pytest.mark.parametrize("style", ["a", "b"])
+def test_style_a_is_kept_as_the_fallback_with_the_circle_logo():
+    assert "signature_html_a" in T
+    assert sendguide.SIGNATURE_LOGOS.get("a", "cec-logo-email.png") == "cec-logo-email.png"
+    assert (sendguide.BASE_DIR / "static" / "img" / "cec-logo-email.png").is_file()
+    assert (sendguide.BASE_DIR / "static" / "img" / sendguide.SIGNATURE_LOGOS["c2"]).is_file()
+
+
+@pytest.mark.parametrize("style", ["a", "b", "c2"])
 def test_shallow_signatures_wrap_only_between_items(style):
     """Each contact item is one unbreakable span; breaks fall at the separators."""
     sig = T["signature_html_" + style]

@@ -62,7 +62,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 BRIDGE = Path(__file__).resolve().with_name("guide_bridge.py")
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "send-guide-email.txt"
 DEFAULT_MANIFEST = BASE_DIR / "config" / "guides.manifest.json"
-LOGO_PATH = BASE_DIR / "static" / "img" / "cec-logo-email.png"   # brand circle logo, 128 px
+# Mark 1 Nov 2026: C2 = long wordmark over two contact lines. To go back to the
+# green-bar 3-line signature, set this to "a" ("b" and "tall" also kept).
+SIGNATURE_STYLE = "c2"
+SIGNATURE_LOGOS = {"c2": "cec-logo-long.png"}   # long wordmark, 186x28 at 2x; every other style: the circle
+LOGO_PATH = BASE_DIR / "static" / "img" / SIGNATURE_LOGOS.get(SIGNATURE_STYLE, "cec-logo-email.png")
 LOGO_CID = "cec-logo"
 DEFAULT_GUIDES_DIR = r"C:\CEC\runtime\hub-guides"
 DEFAULT_HISTORY_DB = r"C:\CEC\runtime\hub-send-guide\send-history.sqlite3"
@@ -316,7 +320,7 @@ def load_template(path: Path | None = None) -> dict:
     for line in (path or TEMPLATE_PATH).read_text(encoding="utf-8").splitlines():
         if line.startswith("#"):
             continue
-        m = re.match(r"^\[([a-z_]+)\]\s*$", line)
+        m = re.match(r"^\[([a-z0-9_]+)\]\s*$", line)
         if m:
             current = m.group(1)
             sections[current] = []
@@ -350,9 +354,6 @@ def subject_for(guides: list[dict], t: dict) -> str:
     if not guides or len(subject) > SUBJECT_MAX:
         return t["subject_fallback"]
     return subject
-
-
-SIGNATURE_STYLE = "a"      # Mark 1 Nov 2026: shallow 3-line signature; "b" = 2 lines, "tall" = first v3
 
 
 def compose(p: dict, guides: list[dict], today: date, template: dict | None = None,
