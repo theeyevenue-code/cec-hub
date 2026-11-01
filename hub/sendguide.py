@@ -62,9 +62,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 BRIDGE = Path(__file__).resolve().with_name("guide_bridge.py")
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "send-guide-email.txt"
 DEFAULT_MANIFEST = BASE_DIR / "config" / "guides.manifest.json"
-# Mark 1 Nov 2026: C2 = long wordmark over two contact lines. To go back to the
-# green-bar 3-line signature, set this to "a" ("b" and "tall" also kept).
-SIGNATURE_STYLE = "c2"
+# Mark 1 Nov 2026: "a" = green bar, circle logo, 3 lines (his pick after trying C2).
+# "c2" = long wordmark over two contact lines; "b" and "tall" also kept.
+SIGNATURE_STYLE = "a"
 SIGNATURE_LOGOS = {"c2": "cec-logo-long.png"}   # long wordmark, 186x28 at 2x; every other style: the circle
 LOGO_PATH = BASE_DIR / "static" / "img" / SIGNATURE_LOGOS.get(SIGNATURE_STYLE, "cec-logo-email.png")
 LOGO_CID = "cec-logo"

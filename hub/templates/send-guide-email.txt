@@ -11,9 +11,9 @@
 # The guide title is the manifest "title" - the same words in the subject, the body
 # and the attachment name ("Concord Eyecare - <title>.pdf").
 # The HTML version of the email is the same text as below (code escapes every
-# merged value), then [closing] and one HTML signature: [signature_html_c2]
-# (long wordmark + 2 contact lines, the default since 1 Nov 2026), [signature_html_a]
-# (green bar, 3 lines - Mark's fallback), [signature_html_b] (2 lines) or
+# merged value), then [closing] and one HTML signature: [signature_html_a]
+# (green bar, 3 lines - the default, Mark 1 Nov 2026), [signature_html_c2]
+# (long wordmark + 2 contact lines, kept as an option), [signature_html_b] (2 lines) or
 # [signature_html_tall] (the first v3 design); sendguide.SIGNATURE_STYLE picks it
 # and its logo. [signature] is the
 # plain-text fallback. The signature matches the practice's house signature
@@ -22,7 +22,7 @@
 # Change the version line whenever the wording changes; every send records it.
 
 [version]
-send-guide-email v3.2 (1 Nov 2026, Mark: subject = guide titles; signature C2, long wordmark, A kept as fallback)
+send-guide-email v3.3 (1 Nov 2026, Mark: subject = guide titles; signature A, green bar 3-line; C2 kept as option)
 
 [subject]
 {guide_titles} | Concord Eyecare

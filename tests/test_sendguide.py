@@ -302,10 +302,16 @@ def test_html_signature_is_the_house_signature(style, logo, width):
         assert no not in h.lower(), no
 
 
-def test_default_signature_is_c2_with_the_long_wordmark():
-    assert sendguide.SIGNATURE_STYLE == "c2"
-    assert sendguide.LOGO_PATH.name == "cec-logo-long.png"
+def test_default_signature_is_a_with_the_circle_logo():
+    assert sendguide.SIGNATURE_STYLE == "a"
+    assert sendguide.LOGO_PATH.name == "cec-logo-email.png"
     h = sendguide.compose(PATIENTS[1001], [{"title": "G"}], date.today())["html"]
+    assert 'width="44"' in h and h.count('src="cid:cec-logo"') == 1
+
+
+def test_c2_is_kept_as_an_option_with_the_long_wordmark():
+    assert sendguide.SIGNATURE_LOGOS["c2"] == "cec-logo-long.png"
+    h = sendguide.compose(PATIENTS[1001], [{"title": "G"}], date.today(), signature="c2")["html"]
     assert 'width="186"' in h and h.count('src="cid:cec-logo"') == 1
     assert 'alt="Concord Eyecare"' in h          # the name survives image blocking
     assert "#438F73" not in h                       # green lives in the logo only
@@ -318,9 +324,8 @@ def test_default_signature_is_c2_with_the_long_wordmark():
         assert bit in h, bit
 
 
-def test_style_a_is_kept_as_the_fallback_with_the_circle_logo():
-    assert "signature_html_a" in T
-    assert sendguide.SIGNATURE_LOGOS.get("a", "cec-logo-email.png") == "cec-logo-email.png"
+def test_both_signature_logos_ship():
+    assert "signature_html_a" in T and "signature_html_c2" in T
     assert (sendguide.BASE_DIR / "static" / "img" / "cec-logo-email.png").is_file()
     assert (sendguide.BASE_DIR / "static" / "img" / sendguide.SIGNATURE_LOGOS["c2"]).is_file()
 
