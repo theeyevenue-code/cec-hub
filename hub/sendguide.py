@@ -352,7 +352,11 @@ def subject_for(guides: list[dict], t: dict) -> str:
     return subject
 
 
-def compose(p: dict, guides: list[dict], today: date, template: dict | None = None) -> dict:
+SIGNATURE_STYLE = "a"      # Mark 1 Nov 2026: shallow 3-line signature; "b" = 2 lines, "tall" = first v3
+
+
+def compose(p: dict, guides: list[dict], today: date, template: dict | None = None,
+            signature: str | None = None) -> dict:
     """Subject, plain-text body and HTML body from the fixed template. Code
     fills in names and guide titles only; the HTML is the same words, escaped,
     then the house signature."""
@@ -373,8 +377,9 @@ def compose(p: dict, guides: list[dict], today: date, template: dict | None = No
         '<div style="max-width:560px;font-family:Arial,Helvetica,sans-serif;font-size:15px;'
         'line-height:22px;color:#222222;">\n'
         + _html_paragraphs(main) + "\n"
-        + f'<p style="margin:0 0 18px 0;">{html.escape(t["closing"])}</p>\n'
-        + t["signature_html"] + "\n</div>\n</body></html>\n")
+        + f'<p style="margin:0 0 18px 0;">{html.escape(t["closing"])}</p>\n</div>\n'
+        # the signature sits outside the 560px text column so the wide styles fit
+        + t["signature_html_" + (signature or SIGNATURE_STYLE)] + "\n</body></html>\n")
     return {"subject": subject_for(guides, t), "body": body, "html": html_body,
             "version": t.get("version", ""), "minor": minor}
 

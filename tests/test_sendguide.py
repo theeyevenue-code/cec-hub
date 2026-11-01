@@ -7,6 +7,7 @@ import hashlib
 import importlib
 import json
 import logging
+import re
 import sqlite3
 from datetime import date, datetime, timedelta
 
@@ -286,15 +287,35 @@ def test_body_wording_unchanged_child_two_guides():
     assert "Hello Kiddo" not in h
 
 
-def test_html_signature_is_the_house_signature():
-    h = sendguide.compose(PATIENTS[1001], [{"title": "G"}], date.today())["html"]
-    for bit in ('src="cid:cec-logo"', 'width="64"', "#438F73", "Concord Eyecare", "Optometrists",
-                'href="tel:+61287659600"', 'href="mailto:info@concordeyecare.com.au"',
-                'href="https://concordeyecare.com.au"', "161 Concord Rd, North Strathfield NSW 2137",
-                "max-width:480px", "Kind regards,"):
+@pytest.mark.parametrize("style,logo,width", [("a", 44, 600), ("b", 36, 760), ("tall", 64, 480)])
+def test_html_signature_is_the_house_signature(style, logo, width):
+    h = sendguide.compose(PATIENTS[1001], [{"title": "G"}], date.today(), signature=style)["html"]
+    text = sendguide.html.unescape(re.sub(r"<[^>]+>", "", h)).replace("\xa0", " ")
+    for bit in ('src="cid:cec-logo"', f'width="{logo}"', "#438F73", 'href="tel:+61287659600"',
+                'href="mailto:info@concordeyecare.com.au"', 'href="https://concordeyecare.com.au"',
+                f"max-width:{width}px"):
         assert bit in h, bit
+    for bit in ("Concord Eyecare", "Optometrists", "(02) 8765 9600", "Kind regards,",
+                "161 Concord Rd, North Strathfield NSW 2137"):
+        assert bit in text, bit
     for no in ("<style", "class=", "facebook", "instagram", "http://"):
         assert no not in h.lower(), no
+
+
+def test_default_signature_is_the_shallow_three_line_one():
+    assert sendguide.SIGNATURE_STYLE == "a"
+    h = sendguide.compose(PATIENTS[1001], [{"title": "G"}], date.today())["html"]
+    assert 'width="44"' in h and h.count('src="cid:cec-logo"') == 1
+
+
+@pytest.mark.parametrize("style", ["a", "b"])
+def test_shallow_signatures_wrap_only_between_items(style):
+    """Each contact item is one unbreakable span; breaks fall at the separators."""
+    sig = T["signature_html_" + style]
+    for item in ("info@concordeyecare.com.au</a></span>", "concordeyecare.com.au</a></span>",
+                 "(02)&nbsp;8765&nbsp;9600", "North&nbsp;Strathfield&nbsp;NSW&nbsp;2137</span>"):
+        assert item in sig, item
+    assert sig.count('white-space:nowrap') >= 5
 
 
 def test_html_escapes_every_merged_value():
@@ -413,7 +434,7 @@ AGENT_SIGS = sendguide.Path(r"C:\CEC\CEC-Optomate-Agent\gmailer\signatures\signa
 @pytest.mark.skipif(not AGENT_SIGS.is_file(), reason="agent repo not on this machine")
 def test_signature_details_match_the_agents_house_signature():
     practice = json.loads(AGENT_SIGS.read_text(encoding="utf-8"))["practice"]
-    sig = T["signature"] + T["signature_html"]
+    sig = sendguide.html.unescape(T["signature"] + T["signature_html_" + sendguide.SIGNATURE_STYLE]).replace("\xa0", " ")
     assert practice["address"] in sig and practice["email"] in sig and practice["website"] in sig
     digits = "".join(c for c in practice["phone"] if c.isdigit())
     assert digits == "".join(c for c in "(02) 8765 9600" if c.isdigit())
