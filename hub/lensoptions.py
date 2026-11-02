@@ -442,6 +442,12 @@ def run_mode(rows: list, pricing: dict, sells: dict, q: dict,
     need = None
     if est:
         need = {s: est["per_eye"].get(s, est["value"]) for s in avail}
+        # Mark (3 Nov 2026): say the stock size to ask for ("minimum 70mm") as
+        # well as the size needed - the smallest stock blank, any lens, that
+        # takes this Rx and is big enough for every eye.
+        sizes = sorted({b for per in avail.values() for v in per.values() for b in v})
+        est["min_stock"] = next((b for b in sizes if b >= max(need.values()) - 1e-9), None)
+        est["stock_sizes"] = sizes
     return summarise(res, sells, avail, need)
 
 

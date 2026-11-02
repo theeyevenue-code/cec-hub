@@ -434,3 +434,14 @@ def test_needs_bigger_blank_points_to_the_index_that_has_it():
     assert line == "Needs 68 mm - this lens only comes 65 mm for this Rx. Big enough stock: 1.60 stock"
     ok, line = lo.blank_line({"type": "stock"}, ("S", "A 1.60", "stock", ""), avail, {"R": 68, "L": 67}, [])
     assert ok and line == "Fits a 70 mm stock blank"
+
+
+def test_blank_says_needed_size_and_minimum_stock_size(client):
+    # Mark, 3 Nov 2026: "needs 68mm" AND "minimum 75mm blank" (the stock size to ask for)
+    client.fake.eyes = (_eye("-2.00", pd="31"), _eye("-2.25", pd="32"))
+    d = client.post("/api/lensoptions/rx", json={"patient_id": 77}).get_json()
+    blank = {t["key"]: t for t in d["rxs"][0]["tabs"]}["distance"]["parts"][0]["blank"]
+    assert blank["value"] == 68 and blank["min_stock"] == 75.0
+    assert blank["stock_sizes"] == [65.0, 75.0]
+    js = open("static/app.js", encoding="utf-8").read()
+    assert "Minimum</span>" in js and "b.min_stock" in js

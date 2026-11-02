@@ -3873,8 +3873,13 @@ function loFrameForm(f) {
 
 function loBlank(b) {
     if (!b) return "";
-    return `<details class="lo-blankest"><summary><span class="lo-k">Blank estimate</span>
-        <strong>${esc(b.value)}mm</strong>${b.approx ? ` <span class="lo-sub">approximate</span>` : ""}
+    // Mark, 3 Nov 2026: the size needed AND the stock size to ask for.
+    const stock = b.min_stock != null
+        ? ` <span class="lo-k">Minimum</span> <strong>${esc(fmtMM(b.min_stock))} blank</strong>`
+        : (b.stock_sizes && b.stock_sizes.length
+            ? ` <span class="lo-sub">no stock blank big enough for this Rx: grind</span>` : "");
+    return `<details class="lo-blankest"><summary><span class="lo-k">Needs</span>
+        <strong>${esc(b.value)}mm</strong>${b.approx ? ` <span class="lo-sub">approximate</span>` : ""}${stock}
         <span class="lo-sub">· ${esc(b.inputs)}</span></summary>
         <div class="lo-working">${b.working.map(esc).join("<br>")}</div>
         <ul class="lo-sub">${b.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></details>`;
