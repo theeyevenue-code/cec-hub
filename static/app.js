@@ -76,6 +76,7 @@ const routes = [
     { re: /^#\/checkin$/, fn: renderCheckin },
     { re: /^#\/checkin\/([0-9a-f]{32})$/, fn: (m) => renderCheckinCheck(m[1]) },
     { re: /^#\/sendguide$/, fn: renderSendGuide },
+    { re: /^#\/lensoptions$/, fn: renderLensOptions },
     { re: /^#\/scanner$/, fn: renderScanner },
     { re: /^#\/scanner-settings$/, fn: renderScanner },   // old link, same page
     { re: /^#\/scanner-help$/, fn: renderScannerHelp },
@@ -86,7 +87,7 @@ function route() {
     // panel-mode = the slim companion window; strips the Hub chrome (see CSS)
     document.body.classList.toggle("panel-mode", hash === "#/panel");
     // lens-mono = the Lens Finder's white, monochrome page (see .lens-page CSS)
-    document.body.classList.toggle("lens-mono", hash === "#/lenses");
+    document.body.classList.toggle("lens-mono", hash === "#/lenses" || hash === "#/lensoptions");
     for (const r of routes) {
         const m = hash.match(r.re);
         if (m) { r.fn(m); window.scrollTo(0, 0); return; }
@@ -3696,6 +3697,244 @@ async function sgSend() {
     msg.innerHTML = errorPanel(d.error || d.message || "That didn't go through.");
     if (d.outcome) sgNewKey();          // a final answer: the next press is a new, deliberate send
     if (d.review) sgReview(); else btn.disabled = false;
+}
+
+/* --- Lens options (click a patient, see the lenses for their saved Rx) ---------------- */
+/* Mark, 3 Nov 2026. The last three patients whose spectacle Rx was saved today, plus a
+   name search. Pick one: their SAVED spectacle Rx (Optomate SPECTACLE_RX) runs through the
+   Lens Finder for every lens type it can make; the type written on the Rx leads. Nothing
+   about the patient is kept in the browser and names never go in a URL. */
+
+const lo = { seq: 0, data: null, rx: 0, tab: "", pid: 0 };
+
+function renderLensOptions() {
+    lo.data = null; lo.rx = 0; lo.tab = "";
+    view.innerHTML = `<div class="lens-page lo-page">
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Lens options</h1>
+        <p class="page-sub">Pick the patient. Their saved Rx shows the lenses to offer.</p>
+        <div class="card lo-pick">
+            <h2 class="lo-h2">Rx saved today</h2>
+            <div id="lo-recent"><div class="ci-muted">Getting today's Rx…</div></div>
+            <form id="lo-find" class="ci-find lo-find">
+                <input id="lo-q" type="text" autocomplete="off" spellcheck="false"
+                       placeholder="Or search: surname and first name" aria-label="Find a patient: surname and first name">
+                <button class="btn" type="submit">Find</button>
+            </form>
+            <div id="lo-found"></div>
+        </div>
+        <div id="lo-result"></div>
+    </div>`;
+    loLoadRecent();
+    document.getElementById("lo-find").addEventListener("submit", loSearch);
+}
+
+async function loLoadRecent() {
+    const box = document.getElementById("lo-recent");
+    const r = await ciCall("/api/lensoptions/recent");
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderLensOptions, "Lens options"); return; }
+    const d = r.data || {};
+    if (d.error) { box.innerHTML = `<div class="ci-muted">${esc(d.error)}</div>`; return; }
+    const ps = d.patients || [];
+    const dayNote = d.test_day ? `<div class="lo-sub">Test copy: showing ${esc(d.date)}, not today</div>` : "";
+    box.innerHTML = (ps.length ? `<div class="lo-recent">${ps.map((p) => `
+        <button class="lo-person" type="button" data-pick="${esc(p.id)}">
+            <span class="lo-person-name">${esc(p.name)}</span>
+            <span class="lo-person-time">saved ${esc(p.saved)}</span>
+        </button>`).join("")}</div>` : `<div class="ci-muted">No spectacle Rx saved today yet.</div>`)
+        + (d.fixture ? `<div class="lo-sub">Fake ZZTEST patients</div>` : "") + dayNote;
+    loWirePicks(box);
+}
+
+async function loSearch(ev) {
+    ev.preventDefault();
+    const found = document.getElementById("lo-found");
+    found.innerHTML = `<div class="ci-muted">Searching…</div>`;
+    const r = await ciCall("/api/lensoptions/search", { q: document.getElementById("lo-q").value });
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderLensOptions, "Lens options"); return; }
+    if (r.status !== 200 || r.data.error) {
+        found.innerHTML = `<div class="ci-muted">${esc(r.data.error || "Search didn't work.")}</div>`;
+        return;
+    }
+    const ps = r.data.patients || [];
+    found.innerHTML = ps.length ? `<table class="ci-table lo-table">
+        <thead><tr><th>Patient</th><th>Born</th><th>Last Rx</th><th></th></tr></thead>
+        <tbody>${ps.map((p) => `<tr>
+            <td><strong>${esc(p.name)}</strong></td>
+            <td class="ci-num">${esc(p.dob)}</td>
+            <td class="ci-num">${esc(p.last_rx)}</td>
+            <td><button class="btn" type="button" data-pick="${esc(p.id)}">Show lenses</button></td></tr>`).join("")}
+        </tbody></table>
+        ${r.data.more ? `<div class="ci-more">More matches - type more of the name</div>` : ""}`
+        : `<div class="ci-muted">Nobody with a saved spectacle Rx by that name. Check the spelling.</div>`;
+    loWirePicks(found);
+}
+
+function loWirePicks(root) {
+    root.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => loLoad(Number(b.dataset.pick))));
+}
+
+// The Rx exactly as saved: verbatim strings, one row per eye.
+function loRxTable(rx) {
+    const row = (label, e) => e ? `<tr>
+        <th scope="row">${label}</th>
+        <td>${esc(e.sph || "—")}</td><td>${esc(e.cyl || "")}</td><td>${esc(e.axis || "")}</td>
+        <td>${esc(e.add || "")}</td><td>${esc(e.intadd || "")}</td><td>${esc(e.pd || "")}</td>
+        <td>${esc(e.prism || "")}</td></tr>` : `<tr><th scope="row">${label}</th><td colspan="7" class="lo-sub">not on this Rx</td></tr>`;
+    return `<table class="lo-rx"><thead><tr><th></th><th>Sphere</th><th>Cyl</th><th>Axis</th>
+        <th>Add</th><th>Int add</th><th>PD</th><th>Prism</th></tr></thead>
+        <tbody>${row("Right", rx.right)}${row("Left", rx.left)}</tbody></table>`;
+}
+
+function loMoney(v) { return v != null ? "$" + Number(v).toFixed(2) : "—"; }
+
+function loLensName(l) {
+    return `<b class="lbl-idx">${esc(l.index)}</b> <span class="lo-cat">${esc(l.category)}</span> ${esc(l.name)}`;
+}
+
+function loSupplier(s) {
+    return /^zeiss$/i.test(s || "") ? ZEISS_LOGO : `<span class="lo-supword">${esc(s || "")}</span>`;
+}
+
+function loAnswer(m) {
+    if (m.unavailable) return `<div class="lo-unavail">${esc(m.unavailable)}</div>`;
+    const a = m.answer;
+    if (!a || !a.best) {
+        return `<div class="lo-answer lo-none"><div class="lo-big">No lens we order covers this Rx</div>
+            ${a ? `<details class="lo-why"><summary>Why</summary><ul>${whyBullets(a.verdict)}</ul></details>` : ""}</div>`;
+    }
+    const b = a.best;
+    const stock = b.type === "Stock";
+    const facts = [
+        ["Sells", b.sell != null ? `${loMoney(b.sell)} <span class="lo-u">a pair</span>` : `<span class="lo-u">not on our price sheet</span>`],
+        ["Cost", `${loMoney(b.cost)} <span class="lo-u">a lens</span>${b.basis === "deal" || b.basis === "promo" ? ` <span class="chip chip-basis chip-${esc(b.basis)}">${esc(b.basis)}</span>` : ""}`],
+        [stock ? "Stock" : "Grind", stock ? (b.blank_mm != null ? `${esc(fmtMM(b.blank_mm))} blank` : "stock") : "made to order"],
+    ];
+    const warn = (b.warnings || []).concat(b.thicker ? ["One step thicker than ideal for this power"] : []);
+    return `${a.blank_note ? `<div class="lo-note">${esc(a.blank_note)}</div>` : ""}
+    <div class="lo-answer ${stock ? "lo-stock" : "lo-grind"}">
+        <div class="lo-k">Best lens</div>
+        <div class="lo-big">${loLensName(b)}</div>
+        <div class="lo-supline">${loSupplier(b.supplier)} <span class="lo-sub">${esc(coatShort(b.coating))}${b.code ? " · code " + esc(b.code) : ""}</span></div>
+        <div class="lo-facts">${facts.map(([k, v]) => `<div class="lo-fact"><div class="lo-k">${esc(k)}</div><div class="lo-v">${v}</div></div>`).join("")}</div>
+        ${b.blank_line ? `<div class="lo-fitline">${esc(b.blank_line)}</div>` : ""}
+        ${warn.length ? `<ul class="lo-warn">${warn.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+    </div>
+    ${(a.others || []).length ? `<div class="lo-k lo-alt-head">Other lenses, cheapest that fits first</div>
+    <div class="table-scroll"><table class="lo-alts"><thead><tr>
+        <th>Lens</th><th>Supplier</th><th>Blank</th><th class="lo-num">Cost / lens</th><th class="lo-num">Sells / pair</th></tr></thead>
+        <tbody>${a.others.map((o) => `<tr class="${o.fits === false ? "lo-row-nofit" : o.type === "Stock" ? "lo-row-stock" : "lo-row-grind"}">
+            <td>${loLensName(o)}<div class="lo-sub">${esc(o.type)} · ${esc(coatShort(o.coating))}${o.thicker ? " · thicker than ideal" : ""}</div></td>
+            <td>${loSupplier(o.supplier)}</td>
+            <td class="lo-blankcell">${esc(o.blank_line || (o.blank_mm != null ? fmtMM(o.blank_mm) : "to size"))}</td>
+            <td class="lo-num">${loMoney(o.cost)}${o.dearer_by ? `<div class="lo-sub">${o.dearer_by > 0 ? "+" : "−"}${esc(loMoney(Math.abs(o.dearer_by)))}</div>` : ""}</td>
+            <td class="lo-num">${loMoney(o.sell)}</td></tr>`).join("")}</tbody></table></div>
+    ${a.more ? `<div class="lo-sub">${esc(a.more)} more in the Lens Finder</div>` : ""}` : ""}
+    <details class="lo-why"><summary>Lens Finder notes</summary><ul>${whyBullets(a.verdict)}</ul></details>`;
+}
+
+async function loLoad(pid, frame) {
+    const out = document.getElementById("lo-result");
+    const seq = ++lo.seq;
+    const keepTab = frame ? lo.tab : "";
+    const keepRx = frame ? lo.rx : 0;
+    out.innerHTML = `<div class="loading-panel">Reading the Rx and checking the lenses…</div>`;
+    if (!frame) out.scrollIntoView({ behavior: "smooth", block: "start" });
+    const body = { patient_id: pid };
+    if (frame) body.frame = frame;
+    const r = await ciCall("/api/lensoptions/rx", body);
+    if (seq !== lo.seq) return;                    // a newer pick replaced this one
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderLensOptions, "Lens options"); return; }
+    const d = r.data || {};
+    if (r.status !== 200 || d.error) { out.innerHTML = errorPanel(d.error || "Couldn't read the Rx."); return; }
+    lo.data = d; lo.pid = pid; lo.rx = keepRx; lo.tab = keepTab;
+    loDraw();
+}
+
+// Frame numbers for the blank estimate: filled from the last spectacle order when
+// there is one, always editable. "Estimate" is said wherever the result shows.
+function loFrameForm(f) {
+    f = f || {};
+    const v = (x) => (x != null ? esc(x) : "");
+    const src = f.source === "order"
+        ? `From the last spectacle order${f.order_date ? " (" + esc(f.order_date) + ")" : ""} - change it if the frame is new.`
+        : f.source === "typed" ? "Typed in." : "No frame on file - type the frame's numbers (on the temple arm).";
+    return `<form id="lo-frame" class="lo-frame">
+        <div class="lo-k">Frame, for the blank size estimate</div>
+        <div class="lo-frame-row">
+            <label>Eye size (A)<input id="lo-a" inputmode="decimal" value="${v(f.a)}" placeholder="52"></label>
+            <label>Bridge (DBL)<input id="lo-dbl" inputmode="decimal" value="${v(f.dbl)}" placeholder="18"></label>
+            <label>Diagonal (ED), optional<input id="lo-ed" inputmode="decimal" value="${v(f.ed)}" placeholder="57"></label>
+            <button class="btn" type="submit">Check blank</button>
+        </div>
+        <div class="lo-sub">${src}</div>
+    </form>`;
+}
+
+function loBlank(b) {
+    if (!b) return "";
+    return `<details class="lo-blankest"><summary><span class="lo-k">Blank estimate</span>
+        <strong>${esc(b.value)}mm</strong>${b.approx ? ` <span class="lo-sub">approximate</span>` : ""}
+        <span class="lo-sub">· ${esc(b.inputs)}</span></summary>
+        <div class="lo-working">${b.working.map(esc).join("<br>")}</div>
+        <ul class="lo-sub">${b.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></details>`;
+}
+
+function loPart(part, many) {
+    return `<div class="lo-part">
+        ${many ? `<div class="lo-parttitle">${esc(part.title)}</div>` : `<div class="lo-modelong">${esc(part.title)}</div>`}
+        ${(part.working || []).length ? `<div class="lo-working">${part.working.map(esc).join("<br>")}</div>` : ""}
+        ${(part.notes || []).length ? `<div class="lo-sub">${part.notes.map(esc).join(" ")}</div>` : ""}
+        ${loBlank(part.blank)}
+        ${part.answer && part.answer.blank_warning ? `<div class="lo-note">${esc(part.answer.blank_warning)}</div>` : ""}
+        ${loAnswer(part)}
+    </div>`;
+}
+
+function loDraw() {
+    const out = document.getElementById("lo-result");
+    const d = lo.data;
+    if (!d) { out.innerHTML = ""; return; }
+    const p = d.patient || {};
+    const head = `<div class="lo-patient"><span class="lo-pname">${esc(p.name)}</span>
+        ${p.dob ? `<span class="lo-sub">born ${esc(p.dob)}</span>` : ""}
+        ${d.fixture ? `<span class="chip chip-amber">fake test patient</span>` : ""}</div>`;
+    if (!(d.rxs || []).length) {
+        out.innerHTML = `<div class="card">${head}<div class="lo-unavail">${esc(d.empty || "No spectacle Rx saved.")}</div></div>`;
+        return;
+    }
+    const rx = d.rxs[lo.rx] || d.rxs[0];
+    const tabs = rx.tabs || [];
+    const tab = tabs.find((t) => t.key === lo.tab) || tabs.find((t) => t.key === rx.default_tab) || tabs[0];
+    lo.tab = tab.key;
+    const several = d.rxs.length > 1 ? `<div class="lo-several"><div class="lo-note">${esc(d.several)}</div>
+        <div class="lo-tabs">${d.rxs.map((x, i) => `<button type="button" class="lo-tab ${i === lo.rx ? "lo-tab-on" : ""}" data-rx="${i}">
+            Rx ${i + 1} · ${esc(x.saved)}${x.type_words && x.type_words.length ? " · " + esc(x.type_words.join(", ")) : ""}</button>`).join("")}</div></div>` : "";
+    const comment = [rx.comment, rx.practice_comment].filter(Boolean);
+    const many = tab.parts.length > 1;
+    out.innerHTML = `<div class="card lo-card">
+        ${head}
+        <div class="lo-sub lo-saved">Spectacle Rx saved ${esc(rx.saved_date)} ${esc(rx.saved)}${rx.rx_date && rx.rx_date !== rx.saved_date ? ` · Rx date ${esc(rx.rx_date)}` : ""}${rx.optom ? ` · ${esc(rx.optom)}` : ""}</div>
+        ${several}
+        ${loRxTable(rx)}
+        ${comment.length ? `<div class="lo-comment"><span class="lo-k">Rx note</span> ${comment.map((c) => esc(c)).join(" · ")}</div>` : ""}
+        ${rx.type_note ? `<div class="lo-note">${esc(rx.type_note)}</div>` : ""}
+        ${(rx.flags || []).length ? `<ul class="lo-flags">${rx.flags.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` : ""}
+        ${loFrameForm(d.frame)}
+        ${rx.blank_note ? `<div class="lo-sub">${esc(rx.blank_note)}</div>` : ""}
+        <div class="lo-k lo-tabhead">Lens type - tap to switch</div>
+        <div class="lo-tabs lo-modes" role="tablist">${tabs.map((t) => `<button type="button" role="tab"
+            class="lo-tab ${t.key === tab.key ? "lo-tab-on" : ""}" data-tab="${esc(t.key)}"
+            aria-selected="${t.key === tab.key}">${esc(t.label)}${t.written ? ` <span class="lo-onrx">on Rx</span>` : ""}</button>`).join("")}</div>
+        <div class="lo-mode">${tab.parts.map((pt) => loPart(pt, many)).join("")}</div>
+    </div>`;
+    out.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { lo.tab = b.dataset.tab; loDraw(); }));
+    out.querySelectorAll("[data-rx]").forEach((b) => b.addEventListener("click", () => { lo.rx = Number(b.dataset.rx); lo.tab = ""; loDraw(); }));
+    document.getElementById("lo-frame").addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        const val = (id) => document.getElementById(id).value.trim();
+        loLoad(lo.pid, { a: val("lo-a"), dbl: val("lo-dbl"), ed: val("lo-ed") });
+    });
 }
 
 /* --- Go ---------------------------------------------------------------------------- */
