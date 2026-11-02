@@ -61,6 +61,18 @@
       "approval_ref": "Mark approved rev 4 FINAL in chat 2 Nov 2026 (\"let's lock it in\"; paper-towel step, smaller Take care). Drive: Instruction sheets.",
       "classification": "care",
       "active": true
+    },
+    {
+      "id": "ipl-treatment",
+      "title": "IPL Treatment Guide",
+      "version": "Nov 2026",
+      "stage": "DECIDING",
+      "language": "en",
+      "path": "CEC-IPL-Deciding-Guide-A4.pdf",
+      "sha256": "708232f66ad2af7b4aa4b22e57652eed54e2aa8244faf34fa0a3f5460cefadce",
+      "approval_ref": "Mark approved 2 Nov 2026 (Front Desk: \"ipl guide ok to publish and put on the cec hub emailer\"; Server Desk: \"add it\"). second-brain export b48bf79e; same file as Drive Patient guides - Deciding/PATIENT GUIDE - IPL - Treatment (Nov 2026).pdf",
+      "classification": "decision",
+      "active": true
     }
   ]
 }
