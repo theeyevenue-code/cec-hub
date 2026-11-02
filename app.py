@@ -20,7 +20,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from hub import checkin, integrations, lenses, sendguide, sop_parser
+from hub import checkin, integrations, lenses, lensoptions, sendguide, sop_parser
 
 logging.basicConfig(
     level=logging.INFO,
@@ -528,6 +528,46 @@ def sendguide_review():
 def sendguide_send():
     return _json(sendguide.send(_integrations(), request.get_json(silent=True) or {},
                                 _staff_name()))
+
+
+# --- Lens options (hub/lensoptions.py) ----------------------------------------
+# Click a patient -> the lenses for their saved spectacle Rx (Mark, 3 Nov 2026).
+# Same staff guard as Send guide; names in POST bodies only; no-store; nothing
+# about a patient reaches hub.log.
+
+def _sells() -> dict:
+    products = lenses.group_products(_catalog()["lenses"], pricing=_pricing())
+    products = lenses.mark_preferred(products, _config_json("lens_filter.json", {}))
+    products = lenses.attach_cec_price(products, _config_json("cec_prices.json", {}))
+    return lensoptions.sell_index(products)
+
+
+@app.route("/api/lensoptions/recent")
+@staff_only
+def lensoptions_recent():
+    return _no_store(jsonify(lensoptions.recent(_integrations())))
+
+
+@app.route("/api/lensoptions/search", methods=["POST"])
+@staff_only
+def lensoptions_search():
+    data = request.get_json(silent=True) or {}
+    out = lensoptions.search(_integrations(), data.get("q", ""))
+    return _no_store(jsonify(out)), (400 if out.get("error") else 200)
+
+
+@app.route("/api/lensoptions/rx", methods=["POST"])
+@staff_only
+def lensoptions_rx():
+    data = request.get_json(silent=True) or {}
+    catalog = _catalog()
+    if catalog.get("message"):
+        return _no_store(jsonify({"error": catalog["message"]})), 503
+    rows = [l for l in catalog["lenses"] if l.get("orderable", True)]
+    frame = data.get("frame") if isinstance(data.get("frame"), dict) else None
+    out = lensoptions.options(_integrations(), data.get("patient_id"), rows,
+                              _pricing(), _sells(), frame)
+    return _no_store(jsonify(out)), (400 if out.get("error") else 200)
 
 
 # iPad: its own page and files, every API call needs the device key header.

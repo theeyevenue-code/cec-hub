@@ -101,6 +101,44 @@ price files — in range? blank big enough? marked Grind when a stock lens
 would do? The same check is callable at `POST /api/lenses/check` for any
 future helper. It's a second pair of eyes only — it never changes an order.
 
+## Lens options (click a patient) - built 3 Nov 2026, not merged
+
+`#/lensoptions`: the last 3 patients whose spectacle Rx was saved (or edited)
+today, plus a name search (Mark's full-name rule; only patients with a saved
+Rx). Pick one: their latest SAVED spectacle Rx (Optomate `SPECTACLE_RX`, never
+the exam slots; every Rx saved that day is offered) runs through the Lens
+Finder for five lens types - Distance (SV), Near (SV), Office / intermediate,
+Multifocal, Bifocal - and the page shows the best lens, the alternatives and
+the prices.
+
+- **Lens type** is read from the Rx comment (RTF and the printed warranty /
+  validity footer stripped) and then `PRACTICE_COMMENT`: SV, SVN, SVD, near,
+  reading, computer, intermediate, office, Occ MF, MF, PAL, progressive, BF,
+  bifocal ... The type written is pre-selected and marked "on Rx"; staff can
+  switch freely. Nothing written + an add -> Multifocal with a line asking for
+  the type on the Rx. No add + "near"/"computer" -> the Rx IS that pair, powers
+  as written. A named special lens (MiyoSmart, Stellest, anti-fatigue ...) gets
+  a "check with the optom" line.
+- **Powers**: Rx strings shown verbatim. Near = sphere + add, computer = sphere
+  + INT add, both with their working; no INT add on the Rx -> "Intermediate add
+  not on the Rx" (never made up). Office lens / multifocal / bifocal = distance
+  Rx + add (the higher add when they differ, said so). Prism -> a warning line.
+- **Blank estimate**: frame A / DBL / ED from the patient's last spectacle
+  order with a frame size (Optomate keeps `SIZE` as '5219' = 52 / 19; `DIAG`
+  when measured; `SPECFRAME` by barcode as fallback), editable. Per eye with
+  that eye's monocular PD (near PD for reading when saved) by the Lens Finder's
+  own `min_blank_from_frame` rule. Labelled estimate; no ED = approximate;
+  height unknown = optical centre at the frame's vertical centre. Each lens
+  then gets one verdict from the price files' own per-row blanks for each
+  eye's Rx: "Fits a 70 mm stock blank", "Needs 68 mm - this lens only comes
+  65 mm for this Rx. Big enough stock: 1.60 stock", or "No stock blank big
+  enough ...: grind (or a smaller frame)". Lenses that fit lead.
+- Read only: `hub/lens_bridge.py` runs `sqlcmd` (Windows auth, `NOLOCK`,
+  SELECT only) in a subprocess. Staff guard, no-store, names in POST bodies,
+  nothing about a patient in hub.log.
+- Test copy: `CEC_HUB_LENS_OPTIONS_DATE=YYYY-MM-DD` shows a past day,
+  `LENS_OPTIONS_FIXTURE=1` shows fake ZZTEST patients (database untouched).
+
 ## Check-in (iPad form)
 
 A patient fills a registration form on the reception iPad; staff check it on the Hub

@@ -1591,6 +1591,103 @@ body.lens-mono main { background: #fafafa; }
 /* check-in: Last exam here line under the patient's name (v5) */
 .ci-visit { font-size: 18px; margin: -4px 0 14px; }
 
+/* --- Lens options (Mark, 3 Nov 2026): answer first and biggest, black on white,
+   green = stock, amber = grind / check, nothing else coloured. -------------------- */
+.lo-page .lo-h2 { font-family: 'Work Sans', sans-serif; font-size: 20px; color: var(--lp-ink); margin-bottom: 12px; }
+.lo-page .lo-sub { color: var(--lp-mute); font-size: 16px; }
+.lo-page .lo-k { font-size: 14px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--lp-mute); }
+.lo-page .lo-recent { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.lo-page .lo-person { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+    font: inherit; background: #fff; border: 1px solid var(--lp-rule); border-left: 5px solid var(--lp-ink);
+    border-radius: 6px; padding: 14px 18px; cursor: pointer; min-height: 72px; }
+.lo-page .lo-person:hover, .lo-page .lo-person:focus-visible { background: #f4f4f4; outline: none; border-color: var(--lp-ink); }
+.lo-page .lo-person-name { font-size: 21px; font-weight: 700; color: var(--lp-ink); }
+.lo-page .lo-person-time { font-size: 16px; color: var(--lp-mute); }
+.lo-page .lo-find { margin-top: 6px; }
+.lo-page .lo-table { margin-top: 12px; }
+.lo-page .lo-card { margin-top: 22px; }
+.lo-page .lo-patient { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+.lo-page .lo-pname { font-size: 28px; font-weight: 700; color: var(--lp-ink); }
+.lo-page .lo-saved { margin: 2px 0 14px; }
+.lo-page .lo-rx { border-collapse: collapse; font-size: 18px; margin: 4px 0 12px; font-variant-numeric: tabular-nums; }
+.lo-page .lo-rx th, .lo-page .lo-rx td { padding: 6px 14px 6px 0; text-align: left; border-bottom: 1px solid var(--lp-rule-soft); }
+.lo-page .lo-rx thead th { font-size: 14px; color: var(--lp-mute); font-weight: 600; }
+.lo-page .lo-rx tbody th { font-weight: 700; color: var(--lp-ink); padding-right: 22px; }
+.lo-page .lo-rx td { min-width: 58px; }
+.lo-page .lo-comment { font-size: 17px; margin: 4px 0 8px; }
+.lo-page .lo-note { background: var(--c-grind-bg); border-left: 4px solid var(--c-grind); color: #4d3200;
+    padding: 8px 14px; font-size: 17px; margin: 8px 0; border-radius: 4px; }
+.lo-page .lo-flags { list-style: none; margin: 8px 0; }
+.lo-page .lo-flags li { background: var(--c-grind-bg); border-left: 4px solid var(--c-grind); color: #4d3200;
+    padding: 6px 14px; font-size: 17px; margin-bottom: 6px; border-radius: 4px; font-weight: 600; }
+.lo-page .lo-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+.lo-page .lo-tab { font: inherit; font-size: 18px; font-weight: 600; padding: 8px 18px; border: 1px solid var(--lp-rule);
+    background: #fff; color: var(--lp-ink); border-radius: 6px 6px 0 0; cursor: pointer; min-height: 48px; }
+.lo-page .lo-tab-on { background: var(--lp-ink); color: #fff; border-color: var(--lp-ink); }
+.lo-page .lo-onrx { font-size: 13px; font-weight: 700; padding: 1px 7px; border-radius: 10px; margin-left: 4px;
+    background: var(--c-stock-bg); color: var(--c-stock); }
+.lo-page .lo-several .lo-tabs { margin: 6px 0 12px; }
+.lo-page .lo-several .lo-tab { border-radius: 6px; font-size: 17px; }
+.lo-page .lo-mode { border-top: 2px solid var(--lp-ink); padding-top: 14px; }
+.lo-page .lo-modelong { font-size: 17px; color: var(--lp-mute); margin-bottom: 8px; }
+.lo-page .lo-working { font-size: 18px; font-variant-numeric: tabular-nums; color: var(--lp-ink); margin-bottom: 6px; }
+.lo-page .lo-answer { border: 2px solid var(--lp-rule); border-radius: 6px; padding: 18px 22px; margin: 10px 0 16px; background: #fff; }
+.lo-page .lo-stock { border-color: var(--c-stock); }
+.lo-page .lo-grind { border-color: var(--c-grind); }
+.lo-page .lo-big { font-size: 30px; font-weight: 700; color: var(--lp-ink); line-height: 1.25; margin: 2px 0 6px; }
+.lo-page .lo-big .lbl-idx { font-weight: 800; }
+.lo-page .lo-cat { font-weight: 500; color: var(--lp-mute); }
+.lo-page .lo-supline { margin-bottom: 12px; }
+.lo-page .lo-supline .zeiss-logo { height: 34px; }
+.lo-page .lo-supword { font-weight: 700; color: var(--c-sync); font-size: 18px; }
+.lo-page .lo-facts { display: flex; flex-wrap: wrap; gap: 8px 40px; }
+.lo-page .lo-v { font-size: 24px; font-weight: 700; color: var(--lp-ink); font-variant-numeric: tabular-nums; }
+.lo-page .lo-u { font-size: 16px; font-weight: 500; color: var(--lp-mute); }
+.lo-page .lo-stock .lo-fact:last-child .lo-k, .lo-page .lo-stock .lo-fact:last-child .lo-v { color: var(--c-stock); }
+.lo-page .lo-grind .lo-fact:last-child .lo-k, .lo-page .lo-grind .lo-fact:last-child .lo-v { color: var(--c-grind); }
+.lo-page .lo-warn { margin: 12px 0 0 20px; font-size: 16px; color: #4d3200; }
+.lo-page .lo-alt-head { margin: 4px 0 6px; }
+.lo-page .lo-alts { border-collapse: collapse; width: 100%; font-size: 17px; }
+.lo-page .lo-alts th { text-align: left; font-size: 14px; color: var(--lp-mute); font-weight: 600; padding: 6px 10px;
+    border-bottom: 1px solid var(--lp-rule); }
+.lo-page .lo-alts td { padding: 10px; border-bottom: 1px solid var(--lp-rule-soft); vertical-align: top; }
+.lo-page .lo-alts td:first-child { border-left: 4px solid transparent; }
+.lo-page .lo-row-stock td:first-child { border-left-color: var(--c-stock); }
+.lo-page .lo-row-grind td:first-child { border-left-color: var(--c-grind); }
+.lo-page .lo-alts .zeiss-logo { height: 26px; }
+.lo-page .lo-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lo-page th.lo-num { text-align: right; }
+.lo-page .lo-why { margin-top: 12px; font-size: 16px; color: var(--lp-mute); }
+.lo-page .lo-why summary { cursor: pointer; font-weight: 600; color: var(--lp-ink); }
+.lo-page .lo-why ul { margin: 6px 0 0 20px; }
+.lo-page .lo-unavail { font-size: 19px; font-weight: 600; color: #4d3200; background: var(--c-grind-bg);
+    padding: 12px 16px; border-radius: 4px; margin: 10px 0; }
+.lo-page .lo-blank { margin-top: 16px; border-top: 1px solid var(--lp-rule-soft); padding-top: 10px; }
+@media (max-width: 640px) {
+    .lo-page .lo-big { font-size: 24px; }
+    .lo-page .lo-rx { font-size: 16px; }
+    .lo-page .lo-rx th, .lo-page .lo-rx td { padding-right: 8px; }
+}
+.lo-page .lo-frame { margin: 14px 0 6px; padding: 12px 0; border-top: 1px solid var(--lp-rule-soft); }
+.lo-page .lo-frame-row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; margin: 6px 0 4px; }
+.lo-page .lo-frame label { display: flex; flex-direction: column; font-size: 16px; color: var(--lp-mute); }
+.lo-page .lo-frame input { font: inherit; font-size: 19px; width: 130px; min-height: 48px; padding: 6px 10px;
+    border: 1px solid #999; border-radius: 6px; color: var(--lp-ink); }
+.lo-page .lo-frame .btn { min-height: 48px; }
+.lo-page .lo-tabhead { margin-top: 16px; }
+.lo-page .lo-part + .lo-part { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--lp-rule); }
+.lo-page .lo-parttitle { font-size: 20px; font-weight: 700; color: var(--lp-ink); margin-bottom: 4px; }
+.lo-page .lo-blankest { font-size: 17px; margin: 6px 0; }
+.lo-page .lo-blankest summary { cursor: pointer; }
+.lo-page .lo-blankest strong { font-size: 20px; color: var(--lp-ink); margin: 0 4px; }
+.lo-page .lo-blankest ul { margin: 4px 0 0 20px; }
+
+.lo-page .lo-fitline { margin-top: 12px; font-size: 19px; font-weight: 600; color: var(--lp-ink); }
+.lo-page .lo-blankcell { font-size: 16px; max-width: 340px; }
+.lo-page .lo-row-nofit td { color: var(--lp-mute); }
+.lo-page .lo-row-nofit td:first-child { border-left-color: #bbb; }
+.lo-page .lo-row-nofit .lo-blankcell { color: #4d3200; font-weight: 600; }
+
 /* --- Medicare rejections (Mark's readability standard: answer first, 17px+ body, nothing
        under 14px, colour only with a meaning - red = resubmit-by within a month; no side-bar
        accent lines. Codex review applied 9 Oct 2026) -------------------------------------- */

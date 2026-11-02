@@ -94,6 +94,13 @@
       "link": "#/lenses"
     },
     {
+      "id": "lensoptions",
+      "icon": "",
+      "name": "Lens options",
+      "description": "Pick a patient: the lenses to offer for their saved Rx, with prices",
+      "link": "#/lensoptions"
+    },
+    {
       "id": "recalls",
       "icon": "📱",
       "name": "Recalls",
