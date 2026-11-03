@@ -27,6 +27,18 @@
       "active": true
     },
     {
+      "id": "orthok-program-zh",
+      "title": "Ortho-K Program Guide (Chinese)",
+      "version": "Nov 2026 (3 Nov, zh-Hans)",
+      "stage": "DECIDING",
+      "language": "zh",
+      "path": "CEC-OrthoK-Deciding-Guide-A4-zh.pdf",
+      "sha256": "8713972da135a23ca291883f3526fe27e2220ee635d9c2ba3a5af6bc0d16830c",
+      "approval_ref": "Mark 3 Nov 2026 via Front Desk: 'put them in the tiles for now' (draft banner removed, second-brain commit dff73201); Nikki's language check pending, guide to be republished if she changes it",
+      "classification": "decision",
+      "active": true
+    },
+    {
       "id": "miyosmart-iq-program",
       "title": "MiyoSmart iQ Program Guide",
       "version": "Nov 2026",
