@@ -17,12 +17,12 @@
     {
       "id": "orthok-program",
       "title": "Ortho-K Program Guide",
-      "version": "Nov 2026",
+      "version": "Nov 2026 (3 Nov rev: tear-layer wording)",
       "stage": "DECIDING",
       "language": "en",
       "path": "CEC-OrthoK-Deciding-Guide-A4.pdf",
-      "sha256": "e020974960998e3f470ffab721e95b97d0e3c65521a9d6eb78497d9eb2131a8e",
-      "approval_ref": "Mark approved the DECIDING guide FINAL 1 Nov 2026 (second-brain wiki/log.md; export commit f818e5ea, printer-safe rev 4). Drive: DECIDING - Ortho-K - Program Guide (Nov 2026).",
+      "sha256": "f8e0d09059374925db5eed22c800bca92c359db82e0b936a7e8db90faac6b784",
+      "approval_ref": "Mark yes 3 Nov 2026 via Front Desk (republished to Drive 21:28; second-brain export commit f2b52db4, tear-layer mechanism wording + redrawn diagram)",
       "classification": "decision",
       "active": true
     },
