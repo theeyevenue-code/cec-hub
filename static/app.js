@@ -1628,6 +1628,16 @@ async function renderLensJobs() {
     </div>`;
 }
 
+// Photochromic goes by many names across suppliers (Photochromic, PhotoFusion,
+// Transitions, Sensity) and staff type it many ways ("photochromatic", "transition",
+// "photo"). Any of those words finds every photochromic lens (Mark, 3 Nov 2026).
+const PHOTO_WORD = /^(photo|transition|sensity|pfx|adaptivesun|light.?react|reactolite)/;
+const PHOTO_HAY = /photo|transition|sensity|pfx|adaptivesun/;
+function lookupWordHits(hay, w) {
+    if (PHOTO_WORD.test(w)) return PHOTO_HAY.test(hay);
+    return hay.includes(w);
+}
+
 const LOOKUP_LIMIT = 80;
 const CAT_ORDER = ["Single vision", "Progressive", "Anti-fatigue", "Occupational", "Bifocal"];
 
@@ -1690,7 +1700,7 @@ function wireLensLookup(cat) {
             if (cIdx && String(p.index) !== cIdx) return false;
             if (cStock && p.type !== cStock) return false;
             if (cCoat && !(p.coatings || []).some((c) => c.coating === cCoat)) return false;
-            return words.every((w) => r.hay.includes(w));
+            return words.every((w) => lookupWordHits(r.hay, w));
         }).map((r) => r.prod);
         if (!lastHits.length) {
             out.innerHTML = `<div class="empty-panel">Nothing loaded matches those filters.
