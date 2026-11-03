@@ -20,7 +20,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from hub import checkin, integrations, lenses, lensoptions, sendguide, sop_parser
+from hub import checkin, integrations, jobscan, lenses, lensoptions, sendguide, sop_parser
 
 logging.basicConfig(
     level=logging.INFO,
@@ -585,6 +585,42 @@ def lensoptions_rx():
     out = lensoptions.options(_integrations(), data.get("patient_id"), rows,
                               _pricing(), _sells(), frame)
     return _no_store(jsonify(out)), (400 if out.get("error") else 200)
+
+
+# --- Jobs arrived (hub/jobscan.py) --------------------------------------------
+# Scan job cards, confirm once -> received in Optomate + "glasses ready" text, as far
+# as the agent's orders\jobscan_config.json switches allow (Mark, 3 Nov 2026). Same
+# staff guard; job numbers in POST bodies; no-store; hub.log gets counts only.
+
+@app.route("/api/jobscan/status")
+@staff_only
+def jobscan_status():
+    return _no_store(jsonify(jobscan.status(_integrations())))
+
+
+@app.route("/api/jobscan/lookup", methods=["POST"])
+@staff_only
+def jobscan_lookup():
+    data = request.get_json(silent=True) or {}
+    out = jobscan.lookup(_integrations(), data.get("ids"))
+    return _no_store(jsonify(out)), (200 if out.get("ok") else 400)
+
+
+@app.route("/api/jobscan/confirm", methods=["POST"])
+@staff_only
+def jobscan_confirm():
+    data = request.get_json(silent=True) or {}
+    out = jobscan.confirm(_integrations(), data.get("ids"), data.get("expected"))
+    if out.get("ok"):
+        c = out.get("counts") or {}
+        logger.info("Jobs arrived: confirm %s - done %d, would %d, skipped %d, failed %d, texted %d",
+                    "TEST MODE" if out.get("nothing_changed") else "live",
+                    c.get("done", 0), c.get("would", 0), c.get("skipped", 0), c.get("failed", 0),
+                    int(out.get("texted") or 0))
+    else:
+        logger.info("Jobs arrived: confirm not done (%s)",
+                    "timeout" if out.get("timeout") else "refused")
+    return _no_store(jsonify(out)), (200 if out.get("ok") else 400)
 
 
 # iPad: its own page and files, every API call needs the device key header.
