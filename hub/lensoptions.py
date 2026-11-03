@@ -594,6 +594,47 @@ def options_for_rx(rx: dict, rows: list, pricing: dict, sells: dict,
     }
 
 
+def compare_request(cfg: dict, pid, rx_index=0, part="", frame=None) -> dict:
+    """The Compare / chat inputs for a picked patient, read locally:
+    {"req": {...for compare.clean_request}, "given", "surname"} or {"error"}.
+    The Rx numbers come from the saved spectacle Rx through mode_question, the
+    same as the Lens options page; the blank need from the frame estimate.
+    The patient's name is returned only for the chat's local name check."""
+    try:
+        pid = int(pid)
+        if pid <= 0:
+            raise ValueError
+        rx_index = int(rx_index or 0)
+    except (TypeError, ValueError):
+        return {"error": "Pick a patient first."}
+    if part not in TYPE_LONG:
+        return {"error": "Pick a lens type."}
+    data = run_bridge(cfg, "rx", "--pid", str(pid))
+    if data.get("error"):
+        return data
+    rxs = [r for r in data.get("rxs") or [] if isinstance(r, dict)]
+    if not rxs:
+        return {"error": "No spectacle Rx saved for this patient in Optomate."}
+    rx = rxs[rx_index] if 0 <= rx_index < len(rxs) else rxs[0]
+    lt = rx.get("lens_type") or {}
+    q = mode_question(rx, part, lt.get("type") if lt.get("as_written") else "")
+    if q["unavailable"]:
+        return {"error": q["unavailable"]}
+    if isinstance(frame, dict) and frame:
+        used = clean_frame({**frame, "source": "typed"})
+    else:
+        last = data.get("frame") if isinstance(data.get("frame"), dict) else None
+        used = clean_frame({**last, "source": "order"}) if last else None
+    pds, _ = mono_pds(rx, near=(part == "near"))
+    est = blank_estimate(used, pds, multi=part in MULTI)
+    p = data.get("patient") or {}
+    kind = {"Single vision": "sv", "Progressive": "progressive", "Occupational": "office",
+            "Bifocal": "bifocal"}[q["kind"]]
+    return {"req": {"right": q["right"], "left": q["left"], "kind": kind, "add": q["add"],
+                    "blank_need": est["per_eye"] if est else None},
+            "given": str(p.get("given") or ""), "surname": str(p.get("surname") or "")}
+
+
 def options(cfg: dict, pid, rows: list, pricing: dict, sells: dict, frame=None) -> dict:
     """frame: the numbers staff typed ({"a", "dbl", "ed"}); None = use the
     frame on the patient's last spectacle order, if any."""

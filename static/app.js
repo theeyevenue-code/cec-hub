@@ -3902,10 +3902,10 @@ async function sgSend() {
    Lens Finder for every lens type it can make; the type written on the Rx leads. Nothing
    about the patient is kept in the browser and names never go in a URL. */
 
-const lo = { seq: 0, data: null, rx: 0, tab: "", pid: 0 };
+const lo = { seq: 0, data: null, rx: 0, tab: "", pid: 0, chat: null, chatSession: null, frame: null };
 
 function renderLensOptions() {
-    lo.data = null; lo.rx = 0; lo.tab = "";
+    lo.data = null; lo.rx = 0; lo.tab = ""; lo.chatSession = null; lo.frame = null;
     view.innerHTML = `<div class="lens-page lo-page">
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Lens options</h1>
@@ -3920,10 +3920,22 @@ function renderLensOptions() {
             </form>
             <div id="lo-found"></div>
         </div>
+        <div id="lo-typed-box"></div>
         <div id="lo-result"></div>
     </div>`;
     loLoadRecent();
     document.getElementById("lo-find").addEventListener("submit", loSearch);
+    loChatStatus();
+}
+
+async function loChatStatus() {
+    const r = await ciCall("/api/lenschat/status");
+    lo.chat = r.status === 200 ? r.data : null;
+    const box = document.getElementById("lo-typed-box");
+    if (!box) return;
+    box.innerHTML = cmpTypedCard();
+    cmpWire(box);
+    if (lo.data) loDraw();
 }
 
 async function loLoadRecent() {
@@ -4044,6 +4056,8 @@ async function loLoad(pid, frame) {
     if (ciLocked(r)) { ciUnlockPanel(r.data, renderLensOptions, "Lens options"); return; }
     const d = r.data || {};
     if (r.status !== 200 || d.error) { out.innerHTML = errorPanel(d.error || "Couldn't read the Rx."); return; }
+    if (pid !== lo.pid) lo.chatSession = null;     // chat context never crosses patients
+    lo.frame = frame || null;
     lo.data = d; lo.pid = pid; lo.rx = keepRx; lo.tab = keepTab;
     loDraw();
 }
@@ -4090,7 +4104,153 @@ function loPart(part, many) {
         ${loBlank(part.blank)}
         ${part.answer && part.answer.blank_warning ? `<div class="lo-note">${esc(part.answer.blank_warning)}</div>` : ""}
         ${loAnswer(part)}
+        ${part.unavailable ? "" : cmpPanel("p-" + part.key, part.key)}
     </div>`;
+}
+
+/* --- Compare (no AI) + Lens Finder chat (Mark-only trial) --------------------------
+   Mark, 3 Nov 2026. Compare runs the server's one comparison engine (hub/compare.py):
+   every number on screen is the lens files' own, added up on the server. The chat
+   sends the server a patient id or typed numbers only; the server checks the typed
+   question locally before anything leaves the practice. */
+
+const CMP_OPTS = {
+    feature: [["any", "Any"], ["photochromic", "Photochromic"], ["polarised", "Polarised"], ["clear", "Clear"], ["blue", "Blue filter"]],
+    colour: [["any", "Any"], ["brown", "Brown"], ["grey", "Grey"], ["green", "Green"], ["pioneer", "Pioneer"], ["burgundy", "Burgundy"], ["black", "Black"], ["blue", "Blue"]],
+    index: [["any", "Any"], ["1.50", "1.50"], ["1.53", "1.53"], ["1.56", "1.56"], ["1.59", "1.59"], ["1.60", "1.60"], ["1.67", "1.67"], ["1.74", "1.74"]],
+    coating: [["any", "Any"], ["platinum", "Platinum"], ["gold", "Gold"], ["silver", "Silver"], ["bluepro", "BluePro"], ["hmc+", "HMC+"], ["hmc blue", "HMC Blue"], ["hard coat", "Hard coat"]],
+    type: [["any", "Any"], ["stock", "Stock"], ["grind", "Grind"]],
+};
+const CMP_LABELS = { feature: "Lens", colour: "Colour", index: "Index", coating: "Coating", type: "Stock / grind" };
+
+function cmpPanel(id, part) {
+    const sel = (k) => `<label>${esc(CMP_LABELS[k])}<select name="${k}">${CMP_OPTS[k].map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("")}</select></label>`;
+    const chat = lo.chat && lo.chat.show ? `<div class="lo-chat">
+        <div class="lo-k">Ask <span class="lo-sub">trial · Mark only</span></div>
+        ${lo.chat.available ? `<form class="lo-chat-form"><input name="q" maxlength="300" autocomplete="off" spellcheck="false"
+            placeholder="e.g. brown photochromic, stock if it can be"><button class="btn" type="submit">Ask</button></form>
+        <div class="lo-sub">Lens words only - no names, dates or ID numbers. ${esc(lo.chat.left || "")} left of ${esc(lo.chat.cap || "")} · ${lo.chat.trial_end ? "trial ends " + esc(lo.chat.trial_end) : "trial starts at the first question"}</div>
+        <div class="lo-chat-out"></div>` : `<div class="lo-sub">${esc(lo.chat.why || "Chat is off.")}</div>`}
+    </div>` : "";
+    return `<div class="lo-compare" id="${esc(id)}" data-part="${esc(part || "")}">
+        <div class="lo-k lo-alt-head">Compare brands and prices</div>
+        <form class="lo-cmp-form">${Object.keys(CMP_OPTS).map(sel).join("")}
+            <button class="btn" type="submit">Compare</button></form>
+        <div class="lo-cmp-out"></div>
+        ${chat}
+    </div>`;
+}
+
+function cmpFilters(box) {
+    const f = {};
+    box.querySelectorAll(".lo-cmp-form select").forEach((s) => { f[s.name] = s.value; });
+    return f;
+}
+
+function cmpSource(box) {
+    if (box.dataset.part) {
+        const b = { patient_id: lo.pid, rx: lo.rx, part: box.dataset.part };
+        if (lo.frame) b.frame = lo.frame;
+        return b;
+    }
+    const v = (n) => (box.closest(".lo-typed").querySelector(`[name="${n}"]`) || {}).value || "";
+    return { typed: { right: { sph: v("rs"), cyl: v("rc") }, left: { sph: v("ls"), cyl: v("lc") },
+        kind: v("kind"), add: v("add"), min_blank: v("blank") } };
+}
+
+function cmpWire(root) {
+    root.querySelectorAll(".lo-compare").forEach((box) => {
+        box.querySelector(".lo-cmp-form").addEventListener("submit", (ev) => { ev.preventDefault(); cmpRun(box); });
+        const cf = box.querySelector(".lo-chat-form");
+        if (cf) cf.addEventListener("submit", (ev) => { ev.preventDefault(); chatAsk(box); });
+    });
+}
+
+async function cmpRun(box) {
+    const out = box.querySelector(".lo-cmp-out");
+    out.innerHTML = `<div class="ci-muted">Comparing…</div>`;
+    const r = await ciCall("/api/lenscompare", { ...cmpSource(box), filters: cmpFilters(box) });
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderLensOptions, "Lens options"); return; }
+    if (r.status !== 200 || r.data.error) { out.innerHTML = `<div class="lo-note">${esc(r.data.error || "Compare didn't work.")}</div>`; return; }
+    out.innerHTML = cmpTable(r.data);
+}
+
+// Right eye first, always (JSON key order is alphabetical).
+function cmpEyes(o) { return ["R", "L"].filter((s) => o && s in o).map((s) => [s, o[s]]); }
+
+function cmpFit(f) {
+    return cmpEyes(f).map(([s, v]) => `<span class="${v === "verified" ? "cmp-ok" : "cmp-no"}">${esc(s)} ${v === "verified" ? "fits" : "not verified"}</span>`).join(" ");
+}
+
+function cmpRows(rows) {
+    return `<div class="table-scroll"><table class="lo-alts cmp-table"><thead><tr>
+        <th>Lens</th><th>Brand</th><th>Stock / blank</th><th>Range</th>
+        <th class="lo-num">Cost / lens</th><th class="lo-num">Pair cost</th><th class="lo-num">vs lowest</th>
+        <th class="lo-num">Sells / pair</th><th>Price source</th></tr></thead>
+        <tbody>${rows.map((x) => `<tr class="${!x.verified ? "cmp-unver" : x.type === "Stock" ? "lo-row-stock" : "lo-row-grind"}">
+            <td><b class="lbl-idx">${esc(x.index)}</b> ${esc(x.product)}${x.material && x.material !== "Clear" ? ` <span class="lo-sub">${esc(x.material)}</span>` : ""}
+                <div class="lo-sub">${esc(coatShort(x.coating))}${x.other_coatings ? ` · ${esc(x.other_coatings)} other coating${x.other_coatings > 1 ? "s" : ""}` : ""}${x.thicker ? " · thicker than the index estimate" : ""}</div>
+                ${(x.missing || []).length ? `<div class="cmp-miss">${x.missing.map(esc).join("<br>")}</div>` : ""}</td>
+            <td>${loSupplier(x.brand)}</td>
+            <td>${esc(x.type)}<div class="lo-sub">${esc(x.blank)}</div></td>
+            <td>${cmpFit(x.fit)}${(x.fit_why || []).length ? `<div class="lo-sub">${x.fit_why.map(esc).join("<br>")}</div>` : ""}</td>
+            <td class="lo-num">${cmpEyes(x.cost).map(([s, c]) => `${esc(s)} ${esc(c || "—")}`).join("<br>")}</td>
+            <td class="lo-num"><strong>${esc(x.pair_total)}</strong></td>
+            <td class="lo-num">${esc(x.vs_lowest || "")}</td>
+            <td class="lo-num">${esc(x.sell_pair || "—")}</td>
+            <td class="lo-sub">${esc(x.basis)}<br>${esc(x.source)} · ${esc(x.source_date)}<br>${esc(x.gst)}</td></tr>`).join("")}
+        </tbody></table></div>`;
+}
+
+function cmpTable(d) {
+    const low = (d.rows || []).find((x) => x.id === d.lowest_id);
+    const lead = low ? `<div class="lo-answer ${low.type === "Stock" ? "lo-stock" : "lo-grind"}">
+            <div class="lo-k">${esc(d.lowest_words)}</div>
+            <div class="lo-big">${esc(low.label)}</div>
+            <div class="lo-supline">${loSupplier(low.brand)} <span class="lo-sub">${esc(low.type)} · ${esc(coatShort(low.coating))}</span></div>
+            <div class="lo-facts"><div class="lo-fact"><div class="lo-k">Pair cost</div><div class="lo-v">${esc(low.pair_total)}</div></div>
+                <div class="lo-fact"><div class="lo-k">Sells</div><div class="lo-v">${esc(low.sell_pair || "not on our price sheet")}</div></div></div>
+        </div>` : `<div class="lo-answer lo-none"><div class="lo-big">No priced, verified lens matches</div></div>`;
+    return `${lead}
+        <div class="lo-sub">Matching: ${esc((d.requirements || []).join(" · "))} · ${esc(d.counts.matching)} lenses, ${esc(d.counts.verified)} verified</div>
+        ${d.index_estimate ? `<div class="lo-sub">${esc(d.index_estimate)}</div>` : ""}
+        ${(d.rows || []).length ? cmpRows(d.rows) : ""}
+        ${d.more ? `<div class="lo-sub">${esc(d.more)} more - narrow it with the boxes above</div>` : ""}
+        <ul class="lo-sub">${(d.notes || []).map((n) => `<li>${esc(n)}</li>`).join("")}</ul>`;
+}
+
+async function chatAsk(box) {
+    const out = box.querySelector(".lo-chat-out");
+    const input = box.querySelector(".lo-chat-form input");
+    const q = input.value.trim();
+    if (!q) return;
+    out.innerHTML = `<div class="ci-muted">Checking the question, then asking…</div>`;
+    const r = await ciCall("/api/lenschat/ask", { ...cmpSource(box), filters: cmpFilters(box), question: q, session: lo.chatSession });
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderLensOptions, "Lens options"); return; }
+    const d = r.data || {};
+    if (r.status !== 200 || d.error) { out.innerHTML = `<div class="lo-note">${esc(d.error || "The chat didn't answer.")}</div>`; return; }
+    lo.chatSession = d.session || null;
+    if (d.blocked) {
+        out.innerHTML = `<div class="lo-note">${esc(d.message)}</div>${d.compare ? cmpTable(d.compare) : ""}`;
+        return;
+    }
+    out.innerHTML = `${cmpRows(d.rows || [])}
+        <div class="cmp-reasons">${(d.reasons || []).map((t) => `<span class="chip">${esc(t)}</span>`).join(" ")}</div>
+        ${d.tradeoff ? `<div class="lo-comment"><span class="lo-k">Note</span> ${esc(d.tradeoff)}</div>` : ""}
+        <details class="lo-why"><summary>All options matching these requirements</summary>${cmpTable(d.compare)}</details>`;
+    input.value = "";
+}
+
+// No patient picked: type the numbers and compare (no AI needed).
+function cmpTypedCard() {
+    const f = (n, ph, label) => `<label>${esc(label)}<input name="${n}" inputmode="decimal" placeholder="${esc(ph)}"></label>`;
+    return `<details class="card lo-typed"><summary class="lo-h2">No patient? Type the Rx and compare</summary>
+        <div class="lo-frame-row">${f("rs", "+3.25", "Right sphere")}${f("rc", "-1.25", "Right cyl")}${f("ls", "+3.25", "Left sphere")}${f("lc", "-1.25", "Left cyl")}</div>
+        <div class="lo-frame-row"><label>Lens type<select name="kind"><option value="sv">Single vision</option>
+            <option value="progressive">Multifocal</option><option value="office">Office</option><option value="bifocal">Bifocal</option></select></label>
+            ${f("add", "+2.00", "Add (multifocal)")}${f("blank", "65", "Blank needed (mm), optional")}</div>
+        ${cmpPanel("t-cmp", "")}
+    </details>`;
 }
 
 function loDraw() {
@@ -4131,7 +4291,8 @@ function loDraw() {
         <div class="lo-mode">${tab.parts.map((pt) => loPart(pt, many)).join("")}</div>
     </div>`;
     out.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { lo.tab = b.dataset.tab; loDraw(); }));
-    out.querySelectorAll("[data-rx]").forEach((b) => b.addEventListener("click", () => { lo.rx = Number(b.dataset.rx); lo.tab = ""; loDraw(); }));
+    out.querySelectorAll("[data-rx]").forEach((b) => b.addEventListener("click", () => { lo.rx = Number(b.dataset.rx); lo.tab = ""; lo.chatSession = null; loDraw(); }));
+    cmpWire(out);
     document.getElementById("lo-frame").addEventListener("submit", (ev) => {
         ev.preventDefault();
         const val = (id) => document.getElementById(id).value.trim();

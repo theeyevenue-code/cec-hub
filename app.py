@@ -587,6 +587,100 @@ def lensoptions_rx():
     return _no_store(jsonify(out)), (400 if out.get("error") else 200)
 
 
+# --- Compare + Lens Finder chat (hub/compare.py, hub/lenschat.py) --------------
+# Compare: no AI, the same engine the chat uses. Chat: Mark-only capped trial,
+# off unless config/lenschat.json says enabled AND a key is present. Patient
+# ids in POST bodies only; hub.log gets counts and reason codes only.
+
+FILTER_KEYS = ("feature", "colour", "index", "coating", "type")
+
+
+def _compare_inputs(data: dict) -> dict:
+    """{"req", "binding", "given", "surname"} or {"error"}. A picked patient
+    (patient_id + rx + part) is read locally; otherwise typed numbers."""
+    if data.get("patient_id"):
+        got = lensoptions.compare_request(_integrations(), data.get("patient_id"),
+                                          data.get("rx", 0), str(data.get("part") or ""),
+                                          data.get("frame") if isinstance(data.get("frame"), dict) else None)
+        if got.get("error"):
+            return got
+        binding = f"p:{int(data['patient_id'])}:{int(data.get('rx') or 0)}:{data.get('part')}"
+        return {**got, "binding": binding}
+    typed = data.get("typed") if isinstance(data.get("typed"), dict) else {}
+    req = {k: typed.get(k) for k in ("right", "left", "kind", "add", "min_blank")}
+    return {"req": req, "given": "", "surname": "",
+            "binding": "t:" + json.dumps(req, sort_keys=True, default=str)}
+
+
+def _filters(data: dict) -> dict:
+    f = data.get("filters") if isinstance(data.get("filters"), dict) else {}
+    return {k: str(f.get(k) or "any") for k in FILTER_KEYS}
+
+
+def _run_compare(req: dict, filters: dict):
+    from hub import compare
+    q, why = compare.clean_request({**req, **filters})
+    if q is None:
+        return None, why
+    catalog = _catalog()
+    return compare.compare(catalog["lenses"], q, _pricing(), _sells()), ""
+
+
+@app.route("/api/lenscompare", methods=["POST"])
+@staff_only
+def lens_compare():
+    from hub import compare
+    data = request.get_json(silent=True) or {}
+    got = _compare_inputs(data)
+    if got.get("error"):
+        return _no_store(jsonify({"error": got["error"]})), 400
+    res, why = _run_compare(got["req"], _filters(data))
+    if res is None:
+        return _no_store(jsonify({"error": why})), 400
+    logger.info("Compare: %d matching, %d verified", res["counts"]["matching"],
+                res["counts"]["verified"])
+    return _no_store(jsonify(compare.public(res)))
+
+
+def _chat_status():
+    from hub import lenschat
+    return lenschat.status(_config_json("lenschat.json", {}), request.remote_addr or "",
+                           _from_this_computer())
+
+
+@app.route("/api/lenschat/status")
+@staff_only
+def lens_chat_status():
+    return _no_store(jsonify(_chat_status()))
+
+
+@app.route("/api/lenschat/ask", methods=["POST"])
+@staff_only
+def lens_chat_ask():
+    from hub import lenschat
+    st = _chat_status()
+    if not st.get("available"):
+        return _no_store(jsonify({"error": st.get("why") or "Chat is off."})), 403
+    data = request.get_json(silent=True) or {}
+    got = _compare_inputs(data)
+    if got.get("error"):
+        return _no_store(jsonify({"error": got["error"]})), 400
+    base = _filters(data)
+    probe, why = _run_compare(got["req"], base)
+    if probe is None:
+        return _no_store(jsonify({"error": why})), 400
+
+    def engine(filters):
+        return _run_compare(got["req"], filters)[0]
+
+    names = lenschat.name_words(_integrations())
+    out = lenschat.ask(_config_json("lenschat.json", {}), binding=got["binding"],
+                       token=data.get("session"), question=data.get("question"),
+                       run_engine=engine, base_filters=base, names=names,
+                       given=got.get("given", ""), surname=got.get("surname", ""))
+    return _no_store(jsonify(out))
+
+
 # --- Jobs arrived (hub/jobscan.py) --------------------------------------------
 # Scan job cards, confirm once -> received in Optomate + "glasses ready" text, as far
 # as the agent's orders\jobscan_config.json switches allow (Mark, 3 Nov 2026). Same
