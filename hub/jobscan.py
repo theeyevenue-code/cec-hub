@@ -9,7 +9,9 @@ The Hub holds no logic and no credential: like the order checker (hub/ordercheck
 runs the agent's engine as a subprocess -
     python -m orders.jobscan status|lookup|confirm --ids N,N --json
 in the agent folder (integrations.json optomate_agent.agent_dir) and passes its JSON on.
-Only validated job numbers are ever passed to the subprocess.
+Only validated job numbers are ever passed to the subprocess: a bare number, or one typed
+"G35144" (glasses) / "C5100" (contacts) - contact lens orders share numbers with glasses jobs
+(agent quirk #87); the engine takes whichever is open and asks staff to pick when both are.
 
 PRIVACY: names come back in the answer for the staff page only. Nothing here logs a name,
 a mobile or a message - app.py logs counts.
@@ -24,7 +26,8 @@ import sys
 
 from hub import checkin
 
-ID_RE = re.compile(r"^\d{1,9}$")
+ID_RE = re.compile(r"^(?:[GC])?\d{1,9}$")
+TOKEN_RE = re.compile(r"^(?:(G|C|CL)[:-]?)?(\d{1,9})$", re.I)
 MAX_IDS = 60
 TIMEOUTS = {"status": 30, "lookup": 30, "confirm": 300}
 NOT_CONNECTED = "Jobs arrived isn't connected to Optomate on this computer."
@@ -46,8 +49,10 @@ def clean_ids(raw) -> tuple[list[str], list[str]]:
         s = str(v if v is not None else "").strip()
         if not s:
             continue
-        if ID_RE.match(s):
-            s = str(int(s))
+        m = TOKEN_RE.match(s)
+        if m:
+            kind = (m.group(1) or "").upper()[:1]
+            s = kind + str(int(m.group(2)))
             if s not in seen:
                 seen.add(s)
                 good.append(s)
