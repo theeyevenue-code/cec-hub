@@ -3810,9 +3810,12 @@ async function sgLoadSetup() {
             ${sgPrintLink(g)}
         </div>`;
     const langs = [...new Set(gs.map((g) => g.language))].sort((a, b) => (a === "en" ? -1 : b === "en" ? 1 : a.localeCompare(b)));
+    // Translated guides follow the English order ("orthok-program-zh" sits where "orthok-program" does).
+    const enIds = gs.filter((g) => g.language === "en").map((g) => g.id);
+    const enPos = (g) => { const i = enIds.indexOf(g.id.replace(new RegExp(`-${g.language}$`), "")); return i < 0 ? enIds.length : i; };
     box.innerHTML = langs.map((l) => `
         ${langs.length > 1 ? `<div class="sg-lang-head">${esc(l === "en" ? "English" : (SG_LANG_HEAD[l] || gs.find((g) => g.language === l).language_name))}</div>` : ""}
-        <div class="sg-guide-list">${gs.filter((g) => g.language === l).map(sgRow).join("")}</div>`).join("");
+        <div class="sg-guide-list">${gs.filter((g) => g.language === l).sort((a, b) => enPos(a) - enPos(b)).map(sgRow).join("")}</div>`).join("");
     box.querySelectorAll("input[type=checkbox]").forEach((c) => c.addEventListener("change", () => {
         if (c.checked) sg.guides.add(c.value); else sg.guides.delete(c.value);
         sgNewKey();
