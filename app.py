@@ -696,7 +696,7 @@ def jobscan_status():
 @staff_only
 def jobscan_lookup():
     data = request.get_json(silent=True) or {}
-    out = jobscan.lookup(_integrations(), data.get("ids"))
+    out = jobscan.lookup(_integrations(), data.get("ids"), data.get("mode"))
     return _no_store(jsonify(out)), (200 if out.get("ok") else 400)
 
 
@@ -704,7 +704,7 @@ def jobscan_lookup():
 @staff_only
 def jobscan_confirm():
     data = request.get_json(silent=True) or {}
-    out = jobscan.confirm(_integrations(), data.get("ids"), data.get("expected"))
+    out = jobscan.confirm(_integrations(), data.get("ids"), data.get("expected"), data.get("mode"))
     if out.get("ok"):
         c = out.get("counts") or {}
         logger.info("Jobs arrived: confirm %s - done %d, would %d, skipped %d, failed %d, texted %d",

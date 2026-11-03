@@ -9,7 +9,9 @@ The Hub holds no logic and no credential: like the order checker (hub/ordercheck
 runs the agent's engine as a subprocess -
     python -m orders.jobscan status|lookup|confirm --ids N,N --json
 in the agent folder (integrations.json optomate_agent.agent_dir) and passes its JSON on.
-Only validated job numbers are ever passed to the subprocess.
+Only validated job numbers are ever passed to the subprocess: a bare number, or one typed
+"G35144" (glasses) / "C5100" (contacts) once staff picked - contact lens orders share numbers
+with glasses jobs (agent quirk #87), and --mode glasses|contacts says which the page is in.
 
 PRIVACY: names come back in the answer for the staff page only. Nothing here logs a name,
 a mobile or a message - app.py logs counts.
@@ -24,7 +26,9 @@ import sys
 
 from hub import checkin
 
-ID_RE = re.compile(r"^\d{1,9}$")
+ID_RE = re.compile(r"^(?:[GC])?\d{1,9}$")
+TOKEN_RE = re.compile(r"^(?:(G|C|CL)[:-]?)?(\d{1,9})$", re.I)
+MODES = ("glasses", "contacts")
 MAX_IDS = 60
 TIMEOUTS = {"status": 30, "lookup": 30, "confirm": 300}
 NOT_CONNECTED = "Jobs arrived isn't connected to Optomate on this computer."
@@ -46,8 +50,10 @@ def clean_ids(raw) -> tuple[list[str], list[str]]:
         s = str(v if v is not None else "").strip()
         if not s:
             continue
-        if ID_RE.match(s):
-            s = str(int(s))
+        m = TOKEN_RE.match(s)
+        if m:
+            kind = (m.group(1) or "").upper()[:1]
+            s = kind + str(int(m.group(2)))
             if s not in seen:
                 seen.add(s)
                 good.append(s)
@@ -56,7 +62,11 @@ def clean_ids(raw) -> tuple[list[str], list[str]]:
     return good, bad
 
 
-def run(cfg: dict, command: str, ids: list[str] | None = None) -> dict:
+def _mode(mode) -> str:
+    return mode if mode in MODES else "glasses"
+
+
+def run(cfg: dict, command: str, ids: list[str] | None = None, mode: str | None = None) -> dict:
     """Run the agent's engine. Never raises."""
     if not connected(cfg):
         return {"ok": False, "connected": False, "error": NOT_CONNECTED}
@@ -65,6 +75,8 @@ def run(cfg: dict, command: str, ids: list[str] | None = None) -> dict:
         if not all(ID_RE.match(i) for i in ids):      # belt and braces
             return {"ok": False, "error": "Only job numbers can be checked."}
         args += ["--ids", ",".join(ids)]
+    if mode:
+        args += ["--mode", _mode(mode)]
     python = (cfg.get("optomate_agent") or {}).get("python") or sys.executable
     try:
         proc = subprocess.run([python, "-m", "orders.jobscan", *args],
@@ -93,18 +105,18 @@ def status(cfg: dict) -> dict:
     return run(cfg, "status")
 
 
-def lookup(cfg: dict, raw) -> dict:
+def lookup(cfg: dict, raw, mode=None) -> dict:
     good, bad = clean_ids(raw)
     if not good and not bad:
         return {"ok": False, "error": "Scan a job card first."}
-    out = run(cfg, "lookup", good) if good else {"ok": True, "lines": []}
+    out = run(cfg, "lookup", good, _mode(mode)) if good else {"ok": True, "lines": []}
     if out.get("ok"):
         out["lines"] = list(out.get("lines") or []) + [
             {"id": b, "state": "bad", "reason": "Not a job number"} for b in bad]
     return out
 
 
-def confirm(cfg: dict, raw, expected) -> dict:
+def confirm(cfg: dict, raw, expected, mode=None) -> dict:
     """expected = how many jobs the dialog promised; a mismatch changes nothing."""
     good, _ = clean_ids(raw)
     if not good:
@@ -116,4 +128,4 @@ def confirm(cfg: dict, raw, expected) -> dict:
     if expected != len(good):
         return {"ok": False, "error": "The list changed while the box was open. Nothing changed - "
                                       "press Confirm again."}
-    return run(cfg, "confirm", good)
+    return run(cfg, "confirm", good, _mode(mode))

@@ -52,6 +52,24 @@ def test_clean_ids_dedupes_strips_zeros_and_splits_bad():
     assert jobscan.clean_ids(None) == ([], [])
 
 
+def test_clean_ids_keeps_glasses_contacts_type():
+    # contacts orders share numbers with glasses jobs (agent quirk #87): the type a user
+    # picked travels as G/C and is never dropped or merged with the bare number
+    good, bad = jobscan.clean_ids(["G035144", "c5100", "CL5100", "5100", "X5100", "G", "C:7"])
+    assert good == ["G35144", "C5100", "5100", "C7"] and bad == ["X5100", "G"]
+
+
+def test_mode_passed_and_sanitised(agent, calls):
+    calls.reply = {"ok": True, "lines": []}
+    jobscan.lookup(agent, ["C5100"], "contacts")
+    jobscan.lookup(agent, ["5100"], "rm -rf")
+    calls.reply = {"ok": True, "counts": {}, "results": []}
+    jobscan.confirm(agent, ["G5100", "C5101"], 2, "contacts")
+    assert calls[0][0][-4:] == ["--ids", "C5100", "--mode", "contacts"]
+    assert calls[1][0][-2:] == ["--mode", "glasses"]
+    assert calls[2][0][-4:] == ["--ids", "G5100,C5101", "--mode", "contacts"]
+
+
 def test_not_connected_without_agent_engine(tmp_path):
     out = jobscan.lookup({"optomate_agent": {"agent_dir": str(tmp_path)}}, ["1"])
     assert out["ok"] is False and out["connected"] is False
@@ -62,7 +80,8 @@ def test_lookup_runs_the_engine_with_validated_ids_only(agent, calls):
     calls.reply = {"ok": True, "lines": [{"id": 35144, "state": "ok"}]}
     out = jobscan.lookup(agent, ["35144", "x;rm", "35144"])
     cmd, kw = calls[0]
-    assert cmd == ["py.exe", "-m", "orders.jobscan", "lookup", "--json", "--ids", "35144"]
+    assert cmd == ["py.exe", "-m", "orders.jobscan", "lookup", "--json", "--ids", "35144",
+                   "--mode", "glasses"]
     assert kw["cwd"] == agent["optomate_agent"]["agent_dir"]
     assert [l["state"] for l in out["lines"]] == ["ok", "bad"]
 
@@ -82,7 +101,8 @@ def test_confirm_refuses_when_count_differs_from_dialog(agent, calls):
 def test_confirm_passes_ids(agent, calls):
     calls.reply = {"ok": True, "nothing_changed": True, "counts": {"would": 2}, "results": []}
     out = jobscan.confirm(agent, ["1", "2"], "2")
-    assert calls[0][0][3:] == ["confirm", "--json", "--ids", "1,2"] and out["nothing_changed"]
+    assert calls[0][0][3:] == ["confirm", "--json", "--ids", "1,2", "--mode", "glasses"]
+    assert out["nothing_changed"]
     assert calls[0][1]["timeout"] == jobscan.TIMEOUTS["confirm"]
 
 
