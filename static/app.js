@@ -3780,14 +3780,19 @@ async function sgLoadSetup() {
     const box = document.getElementById("sg-guides");
     const gs = d.guides || [];
     if (!gs.length) { box.innerHTML = `<div class="ci-muted">No approved guides yet. Ask Mark.</div>`; return; }
-    box.innerHTML = `<div class="sg-guide-list">${gs.map((g) => `
+    // English first, then each other language in its own section (Mark 3 Nov 2026).
+    const SG_LANG_HEAD = { zh: "Chinese / 中文", ko: "Korean / 한국어" };
+    const sgRow = (g) => `
         <label class="sg-guide${g.ok ? "" : " sg-guide-off"}">
             <input type="checkbox" value="${esc(g.id)}"${g.ok ? "" : " disabled"}>
             <span class="sg-guide-title">${esc(g.title)}</span>
             <span class="sg-stage">${esc(g.stage)}</span>
-            ${g.language !== "en" ? `<span class="sg-stage sg-lang">${esc(g.language_name)}</span>` : ""}
             ${g.ok ? "" : `<span class="sg-problem">${esc(g.problem)}</span>`}
-        </label>`).join("")}</div>`;
+        </label>`;
+    const langs = [...new Set(gs.map((g) => g.language))].sort((a, b) => (a === "en" ? -1 : b === "en" ? 1 : a.localeCompare(b)));
+    box.innerHTML = langs.map((l) => `
+        ${langs.length > 1 ? `<div class="sg-lang-head">${esc(l === "en" ? "English" : (SG_LANG_HEAD[l] || gs.find((g) => g.language === l).language_name))}</div>` : ""}
+        <div class="sg-guide-list">${gs.filter((g) => g.language === l).map(sgRow).join("")}</div>`).join("");
     box.querySelectorAll("input[type=checkbox]").forEach((c) => c.addEventListener("change", () => {
         if (c.checked) sg.guides.add(c.value); else sg.guides.delete(c.value);
         sgNewKey();

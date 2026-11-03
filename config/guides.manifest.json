@@ -39,6 +39,42 @@
       "active": true
     },
     {
+      "id": "orthok-collecting-zh",
+      "title": "Ortho-K Collection Guide (Chinese)",
+      "version": "Nov 2026 (zh-Hans)",
+      "stage": "COLLECTING",
+      "language": "zh",
+      "path": "CEC-OrthoK-Collecting-Guide-A4-zh.pdf",
+      "sha256": "bae60b94632448ed35254ea03b63764790244106dba0b22f10de8fb5d1cc1fdb",
+      "approval_ref": "Mark 3 Nov 2026 via Front Desk: Chinese guides in their own Chinese section (banners off, published to approved Drive, second-brain commit d11106ec); Nikki's language check pending, republish if she changes it. Guide pages only: identical to pages 1-4 of the approved Collection pack (893d0c3547b9); the pack itself carries the referral flyer and stays print-only.",
+      "classification": "care",
+      "active": true
+    },
+    {
+      "id": "miyosmart-iq-program-zh",
+      "title": "MiyoSmart iQ Program Guide (Chinese)",
+      "version": "Nov 2026 (zh-Hans)",
+      "stage": "DECIDING",
+      "language": "zh",
+      "path": "CEC-MiyoSmart-iQ-Program-Guide-A4-zh.pdf",
+      "sha256": "323dd76a28c7d0311c36b359c2ea1a86dc6ca66b5360f0b0a82e9c6597945c1b",
+      "approval_ref": "Mark 3 Nov 2026 via Front Desk: Chinese guides in their own Chinese section (banners off, published to approved Drive, second-brain commit d11106ec); Nikki's language check pending, republish if she changes it",
+      "classification": "decision",
+      "active": true
+    },
+    {
+      "id": "adult-myopia-zh",
+      "title": "Adult Myopia Guide (Chinese)",
+      "version": "Nov 2026 (zh-Hans)",
+      "stage": "GENERAL",
+      "language": "zh",
+      "path": "CEC-Adult-Myopia-Guide-A4-zh.pdf",
+      "sha256": "b65dcf42bd2768ba74e3c6a03a1e248374a778cfe77f427b12511f195281e691",
+      "approval_ref": "Mark 3 Nov 2026 via Front Desk: Chinese guides in their own Chinese section (banners off, published to approved Drive, second-brain commit d11106ec); Nikki's language check pending, republish if she changes it",
+      "classification": "care",
+      "active": true
+    },
+    {
       "id": "miyosmart-iq-program",
       "title": "MiyoSmart iQ Program Guide",
       "version": "Nov 2026",

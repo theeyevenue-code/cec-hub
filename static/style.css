@@ -1934,6 +1934,8 @@ body.lens-mono main { background: #fafafa; }
 .sg-guide-title { font-weight: 700; color: var(--ink); }
 .sg-stage { font-size: 15px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
 .sg-lang { color: var(--info-ink); border-color: var(--info-line); background: var(--info-bg); }
+.sg-lang-head { font-size: 18px; font-weight: 600; margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.sg-lang-head:first-child { margin-top: 0; }
 .sg-guide-off { opacity: 0.7; cursor: not-allowed; }
 .sg-problem { flex-basis: 100%; font-size: 17px; color: var(--danger-ink); font-weight: 600; }
 .sg-panel { border-collapse: collapse; width: 100%; font-size: 18px; margin-bottom: 14px; }
