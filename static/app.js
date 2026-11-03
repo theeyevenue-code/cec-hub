@@ -3782,13 +3782,29 @@ async function sgLoadSetup() {
     if (!gs.length) { box.innerHTML = `<div class="ci-muted">No approved guides yet. Ask Mark.</div>`; return; }
     // English first, then each other language in its own section (Mark 3 Nov 2026).
     const SG_LANG_HEAD = { zh: "Chinese / 中文", ko: "Korean / 한국어" };
-    const sgRow = (g) => `
-        <label class="sg-guide${g.ok ? "" : " sg-guide-off"}">
-            <input type="checkbox" value="${esc(g.id)}"${g.ok ? "" : " disabled"}>
-            <span class="sg-guide-title">${esc(g.title)}</span>
-            <span class="sg-stage">${esc(g.stage)}</span>
-            ${g.ok ? "" : `<span class="sg-problem">${esc(g.problem)}</span>`}
-        </label>`;
+    // Send rows keep their tick box; "Print" is a separate link OUTSIDE the label so it never
+    // toggles the box. Print-only items have no box at all (never emailed).
+    const sgPrintLink = (g) => g.can_print
+        ? `<a class="btn btn-quiet sg-print" href="/api/sendguide/print/${encodeURIComponent(g.id)}" target="_blank" rel="noopener">Print</a>` : "";
+    const sgRow = (g) => g.print_only ? `
+        <div class="sg-guide-row">
+            <div class="sg-guide sg-guide-printonly${g.can_print ? "" : " sg-guide-off"}">
+                <span class="sg-guide-title">${esc(g.title)}</span>
+                <span class="sg-stage">${esc(g.stage)}</span>
+                <span class="sg-stage sg-printonly-chip">Print only</span>
+                ${g.can_print ? "" : `<span class="sg-problem">${esc(g.problem)}</span>`}
+            </div>
+            ${sgPrintLink(g)}
+        </div>` : `
+        <div class="sg-guide-row">
+            <label class="sg-guide${g.ok ? "" : " sg-guide-off"}">
+                <input type="checkbox" value="${esc(g.id)}"${g.ok ? "" : " disabled"}>
+                <span class="sg-guide-title">${esc(g.title)}</span>
+                <span class="sg-stage">${esc(g.stage)}</span>
+                ${g.ok ? "" : `<span class="sg-problem">${esc(g.problem)}</span>`}
+            </label>
+            ${sgPrintLink(g)}
+        </div>`;
     const langs = [...new Set(gs.map((g) => g.language))].sort((a, b) => (a === "en" ? -1 : b === "en" ? 1 : a.localeCompare(b)));
     box.innerHTML = langs.map((l) => `
         ${langs.length > 1 ? `<div class="sg-lang-head">${esc(l === "en" ? "English" : (SG_LANG_HEAD[l] || gs.find((g) => g.language === l).language_name))}</div>` : ""}

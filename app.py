@@ -12,13 +12,14 @@ gracefully when the files aren't on this machine.
 """
 
 import json
+import html
 import functools
 import ipaddress
 import logging
 import os
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, make_response, request, send_from_directory
 
 from hub import checkin, integrations, jobscan, lenses, lensoptions, sendguide, sop_parser
 
@@ -538,6 +539,29 @@ def sendguide_search():
 @staff_only
 def sendguide_review():
     return _json(sendguide.review(_integrations(), request.get_json(silent=True) or {}))
+
+
+@app.route("/api/sendguide/print/<guide_id>")
+def sendguide_print(guide_id):
+    """The approved guide PDF, inline, for the desk printer. Same staff lock as
+    the other Send guide routes, but a locked or refused request gets a plain
+    page (it opens in a new tab). Print-only items are served here and nowhere
+    else; they can never be emailed."""
+    def page(msg, status):
+        body = ("<!doctype html><meta charset=utf-8><title>Print guide</title>"
+                "<body style='font:20px Arial,sans-serif;max-width:560px;margin:40px auto;padding:0 16px'>"
+                f"<p>{html.escape(msg)}</p><p>Close this tab and go back to the Hub.</p>")
+        return _no_store(make_response(body, status))
+    if _staff_refusal() is not None:
+        return page("This computer is locked. Unlock Send guide in the Hub first, then press Print again.", 403)
+    data, problem = sendguide.print_guide(_integrations(), guide_id)
+    if data is None:
+        return page(problem, 404)
+    resp = make_response(data)
+    resp.headers["Content-Type"] = "application/pdf"
+    resp.headers["Content-Disposition"] = "inline"
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    return _no_store(resp)
 
 
 @app.route("/api/sendguide/send", methods=["POST"])

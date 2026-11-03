@@ -99,6 +99,14 @@ def world(tmp_path, monkeypatch):
          "language": "en", "path": "a.pdf",
          "sha256": hashlib.sha256(PDF_A).hexdigest(), "approval_ref": "test",
          "classification": "marketing", "active": True},
+        {"id": "pack", "title": "Collection Pack", "version": "", "stage": "COLLECTING",
+         "language": "en", "path": "a.pdf",
+         "sha256": hashlib.sha256(PDF_A).hexdigest(), "approval_ref": "test",
+         "classification": "print", "active": True},
+        {"id": "pack-off", "title": "Old Pack", "version": "", "stage": "COLLECTING",
+         "language": "en", "path": "a.pdf",
+         "sha256": hashlib.sha256(PDF_A).hexdigest(), "approval_ref": "test",
+         "classification": "print", "active": False},
     ]}), encoding="utf-8")
     hist = tmp_path / "runtime" / "history.sqlite3"
     cfg = {"optomate_agent": {"agent_dir": str(agent)},
@@ -161,14 +169,17 @@ def test_attached_bytes_are_hash_checked_again_in_the_bridge():
         guide_bridge.build_message(spec)
 
 
-def test_shipped_manifest_is_valid_and_care_only():
+def test_shipped_manifest_is_valid_and_only_known_classes():
     data = json.loads((sendguide.DEFAULT_MANIFEST).read_text(encoding="utf-8"))
     ids = [g["id"] for g in data["guides"]]
     assert len(ids) == len(set(ids))
     for g in data["guides"]:
-        assert g["classification"] in sendguide.SEND_CLASSES
+        assert g["classification"] in sendguide.PRINT_CLASSES
         assert sendguide.HEX64_RE.match(g["sha256"])
-        assert "Pack" not in g["path"] and "Flyer" not in g["path"]
+        if g["classification"] == "print":
+            assert g["stage"] == "COLLECTING"
+        else:
+            assert "Pack" not in g["path"] and "Flyer" not in g["path"]
 
 
 # --- no email ---------------------------------------------------------------------
@@ -386,7 +397,7 @@ def test_shipped_manifest_has_one_name_per_guide(monkeypatch):
     assert any(g["title"] == "Ortho-K Collection Guide" for g in shipped)
 
 
-@pytest.mark.parametrize("gid", [g["id"] for g in _shipped_guides()])
+@pytest.mark.parametrize("gid", [g["id"] for g in _shipped_guides() if g["classification"] != "print"])
 def test_title_identical_in_subject_body_and_attachment(world, gid):
     """End to end for every shipped guide: the manifest title is the subject,
     is in the plain and HTML bodies, and is the attachment's file name."""
@@ -699,7 +710,7 @@ def test_no_names_or_emails_in_the_log(world, caplog):
 def test_routes_are_post_and_no_store(client, world):
     r = client.get("/api/sendguide/setup")
     assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
-    assert [g["id"] for g in r.get_json()["guides"]] == ["guide-a", "guide-b", "flyer"]
+    assert [g["id"] for g in r.get_json()["guides"]] == ["guide-a", "guide-b", "flyer", "pack"]
     assert client.get("/api/sendguide/search?q=Smith").status_code in (404, 405)   # POST only
     r = client.post("/api/sendguide/review", json={"patient_id": 1002, "guide_ids": ["guide-a"]})
     assert r.headers["Cache-Control"] == "no-store" and r.get_json()["to"]["label"] == "Parent/guardian's email"
@@ -746,3 +757,65 @@ def test_chinese_guide_entry_is_accepted_and_labelled(world):
     assert "guide-bad-lang" not in page                       # malformed language: dropped
     _, r = sendguide.review(world["cfg"], {"patient_id": 1001, "guide_ids": ["guide-a", "guide-a-zh"]})
     assert r["can_send"] and [g["language"] for g in r["guides"]] == ["en", "zh"]
+
+
+# --- print route (desk printer) -------------------------------------------------
+
+def test_guides_for_page_flags(world):
+    page = {g["id"]: g for g in sendguide.guides_for_page(world["cfg"])}
+    assert (page["guide-a"]["can_send"], page["guide-a"]["can_print"], page["guide-a"]["print_only"]) == (True, True, False)
+    assert (page["pack"]["can_send"], page["pack"]["can_print"], page["pack"]["print_only"]) == (False, True, True)
+    assert page["pack"]["ok"] is False and page["pack"]["problem"] == ""
+    assert (page["flyer"]["can_send"], page["flyer"]["can_print"]) == (False, False)
+    assert "pack-off" not in page
+
+
+def test_print_item_refused_by_send_path_and_guide_bytes(world):
+    g = next(x for x in sendguide.load_manifest(world["cfg"]) if x["id"] == "pack")
+    data, why = sendguide.guide_bytes(world["cfg"], g)
+    assert data is None and "print-only" in why
+    status, body = _send(world, 1001, ["pack"])
+    assert status != 200
+    assert world["fake"].delivered == []
+    status, body = _send(world, 1001, ["guide-a", "pack"])
+    assert status != 200 and world["fake"].delivered == []
+
+
+def test_print_route_serves_matching_hash(client):
+    for gid in ("pack", "guide-a"):
+        r = client.get(f"/api/sendguide/print/{gid}")
+        assert r.status_code == 200
+        assert r.headers["Content-Type"] == "application/pdf"
+        assert r.headers["Content-Disposition"] == "inline"
+        assert "no-store" in r.headers["Cache-Control"]
+        assert r.data == PDF_A
+
+
+def test_print_route_refuses_changed_hash(world, client):
+    (world["gdir"] / "a.pdf").write_bytes(PDF_A + b"tampered")
+    r = client.get("/api/sendguide/print/pack")
+    assert r.status_code == 404 and r.headers["Content-Type"].startswith("text/html")
+    assert b"changed since it was approved" in r.data
+
+
+@pytest.mark.parametrize("gid", ["pack-off", "flyer", "nope", "..%2f..%2fetc", "a.pdf", "PACK", "x" * 60])
+def test_print_route_refuses_inactive_marketing_unknown_and_traversal(client, gid):
+    r = client.get(f"/api/sendguide/print/{gid}")
+    assert r.status_code in (404,)
+    assert r.headers["Content-Type"].startswith("text/html")
+
+
+def test_print_refuses_path_outside_guides_dir(world):
+    g = dict(next(x for x in sendguide.load_manifest(world["cfg"]) if x["id"] == "pack"))
+    g["path"] = "sub/../a.pdf"
+    assert sendguide.print_bytes(world["cfg"], g)[0] == PDF_A       # resolves inside: allowed
+    g["path"] = "../a.pdf"
+    assert sendguide.print_bytes(world["cfg"], g)[0] is None
+
+
+def test_every_shipped_print_item_is_refused_by_send():
+    cfg = {}
+    shipped = [g for g in sendguide.load_manifest(cfg) if g["classification"] == "print"]
+    assert len(shipped) >= 4
+    for g in shipped:
+        assert sendguide.guide_bytes(cfg, g)[0] is None

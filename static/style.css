@@ -1929,6 +1929,13 @@ body.lens-mono main { background: #fafafa; }
 .sg-guide-list { display: flex; flex-direction: column; gap: 10px; }
 .sg-guide { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 20px;
     min-height: 56px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.sg-guide-row { display: flex; align-items: stretch; gap: 10px; }
+.sg-guide-row .sg-guide { flex: 1 1 auto; min-width: 0; }
+.sg-guide-printonly { cursor: default; }
+.sg-guide-printonly:hover { background: transparent; }
+.sg-printonly-chip { color: var(--info-ink); border-color: var(--info-line); background: var(--info-bg); }
+.sg-print { display: inline-flex; align-items: center; justify-content: center; min-width: 88px;
+    font-size: 18px; text-decoration: none; border-radius: 12px; }
 .sg-guide:hover { background: var(--mint-soft); }
 .sg-guide input { width: 26px; height: 26px; accent-color: var(--green-deep); }
 .sg-guide-title { font-weight: 700; color: var(--ink); }
