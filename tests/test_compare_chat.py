@@ -346,7 +346,7 @@ def test_budget_exhaustion_refuses_and_survives_restart(chat):
 
 
 @pytest.mark.parametrize("content", [None, "{not json", json.dumps({"version": 1, "spent_aud": "x"}),
-                                     json.dumps({**lenschat.Ledger.fresh(), "cap_aud": "50.00"}),
+                                     json.dumps({**lenschat.Ledger.fresh(), "cap_aud": "0"}),
                                      json.dumps({**lenschat.Ledger.fresh(), "spent_aud": "-1"})])
 def test_missing_or_corrupt_ledger_refuses(chat, content):
     if content is None:
@@ -426,3 +426,29 @@ def test_chat_off_by_default(hub_client_lenses):
     assert st["available"] is False
     r = client.post("/api/lenschat/ask", json={"typed": {"right": {"sph": "-2.00"}}, "question": "grey"})
     assert r.status_code == 403
+
+
+def test_editing_the_ledger_cap_does_not_raise_the_cap(tmp_path):
+    # the cap comes from config, never from the ledger file
+    led = tmp_path / "spend.json"
+    lenschat.Ledger(led).init()
+    data = json.loads(led.read_text()); data["cap_aud"] = "500.00"; led.write_text(json.dumps(data))
+    L = lenschat.Ledger(led, cap=Decimal("1.00"))
+    with pytest.raises(lenschat.BudgetRefused):
+        L.reserve(Decimal("1.50"), [0, 1, 2, 3, 4, 5], today=dt.date(2026, 11, 4))
+
+
+def test_monthly_cap_rolls_over_and_no_trial_end(tmp_path):
+    # Mark 3 Nov 2026: leave it running - monthly cap, no end date
+    led = tmp_path / "spend.json"
+    lenschat.Ledger(led).init()
+    L = lenschat.Ledger(led, cap=Decimal("2.00"), monthly=True, trial_days=0)
+    L.reserve(Decimal("1.50"), [0, 1, 2, 3, 4, 5], today=dt.date(2026, 11, 4))
+    with pytest.raises(lenschat.BudgetRefused):
+        L.reserve(Decimal("1.00"), [0, 1, 2, 3, 4, 5], today=dt.date(2026, 11, 30))
+    L.reserve(Decimal("1.00"), [0, 1, 2, 3, 4, 5], today=dt.date(2026, 12, 1))   # new month
+    data = json.loads(led.read_text())
+    assert data["trial_end"] == "" and data["month"] == "2026-12"
+    assert Decimal(data["total_aud"]) == Decimal("1.50") and Decimal(data["spent_aud"]) == Decimal("1.00")
+    cfg = {"enabled": True, "ledger": str(led), "cap_aud": "2.00", "monthly": True, "trial_days": 0}
+    assert lenschat.ledger_for(lenschat.settings(cfg)).cap == Decimal("2.00")
