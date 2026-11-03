@@ -1,0 +1,8 @@
+{
+  "_readme": "Hub assistant tool switches (phase 1a, Mark 3 Nov 2026). Copy to config/assistant.json (git-ignored) to change them on this machine. This file can only SWITCH A TOOL OFF (enabled false) or NARROW its audience; it can never add a tool or widen one - the approved list is in hub/assistant/registry.py (APPROVED_TOOLS). audience: mark = Mark only. On/off for the whole assistant, the key, the ledger and the monthly cap stay in config/lenschat.json.",
+  "tools": {
+    "lens_compare": {"enabled": true, "audience": "mark"},
+    "lens_price": {"enabled": true, "audience": "mark"},
+    "lens_ranges": {"enabled": true, "audience": "mark"}
+  }
+}

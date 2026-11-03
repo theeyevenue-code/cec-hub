@@ -1,9 +1,19 @@
 {
-  "_readme": "Lens Finder chat trial (Mark, 3 Nov 2026). Copy to config/lenschat.json (git-ignored) to switch it on. The chat runs only when enabled is true AND an API key is present (environment CEC_LENSCHAT_API_KEY, or key_file - keep that file OUTSIDE every repo). Spend is capped at A$10 for life by the ledger file (create it once with: python -m hub.lenschat init-ledger). Mark-only: requests from the server itself, or from the device addresses in allow_ips. practice_weekdays: 0 = Monday ... 6 = Sunday; the trial ends after 7 of these days from the first question.",
+  "_readme": "Hub assistant settings (Mark, 3 Nov 2026) - the home-page chat box and the Lens Finder box share them. Copy to config/lenschat.json (git-ignored). It runs only when enabled is true AND an API key is present (environment CEC_LENSCHAT_API_KEY, or key_file - keep that file OUTSIDE every repo). Spend: cap_aud per Sydney calendar month, enforced by the ledger file (outside every repo; create once with: python -m hub.lenschat init-ledger; an old trial ledger is converted in place on first read, spend carried forward). trial_days 0 = no end date. Mark-only: requests from the server itself, or from the device addresses in allow_ips. Which tools run is set in config/assistant.json (switch off / narrow only).",
   "enabled": false,
   "allow_ips": [],
   "model": "claude-sonnet-5-5",
   "key_file": "C:\\CEC\\hub-private\\anthropic_key.txt",
   "ledger": "C:\\CEC\\hub-private\\lenschat-spend.json",
-  "practice_weekdays": [0, 1, 2, 3, 4, 5]
+  "practice_weekdays": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "monthly": true,
+  "trial_days": 0,
+  "cap_aud": "15.00"
 }
