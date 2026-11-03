@@ -74,7 +74,8 @@ DEFAULT_HISTORY_DB = r"C:\CEC\runtime\hub-send-guide\send-history.sqlite3"
 REPEAT_DAYS = 30
 ADULT_AGE = 16   # Mark 1 Nov 2026: child = under 16, same as Check-in
 MAX_GUIDES = 6
-SEND_CLASSES = ("care", "decision")          # never "marketing" / "print-only"
+SEND_CLASSES = ("care", "decision")          # the ONLY classes that can be emailed
+PRINT_CLASSES = SEND_CLASSES + ("print",)    # what the desk printer may print (never "marketing")
 GUIDE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_FILE_RE = re.compile(r"^[A-Za-z0-9 ._()\-]{1,120}\.pdf$")
@@ -184,13 +185,11 @@ def load_manifest(cfg: dict) -> list[dict]:
     return out
 
 
-def guide_bytes(cfg: dict, g: dict) -> tuple[bytes | None, str]:
-    """The guide's PDF bytes if they are exactly the approved file, else
-    (None, plain-words reason). Fail closed on every doubt."""
+def _checked_bytes(cfg: dict, g: dict, classes: tuple, refusal: str) -> tuple[bytes | None, str]:
     if not g.get("active"):
         return None, "This guide has been withdrawn."
-    if g.get("classification") not in SEND_CLASSES:
-        return None, "This guide is print-only."
+    if g.get("classification") not in classes:
+        return None, refusal
     base = guides_dir(cfg).resolve()
     p = (base / str(g["path"])).resolve()
     if p.parent != base:
@@ -204,6 +203,29 @@ def guide_bytes(cfg: dict, g: dict) -> tuple[bytes | None, str]:
     return data, ""
 
 
+def guide_bytes(cfg: dict, g: dict) -> tuple[bytes | None, str]:
+    """The guide's PDF bytes if they are exactly the approved file AND it may
+    be emailed, else (None, plain-words reason). Fail closed on every doubt.
+    A "print" item is refused here: print-only items are never emailed."""
+    return _checked_bytes(cfg, g, SEND_CLASSES, "This guide is print-only.")
+
+
+def print_bytes(cfg: dict, g: dict) -> tuple[bytes | None, str]:
+    """Same checks for the desk printer: care, decision and print-only items
+    (never marketing). Used only by the print route, never by Send."""
+    return _checked_bytes(cfg, g, PRINT_CLASSES, "This guide can't be printed from here.")
+
+
+def print_guide(cfg: dict, gid: str) -> tuple[bytes | None, str]:
+    """(pdf bytes, '') for a printable guide id, else (None, plain-words reason)."""
+    if not isinstance(gid, str) or not GUIDE_ID_RE.match(gid):
+        return None, "That guide isn't on the approved list."
+    g = next((m for m in load_manifest(cfg) if m["id"] == gid), None)
+    if g is None:
+        return None, "That guide isn't on the approved list."
+    return print_bytes(cfg, g)
+
+
 def _lang_name(code: str) -> str:
     return LANG_NAMES.get(code.split("-")[0], code)
 
@@ -213,11 +235,17 @@ def guides_for_page(cfg: dict) -> list[dict]:
     for g in load_manifest(cfg):
         if not g.get("active"):
             continue
-        _, problem = guide_bytes(cfg, g)
+        _, send_problem = guide_bytes(cfg, g)
+        _, print_problem = print_bytes(cfg, g)
+        cls = g.get("classification")
+        can_send = cls in SEND_CLASSES and not send_problem
+        can_print = not print_problem
+        problem = "" if (can_send or can_print) else (send_problem if cls in SEND_CLASSES else print_problem)
         out.append({"id": g["id"], "title": g["title"], "version": g.get("version") or "",
                     "stage": str(g.get("stage") or "").title(), "language": g["language"],
                     "language_name": _lang_name(g["language"]),
-                    "ok": not problem, "problem": problem})
+                    "print_only": cls == "print", "can_send": can_send, "can_print": can_print,
+                    "ok": can_send, "problem": problem})
     return out
 
 

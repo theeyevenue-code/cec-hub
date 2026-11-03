@@ -1,5 +1,5 @@
 {
-  "_readme": "The ONLY guides the Send guide tile can email. No folder is ever scanned. Each PDF lives in send_guide.guides_dir (default C:\\CEC\\runtime\\hub-guides, outside every repo and sync folder) at 'path', and is refused at send time unless its SHA-256 still matches. The title is the ONE name for a guide: the email subject, the body and the attachment name ('Concord Eyecare - <title>.pdf') all come from it, so there is no separate file-name field. To add or replace a guide: copy the approved final export from second-brain handouts\\exports\\ into guides_dir, put its sha256 here with the approval reference, set active true, commit. To withdraw one: active false. Care and decision guides only: the referral flyer and the collecting print pack (guide + flyer) are PRINT-ONLY and never go in this list (Codex 1 Nov 2026, commercial-message rules).",
+  "_readme": "The ONLY guides the Send guide tile can email. No folder is ever scanned. Each PDF lives in send_guide.guides_dir (default C:\\CEC\\runtime\\hub-guides, outside every repo and sync folder) at 'path', and is refused at send time unless its SHA-256 still matches. The title is the ONE name for a guide: the email subject, the body and the attachment name ('Concord Eyecare - <title>.pdf') all come from it, so there is no separate file-name field. To add or replace a guide: copy the approved final export from second-brain handouts\\exports\\ into guides_dir, put its sha256 here with the approval reference, set active true, commit. To withdraw one: active false. Care and decision guides can be emailed. Print-only items (the collecting print pack and the referral flyer) carry classification \"print\": they can be printed from the Send guide tile and are never emailed (Codex 1 Nov 2026, commercial-message rules; Mark 3 Nov 2026).",
   "version": 1,
   "guides": [
     {
@@ -120,6 +120,54 @@
       "sha256": "708232f66ad2af7b4aa4b22e57652eed54e2aa8244faf34fa0a3f5460cefadce",
       "approval_ref": "Mark approved 2 Nov 2026 (Front Desk: \"ipl guide ok to publish and put on the cec hub emailer\"; Server Desk: \"add it\"). second-brain export b48bf79e; same file as Drive Patient guides - Deciding/PATIENT GUIDE - IPL - Treatment (Nov 2026).pdf",
       "classification": "decision",
+      "active": true
+    },
+    {
+      "id": "orthok-collecting-pack",
+      "title": "Ortho-K Collection Pack",
+      "version": "Nov 2026 (guide rev 8 + flyer)",
+      "stage": "COLLECTING",
+      "language": "en",
+      "path": "CEC-OrthoK-Collecting-Pack-A4.pdf",
+      "sha256": "f42a542ebfe699332bdae526316977fcfbe67ac5567ca572ca076659e03ecd80",
+      "approval_ref": "Print-only collecting pack (guide + referral flyer), Codex 1 Nov 2026 rule; Mark 3 Nov 2026 via Front Desk: print option in Send guide",
+      "classification": "print",
+      "active": true
+    },
+    {
+      "id": "orthok-referral-flyer",
+      "title": "Ortho-K Referral Flyer",
+      "version": "Nov 2026",
+      "stage": "COLLECTING",
+      "language": "en",
+      "path": "CEC-OrthoK-Referral-Flyer-A4.pdf",
+      "sha256": "dd505f80f0f32b727a4707f9f16fe8d105e639eba7ed395e3ed717ce91cb0ac5",
+      "approval_ref": "Print-only referral flyer, published to approved Drive 1 Nov 2026 (second-brain f818e5ea); Mark 3 Nov 2026 via Front Desk: print option in Send guide",
+      "classification": "print",
+      "active": true
+    },
+    {
+      "id": "orthok-collecting-pack-zh",
+      "title": "Ortho-K Collection Pack (Chinese)",
+      "version": "Nov 2026 (3 Nov, zh-Hans)",
+      "stage": "COLLECTING",
+      "language": "zh",
+      "path": "CEC-OrthoK-Collecting-Pack-A4-zh.pdf",
+      "sha256": "893d0c3547b97a7bf1f7616fd40ad18a9abe6f1a68456db3d19e78e4d780b1f2",
+      "approval_ref": "Mark 3 Nov 2026 via Front Desk (approved Drive, second-brain d11106ec); Nikki's language check pending; print-only",
+      "classification": "print",
+      "active": true
+    },
+    {
+      "id": "orthok-referral-flyer-zh",
+      "title": "Ortho-K Referral Flyer (Chinese)",
+      "version": "Nov 2026 (3 Nov, zh-Hans)",
+      "stage": "COLLECTING",
+      "language": "zh",
+      "path": "CEC-OrthoK-Referral-Flyer-A4-zh.pdf",
+      "sha256": "11d0fc8e60dedcd58a18244b646035a67271a03785534593322facaf8aaabe5f",
+      "approval_ref": "Mark 3 Nov 2026 via Front Desk (approved Drive, second-brain d11106ec); Nikki's language check pending; print-only",
+      "classification": "print",
       "active": true
     }
   ]
