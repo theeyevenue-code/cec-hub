@@ -1706,6 +1706,11 @@ body.lens-mono main { background: #fafafa; }
 .lo-typed { margin-top: 14px; }
 .lo-typed summary { cursor: pointer; }
 .lo-typed .lo-frame-row { margin-top: 10px; }
+/* Hub assistant box on the home page (Mark, 3 Nov 2026) - same look as the Lens Finder box */
+.asst-home { margin: 0 0 22px; }
+.asst-home .asst-card { padding: 16px 18px; }
+.asst-home .lo-chat-form input { font-size: 18px; min-height: 48px; }
+.asst-notes { margin: 6px 0 14px 20px; }
 
 /* --- Medicare rejections (Mark's readability standard: answer first, 17px+ body, nothing
        under 14px, colour only with a meaning - red = resubmit-by within a month; no side-bar

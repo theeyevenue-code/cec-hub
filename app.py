@@ -22,6 +22,9 @@ from pathlib import Path
 from flask import Flask, jsonify, make_response, request, send_from_directory
 
 from hub import checkin, integrations, jobscan, lenses, lensoptions, sendguide, sop_parser
+from hub import lenschat
+from hub.assistant import core as assistant, registry as assistant_registry
+from hub.assistant.adapters import ReadContext
 
 logging.basicConfig(
     level=logging.INFO,
@@ -611,7 +614,7 @@ def lensoptions_rx():
     return _no_store(jsonify(out)), (400 if out.get("error") else 200)
 
 
-# --- Compare + Lens Finder chat (hub/compare.py, hub/lenschat.py) --------------
+# --- Compare (hub/compare.py) - no AI; the Lens Finder box's chat is below ------
 # Compare: no AI, the same engine the chat uses. Chat: Mark-only capped trial,
 # off unless config/lenschat.json says enabled AND a key is present. Patient
 # ids in POST bodies only; hub.log gets counts and reason codes only.
@@ -666,42 +669,70 @@ def lens_compare():
     return _no_store(jsonify(compare.public(res)))
 
 
+# --- Hub assistant (hub/assistant/) -------------------------------------------
+# One endpoint for the home-page chat box AND the Lens Finder box (Mark, 3 Nov
+# 2026; Codex 2026-11-03-hub-assistant, phase 1a). Mark-only, off unless
+# config/lenschat.json says enabled AND a key is present. The tool registry is
+# checked once here at start-up and again on every tool call; config/assistant.json
+# can only switch a tool off or narrow it. Read adapters only: the assistant is
+# handed lens data and (for the Lens Finder box) the comparison bound to the Rx
+# the page picked - no Optomate config, no write route, no credentials.
+# The old /api/lenschat/* URLs are the same handlers (a tab opened before the
+# update keeps working).
+
+ASSISTANT_REG = assistant_registry.build(_config_json("assistant.json", {}))
+
+
+def _assistant_cfgs():
+    return _config_json("lenschat.json", {}), _config_json("assistant.json", {})
+
+
 def _chat_status():
-    from hub import lenschat
-    return lenschat.status(_config_json("lenschat.json", {}), request.remote_addr or "",
-                           _from_this_computer())
+    chat_cfg, asst_cfg = _assistant_cfgs()
+    return assistant.status(chat_cfg, ASSISTANT_REG, request.remote_addr or "",
+                            _from_this_computer(), asst_cfg=asst_cfg)
 
 
+@app.route("/api/assistant/status")
 @app.route("/api/lenschat/status")
 @staff_only
-def lens_chat_status():
+def assistant_status():
     return _no_store(jsonify(_chat_status()))
 
 
+@app.route("/api/assistant/ask", methods=["POST"])
 @app.route("/api/lenschat/ask", methods=["POST"])
 @staff_only
-def lens_chat_ask():
-    from hub import lenschat
+def assistant_ask():
     st = _chat_status()
     if not st.get("available"):
-        return _no_store(jsonify({"error": st.get("why") or "Chat is off."})), 403
+        return _no_store(jsonify({"error": st.get("why") or "The assistant is off.",
+                                  "cap_reached": bool(st.get("cap_reached"))})), 403
     data = request.get_json(silent=True) or {}
-    got = _compare_inputs(data)
-    if got.get("error"):
-        return _no_store(jsonify({"error": got["error"]})), 400
-    base = _filters(data)
-    probe, why = _run_compare(got["req"], base)
-    if probe is None:
-        return _no_store(jsonify({"error": why})), 400
+    engine, base, binding, given, surname = None, None, "home", "", ""
+    if data.get("patient_id") or isinstance(data.get("typed"), dict):
+        got = _compare_inputs(data)
+        if got.get("error"):
+            return _no_store(jsonify({"error": got["error"]})), 400
+        base = _filters(data)
+        probe, why = _run_compare(got["req"], base)
+        if probe is None:
+            return _no_store(jsonify({"error": why})), 400
 
-    def engine(filters):
-        return _run_compare(got["req"], filters)[0]
-
+        def engine(filters):
+            return _run_compare(got["req"], filters)[0]
+        binding, given, surname = got["binding"], got.get("given", ""), got.get("surname", "")
+    catalog = _catalog()
+    ctx = ReadContext(rows=catalog.get("lenses") or [], pricing=_pricing(),
+                      cec_prices=_config_json("cec_prices.json", {}), engine=engine,
+                      base_filters=base)
+    chat_cfg, asst_cfg = _assistant_cfgs()
     names = lenschat.name_words(_integrations())
-    out = lenschat.ask(_config_json("lenschat.json", {}), binding=got["binding"],
-                       token=data.get("session"), question=data.get("question"),
-                       run_engine=engine, base_filters=base, names=names,
-                       given=got.get("given", ""), surname=got.get("surname", ""))
+    out = assistant.ask(chat_cfg, asst_cfg, ASSISTANT_REG, binding=binding,
+                        token=data.get("session"), question=data.get("question"), ctx=ctx,
+                        names=names, given=given, surname=surname,
+                        audience=assistant.user_audience(chat_cfg, request.remote_addr or "",
+                                                         _from_this_computer()))
     return _no_store(jsonify(out))
 
 

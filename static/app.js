@@ -108,12 +108,14 @@ async function renderHome() {
     let attn = {};
     try {
         // attention is best-effort: the home page must render even if it fails
-        const [tilesData, attnData] = await Promise.all([
+        const [tilesData, attnData, asstData] = await Promise.all([
             getJSON("/api/tiles"),
             getJSON("/api/attention").catch(() => ({ tiles: {} })),
+            getJSON("/api/assistant/status").catch(() => null),
         ]);
         data = tilesData;
         attn = attnData.tiles || {};
+        asst.status = asstData;
     } catch (e) {
         view.innerHTML = errorPanel(e.message);
         return;
@@ -168,6 +170,7 @@ async function renderHome() {
             <button class="btn btn-quiet home-edit-btn" id="home-edit">
                 ${homeEdit ? "✔ Done" : "✏ Edit layout"}</button>
         </div>
+        ${homeEdit ? "" : asstHomePanel()}
         ${hot.length && quiet.length ? `<div class="attn-head attn-head-quiet attn-head-first">Everything else</div>` : ""}
         <div class="tile-grid">${quiet.map(quietTile).join("")}</div>
         ${hot.length ? `<div class="attn-head attn-head-after">Needs attention</div>
@@ -178,6 +181,7 @@ async function renderHome() {
         </div>` : ""}
         ${sysMapPanel()}`;
 
+    asstWireHome();
     document.getElementById("home-edit").addEventListener("click", () => {
         homeEdit = !homeEdit;
         renderHome();
@@ -3950,7 +3954,7 @@ function renderLensOptions() {
 }
 
 async function loChatStatus() {
-    const r = await ciCall("/api/lenschat/status");
+    const r = await ciCall("/api/assistant/status");
     lo.chat = r.status === 200 ? r.data : null;
     const box = document.getElementById("lo-typed-box");
     if (!box) return;
@@ -4147,11 +4151,11 @@ const CMP_LABELS = { feature: "Lens", colour: "Colour", index: "Index", coating:
 function cmpPanel(id, part) {
     const sel = (k) => `<label>${esc(CMP_LABELS[k])}<select name="${k}">${CMP_OPTS[k].map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("")}</select></label>`;
     const chat = lo.chat && lo.chat.show ? `<div class="lo-chat">
-        <div class="lo-k">Ask <span class="lo-sub">trial · Mark only</span></div>
+        <div class="lo-k">Ask <span class="lo-sub">Mark only</span></div>
         ${lo.chat.available ? `<form class="lo-chat-form"><input name="q" maxlength="300" autocomplete="off" spellcheck="false"
             placeholder="e.g. brown photochromic, stock if it can be"><button class="btn" type="submit">Ask</button></form>
-        <div class="lo-sub">Lens words only - no names, dates or ID numbers. ${esc(lo.chat.left || "")} left of ${esc(lo.chat.cap || "")} · ${lo.chat.trial_end ? "trial ends " + esc(lo.chat.trial_end) : "trial starts at the first question"}</div>
-        <div class="lo-chat-out"></div>` : `<div class="lo-sub">${esc(lo.chat.why || "Chat is off.")}</div>`}
+        <div class="lo-sub">${asstBudgetLine(lo.chat)}</div>
+        <div class="lo-chat-out"></div>` : `<div class="lo-note">${esc(lo.chat.why || "Chat is off.")}</div>`}
     </div>` : "";
     return `<div class="lo-compare" id="${esc(id)}" data-part="${esc(part || "")}">
         <div class="lo-k lo-alt-head">Compare brands and prices</div>
@@ -4246,20 +4250,89 @@ async function chatAsk(box) {
     const q = input.value.trim();
     if (!q) return;
     out.innerHTML = `<div class="ci-muted">Checking the question, then asking…</div>`;
-    const r = await ciCall("/api/lenschat/ask", { ...cmpSource(box), filters: cmpFilters(box), question: q, session: lo.chatSession });
+    const r = await ciCall("/api/assistant/ask", { ...cmpSource(box), filters: cmpFilters(box), question: q, session: lo.chatSession });
     if (ciLocked(r)) { ciUnlockPanel(r.data, renderLensOptions, "Lens options"); return; }
     const d = r.data || {};
     if (r.status !== 200 || d.error) { out.innerHTML = `<div class="lo-note">${esc(d.error || "The chat didn't answer.")}</div>`; return; }
     lo.chatSession = d.session || null;
+    out.innerHTML = asstAnswer(d);
+    if (!d.blocked) input.value = "";
+}
+
+/* --- Hub assistant: one endpoint for the home box and the Lens Finder box -------------
+   Mark, 3 Nov 2026 (phase 1a: lens compare, prices, ranges; Mark only). The browser sends
+   the question (and, on Lens options, the picked patient id or typed numbers); the server
+   checks the question before anything leaves the practice and renders every number. */
+
+const asst = { status: null, session: null };
+
+function asstBudgetLine(st) {
+    if (!st) return "";
+    return `Lens words only - no names, dates or ID numbers. ${esc(st.left || "")} left of ${esc(st.cap || "")} this month${st.resets ? " · resets " + esc(st.resets) : ""}`;
+}
+
+function asstHomePanel() {
+    const st = asst.status;
+    if (!st || !st.show) return "";
+    return `<div class="lens-page lo-page asst-home"><div class="card asst-card">
+        <div class="lo-k">Ask about lenses <span class="lo-sub">Mark only</span></div>
+        ${st.available ? `<form class="lo-chat-form" id="asst-form"><input id="asst-q" maxlength="300" autocomplete="off" spellcheck="false"
+            aria-label="Ask about lens prices or ranges" placeholder="e.g. what does ClearView FSV cost, or its power range"><button class="btn" type="submit">Ask</button></form>
+        <div class="lo-sub">${asstBudgetLine(st)}</div>` : `<div class="lo-note">${esc(st.why || "The assistant is off.")}</div>
+        <div class="lo-sub">Lens options and the Lens Finder still work without it.</div>`}
+        <div id="asst-out"></div>
+    </div></div>`;
+}
+
+function asstWireHome() {
+    const f = document.getElementById("asst-form");
+    if (!f) return;
+    f.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const input = document.getElementById("asst-q");
+        const out = document.getElementById("asst-out");
+        const q = input.value.trim();
+        if (!q) return;
+        out.innerHTML = `<div class="ci-muted">Checking the question, then asking…</div>`;
+        const r = await ciCall("/api/assistant/ask", { question: q, session: asst.session });
+        const d = r.data || {};
+        if (r.status !== 200 || d.error) { out.innerHTML = `<div class="lo-note">${esc(d.error || "The assistant didn't answer.")}</div>`; return; }
+        asst.session = d.session || null;
+        out.innerHTML = asstAnswer(d);
+        if (!d.blocked) input.value = "";
+    });
+}
+
+// One answer, any tool: cards first (biggest), then reasons, the note, the fallback.
+function asstAnswer(d) {
     if (d.blocked) {
-        out.innerHTML = `<div class="lo-note">${esc(d.message)}</div>${d.compare ? cmpTable(d.compare) : ""}`;
-        return;
+        return `<div class="lo-note">${esc(d.message)}</div>${d.compare ? cmpTable(d.compare) : ""}`;
     }
-    out.innerHTML = `${cmpRows(d.rows || [])}
+    return `${(d.cards || []).map(asstCard).join("")}
         <div class="cmp-reasons">${(d.reasons || []).map((t) => `<span class="chip">${esc(t)}</span>`).join(" ")}</div>
-        ${d.tradeoff ? `<div class="lo-comment"><span class="lo-k">Note</span> ${esc(d.tradeoff)}</div>` : ""}
-        <details class="lo-why"><summary>All options matching these requirements</summary>${cmpTable(d.compare)}</details>`;
-    input.value = "";
+        ${d.note ? `<div class="lo-comment"><span class="lo-k">Note</span> ${esc(d.note)}</div>` : ""}`;
+}
+
+function asstCard(c) {
+    if (c.kind === "compare") {
+        return `${cmpRows(c.rows || [])}
+            <details class="lo-why"><summary>All options matching these requirements</summary>${cmpTable(c.compare)}</details>`;
+    }
+    const L = c.lead;
+    const rows = c.rows || [];
+    const lead = L ? `<div class="lo-answer ${rows[0] && rows[0].cls === "stock" ? "lo-stock" : "lo-grind"}">
+            <div class="lo-k">${esc(c.title)}</div>
+            <div class="lo-big">${esc(L.label)}</div>
+            <div class="lo-supline">${loSupplier(L.brand)}</div>
+            <div class="lo-facts">${(L.facts || []).map(([k, v]) => `<div class="lo-fact"><div class="lo-k">${esc(k)}</div><div class="lo-v">${esc(v)}</div></div>`).join("")}</div>
+        </div>` : "";
+    const num = new Set(c.num_cols || []);
+    const cell = (v, i, r) => `<td${num.has(i) ? ` class="lo-num"` : ""}>${i === 0 && v ? `<b>${esc(v)}</b>` : esc(v)}${i === 0 && (r.missing || []).length ? `<div class="cmp-miss">${r.missing.map(esc).join("<br>")}</div>` : ""}</td>`;
+    return `${lead}<div class="table-scroll"><table class="lo-alts cmp-table"><thead><tr>
+        ${(c.columns || []).map((h, i) => `<th${num.has(i) ? ` class="lo-num"` : ""}>${esc(h)}</th>`).join("")}</tr></thead>
+        <tbody>${rows.map((r) => `<tr class="${r.cls === "stock" ? "lo-row-stock" : "lo-row-grind"}">${r.cells.map((v, i) => cell(v, i, r)).join("")}</tr>`).join("")}
+        </tbody></table></div>
+        <ul class="lo-sub asst-notes">${(c.notes || []).map((n) => `<li>${esc(n)}</li>`).join("")}</ul>`;
 }
 
 // No patient picked: type the numbers and compare (no AI needed).
