@@ -2105,6 +2105,7 @@ async function loadRecallBatch(out, quiet = false) {
         : " · numbers are current";
 
     out.innerHTML = `
+        ${recallSentBeforeBanner(d)}
         <h2>${d.to_send} ${d.to_send === 1 ? "person" : "people"} · ${d.messages_to_send}
             text message${d.messages_to_send === 1 ? "" : "s"}</h2>
         <div class="updated-line">${esc(d.month_label)} · reminder ${esc(d.touch)} · ${seg}${freshness}</div>
@@ -2268,6 +2269,32 @@ async function loadRecallHistory(box) {
     });
 }
 
+// Mark, 3 Nov 2026: warn loudly when this month + reminder has already gone out,
+// so nobody sends the same batch twice. (The sender still skips anyone already
+// texted; this makes it visible before anyone presses Send.)
+function recallSentBeforeText(d) {
+    const s = d.sent_before;
+    if (!s || !s.people) return "";
+    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const when = s.dates.map((iso) => {
+        const [y, m, day] = String(iso).split("-").map(Number);
+        return `${day} ${MON[m - 1]} ${y}`;
+    }).join(", ");
+    return `ALREADY SENT: ${d.month_label} ${d.touch} went to ${s.people} ` +
+        `${s.people === 1 ? "person" : "people"} on ${when}.`;
+}
+
+function recallSentBeforeBanner(d) {
+    const t = recallSentBeforeText(d);
+    if (!t) return "";
+    const rest = d.to_send
+        ? `Only the ${d.to_send} not texted yet are listed below (newly due, or un-ticked last time).`
+        : "Everyone due has been texted. Nothing more to send.";
+    return `<div style="margin:0 0 12px;padding:12px 14px;border:2px solid #b3261e;
+        border-radius:8px;background:#fdf1f0;font-size:18px"><strong style="color:#b3261e">${esc(t)}</strong>
+        <div style="font-size:15px;margin-top:4px">${esc(rest)}</div></div>`;
+}
+
 function renderRecallSendArea(d) {
     const n = d.messages_to_send;
     if (!d.live_enabled) {
@@ -2302,7 +2329,9 @@ function wireRecallSendButton(out, d, month, touch) {
         const what = d.pilot_next
             ? `Send a TEST RUN now (up to 25 real text messages)?`
             : `Send ${d.messages_to_send} text messages now?`;
-        if (!window.confirm(`${what} This cannot be undone.`)) return;
+        const before = recallSentBeforeText(d);
+        const warn = before ? `${before}\n\nThis sends only to the ${d.to_send} not texted yet.\n\n` : "";
+        if (!window.confirm(`${warn}${what} This cannot be undone.`)) return;
         sendBtn.disabled = true;
         note.textContent = "Sending…";
         try {
