@@ -28,6 +28,19 @@ TOUCHES = ("T0", "T+6")
 TIMEOUT_S = 120  # the agent pulls the whole exam/appointment history
 
 
+# Mark's optional per-run leave-outs (3 Nov 2026), OFF unless ticked. Only ever
+# passed as fixed flags; a flag is added only when its box is ticked, so an agent
+# without the feature still works with both unticked.
+OPTIONAL_FILTERS = (("filter_vision_australia", "--filter-vision-australia"),
+                    ("filter_tests_no_purchase", "--filter-tests-no-purchase"))
+
+
+def filter_args(filters) -> list:
+    """Fixed CLI flags for the ticked optional leave-outs (strict True only)."""
+    f = filters if isinstance(filters, dict) else {}
+    return [flag for key, flag in OPTIONAL_FILTERS if f.get(key) is True]
+
+
 def not_connected(msg: str) -> dict:
     return {"connected": False, "message": msg}
 
@@ -68,7 +81,7 @@ def preview_file(cfg: dict, month: str, touch: str) -> Path | None:
     return p if p.is_file() else None
 
 
-def preview(cfg: dict, month: str, touch: str) -> dict:
+def preview(cfg: dict, month: str, touch: str, filters=None) -> dict:
     """Build (or rebuild) the preview for one month+touch. Never raises —
     always returns a dict the tile can render."""
     month = str(month or "").strip()
@@ -93,7 +106,8 @@ def preview(cfg: dict, month: str, touch: str) -> dict:
         # un-ticking someone doesn't cost a fresh ~40s pull every time.
         proc = subprocess.run(
             [python, "-m", "recall.preview", "--month", month,
-             "--touch", touch, "--json", "--max-age", "600"],
+             "--touch", touch, "--json", "--max-age", "600",
+             *filter_args(filters)],
             cwd=str(dpath), capture_output=True, text=True, timeout=TIMEOUT_S,
         )
     except subprocess.TimeoutExpired:
@@ -127,7 +141,7 @@ HASH_RE = re.compile(r"^[0-9a-f]{8,64}$")
 
 
 def send(cfg: dict, month: str, touch: str, batch_hash: str,
-         limit=None) -> dict:
+         limit=None, filters=None) -> dict:
     """Send the reviewed batch. The agent refuses unless the hash of a FRESH
     rebuild matches what Mark reviewed, the config gates are on, Twilio is
     configured, and the batch is under the safety cap. Never raises."""
@@ -152,7 +166,7 @@ def send(cfg: dict, month: str, touch: str, batch_hash: str,
         proc = subprocess.run(
             [python, "-m", "recall.send_batch", "--month", month,
              "--touch", touch, "--expect-hash", batch_hash, "--json",
-             *argv_limit],
+             *argv_limit, *filter_args(filters)],
             cwd=str(dpath), capture_output=True, text=True, timeout=600,
         )
     except subprocess.TimeoutExpired:

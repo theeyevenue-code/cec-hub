@@ -15,7 +15,7 @@ import re
 import subprocess
 import sys
 
-from hub.recall import _agent_cfg, agent_dir, not_connected
+from hub.recall import _agent_cfg, agent_dir, filter_args, not_connected
 
 TOUCHES = ("HF1", "HF2")
 HASH_RE = re.compile(r"^[0-9a-f]{8,64}$")
@@ -45,14 +45,16 @@ def _run(cfg: dict, args: list, timeout: int = TIMEOUT_S) -> dict:
     return data
 
 
-def preview(cfg: dict, touch: str) -> dict:
+def preview(cfg: dict, touch: str, filters=None) -> dict:
     touch = str(touch or "").strip().upper()
     if touch not in TOUCHES:
         return {"connected": True, "error": "Pick the first or last reminder."}
-    return _run(cfg, ["preview", "--touch", touch])
+    flags = filter_args(filters)
+    # --max-age only with a filter ticked (reuses the agent's 10-minute filter cache)
+    return _run(cfg, ["preview", "--touch", touch, *flags, *(["--max-age", "600"] if flags else [])])
 
 
-def send(cfg: dict, touch: str, batch_hash: str, limit=None) -> dict:
+def send(cfg: dict, touch: str, batch_hash: str, limit=None, filters=None) -> dict:
     touch = str(touch or "").strip().upper()
     batch_hash = str(batch_hash or "").strip().lower()
     if touch not in TOUCHES:
@@ -65,7 +67,7 @@ def send(cfg: dict, touch: str, batch_hash: str, limit=None) -> dict:
             args += ["--limit", str(max(1, int(limit)))]
         except (TypeError, ValueError):
             return {"error": "Bad number to send."}
-    return _run(cfg, args, timeout=900)
+    return _run(cfg, args + filter_args(filters), timeout=900)
 
 
 def set_deselected(cfg: dict, touch: str, year, pids) -> dict:

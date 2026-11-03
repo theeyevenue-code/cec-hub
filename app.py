@@ -236,7 +236,7 @@ def recall_preview():
     from hub import recall
     data = request.get_json(silent=True) or {}
     result = recall.preview(_integrations(), data.get("month", ""),
-                            data.get("touch", "T0"))
+                            data.get("touch", "T0"), data.get("filters"))
     # Deliberately not logging patients — the log is not the place for PHI.
     return jsonify(result)
 
@@ -267,7 +267,7 @@ def recall_send():
     data = request.get_json(silent=True) or {}
     result = recall.send(_integrations(), data.get("month", ""),
                          data.get("touch", "T0"), data.get("hash", ""),
-                         data.get("limit"))
+                         data.get("limit"), data.get("filters"))
     if result.get("sent"):
         logger.info(f"RECALL SEND by {_staff_name()}: {data.get('month')}/"
                     f"{data.get('touch')} -> {result.get('sent')} sent, "
@@ -281,7 +281,7 @@ def fundsms_preview():
     """Health-fund texts: the full list for HF1 (Nov) or HF2 (Dec). Sends nothing."""
     from hub import fundsms
     data = request.get_json(silent=True) or {}
-    return jsonify(fundsms.preview(_integrations(), data.get("touch", "HF1")))
+    return jsonify(fundsms.preview(_integrations(), data.get("touch", "HF1"), data.get("filters")))
 
 
 @app.route("/api/fundsms/deselect", methods=["POST"])
@@ -303,7 +303,7 @@ def fundsms_send():
     from hub import fundsms
     data = request.get_json(silent=True) or {}
     result = fundsms.send(_integrations(), data.get("touch", ""), data.get("hash", ""),
-                          data.get("limit"))
+                          data.get("limit"), data.get("filters"))
     if result.get("sent"):
         logger.info(f"HEALTH-FUND SEND by {_staff_name()}: {data.get('touch')} -> "
                     f"{result.get('sent')} sent, {result.get('failed', 0)} failed")

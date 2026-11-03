@@ -391,3 +391,32 @@ def test_t4_early_reminder_is_gone(cfg):
     assert recall.TOUCHES == ("T0", "T+6")
     out = recall.preview(cfg, "2026-08", "T-4")
     assert out.get("error") and "T-4" not in recall.TOUCHES
+
+
+# --- optional leave-outs (Mark, 3 Nov 2026) -----------------------------------
+
+def test_filter_args_only_for_strict_true():
+    assert recall.filter_args(None) == []
+    assert recall.filter_args({"filter_vision_australia": "yes",
+                               "filter_tests_no_purchase": 1}) == []
+    assert recall.filter_args({"filter_vision_australia": True}) == ["--filter-vision-australia"]
+    assert recall.filter_args({"filter_vision_australia": True, "filter_tests_no_purchase": True,
+                               "evil": "--x"}) == ["--filter-vision-australia",
+                                                   "--filter-tests-no-purchase"]
+    assert recall.filter_args(["--filter-vision-australia"]) == []
+
+
+def test_preview_and_send_pass_ticked_filters_only(cfg, monkeypatch):
+    seen = []
+
+    class P:
+        stdout = json.dumps({"ok": True, "to_send": 1})
+        returncode = 0
+
+    monkeypatch.setattr(recall.subprocess, "run", lambda argv, **kw: seen.append(argv) or P())
+    recall.preview(cfg, "2026-08", "T0")
+    assert not any(a.startswith("--filter") for a in seen[-1])          # default off
+    recall.preview(cfg, "2026-08", "T0", {"filter_tests_no_purchase": True})
+    assert "--filter-tests-no-purchase" in seen[-1] and "--filter-vision-australia" not in seen[-1]
+    recall.send(cfg, "2026-08", "T0", "abcdef12", None, {"filter_vision_australia": True})
+    assert "--filter-vision-australia" in seen[-1] and "recall.send_batch" in seen[-1]
