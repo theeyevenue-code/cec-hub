@@ -3,21 +3,21 @@
   "tiles": [
     {
       "id": "checkin",
-      "icon": "",
+      "icon": "📝",
       "name": "Check-in",
       "description": "Send a patient's form to the iPad, then check it and save it to Optomate",
       "link": "#/checkin"
     },
     {
       "id": "sendguide",
-      "icon": "",
+      "icon": "📨",
       "name": "Send guide",
       "description": "Email a patient their guide from info@ after the visit",
       "link": "#/sendguide"
     },
     {
       "id": "stocktake",
-      "icon": "",
+      "icon": "📦",
       "name": "Stocktake",
       "description": "Scan every frame on the shelves. Counting only - Optomate is not changed",
       "link": "#/stocktake"
@@ -102,14 +102,14 @@
     },
     {
       "id": "lensoptions",
-      "icon": "",
+      "icon": "🔎",
       "name": "Lens options",
       "description": "Pick a patient: the lenses to offer for their saved Rx, with prices",
       "link": "#/lensoptions"
     },
     {
       "id": "jobscan",
-      "icon": "",
+      "icon": "📥",
       "name": "Jobs arrived",
       "description": "Scan the job cards, confirm once: marked received and the patient texted",
       "link": "#/jobs-arrived"
