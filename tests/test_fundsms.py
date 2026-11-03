@@ -27,3 +27,21 @@ def test_deselect_writes_only_validated_file(tmp_path):
     assert saved["pids"] == [1, 3]
     assert "error" in fundsms.set_deselected(cfg, "../x", 2026, [])
     assert "error" in fundsms.set_deselected(cfg, "HF1", "1999", [])
+
+
+def test_filters_passed_only_when_ticked(tmp_path, monkeypatch):
+    (tmp_path / "recall").mkdir()
+    (tmp_path / "recall" / "fundsms.py").write_text("", encoding="utf-8")
+    cfg = {"optomate_agent": {"agent_dir": str(tmp_path), "python": "py"}}
+    seen = []
+
+    class P:
+        stdout = '{"ok": true}'
+
+    monkeypatch.setattr(fundsms.subprocess, "run", lambda argv, **kw: seen.append(argv) or P())
+    fundsms.preview(cfg, "HF1")
+    assert not any(a.startswith("--filter") or a == "--max-age" for a in seen[-1])
+    fundsms.preview(cfg, "HF1", {"filter_vision_australia": True})
+    assert "--filter-vision-australia" in seen[-1] and "--max-age" in seen[-1]
+    fundsms.send(cfg, "HF1", "abcdef12", 10, {"filter_tests_no_purchase": True})
+    assert "--filter-tests-no-purchase" in seen[-1] and "--filter-vision-australia" not in seen[-1]

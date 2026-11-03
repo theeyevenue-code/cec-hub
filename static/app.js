@@ -1970,6 +1970,7 @@ function renderRecalls() {
                     </select>
                 </label>
             </div>
+            ${optionalFilterBoxes("rc")}
             <div id="rc-out" style="margin-top:12px">
                 <div class="loading-panel">Working out who is due…</div>
             </div>
@@ -2020,6 +2021,7 @@ function renderRecalls() {
     const load = () => loadRecallBatch(out);
     document.getElementById("rc-month").addEventListener("change", load);
     document.getElementById("rc-touch").addEventListener("change", load);
+    wireOptionalFilterBoxes("rc", load);
     load();   // full list from the start — no extra click
 
     loadRecallHistory(document.getElementById("rc-history"));
@@ -2061,6 +2063,7 @@ function renderRecalls() {
 async function loadRecallBatch(out, quiet = false) {
     const month = document.getElementById("rc-month").value;
     const touch = document.getElementById("rc-touch").value;
+    const filters = optionalFilterState("rc");   // the send uses exactly these
     if (!quiet) {
         out.innerHTML = `<div class="loading-panel">Working out who is due…
             <br><span style="font-size:12px;color:#55636b">First look of the day takes
@@ -2068,7 +2071,7 @@ async function loadRecallBatch(out, quiet = false) {
     }
     let d;
     try {
-        d = await postJSON("/api/recall/preview", { month, touch });
+        d = await postJSON("/api/recall/preview", { month, touch, filters });
     } catch (e) {
         out.innerHTML = errorPanel(e.message);
         return;
@@ -2123,6 +2126,7 @@ async function loadRecallBatch(out, quiet = false) {
             ${d.skipped_opted_out} asked for no recalls ·
             ${d.skipped_already_sent} already texted this round
             ${d.optomate_texted_days ? ` · ${d.skipped_optomate_texted || 0} Optomate texted in last ${d.optomate_texted_days} days` : ""}
+            ${optionalSkippedText(d.optional_filters, d.skipped_vision_australia, d.skipped_tests_no_purchase)}
             ${d.deselected ? ` · <strong>${d.deselected} un-ticked by you</strong>` : ""}</p>
         ${d.optomate_check_error ? `<p class="warn" style="color:#b26a00;font-weight:600">${esc(d.optomate_check_error)}</p>` : ""}
         ${sample ? `<p style="margin:6px 0 2px"><strong>The message:</strong></p>
@@ -2143,7 +2147,7 @@ async function loadRecallBatch(out, quiet = false) {
                Print-friendly copy</a></p>
         ${renderRecallSendArea(d)}`;
 
-    wireRecallSendButton(out, d, month, touch);
+    wireRecallSendButton(out, d, month, touch, filters);
 
     // Un-tick = saved immediately, then the counts refresh in place (the row
     // greys out straight away so it never feels stuck).
@@ -2327,7 +2331,7 @@ function renderRecallSendArea(d) {
         </div>`;
 }
 
-function wireRecallSendButton(out, d, month, touch) {
+function wireRecallSendButton(out, d, month, touch, filters) {
     const sendBtn = document.getElementById("rc-send");
     if (!sendBtn) return;   // sending switched off — nothing to wire
     const note = document.getElementById("rc-send-note");
@@ -2342,7 +2346,7 @@ function wireRecallSendButton(out, d, month, touch) {
         note.textContent = "Sending…";
         try {
             const r = await postJSON("/api/recall/send",
-                { month, touch, hash: d.batch_hash });
+                { month, touch, hash: d.batch_hash, filters });
             note.textContent = r.error ? r.error
                 : `Done: ${r.sent} sent, ${r.failed || 0} failed`
                   + (r.held_uncertain ? `, ${r.held_uncertain} held for checking` : "")
@@ -2469,6 +2473,35 @@ async function loadContactTimeline(out, pid, name) {
         </ul>` : ""}`;
 }
 
+/* --- Optional leave-outs (Mark, 3 Nov 2026) ------------------------------------------ */
+/* Off by default, per list run. Ticking re-previews; the send carries the same switches,
+   and the agent refuses if they differ from the list that was reviewed. Clinical
+   patients (glaucoma, diabetes, ortho-K, short recalls...) are never left out. */
+
+function optionalFilterBoxes(prefix) {
+    return `<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:15px">
+        <label><input type="checkbox" id="${prefix}-f-va"> Leave out Vision Australia patients</label>
+        <label><input type="checkbox" id="${prefix}-f-tnp"> Leave out 4+ tests, nothing bought in 4 years</label>
+    </div>`;
+}
+
+function optionalFilterState(prefix) {
+    const on = (id) => Boolean(document.getElementById(id) && document.getElementById(id).checked);
+    return { filter_vision_australia: on(`${prefix}-f-va`),
+             filter_tests_no_purchase: on(`${prefix}-f-tnp`) };
+}
+
+function wireOptionalFilterBoxes(prefix, load) {
+    [`${prefix}-f-va`, `${prefix}-f-tnp`].forEach((id) =>
+        document.getElementById(id).addEventListener("change", load));
+}
+
+function optionalSkippedText(on, va, tnp) {
+    const f = on || [];
+    return (f.includes("vision_australia") ? ` · ${va || 0} Vision Australia` : "")
+        + (f.includes("tests_no_purchase") ? ` · ${tnp || 0} lots of tests, no purchases` : "");
+}
+
 /* --- Health fund texts (end-of-year "use your optical extras") ---------------------- */
 /* Same pattern as Recalls: the whole list first, tick boxes, send exactly what was
    reviewed. The agent refuses a changed list, caps each run and starts with a pilot. */
@@ -2491,21 +2524,24 @@ function renderHealthFund() {
                 <select id="hf-touch">${HF_TOUCHES.map((t) =>
                     `<option value="${t.code}"${(t.code === "HF2") === dec ? " selected" : ""}>${esc(t.label)}</option>`).join("")}
                 </select></label>
+            ${optionalFilterBoxes("hf")}
             <div id="hf-out" style="margin-top:12px">
                 <div class="loading-panel">Working out who qualifies…</div></div>
         </div>`;
     const out = document.getElementById("hf-out");
     const load = () => loadHealthFund(out);
     document.getElementById("hf-touch").addEventListener("change", load);
+    wireOptionalFilterBoxes("hf", load);
     load();
 }
 
 async function loadHealthFund(out, quiet = false) {
     const touch = document.getElementById("hf-touch").value;
+    const filters = optionalFilterState("hf");   // the send uses exactly these
     if (!quiet) out.innerHTML = `<div class="loading-panel">Working out who qualifies… (about 20 seconds)</div>`;
     let d;
     try {
-        d = await postJSON("/api/fundsms/preview", { touch });
+        d = await postJSON("/api/fundsms/preview", { touch, filters });
     } catch (e) {
         out.innerHTML = errorPanel(e.message);
         return;
@@ -2534,6 +2570,7 @@ async function loadHealthFund(out, quiet = false) {
             ${sk.no_mobile || 0} no mobile ·
             ${sk.already_sent || 0} already sent this text
             ${d.optomate_texted_days ? ` · ${sk.optomate_texted || 0} Optomate texted in last ${d.optomate_texted_days} days` : ""}
+            ${optionalSkippedText(d.optional_filters, sk.vision_australia, sk.tests_no_purchase)}
             ${d.deselected ? ` · <strong>${d.deselected} un-ticked by you</strong>` : ""}</p>
         ${d.optomate_check_error ? `<p class="warn" style="color:#b26a00;font-weight:600">${esc(d.optomate_check_error)}</p>` : ""}
         ${one ? `<p style="margin:6px 0 2px"><strong>The text:</strong></p>${msgBox(one.message)}` : ""}
@@ -2576,7 +2613,7 @@ async function loadHealthFund(out, quiet = false) {
         btn.disabled = true;
         note.textContent = "Sending…";
         try {
-            const r = await postJSON("/api/fundsms/send", { touch, hash: d.batch_hash, limit: n });
+            const r = await postJSON("/api/fundsms/send", { touch, hash: d.batch_hash, limit: n, filters });
             note.textContent = r.error ? r.error
                 : (r.dry_run ? `Dry run: ${r.would_send} texts would go. Nothing sent.`
                    : `Done: ${r.sent} sent, ${r.failed || 0} failed. ${r.note || ""}`);
