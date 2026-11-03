@@ -23,6 +23,9 @@ Commands
          patient's LATEST one (newest first; two on a day is usually a distance
          and a reading pair), each with both eyes verbatim and the lens type
          read from the Rx comment.
+  names
+      -> {"names": [...]} every given-name / surname word, lower case, for
+         the Lens Finder chat's pre-send name check (kept in memory only).
 
 THE SAVED SPECTACLE Rx, not the exam: table SPECTACLE_RX (the script the optom
 saved), never the subjective/final slots of EXAMINATION.
@@ -692,6 +695,34 @@ def cmd_rx(pid: int, sql=None) -> dict:
     return {"patient": patient, "rxs": build_rx(rows), "frame": frame}
 
 
+def names_query() -> str:
+    """Every distinct given name and surname (read only) - for the Lens Finder
+    chat's local pre-send name check. Never logged; the Hub keeps the word
+    list in memory only."""
+    return (f"SELECT DISTINCT LOWER({_txt('p.GIVEN')}) FROM PATIENT p WITH (NOLOCK) "
+            f"UNION SELECT DISTINCT LOWER({_txt('p.SURNAME')}) FROM PATIENT p WITH (NOLOCK)")
+
+
+def name_words(values) -> list[str]:
+    """'Mary-Jane' / "O'Brien" / 'Van Der Berg' -> the single words, lower case,
+    two letters or more."""
+    out = set()
+    for v in values:
+        for w in re.split(r"[^a-z]+", str(v or "").lower().replace("'", "")):
+            if len(w) >= 2:
+                out.add(w)
+    return sorted(out)
+
+
+def cmd_names(sql=None) -> dict:
+    if fixture_mode() and sql is None:
+        db = fixture_db(date.today().isoformat())
+        vals = [v for g, s, _ in db["people"].values() for v in (g, s)]
+    else:
+        vals = [r[0] for r in (sql or sqlq)(names_query()) if r]
+    return {"names": name_words(vals)}
+
+
 def main(argv=None) -> int:
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -707,6 +738,8 @@ def main(argv=None) -> int:
             result = cmd_search(opts["--q"])
         elif cmd == "rx" and set(opts) == {"--pid"} and opts["--pid"].isdigit():
             result = cmd_rx(int(opts["--pid"]))
+        elif cmd == "names" and not opts:
+            result = cmd_names()
         else:
             result = {"error": "Bad command."}
     except BridgeError as exc:

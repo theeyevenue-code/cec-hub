@@ -15,4 +15,5 @@ config/lens_filter.json
 config/cec_prices.json
 data/
 config/lens_pricing.json
+config/lenschat.json
 config/*.bak

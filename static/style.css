@@ -1688,6 +1688,25 @@ body.lens-mono main { background: #fafafa; }
 .lo-page .lo-row-nofit td:first-child { border-left-color: #bbb; }
 .lo-page .lo-row-nofit .lo-blankcell { color: #4d3200; font-weight: 600; }
 
+/* --- Compare + Lens Finder chat (Mark, 3 Nov 2026) ------------------------------------ */
+.lo-compare { margin-top: 18px; padding-top: 14px; border-top: 1px solid #e3e7e5; }
+.lo-cmp-form { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; margin: 6px 0 12px; }
+.lo-cmp-form label { display: flex; flex-direction: column; font-size: 15px; gap: 4px; }
+.lo-cmp-form select { font-size: 17px; padding: 6px 8px; min-width: 110px; }
+.cmp-table td { font-size: 17px; vertical-align: top; }
+.cmp-table .lo-sub { font-size: 14px; }
+.cmp-unver td { color: #5f6663; background: #f6f7f6; }
+.cmp-miss { font-size: 14px; color: var(--amber-ink); background: var(--amber-bg); padding: 2px 6px; margin-top: 4px; }
+.cmp-ok { color: var(--green-deep); font-weight: 600; white-space: nowrap; }
+.cmp-no { color: var(--amber-ink); font-weight: 600; white-space: nowrap; }
+.cmp-reasons { margin: 8px 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.lo-chat { margin-top: 16px; padding: 12px 14px; border: 1px solid #d5dcd9; border-radius: 10px; }
+.lo-chat-form { display: flex; gap: 10px; margin: 8px 0 6px; }
+.lo-chat-form input { flex: 1; font-size: 17px; padding: 8px 10px; min-width: 0; }
+.lo-typed { margin-top: 14px; }
+.lo-typed summary { cursor: pointer; }
+.lo-typed .lo-frame-row { margin-top: 10px; }
+
 /* --- Medicare rejections (Mark's readability standard: answer first, 17px+ body, nothing
        under 14px, colour only with a meaning - red = resubmit-by within a month; no side-bar
        accent lines. Codex review applied 9 Oct 2026) -------------------------------------- */
