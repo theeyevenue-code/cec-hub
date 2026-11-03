@@ -101,6 +101,13 @@
       "link": "#/lensoptions"
     },
     {
+      "id": "jobscan",
+      "icon": "",
+      "name": "Jobs arrived",
+      "description": "Scan the job cards, confirm once: marked received and the patient texted",
+      "link": "#/jobs-arrived"
+    },
+    {
       "id": "recalls",
       "icon": "📱",
       "name": "Recalls",

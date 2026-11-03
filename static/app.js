@@ -77,6 +77,7 @@ const routes = [
     { re: /^#\/checkin\/([0-9a-f]{32})$/, fn: (m) => renderCheckinCheck(m[1]) },
     { re: /^#\/sendguide$/, fn: renderSendGuide },
     { re: /^#\/lensoptions$/, fn: renderLensOptions },
+    { re: /^#\/jobs-arrived$/, fn: renderJobsArrived },
     { re: /^#\/scanner$/, fn: renderScanner },
     { re: /^#\/scanner-settings$/, fn: renderScanner },   // old link, same page
     { re: /^#\/scanner-help$/, fn: renderScannerHelp },
@@ -3969,6 +3970,191 @@ function loDraw() {
         const val = (id) => document.getElementById(id).value.trim();
         loLoad(lo.pid, { a: val("lo-a"), dbl: val("lo-dbl"), ed: val("lo-ed") });
     });
+}
+
+/* --- Jobs arrived (scan job cards, confirm once) ------------------------------------ */
+/* Mark, 3 Nov 2026. The NETUM scanner types the job number + Enter into the box; each scan
+   adds a line (job, patient, lens, ordered). Same card twice = one line. Grey = already
+   received; red = cancelled / not found / not a number. ONE Confirm: the agent marks each
+   job received in Optomate and texts "glasses ready" - as far as its switches allow
+   (orders\jobscan_config.json). Nothing is kept in the browser; names never go in a URL. */
+
+const ja = { lines: new Map(), gates: null, words: "", busy: false, seq: 0 };
+const JA_STATE = {
+    ok: ["Ready to mark", "ja-ok"], received: ["Already in", "ja-grey"], looking: ["Checking…", "ja-wait"],
+    cancelled: ["Cancelled", "ja-red"], notfound: ["Not found", "ja-red"], bad: ["Not a job number", "ja-red"],
+    error: ["Couldn't check", "ja-red"],
+};
+
+function renderJobsArrived() {
+    ja.lines = new Map(); ja.busy = false; ja.seq += 1;
+    view.innerHTML = `<div class="ja-page">
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Jobs arrived</h1>
+        <div id="ja-mode"></div>
+        <p class="ja-how">Scan each job card. Then press Confirm once.</p>
+        <form id="ja-scan" class="ja-scan" autocomplete="off">
+            <input id="ja-in" type="text" inputmode="numeric" autocomplete="off" spellcheck="false"
+                   placeholder="Scan a job card" aria-label="Job number">
+            <button class="btn btn-quiet" type="submit">Add</button>
+        </form>
+        <div id="ja-list"></div>
+        <div id="ja-foot"></div>
+    </div>`;
+    const input = document.getElementById("ja-in");
+    document.getElementById("ja-scan").addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        const v = input.value.trim();
+        input.value = "";
+        if (v) jaAdd(v);
+        input.focus();
+    });
+    // keep the scanner's box focused: a tap anywhere that isn't a button goes back to it
+    document.querySelector(".ja-page").addEventListener("click", (ev) => {
+        if (!ev.target.closest("button, a, input")) input.focus();
+    });
+    input.focus();
+    jaDraw();
+    jaLoadMode();
+}
+
+async function jaLoadMode() {
+    const seq = ja.seq;
+    const r = await ciCall("/api/jobscan/status");
+    if (seq !== ja.seq) return;
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderJobsArrived, "Jobs arrived"); return; }
+    const d = r.data || {};
+    const box = document.getElementById("ja-mode");
+    if (!d.ok) { box.innerHTML = `<div class="ja-banner ja-banner-red">${esc(d.error || "Not connected.")}</div>`; return; }
+    ja.gates = d.gates; ja.words = d.mode_words || "";
+    box.innerHTML = d.gates.dry_run
+        ? `<div class="ja-banner ja-banner-test"><strong>TEST MODE</strong> - nothing will be changed or texted${d.fixture ? " (fake ZZTEST jobs)" : ""}</div>`
+        : `<div class="ja-banner">${esc(ja.words)}</div>`;
+}
+
+function jaKey(v) {
+    return /^\d{1,9}$/.test(v) ? String(parseInt(v, 10)) : v.replace(/[^\w-]/g, "").slice(0, 20);
+}
+
+async function jaAdd(raw) {
+    const id = jaKey(raw);
+    if (!id) return;
+    if (ja.lines.has(id)) { jaFlash(id); return; }          // same card twice = one line
+    if (!/^\d{1,9}$/.test(id)) {
+        ja.lines.set(id, { id, state: "bad", reason: "Not a job number" });
+        jaDraw(); return;
+    }
+    ja.lines.set(id, { id, state: "looking" });
+    jaDraw();
+    const seq = ja.seq;
+    let r;
+    try { r = await ciCall("/api/jobscan/lookup", { ids: [id] }); } catch (e) { r = { status: 0, data: {} }; }
+    if (seq !== ja.seq || !ja.lines.has(id)) return;
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderJobsArrived, "Jobs arrived"); return; }
+    const d = r.data || {};
+    const line = d.ok && (d.lines || []).find((l) => String(l.id) === id);
+    ja.lines.set(id, line ? { ...line, id } : { id, state: "error", reason: d.error || "The Hub didn't answer - scan it again." });
+    jaDraw();
+}
+
+function jaFlash(id) {
+    const row = document.querySelector(`[data-ja-row="${CSS.escape(id)}"]`);
+    if (!row) return;
+    row.classList.remove("ja-flash"); void row.offsetWidth; row.classList.add("ja-flash");
+}
+
+function jaReady() { return [...ja.lines.values()].filter((l) => l.state === "ok"); }
+
+function jaDraw() {
+    const list = document.getElementById("ja-list");
+    const foot = document.getElementById("ja-foot");
+    if (!list) return;
+    const rows = [...ja.lines.values()];
+    list.innerHTML = rows.length ? `<table class="ja-table">
+        <thead><tr><th>Job</th><th>Patient</th><th>Lens</th><th>Ordered</th><th>Status</th><th></th></tr></thead>
+        <tbody>${rows.map((l) => {
+            const [word, cls] = JA_STATE[l.state] || JA_STATE.error;
+            return `<tr class="${cls}" data-ja-row="${esc(l.id)}">
+                <td class="ja-job">${esc(l.id)}</td>
+                <td class="ja-name">${esc(l.name || "")}</td>
+                <td>${esc(l.lens || "")}</td>
+                <td class="ja-num">${esc(l.ordered || "")}</td>
+                <td><span class="ja-chip">${esc(word)}</span>${l.reason && l.state !== "bad" ? `<div class="ja-why">${esc(l.reason)}</div>` : ""}</td>
+                <td><button class="btn btn-quiet ja-x" type="button" data-ja-remove="${esc(l.id)}" aria-label="Remove job ${esc(l.id)}">Remove</button></td>
+            </tr>`; }).join("")}</tbody></table>
+        <div class="ja-key"><span class="ja-chip ja-ok">Ready to mark</span> <span class="ja-chip ja-grey">Already in - skipped</span> <span class="ja-chip ja-red">Problem - skipped</span></div>`
+        : `<div class="ja-empty">No jobs scanned yet.</div>`;
+    list.querySelectorAll("[data-ja-remove]").forEach((b) => b.addEventListener("click", () => {
+        ja.lines.delete(b.dataset.jaRemove); jaDraw(); document.getElementById("ja-in").focus();
+    }));
+    const n = jaReady().length;
+    const waiting = rows.some((l) => l.state === "looking");
+    foot.innerHTML = `<button id="ja-go" class="btn ja-go" type="button" ${n && !waiting && !ja.busy ? "" : "disabled"}>
+        Confirm ${n} job${n === 1 ? "" : "s"}</button><div id="ja-msg"></div>`;
+    document.getElementById("ja-go").addEventListener("click", jaConfirm);
+}
+
+function jaDialogText(n) {
+    const g = ja.gates || { dry_run: true };
+    const jobs = `${n} job${n === 1 ? "" : "s"}`;
+    if (g.dry_run) return `TEST MODE: show what would happen for ${jobs}.\n\nNothing will be changed in Optomate and no texts will be sent.`;
+    const parts = [];
+    parts.push(g.write_live ? `Mark ${jobs} received in Optomate (tilt and wrap become 0; the old values go in the job's comments).`
+                            : `Optomate will NOT be changed (writes are switched off).`);
+    if (g.sms === "live") parts.push(g.write_live
+        ? `Text up to ${n} patient${n === 1 ? "" : "s"} that their glasses are ready (no mobile or already texted = skipped).`
+        : `No patient texts: a job is only texted once it is marked received.`);
+    else if (g.sms === "test") parts.push(`Texts go to the test phone only, not to patients.`);
+    else parts.push(`No texts will be sent (texts are switched off).`);
+    if (g.write_live || g.sms === "live") parts.push(`This can't be undone.`);
+    return parts.join("\n\n");
+}
+
+async function jaConfirm() {
+    const ready = jaReady();
+    if (ja.busy || !ready.length) return;
+    if (!window.confirm(jaDialogText(ready.length))) { document.getElementById("ja-in").focus(); return; }
+    ja.busy = true;
+    const btn = document.getElementById("ja-go");
+    btn.disabled = true;
+    document.getElementById("ja-msg").innerHTML = `<div class="ci-muted">Working… don't close this page.</div>`;
+    const ids = ready.map((l) => l.id);
+    let r;
+    try { r = await ciCall("/api/jobscan/confirm", { ids, expected: ids.length }); }
+    catch (e) { r = { status: 0, data: { error: "The Hub didn't answer. Scan the cards again: finished jobs show grey." } }; }
+    ja.busy = false;
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderJobsArrived, "Jobs arrived"); return; }
+    const d = r.data || {};
+    if (!d.ok) { document.getElementById("ja-msg").innerHTML = errorPanel(d.error || "That didn't go through."); jaDraw(); return; }
+    jaResults(d);
+}
+
+const JA_OUT = { done: ["Done", "ja-ok"], would: ["Would do", "ja-wait"], skipped: ["Skipped", "ja-grey"], failed: ["Failed", "ja-red"] };
+
+function jaResults(d) {
+    const c = d.counts || {};
+    const head = d.nothing_changed
+        ? `<div class="ja-banner ja-banner-test"><strong>TEST MODE - nothing was changed</strong></div>
+           <div class="ja-answer">${c.would || 0} would be marked received</div>`
+        : `<div class="ja-answer">${c.done || 0} marked received · ${d.texted || 0} texted${c.failed ? ` · <span class="ja-bad">${c.failed} failed</span>` : ""}</div>`;
+    view.innerHTML = `<div class="ja-page">
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Jobs arrived</h1>
+        ${head}
+        <table class="ja-table ja-results">
+            <thead><tr><th>Job</th><th>Patient</th><th>Result</th><th>Optomate</th><th>Text</th></tr></thead>
+            <tbody>${(d.results || []).map((x) => {
+                const [word, cls] = JA_OUT[x.outcome] || JA_OUT.failed;
+                return `<tr class="${cls}">
+                    <td class="ja-job">${esc(x.id)}</td>
+                    <td class="ja-name">${esc(x.name)}</td>
+                    <td><span class="ja-chip">${esc(word)}</span></td>
+                    <td>${esc(x.write)}</td>
+                    <td>${esc(x.text)}${x.message && d.nothing_changed ? `<div class="ja-sms">“${esc(x.message)}”</div>` : ""}</td>
+                </tr>`; }).join("")}</tbody></table>
+        <button class="btn ja-go" type="button" id="ja-again">Scan more jobs</button>
+    </div>`;
+    document.getElementById("ja-again").addEventListener("click", renderJobsArrived);
 }
 
 /* --- Go ---------------------------------------------------------------------------- */
