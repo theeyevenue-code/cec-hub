@@ -70,6 +70,12 @@ DEFAULTS = {
     "key_file": str(PRIVATE_DIR / "anthropic_key.txt"),
     "ledger": str(PRIVATE_DIR / "lenschat-spend.json"),
     "practice_weekdays": [0, 1, 2, 3, 4, 5],     # Mon-Sat
+    # Mark 3 Nov 2026: "lets build on assumption we leave this running". cap_aud is per
+    # calendar month when monthly is true (spend rolls into total_aud on the 1st);
+    # trial_days 0 = no end date. Defaults keep the original A$10 lifetime / 7-day trial.
+    "cap_aud": str(CAP_AUD),
+    "monthly": False,
+    "trial_days": TRIAL_DAYS,
 }
 
 REPHRASE = "Please rephrase using lens requirements; nothing was sent."
@@ -135,6 +141,20 @@ def settings(cfg: dict | None) -> dict:
     return out
 
 
+def cap_of(s: dict) -> Decimal:
+    """The configured cap; anything unreadable or <= 0 falls back to A$10."""
+    try:
+        c = Decimal(str(s.get("cap_aud")))
+        return c if c > 0 else CAP_AUD
+    except Exception:
+        return CAP_AUD
+
+
+def ledger_for(s: dict) -> "Ledger":
+    return Ledger(Path(s["ledger"]), cap=cap_of(s), monthly=bool(s.get("monthly")),
+                  trial_days=int(s.get("trial_days") or 0))
+
+
 def api_key(s: dict) -> str:
     """Environment first, then the key file outside the repo. Never logged."""
     k = (os.environ.get(KEY_ENV) or "").strip()
@@ -161,16 +181,19 @@ def status(cfg: dict | None, remote_ip: str = "", loopback: bool = False,
     if not api_key(s):
         return {"available": False, "show": True, "why": "Chat has no API key on this computer."}
     try:
-        led = Ledger(Path(s["ledger"])).read()
+        ledger = ledger_for(s)
+        led = ledger.read()
     except LedgerError as e:
         return {"available": False, "show": True, "why": str(e)}
     today = today or _dt.date.today()
     if led["trial_end"] and today > _dt.date.fromisoformat(led["trial_end"]):
         return {"available": False, "show": True, "why": TRIAL_OVER, "ended": True}
-    spent = Decimal(led["spent_aud"])
-    left = max(CAP_AUD - spent, Decimal(0))
+    spent = ledger.spent_now(led, today)
+    cap = ledger.cap
+    left = max(cap - spent, Decimal(0))
     return {"available": True, "show": True, "why": "",
-            "spent": f"A${spent.quantize(Decimal('0.01'))}", "cap": f"A${CAP_AUD}",
+            "spent": f"A${spent.quantize(Decimal('0.01'))}",
+            "cap": f"A${cap}" + (" a month" if ledger.monthly else ""),
             "left": f"A${left.quantize(Decimal('0.01'))}",
             "trial_end": led["trial_end"] or ""}
 
@@ -202,8 +225,18 @@ def practice_day_end(start: _dt.date, weekdays, n: int = TRIAL_DAYS) -> _dt.date
 class Ledger:
     _lock = threading.Lock()
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, cap: Decimal = CAP_AUD, monthly: bool = False,
+                 trial_days: int = TRIAL_DAYS):
         self.path = Path(path)
+        self.cap = Decimal(cap)
+        self.monthly = monthly
+        self.trial_days = trial_days
+
+    def spent_now(self, data: dict, today: _dt.date) -> Decimal:
+        """Spend counted against the cap: this month's when monthly."""
+        if self.monthly and data.get("month") != today.strftime("%Y-%m"):
+            return Decimal(0)
+        return Decimal(str(data["spent_aud"]))
 
     @staticmethod
     def fresh() -> dict:
@@ -221,7 +254,7 @@ class Ledger:
         try:
             assert isinstance(data, dict) and data.get("version") == 1
             spent = Decimal(str(data["spent_aud"]))
-            assert spent >= 0 and Decimal(str(data["cap_aud"])) == CAP_AUD
+            assert spent >= 0 and Decimal(str(data["cap_aud"])) > 0
             int(data["calls"])
             for k in ("first_use", "trial_end"):
                 if data.get(k):
@@ -252,12 +285,22 @@ class Ledger:
             today = today or _dt.date.today()
             if data["trial_end"] and today > _dt.date.fromisoformat(data["trial_end"]):
                 raise BudgetRefused("trial_over")
+            month = today.strftime("%Y-%m")
+            if self.monthly and data.get("month") != month:
+                # new calendar month: last month's spend moves to the running total
+                data["total_aud"] = str(Decimal(str(data.get("total_aud") or "0"))
+                                        + Decimal(str(data["spent_aud"])))
+                data["spent_aud"] = "0.0000"
+                data["month"] = month
             spent = Decimal(str(data["spent_aud"]))
-            if spent + worst > CAP_AUD:
+            if spent + worst > self.cap:
                 raise BudgetRefused("cap")
+            data["cap_aud"] = str(self.cap)
             if not data["first_use"]:
                 data["first_use"] = today.isoformat()
-                data["trial_end"] = practice_day_end(today, weekdays).isoformat()
+                if self.trial_days > 0:
+                    data["trial_end"] = practice_day_end(today, weekdays,
+                                                         self.trial_days).isoformat()
             data["spent_aud"] = str((spent + worst).quantize(Decimal("0.0001"), rounding=ROUND_UP))
             data["calls"] = int(data["calls"]) + 1
             self._write(data)
@@ -605,7 +648,7 @@ def ask(cfg: dict, *, binding: str, token, question, run_engine, base_filters: d
             return {**fallback, "blocked": True, "message": "Chat has no API key on this computer."}
         client = make_client(key)
 
-    ledger = Ledger(Path(s["ledger"]))
+    ledger = ledger_for(s)
     seen = {x["id"]: x for x in base["_all"]}
     user_json = first_message(base, base_filters, text)
     messages = list(history) + [{"role": "user", "content": user_json}]
