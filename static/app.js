@@ -4055,6 +4055,38 @@ function loSupplier(s) {
     return /^zeiss$/i.test(s || "") ? ZEISS_LOGO : `<span class="lo-supword">${esc(s || "")}</span>`;
 }
 
+/* The options as a grid (Mark, 4 Nov 2026): one row per index, thinnest-last (1.50 down to 1.74),
+   one column per supplier (Synchrony, ZEISS, then any other). In each cell stock comes before grind,
+   then cheapest. Green = fits this frame, grey = made to order, red = stock blank too small. The
+   suggested index is a quiet note on its row - an option, not a pick. */
+const LO_SUPPLIER_ORDER = ["synchrony", "zeiss"];
+function loGrid(list, rec) {
+    const idx = [...new Set(list.map((o) => o.index))].sort((x, y) => parseFloat(x) - parseFloat(y));
+    const sups = [...new Set(list.map((o) => o.supplier))].sort((x, y) => {
+        const r = (s) => { const i = LO_SUPPLIER_ORDER.indexOf(String(s).toLowerCase()); return i < 0 ? 99 : i; };
+        return r(x) - r(y) || String(x).localeCompare(String(y));
+    });
+    const rank = (o) => (o.fits === false ? 2 : o.type === "Stock" ? 0 : 1);
+    const item = (o) => {
+        const cls = o.fits === false ? "lo-it-nofit" : o.type === "Stock" ? "lo-it-stock" : "lo-it-grind";
+        const fit = o.fits === false ? o.blank_line.replace(/\. .*$/, "")
+            : o.type === "Stock" ? (o.blank_line || "Stock") : "Made to order";
+        return `<div class="lo-it ${cls}"><div class="lo-it-top"><span class="lo-it-kind">${esc(o.type)}</span>
+            <span class="lo-it-name">${esc(o.name.toLowerCase() === o.type.toLowerCase() ? o.category : o.name)}</span>
+            <span class="lo-it-price">${o.sell != null ? loMoney(o.sell) : "—"}</span></div>
+            <div class="lo-it-sub">${esc(fit)} · ${esc(coatShort(o.coating))} · cost ${loMoney(o.cost)}${o.code ? " · " + esc(o.code) : ""}</div></div>`;
+    };
+    const cell = (i, s) => {
+        const xs = list.filter((o) => o.index === i && o.supplier === s)
+            .sort((p, q) => rank(p) - rank(q) || (p.sell ?? 1e9) - (q.sell ?? 1e9));
+        return xs.length ? xs.map(item).join("") : `<div class="lo-it-none">Not for this Rx</div>`;
+    };
+    return `<div class="lo-k lo-alt-head">Lenses for this Rx · per pair · <span class="lo-key"><span class="lo-it-stock">fits</span> <span class="lo-it-grind">made to order</span> <span class="lo-it-nofit">blank too small</span></span></div>
+    <div class="table-scroll"><table class="lo-grid"><thead><tr><th>Index</th>${sups.map((s) => `<th>${loSupplier(s)}</th>`).join("")}</tr></thead>
+    <tbody>${idx.map((i) => `<tr><th class="lo-grid-idx"><b class="lbl-idx">${esc(i)}</b>${rec && i === rec ? `<div class="lo-sugg">suggested for this power</div>` : ""}</th>
+        ${sups.map((s) => `<td>${cell(i, s)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
 /* Mark, 4 Nov 2026: offer the options, don't push one. Every lens that covers the Rx, cheapest
    first; a lower index than the Lens Finder suggests is listed too, marked "thicker". */
 function loAnswer(m) {
@@ -4076,8 +4108,7 @@ function loAnswer(m) {
                 <td class="lo-num">${loMoney(o.cost)}${o.basis === "deal" || o.basis === "promo" ? ` <span class="chip chip-basis chip-${esc(o.basis)}">${esc(o.basis)}</span>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
         const main = priced.length ? priced : unpriced;
         return `${a.blank_note && !/leads/.test(a.blank_note) ? `<div class="lo-note">${esc(a.blank_note)}</div>` : ""}
-        <div class="lo-k lo-alt-head">${main.length} lens${main.length === 1 ? "" : "es"} for this Rx, cheapest first${rec ? ` · suggested index for this power: <b>${esc(rec)}</b>` : ""}</div>
-        ${table(main)}
+        ${loGrid(main, rec)}
         ${priced.length && unpriced.length ? `<details class="lo-why"><summary>${unpriced.length} more not on our price sheet</summary>${table(unpriced)}</details>` : ""}
         <details class="lo-why"><summary>Lens Finder notes</summary><ul>${whyBullets(a.verdict)}</ul></details>`;
     }
