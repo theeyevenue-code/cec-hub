@@ -61,8 +61,9 @@ def clean_ids(raw) -> tuple[list[str], list[str]]:
     return good, bad
 
 
-def run(cfg: dict, command: str, ids: list[str] | None = None) -> dict:
-    """Run the agent's engine. Never raises."""
+def run(cfg: dict, command: str, ids: list[str] | None = None,
+        own: list[str] | None = None) -> dict:
+    """Run the agent's engine. Never raises. own = glasses jobs switched to "Replacement lenses"."""
     if not connected(cfg):
         return {"ok": False, "connected": False, "error": NOT_CONNECTED}
     args = [command, "--json"]
@@ -70,6 +71,10 @@ def run(cfg: dict, command: str, ids: list[str] | None = None) -> dict:
         if not all(ID_RE.match(i) for i in ids):      # belt and braces
             return {"ok": False, "error": "Only job numbers can be checked."}
         args += ["--ids", ",".join(ids)]
+    if own:
+        if not all(ID_RE.match(i) for i in own):
+            return {"ok": False, "error": "Only job numbers can be checked."}
+        args += ["--own", ",".join(own)]
     python = (cfg.get("optomate_agent") or {}).get("python") or sys.executable
     try:
         proc = subprocess.run([python, "-m", "orders.jobscan", *args],
@@ -109,8 +114,10 @@ def lookup(cfg: dict, raw) -> dict:
     return out
 
 
-def confirm(cfg: dict, raw, expected) -> dict:
-    """expected = how many jobs the dialog promised; a mismatch changes nothing."""
+def confirm(cfg: dict, raw, expected, own_raw=None) -> dict:
+    """expected = how many jobs the dialog promised; a mismatch changes nothing.
+    own_raw = glasses jobs staff switched to "Replacement lenses" (own frame, patient has it;
+    Mark 4 Nov 2026) - only ones also being confirmed, glasses only."""
     good, _ = clean_ids(raw)
     if not good:
         return {"ok": False, "error": "No jobs to confirm."}
@@ -121,4 +128,6 @@ def confirm(cfg: dict, raw, expected) -> dict:
     if expected != len(good):
         return {"ok": False, "error": "The list changed while the box was open. Nothing changed - "
                                       "press Confirm again."}
-    return run(cfg, "confirm", good)
+    own_good, _ = clean_ids(own_raw)
+    own = [i for i in own_good if i in good and i.startswith("G")]
+    return run(cfg, "confirm", good, own)

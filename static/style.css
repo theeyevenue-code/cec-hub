@@ -2166,6 +2166,8 @@ tr.ja-flash td { animation: ja-flash 1.2s ease-out; }
 .ja-pick span { display: block; font-size: 15px; font-weight: 400; margin-top: 2px; }
 .ja-chip.ja-call, .ja-key .ja-call { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber-ink); }
 .ja-chip.ja-plain { background: #fff; border-color: #b5b5b5; color: #4a4a4a; }
+.ja-own { font: inherit; font-size: 15px; font-weight: 600; padding: 4px 12px; margin-left: 4px; border-radius: 999px; border: 1px solid #b5b5b5; background: #fff; color: #4a4a4a; cursor: pointer; }
+.ja-own-on { background: #ede7f6; border-color: #6a4c9c; color: #4a2f7a; }
 .ja-key .ja-amber { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber-ink); }
 .ja-callword { color: var(--amber-ink); }
 @media (max-width: 700px) { .ja-table th:nth-child(4), .ja-table td:nth-child(4) { display: none; } }

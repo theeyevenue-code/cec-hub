@@ -759,7 +759,7 @@ def jobscan_lookup():
 @staff_only
 def jobscan_confirm():
     data = request.get_json(silent=True) or {}
-    out = jobscan.confirm(_integrations(), data.get("ids"), data.get("expected"))
+    out = jobscan.confirm(_integrations(), data.get("ids"), data.get("expected"), data.get("own"))
     if out.get("ok"):
         c = out.get("counts") or {}
         logger.info("Jobs arrived: confirm %s - done %d, would %d, skipped %d, failed %d, texted %d",
