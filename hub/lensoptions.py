@@ -5,6 +5,12 @@ patients whose spectacle Rx was saved today (or search by name), and the page
 shows the best spectacle lens for that Rx, the alternatives and the prices,
 in plain words.
 
+OPTIONS, NOT A PICK (Mark, 4 Nov 2026: "overcharging is also not good ... think of this not so much
+as recommending the top lens, but more about offering different lenses"; a patient chose Synchrony
+1.56 when the page led with a 1.67). The page lists EVERY lens we order that covers the Rx, cheapest
+first - lower indices included, marked "thicker" with the index the Lens Finder suggests. "best" /
+"others" stay in the answer for the Lens Finder assistant and older callers.
+
   hub/lens_bridge.py    reads Optomate (SQL, read only) in a subprocess
   this module           turns the saved Rx into Lens Finder questions, one per
                         lens type, and trims the answers for the page
@@ -369,15 +375,37 @@ def blank_line(o: dict, key, avail: dict, need: dict | None, fits_at: list) -> t
     return False, line
 
 
+def blank_mismatch(listed: list, need: dict | None) -> dict | None:
+    """Mark, 4 Nov 2026: flag in red when the frame's (rough) blank estimate and the stock
+    blank sizes don't match. Every stock lens on the page that is too small for the frame,
+    with the biggest blank it comes in; None when there is no frame estimate or all fit.
+    Only lenses on the price sheet when any are (the same set the grid shows)."""
+    if not need:
+        return None
+    shown = [x for x in listed if x.get("sell") is not None] or listed
+    stock = [x for x in shown if x.get("type") == "Stock"]
+    small = [x for x in stock if x.get("fits") is False]
+    if not small:
+        return None
+    small.sort(key=lambda x: (str(x.get("supplier") or ""), float(x.get("index") or 0)))
+    return {
+        "need": _mm(max(need.values())),
+        "none_fit": len(small) == len(stock),
+        "lenses": [{"supplier": x.get("supplier") or "", "index": x.get("index") or "",
+                    "name": x.get("name") or "", "largest": _mm(max(x["blanks"])) if x.get("blanks") else ""}
+                   for x in small],
+    }
+
+
 def summarise(result: dict, sells: dict, avail: dict | None = None,
               need: dict | None = None) -> dict:
     """The engine's answer cut to what the page shows: one line per lens, each
     with its blank verdict; the cheapest that FITS leads (engine order, with
     stock lenses too small for the frame moved behind the ones that fit)."""
     avail = avail or {}
-    options = [o for o in result.get("options") or [] if o.get("orderable", True)
-               and not o.get("hard_under") and o.get("standard_coating", True)
-               and o.get("plain", True)]
+    every = [o for o in result.get("options") or [] if o.get("orderable", True)
+             and o.get("standard_coating", True) and o.get("plain", True)]
+    options = [o for o in every if not o.get("hard_under")]
     lines, seen = [], set()
     for o in options:
         key = _pkey(o)
@@ -409,7 +437,23 @@ def summarise(result: dict, sells: dict, avail: dict | None = None,
             x["blank_mm"] = max(picked) if ok and picked else (sizes[-1] if not ok else sizes[0])
         return x
     rest = [out(v) for v in ordered if v is not best]
+
+    # the full list for the page: every lens covering the Rx, thinner-suggested ones included
+    listed, seen_all = [], set()
+    for o in every:
+        key = _pkey(o)
+        if key in seen_all:
+            continue
+        seen_all.add(key)
+        ok, line = blank_line(o, key, avail, need, [f"{i} stock" for i in fit_idx])
+        x = out((ok, o, key, line))
+        x["steps_under"] = int(o.get("steps_under") or 0)
+        x["thicker"] = x["steps_under"] > 0
+        listed.append(x)
+    listed.sort(key=lambda x: (x["fits"] is False, x["sell"] is None,
+                               x["sell"] if x["sell"] is not None else (x["cost"] or 0), x["cost"] or 0))
     engine_best = next((o for o in result.get("options") or [] if o.get("best")), None)
+    blank_warning = blank_mismatch(listed, need)
     note = ""
     if best and engine_best is not None and _pkey(engine_best) != best[2]:
         note = ("The usual first choice is too small for this frame (blank estimate), "
@@ -419,7 +463,9 @@ def summarise(result: dict, sells: dict, avail: dict | None = None,
     return {
         "best": out(best) if best else None,
         "others": rest[:SHOW], "more": max(0, len(rest) - SHOW),
+        "options": listed,
         "blank_note": note,
+        "blank_warning": blank_warning,
         "headline": result.get("headline") or "", "verdict": result.get("verdict") or "",
         "rec_index": _fmt_index(result.get("rec_index")),
         "rx_display": (result.get("rx") or {}).get("display", ""),

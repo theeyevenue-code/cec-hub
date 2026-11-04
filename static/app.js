@@ -4055,9 +4055,63 @@ function loSupplier(s) {
     return /^zeiss$/i.test(s || "") ? ZEISS_LOGO : `<span class="lo-supword">${esc(s || "")}</span>`;
 }
 
+/* The options as a grid (Mark, 4 Nov 2026): one row per index, thinnest-last (1.50 down to 1.74),
+   one column per supplier (Synchrony, ZEISS, then any other). In each cell stock comes before grind,
+   then cheapest. Green = fits this frame, grey = made to order, red = stock blank too small. The
+   suggested index is a quiet note on its row - an option, not a pick. */
+const LO_SUPPLIER_ORDER = ["synchrony", "zeiss"];
+function loGrid(list, rec) {
+    const idx = [...new Set(list.map((o) => o.index))].sort((x, y) => parseFloat(x) - parseFloat(y));
+    const sups = [...new Set(list.map((o) => o.supplier))].sort((x, y) => {
+        const r = (s) => { const i = LO_SUPPLIER_ORDER.indexOf(String(s).toLowerCase()); return i < 0 ? 99 : i; };
+        return r(x) - r(y) || String(x).localeCompare(String(y));
+    });
+    const rank = (o) => (o.fits === false ? 2 : o.type === "Stock" ? 0 : 1);
+    const item = (o) => {
+        const cls = o.fits === false ? "lo-it-nofit" : o.type === "Stock" ? "lo-it-stock" : "lo-it-grind";
+        const fit = o.fits === false ? o.blank_line.replace(/\. .*$/, "")
+            : o.type === "Stock" ? (o.blank_line || "Stock") : "Made to order";
+        return `<div class="lo-it ${cls}"><div class="lo-it-top"><span class="lo-it-kind">${esc(o.type)}</span>
+            <span class="lo-it-name">${esc(o.name.toLowerCase() === o.type.toLowerCase() ? o.category : o.name)}</span>
+            <span class="lo-it-price">${o.sell != null ? loMoney(o.sell) : "—"}</span></div>
+            <div class="lo-it-sub">${esc(fit)} · ${esc(coatShort(o.coating))} · cost ${loMoney(o.cost)}${o.code ? " · " + esc(o.code) : ""}</div></div>`;
+    };
+    const cell = (i, s) => {
+        const xs = list.filter((o) => o.index === i && o.supplier === s)
+            .sort((p, q) => rank(p) - rank(q) || (p.sell ?? 1e9) - (q.sell ?? 1e9));
+        return xs.length ? xs.map(item).join("") : `<div class="lo-it-none">Not for this Rx</div>`;
+    };
+    return `<div class="lo-k lo-alt-head">Lenses for this Rx · per pair · <span class="lo-key"><span class="lo-it-stock">fits</span> <span class="lo-it-grind">made to order</span> <span class="lo-it-nofit">blank too small</span></span></div>
+    <div class="table-scroll"><table class="lo-grid"><thead><tr><th>Index</th>${sups.map((s) => `<th>${loSupplier(s)}</th>`).join("")}</tr></thead>
+    <tbody>${idx.map((i) => `<tr><th class="lo-grid-idx"><b class="lbl-idx">${esc(i)}</b>${rec && i === rec ? `<div class="lo-sugg">suggested for this power</div>` : ""}</th>
+        ${sups.map((s) => `<td>${cell(i, s)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+/* Mark, 4 Nov 2026: offer the options, don't push one. Every lens that covers the Rx, cheapest
+   first; a lower index than the Lens Finder suggests is listed too, marked "thicker". */
 function loAnswer(m) {
     if (m.unavailable) return `<div class="lo-unavail">${esc(m.unavailable)}</div>`;
     const a = m.answer;
+    const opts = (a && a.options) || [];
+    if (opts.length) {
+        const rec = a.rec_index ? fmtIndex(a.rec_index) : "";
+        // only lenses on our price sheet can be quoted; the rest fold away
+        const priced = opts.filter((o) => o.sell != null);
+        const unpriced = opts.filter((o) => o.sell == null);
+        const table = (list) => `<div class="table-scroll"><table class="lo-alts lo-list"><thead><tr>
+            <th>Lens</th><th>Supplier</th><th>Blank</th><th class="lo-num">Sells / pair</th><th class="lo-num">Cost / lens</th></tr></thead>
+            <tbody>${list.map((o) => `<tr class="${o.fits === false ? "lo-row-nofit" : o.type === "Stock" ? "lo-row-stock" : "lo-row-grind"}">
+                <td>${loLensName(o)}<div class="lo-sub">${esc(o.type)} · ${esc(coatShort(o.coating))}${o.code ? " · code " + esc(o.code) : ""}${o.thicker ? ` · <span class="lo-thick">thicker${rec ? " than " + esc(rec) : ""}</span>` : ""}</div></td>
+                <td>${loSupplier(o.supplier)}</td>
+                <td class="lo-blankcell">${esc(o.blank_line || (o.blank_mm != null ? fmtMM(o.blank_mm) : "to size"))}</td>
+                <td class="lo-num lo-sell">${o.sell != null ? loMoney(o.sell) : `<span class="lo-u">not on price sheet</span>`}</td>
+                <td class="lo-num">${loMoney(o.cost)}${o.basis === "deal" || o.basis === "promo" ? ` <span class="chip chip-basis chip-${esc(o.basis)}">${esc(o.basis)}</span>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+        const main = priced.length ? priced : unpriced;
+        return `${a.blank_note && !/leads/.test(a.blank_note) ? `<div class="lo-note">${esc(a.blank_note)}</div>` : ""}
+        ${loGrid(main, rec)}
+        ${priced.length && unpriced.length ? `<details class="lo-why"><summary>${unpriced.length} more not on our price sheet</summary>${table(unpriced)}</details>` : ""}
+        <details class="lo-why"><summary>Lens Finder notes</summary><ul>${whyBullets(a.verdict)}</ul></details>`;
+    }
     if (!a || !a.best) {
         return `<div class="lo-answer lo-none"><div class="lo-big">No lens we order covers this Rx</div>
             ${a ? `<details class="lo-why"><summary>Why</summary><ul>${whyBullets(a.verdict)}</ul></details>` : ""}</div>`;
@@ -4146,13 +4200,25 @@ function loBlank(b) {
         <ul class="lo-sub">${b.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></details>`;
 }
 
+/* Mark, 4 Nov 2026: a red flag when the frame's rough blank estimate and the stock blank sizes
+   don't match - which stock lenses are too small, and the biggest each comes in. */
+function loBlankWarning(w) {
+    if (!w || !(w.lenses || []).length) return "";
+    const head = w.none_fit
+        ? `No stock blank is big enough: frame needs about ${esc(w.need)}`
+        : `Frame needs about ${esc(w.need)}: ${w.lenses.length} stock lens${w.lenses.length === 1 ? " is" : "es are"} too small`;
+    return `<div class="lo-blankwarn" role="alert"><div class="lo-blankwarn-head">${head}</div>
+        <ul>${w.lenses.map((x) => `<li><b>${esc(fmtIndex(x.index))}</b> ${esc(x.supplier)} ${esc(x.name)}${x.largest ? ` <span class="lo-blankwarn-mm">largest ${esc(x.largest)}</span>` : ""}</li>`).join("")}</ul>
+        <div class="lo-blankwarn-foot">${w.none_fit ? "Grind" : "Use a stock lens that fits (green), grind"}, or choose a smaller frame. Rough estimate: check the blank before ordering.</div></div>`;
+}
+
 function loPart(part, many) {
     return `<div class="lo-part">
         ${many ? `<div class="lo-parttitle">${esc(part.title)}</div>` : `<div class="lo-modelong">${esc(part.title)}</div>`}
         ${(part.working || []).length ? `<div class="lo-working">${part.working.map(esc).join("<br>")}</div>` : ""}
         ${(part.notes || []).length ? `<div class="lo-sub">${part.notes.map(esc).join(" ")}</div>` : ""}
         ${loBlank(part.blank)}
-        ${part.answer && part.answer.blank_warning ? `<div class="lo-note">${esc(part.answer.blank_warning)}</div>` : ""}
+        ${loBlankWarning(part.answer && part.answer.blank_warning)}
         ${loAnswer(part)}
         ${part.unavailable ? "" : cmpPanel("p-" + part.key, part.key)}
     </div>`;
