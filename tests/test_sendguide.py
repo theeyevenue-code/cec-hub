@@ -819,3 +819,16 @@ def test_every_shipped_print_item_is_refused_by_send():
     assert len(shipped) >= 4
     for g in shipped:
         assert sendguide.guide_bytes(cfg, g)[0] is None
+
+
+def test_day_list_leaves_out_jennifer_cheas_appointments(monkeypatch):
+    # Mark 4 Nov 2026: Jennifer Chea = Optomate user 2; Jenny Livanos (3) stays
+    monkeypatch.setattr(sendguide.checkin, "connected", lambda cfg: True)
+    appts = [{"patient_id": 1, "given": "A", "surname": "One", "time": "09:00", "optometrist_id": 5},
+             {"patient_id": 2, "given": "B", "surname": "Two", "time": "09:30", "optometrist_id": 2},
+             {"patient_id": 3, "given": "C", "surname": "Three", "time": "10:00", "optometrist_id": "2"},
+             {"patient_id": 4, "given": "D", "surname": "Four", "time": "10:30", "optometrist_id": 3},
+             {"patient_id": 5, "given": "E", "surname": "Five", "time": "11:00", "optometrist_id": None}]
+    monkeypatch.setattr(sendguide.checkin, "run_engine", lambda cfg, *a, **k: {"appointments": appts})
+    rows = sendguide.today({})["appointments"]
+    assert [r["patient_id"] for r in rows] == [1, 4, 5]
