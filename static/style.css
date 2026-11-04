@@ -1712,6 +1712,35 @@ body.lens-mono main { background: #fafafa; }
 .asst-home .lo-chat-form input { font-size: 18px; min-height: 48px; }
 .asst-notes { margin: 6px 0 14px 20px; }
 
+/* Lens options grid (Mark, 4 Nov 2026): index rows x supplier columns; colour = fits / to order / too small */
+.lo-grid { border-collapse: collapse; width: 100%; font-size: 16px; }
+.lo-grid th, .lo-grid td { border-bottom: 1px solid #e3e3e3; padding: 8px 10px; vertical-align: top; text-align: left; }
+.lo-grid thead th { font-size: 15px; color: #4a4a4a; }
+.lo-grid-idx { width: 6.5em; font-size: 20px; }
+.lo-sugg { font-size: 14px; font-weight: 400; color: #6b6b6b; }
+.lo-it { border-left: 4px solid #b5b5b5; padding: 4px 8px; margin: 0 0 6px; }
+.lo-it-top { display: flex; gap: 8px; align-items: baseline; }
+.lo-it-kind { font-size: 14px; font-weight: 700; text-transform: uppercase; min-width: 3.6em; }
+.lo-it-name { flex: 1; }
+.lo-it-price { font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
+.lo-it-sub { font-size: 14px; color: #5a5a5a; }
+.lo-it-stock { border-left-color: var(--green); }
+.lo-it-stock .lo-it-kind, .lo-key .lo-it-stock { color: var(--green-dark); }
+.lo-it-grind { border-left-color: #b5b5b5; }
+.lo-blankwarn { margin: 12px 0; padding: 12px 16px; border: 2px solid var(--danger-ink);
+    background: var(--danger-bg); color: var(--danger-ink); border-radius: 6px; font-size: 17px; }
+.lo-blankwarn-head { font-size: 20px; font-weight: 700; }
+.lo-blankwarn ul { margin: 6px 0 6px 20px; padding: 0; }
+.lo-blankwarn-mm { font-variant-numeric: tabular-nums; }
+.lo-blankwarn-foot { font-size: 15px; }
+.lo-it-nofit { border-left-color: var(--danger-ink); opacity: .8; }
+.lo-it-nofit .lo-it-kind, .lo-key .lo-it-nofit { color: var(--danger-ink); }
+.lo-it-none { color: #8a8a8a; font-size: 14px; }
+.lo-key span { font-size: 14px; font-weight: 600; margin-left: 8px; text-transform: none; }
+.lo-key .lo-it-grind { color: #6b6b6b; }
+.lo-list .lo-sell { font-weight: 700; font-size: 18px; }
+.lo-thick { color: #8a5a00; }
+
 /* --- Medicare rejections (Mark's readability standard: answer first, 17px+ body, nothing
        under 14px, colour only with a meaning - red = resubmit-by within a month; no side-bar
        accent lines. Codex review applied 9 Oct 2026) -------------------------------------- */
@@ -2135,34 +2164,6 @@ body.lens-mono main { background: #fafafa; }
 .ja-num { white-space: nowrap; text-align: right; }
 .ja-why { font-size: 15px; color: var(--muted); margin-top: 2px; }
 .ja-sms { font-size: 16px; color: #2b2b2b; margin-top: 6px; max-width: 46em; white-space: normal; }
-/* Lens options grid (Mark, 4 Nov 2026): index rows x supplier columns; colour = fits / to order / too small */
-.lo-grid { border-collapse: collapse; width: 100%; font-size: 16px; }
-.lo-grid th, .lo-grid td { border-bottom: 1px solid #e3e3e3; padding: 8px 10px; vertical-align: top; text-align: left; }
-.lo-grid thead th { font-size: 15px; color: #4a4a4a; }
-.lo-grid-idx { width: 6.5em; font-size: 20px; }
-.lo-sugg { font-size: 14px; font-weight: 400; color: #6b6b6b; }
-.lo-it { border-left: 4px solid #b5b5b5; padding: 4px 8px; margin: 0 0 6px; }
-.lo-it-top { display: flex; gap: 8px; align-items: baseline; }
-.lo-it-kind { font-size: 14px; font-weight: 700; text-transform: uppercase; min-width: 3.6em; }
-.lo-it-name { flex: 1; }
-.lo-it-price { font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
-.lo-it-sub { font-size: 14px; color: #5a5a5a; }
-.lo-it-stock { border-left-color: var(--green); }
-.lo-it-stock .lo-it-kind, .lo-key .lo-it-stock { color: var(--green-dark); }
-.lo-it-grind { border-left-color: #b5b5b5; }
-.lo-blankwarn { margin: 12px 0; padding: 12px 16px; border: 2px solid var(--danger-ink);
-    background: var(--danger-bg); color: var(--danger-ink); border-radius: 6px; font-size: 17px; }
-.lo-blankwarn-head { font-size: 20px; font-weight: 700; }
-.lo-blankwarn ul { margin: 6px 0 6px 20px; padding: 0; }
-.lo-blankwarn-mm { font-variant-numeric: tabular-nums; }
-.lo-blankwarn-foot { font-size: 15px; }
-.lo-it-nofit { border-left-color: var(--danger-ink); opacity: .8; }
-.lo-it-nofit .lo-it-kind, .lo-key .lo-it-nofit { color: var(--danger-ink); }
-.lo-it-none { color: #8a8a8a; font-size: 14px; }
-.lo-key span { font-size: 14px; font-weight: 600; margin-left: 8px; text-transform: none; }
-.lo-key .lo-it-grind { color: #6b6b6b; }
-.lo-list .lo-sell { font-weight: 700; font-size: 18px; }
-.lo-thick { color: #8a5a00; }
 .ja-chip { display: inline-block; font-size: 15px; font-weight: 600; padding: 2px 10px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
 tr.ja-ok .ja-chip, .ja-key .ja-ok { background: #e3f3ea; border-color: var(--green); color: var(--green-dark); }
 tr.ja-grey td { color: #6b6b6b; background: #f4f4f4; }
