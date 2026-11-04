@@ -194,3 +194,14 @@ def test_confirm_without_replacement_lens_jobs_sends_no_own(agent, calls):
     calls.reply = {"ok": True, "nothing_changed": True, "counts": {"would": 1}, "results": []}
     jobscan.confirm(agent, ["G1"], 1)
     assert "--own" not in calls[0][0]
+
+
+def test_preview_runs_the_agent_dry(agent, calls):
+    calls.reply = {"ok": True, "texts": [{"key": "G1", "text": "Would text", "message": "Hi"}]}
+    out = jobscan.preview(agent, ["G1", "C2"], ["G1"])
+    assert calls[0][0][3:] == ["preview", "--json", "--ids", "G1,C2", "--own", "G1"]
+    assert out["texts"][0]["message"] == "Hi"
+
+
+def test_preview_of_nothing_never_runs_the_engine(agent, calls):
+    assert jobscan.preview(agent, [], []) == {"ok": True, "texts": []} and calls == []

@@ -29,7 +29,7 @@ from hub import checkin
 ID_RE = re.compile(r"^(?:[GC])?\d{1,9}$")
 TOKEN_RE = re.compile(r"^(?:(G|C|CL)[:-]?)?(\d{1,9})$", re.I)
 MAX_IDS = 60
-TIMEOUTS = {"status": 30, "lookup": 30, "confirm": 300}
+TIMEOUTS = {"status": 30, "lookup": 30, "preview": 45, "confirm": 300}
 NOT_CONNECTED = "Jobs arrived isn't connected to Optomate on this computer."
 TIMEOUT_CONFIRM = ("Optomate took too long, so some jobs may be done and some not. "
                    "Scan the cards again: finished jobs show grey and are never texted twice.")
@@ -114,6 +114,20 @@ def lookup(cfg: dict, raw) -> dict:
     return out
 
 
+def _own(own_raw, good: list[str]) -> list[str]:
+    own_good, _ = clean_ids(own_raw)
+    return [i for i in own_good if i in good and i.startswith("G")]
+
+
+def preview(cfg: dict, raw, own_raw=None) -> dict:
+    """The text each scanned job would get (Mark, 4 Nov 2026: staff see what goes out).
+    A dry run of Confirm in the agent: nothing written, nothing sent."""
+    good, _ = clean_ids(raw)
+    if not good:
+        return {"ok": True, "texts": []}
+    return run(cfg, "preview", good, _own(own_raw, good))
+
+
 def confirm(cfg: dict, raw, expected, own_raw=None) -> dict:
     """expected = how many jobs the dialog promised; a mismatch changes nothing.
     own_raw = glasses jobs staff switched to "Replacement lenses" (own frame, patient has it;
@@ -128,6 +142,4 @@ def confirm(cfg: dict, raw, expected, own_raw=None) -> dict:
     if expected != len(good):
         return {"ok": False, "error": "The list changed while the box was open. Nothing changed - "
                                       "press Confirm again."}
-    own_good, _ = clean_ids(own_raw)
-    own = [i for i in own_good if i in good and i.startswith("G")]
-    return run(cfg, "confirm", good, own)
+    return run(cfg, "confirm", good, _own(own_raw, good))

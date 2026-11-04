@@ -4740,7 +4740,8 @@ async function renderStocktake(sid) {
    patient kept the frame - that job gets the "bring in your glasses" text. Optomate's own-frame tick
    is only a hint ("Own frame in Optomate"): it is also ticked when the frame was left with us. */
 
-const ja = { lines: new Map(), own: new Set(), gates: null, words: "", busy: false, seq: 0 };
+const ja = { lines: new Map(), own: new Set(), gates: null, words: "", busy: false, seq: 0,
+             texts: new Map(), pvSeq: 0, pvTimer: null, pvFor: "" };
 const JA_STATE = {
     ok: ["Ready to mark", "ja-ok"], received: ["Already in", "ja-grey"], looking: ["Checking…", "ja-wait"],
     cancelled: ["Cancelled", "ja-red"], notfound: ["Not found", "ja-red"], bad: ["Not a job number", "ja-red"],
@@ -4751,6 +4752,7 @@ const JA_TYPE = { glasses: ["GLASSES", "ja-type-g"], contacts: ["CONTACTS", "ja-
 function renderJobsArrived() {
     reloadIfHubChanged();      // empty list: nothing to lose
     ja.lines = new Map(); ja.own = new Set(); ja.busy = false; ja.seq += 1;
+    ja.texts = new Map(); ja.pvFor = ""; clearTimeout(ja.pvTimer);
     view.innerHTML = `<div class="ja-page">
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Jobs arrived</h1>
@@ -4876,8 +4878,8 @@ function jaRow(l) {
         const on = ja.own.has(l.key);
         extra.push(`<button type="button" class="ja-own${on ? " ja-own-on" : ""}" data-ja-own="${esc(l.key)}" aria-pressed="${on}">${on ? "✓ " : ""}Replacement lenses</button>`);
         if (l.own_frame && !on) extra.push(`<div class="ja-why">Own frame in Optomate - does the patient have it? Press Replacement lenses.</div>`);
-        if (on) extra.push(`<div class="ja-why">Text asks them to bring in their glasses</div>`);
     }
+    if (l.state === "ok") extra.push(jaTextPreview(l.key));
     const why = [l.state !== "bad" && l.reason ? l.reason : "", l.note || ""].filter(Boolean);
     const others = (l.others || []).map((o) => o.old
         ? `<div class="ja-other ja-other-old">Old open job - check: ${esc(o.what)}, job ${esc(o.job)} (ordered ${esc(o.ordered || "?")})</div>`
@@ -4891,6 +4893,37 @@ function jaRow(l) {
         <td><span class="ja-chip">${esc(word)}</span> ${extra.join(" ")}${why.map((w) => `<div class="ja-why">${esc(w)}</div>`).join("")}</td>
         <td><button class="btn btn-quiet ja-x" type="button" data-ja-remove="${esc(l.key)}" aria-label="Remove job ${esc(l.id)}">Remove</button></td>
     </tr>${others ? `<tr class="${cls} ja-others-row"><td></td><td colspan="6">${others}</td></tr>` : ""}`;
+}
+
+/* What this job's patient would be texted if Confirm were pressed now (agent dry run). */
+function jaTextPreview(key) {
+    const t = ja.texts.get(key);
+    if (!t) return `<div class="ja-sms ja-sms-wait">Text: checking…</div>`;
+    if (t.message) return `<div class="ja-sms">${esc(t.text.replace(/^Would text/, "Texts"))}:<br>“${esc(t.message)}”</div>`;
+    return `<div class="ja-why">${esc(t.text || "No text")}</div>`;
+}
+
+/* re-ask the agent whenever the ready list or the switches change (debounced) */
+function jaPreviewSoon() {
+    const ready = jaReady();
+    const ids = ready.map((l) => l.key);
+    const own = ids.filter((k) => ja.own.has(k));
+    const sig = ids.join(",") + "|" + own.join(",");
+    if (sig === ja.pvFor) return;
+    ja.pvFor = sig;
+    ja.texts = new Map();
+    clearTimeout(ja.pvTimer);
+    if (!ids.length) return;
+    const seq = ++ja.pvSeq;
+    ja.pvTimer = setTimeout(async () => {
+        let r;
+        try { r = await ciCall("/api/jobscan/preview", { ids, own }); } catch (e) { r = { status: 0, data: {} }; }
+        if (seq !== ja.pvSeq) return;
+        const d = r.data || {};
+        ja.texts = new Map((d.ok ? d.texts || [] : []).map((t) => [t.key, t]));
+        if (!d.ok) ids.forEach((k) => ja.texts.set(k, { key: k, text: "Couldn't preview the text - Confirm still checks everything", message: "" }));
+        jaDraw();
+    }, 500);
 }
 
 function jaDraw() {
@@ -4917,6 +4950,7 @@ function jaDraw() {
         if (opt) jaReplace(b.dataset.jaPick, { ...opt });
         document.getElementById("ja-in").focus();
     }));
+    jaPreviewSoon();
     const ready = jaReady();
     const n = ready.length;
     const nc = ready.filter((l) => l.type === "contacts").length;
@@ -5003,7 +5037,7 @@ function jaResults(d) {
                     <td class="ja-name">${esc(x.name)}${(x.others || []).map((o) => `<div class="ja-other${o.old ? " ja-other-old" : ""}">${o.old ? "Old open job - check" : "Still open"}: ${esc(o.what)}, job ${esc(o.job)}</div>`).join("")}</td>
                     <td><span class="ja-chip">${esc(word)}</span></td>
                     <td>${esc(x.write)}</td>
-                    <td>${x.own ? `<span class="ja-chip ja-plain">Replacement lenses</span> ` : ""}${x.call ? `<span class="ja-chip ja-call">${esc(x.text)}</span>` : esc(x.text)}${x.message && d.nothing_changed ? `<div class="ja-sms">“${esc(x.message)}”</div>` : ""}${x.job_note ? `<div class="ja-why">${esc(x.job_note)}</div>` : ""}</td>
+                    <td>${x.own ? `<span class="ja-chip ja-plain">Replacement lenses</span> ` : ""}${x.call ? `<span class="ja-chip ja-call">${esc(x.text)}</span>` : esc(x.text)}${x.message ? `<div class="ja-sms">“${esc(x.message)}”</div>` : ""}${x.job_note ? `<div class="ja-why">${esc(x.job_note)}</div>` : ""}</td>
                 </tr>`; }).join("")}</tbody></table>
         <button class="btn ja-go" type="button" id="ja-again">Scan more jobs</button>
     </div>`;
