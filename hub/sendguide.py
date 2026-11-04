@@ -542,8 +542,15 @@ def setup(cfg: dict) -> dict:
             "fixture": bool(m.get("fixture"))}
 
 
+# Optometrists whose patients are left off the day list (Optomate USERS.ID = the appointment's
+# OPTOMETRIST_ID). Mark, 4 Nov 2026: exclude Jennifer Chea's appointments (2 = JC, checked by SQL;
+# Jenny Livanos is 3 and stays). Search still finds anyone.
+EXCLUDE_OPTOMETRIST_IDS = {2}
+
+
 def today(cfg: dict) -> dict:
-    """Today's appointments, via the Check-in engine (hub/checkin.py's reader)."""
+    """Today's appointments, via the Check-in engine (hub/checkin.py's reader), minus the
+    optometrists in EXCLUDE_OPTOMETRIST_IDS."""
     if not checkin.connected(cfg):
         return {"connected": False, "message": NOT_CONNECTED}
     data = checkin.run_engine(cfg, "today")
@@ -551,8 +558,16 @@ def today(cfg: dict) -> dict:
         return {"connected": True, "error": data["error"]}
     rows = [{"patient_id": a.get("patient_id"), "time": a.get("time") or "",
              "name": " ".join(x for x in (a.get("given"), a.get("surname")) if x)}
-            for a in data.get("appointments") or [] if a.get("patient_id")]
+            for a in data.get("appointments") or [] if a.get("patient_id")
+            and _opt_id(a.get("optometrist_id")) not in EXCLUDE_OPTOMETRIST_IDS]
     return {"connected": True, "appointments": rows, "fixture": bool(data.get("fixture"))}
+
+
+def _opt_id(v) -> int | None:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
 
 
 def search(cfg: dict, q) -> dict:
