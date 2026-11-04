@@ -4055,9 +4055,32 @@ function loSupplier(s) {
     return /^zeiss$/i.test(s || "") ? ZEISS_LOGO : `<span class="lo-supword">${esc(s || "")}</span>`;
 }
 
+/* Mark, 4 Nov 2026: offer the options, don't push one. Every lens that covers the Rx, cheapest
+   first; a lower index than the Lens Finder suggests is listed too, marked "thicker". */
 function loAnswer(m) {
     if (m.unavailable) return `<div class="lo-unavail">${esc(m.unavailable)}</div>`;
     const a = m.answer;
+    const opts = (a && a.options) || [];
+    if (opts.length) {
+        const rec = a.rec_index ? fmtIndex(a.rec_index) : "";
+        // only lenses on our price sheet can be quoted; the rest fold away
+        const priced = opts.filter((o) => o.sell != null);
+        const unpriced = opts.filter((o) => o.sell == null);
+        const table = (list) => `<div class="table-scroll"><table class="lo-alts lo-list"><thead><tr>
+            <th>Lens</th><th>Supplier</th><th>Blank</th><th class="lo-num">Sells / pair</th><th class="lo-num">Cost / lens</th></tr></thead>
+            <tbody>${list.map((o) => `<tr class="${o.fits === false ? "lo-row-nofit" : o.type === "Stock" ? "lo-row-stock" : "lo-row-grind"}">
+                <td>${loLensName(o)}<div class="lo-sub">${esc(o.type)} · ${esc(coatShort(o.coating))}${o.code ? " · code " + esc(o.code) : ""}${o.thicker ? ` · <span class="lo-thick">thicker${rec ? " than " + esc(rec) : ""}</span>` : ""}</div></td>
+                <td>${loSupplier(o.supplier)}</td>
+                <td class="lo-blankcell">${esc(o.blank_line || (o.blank_mm != null ? fmtMM(o.blank_mm) : "to size"))}</td>
+                <td class="lo-num lo-sell">${o.sell != null ? loMoney(o.sell) : `<span class="lo-u">not on price sheet</span>`}</td>
+                <td class="lo-num">${loMoney(o.cost)}${o.basis === "deal" || o.basis === "promo" ? ` <span class="chip chip-basis chip-${esc(o.basis)}">${esc(o.basis)}</span>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+        const main = priced.length ? priced : unpriced;
+        return `${a.blank_note && !/leads/.test(a.blank_note) ? `<div class="lo-note">${esc(a.blank_note)}</div>` : ""}
+        <div class="lo-k lo-alt-head">${main.length} lens${main.length === 1 ? "" : "es"} for this Rx, cheapest first${rec ? ` · suggested index for this power: <b>${esc(rec)}</b>` : ""}</div>
+        ${table(main)}
+        ${priced.length && unpriced.length ? `<details class="lo-why"><summary>${unpriced.length} more not on our price sheet</summary>${table(unpriced)}</details>` : ""}
+        <details class="lo-why"><summary>Lens Finder notes</summary><ul>${whyBullets(a.verdict)}</ul></details>`;
+    }
     if (!a || !a.best) {
         return `<div class="lo-answer lo-none"><div class="lo-big">No lens we order covers this Rx</div>
             ${a ? `<details class="lo-why"><summary>Why</summary><ul>${whyBullets(a.verdict)}</ul></details>` : ""}</div>`;

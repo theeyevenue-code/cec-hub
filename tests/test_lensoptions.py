@@ -445,3 +445,19 @@ def test_blank_says_needed_size_and_minimum_stock_size(client):
     assert blank["stock_sizes"] == [65.0, 75.0]
     js = open("static/app.js", encoding="utf-8").read()
     assert "Minimum</span>" in js and "b.min_stock" in js
+
+def test_options_list_everything_cheapest_first_including_thicker(client):
+    # Mark 4 Nov 2026: offer the options, not one pick - lower indices listed, marked thicker
+    d = client.post("/api/lensoptions/rx", json={"patient_id": 77}).get_json()
+    tabs = {t["key"]: t for t in d["rxs"][0]["tabs"]}
+    for key in ("multifocal", "near"):
+        a = tabs[key]["parts"][0]["answer"]
+        opts = a["options"]
+        assert len(opts) >= len(a["others"]) + (1 if a["best"] else 0) - a["more"]
+        fit = [o for o in opts if o["fits"] is not False]
+        priced = [o["sell"] for o in fit if o["sell"] is not None]
+        assert priced == sorted(priced)
+        assert all(o["fits"] is False for o in opts[len(fit):])
+        assert {o["name"] for o in opts} >= {a["best"]["name"]}
+        assert all(o["thicker"] == (o["steps_under"] > 0) for o in opts)
+

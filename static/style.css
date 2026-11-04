@@ -2135,6 +2135,8 @@ body.lens-mono main { background: #fafafa; }
 .ja-num { white-space: nowrap; text-align: right; }
 .ja-why { font-size: 15px; color: var(--muted); margin-top: 2px; }
 .ja-sms { font-size: 16px; color: #2b2b2b; margin-top: 6px; max-width: 46em; white-space: normal; }
+.lo-list .lo-sell { font-weight: 700; font-size: 18px; }
+.lo-thick { color: #8a5a00; }
 .ja-chip { display: inline-block; font-size: 15px; font-weight: 600; padding: 2px 10px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
 tr.ja-ok .ja-chip, .ja-key .ja-ok { background: #e3f3ea; border-color: var(--green); color: var(--green-dark); }
 tr.ja-grey td { color: #6b6b6b; background: #f4f4f4; }
