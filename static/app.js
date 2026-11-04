@@ -4200,13 +4200,25 @@ function loBlank(b) {
         <ul class="lo-sub">${b.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></details>`;
 }
 
+/* Mark, 4 Nov 2026: a red flag when the frame's rough blank estimate and the stock blank sizes
+   don't match - which stock lenses are too small, and the biggest each comes in. */
+function loBlankWarning(w) {
+    if (!w || !(w.lenses || []).length) return "";
+    const head = w.none_fit
+        ? `No stock blank is big enough: frame needs about ${esc(w.need)}`
+        : `Frame needs about ${esc(w.need)}: ${w.lenses.length} stock lens${w.lenses.length === 1 ? " is" : "es are"} too small`;
+    return `<div class="lo-blankwarn" role="alert"><div class="lo-blankwarn-head">${head}</div>
+        <ul>${w.lenses.map((x) => `<li><b>${esc(fmtIndex(x.index))}</b> ${esc(x.supplier)} ${esc(x.name)}${x.largest ? ` <span class="lo-blankwarn-mm">largest ${esc(x.largest)}</span>` : ""}</li>`).join("")}</ul>
+        <div class="lo-blankwarn-foot">${w.none_fit ? "Grind" : "Use a stock lens that fits (green), grind"}, or choose a smaller frame. Rough estimate: check the blank before ordering.</div></div>`;
+}
+
 function loPart(part, many) {
     return `<div class="lo-part">
         ${many ? `<div class="lo-parttitle">${esc(part.title)}</div>` : `<div class="lo-modelong">${esc(part.title)}</div>`}
         ${(part.working || []).length ? `<div class="lo-working">${part.working.map(esc).join("<br>")}</div>` : ""}
         ${(part.notes || []).length ? `<div class="lo-sub">${part.notes.map(esc).join(" ")}</div>` : ""}
         ${loBlank(part.blank)}
-        ${part.answer && part.answer.blank_warning ? `<div class="lo-note">${esc(part.answer.blank_warning)}</div>` : ""}
+        ${loBlankWarning(part.answer && part.answer.blank_warning)}
         ${loAnswer(part)}
         ${part.unavailable ? "" : cmpPanel("p-" + part.key, part.key)}
     </div>`;

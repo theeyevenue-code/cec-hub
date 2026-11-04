@@ -2150,6 +2150,12 @@ body.lens-mono main { background: #fafafa; }
 .lo-it-stock { border-left-color: var(--green); }
 .lo-it-stock .lo-it-kind, .lo-key .lo-it-stock { color: var(--green-dark); }
 .lo-it-grind { border-left-color: #b5b5b5; }
+.lo-blankwarn { margin: 12px 0; padding: 12px 16px; border: 2px solid var(--danger-ink);
+    background: var(--danger-bg); color: var(--danger-ink); border-radius: 6px; font-size: 17px; }
+.lo-blankwarn-head { font-size: 20px; font-weight: 700; }
+.lo-blankwarn ul { margin: 6px 0 6px 20px; padding: 0; }
+.lo-blankwarn-mm { font-variant-numeric: tabular-nums; }
+.lo-blankwarn-foot { font-size: 15px; }
 .lo-it-nofit { border-left-color: var(--danger-ink); opacity: .8; }
 .lo-it-nofit .lo-it-kind, .lo-key .lo-it-nofit { color: var(--danger-ink); }
 .lo-it-none { color: #8a8a8a; font-size: 14px; }

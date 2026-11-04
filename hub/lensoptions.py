@@ -375,6 +375,28 @@ def blank_line(o: dict, key, avail: dict, need: dict | None, fits_at: list) -> t
     return False, line
 
 
+def blank_mismatch(listed: list, need: dict | None) -> dict | None:
+    """Mark, 4 Nov 2026: flag in red when the frame's (rough) blank estimate and the stock
+    blank sizes don't match. Every stock lens on the page that is too small for the frame,
+    with the biggest blank it comes in; None when there is no frame estimate or all fit.
+    Only lenses on the price sheet when any are (the same set the grid shows)."""
+    if not need:
+        return None
+    shown = [x for x in listed if x.get("sell") is not None] or listed
+    stock = [x for x in shown if x.get("type") == "Stock"]
+    small = [x for x in stock if x.get("fits") is False]
+    if not small:
+        return None
+    small.sort(key=lambda x: (str(x.get("supplier") or ""), float(x.get("index") or 0)))
+    return {
+        "need": _mm(max(need.values())),
+        "none_fit": len(small) == len(stock),
+        "lenses": [{"supplier": x.get("supplier") or "", "index": x.get("index") or "",
+                    "name": x.get("name") or "", "largest": _mm(max(x["blanks"])) if x.get("blanks") else ""}
+                   for x in small],
+    }
+
+
 def summarise(result: dict, sells: dict, avail: dict | None = None,
               need: dict | None = None) -> dict:
     """The engine's answer cut to what the page shows: one line per lens, each
@@ -431,6 +453,7 @@ def summarise(result: dict, sells: dict, avail: dict | None = None,
     listed.sort(key=lambda x: (x["fits"] is False, x["sell"] is None,
                                x["sell"] if x["sell"] is not None else (x["cost"] or 0), x["cost"] or 0))
     engine_best = next((o for o in result.get("options") or [] if o.get("best")), None)
+    blank_warning = blank_mismatch(listed, need)
     note = ""
     if best and engine_best is not None and _pkey(engine_best) != best[2]:
         note = ("The usual first choice is too small for this frame (blank estimate), "
@@ -442,6 +465,7 @@ def summarise(result: dict, sells: dict, avail: dict | None = None,
         "others": rest[:SHOW], "more": max(0, len(rest) - SHOW),
         "options": listed,
         "blank_note": note,
+        "blank_warning": blank_warning,
         "headline": result.get("headline") or "", "verdict": result.get("verdict") or "",
         "rec_index": _fmt_index(result.get("rec_index")),
         "rx_display": (result.get("rx") or {}).get("display", ""),

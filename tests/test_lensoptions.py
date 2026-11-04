@@ -461,3 +461,23 @@ def test_options_list_everything_cheapest_first_including_thicker(client):
         assert {o["name"] for o in opts} >= {a["best"]["name"]}
         assert all(o["thicker"] == (o["steps_under"] > 0) for o in opts)
 
+
+
+
+def test_blank_mismatch_flags_stock_too_small_for_the_frame():
+    # Mark 4 Nov 2026: red flag when the frame estimate and stock blank sizes don't match
+    from hub.lensoptions import blank_mismatch
+    listed = [
+        {"type": "Stock", "fits": True, "sell": 140, "supplier": "Synchrony", "index": "1.50",
+         "name": "FSV Clear", "blanks": [65, 70]},
+        {"type": "Stock", "fits": False, "sell": 140, "supplier": "Synchrony", "index": "1.56",
+         "name": "FSV Clear", "blanks": [60, 65]},
+        {"type": "Grind", "fits": True, "sell": 240, "supplier": "Synchrony", "index": "1.50",
+         "name": "Single vision"},
+    ]
+    w = blank_mismatch(listed, {"R": 67, "L": 66})
+    assert w["need"] == "67 mm" and not w["none_fit"]
+    assert [(x["index"], x["largest"]) for x in w["lenses"]] == [("1.56", "65 mm")]
+    assert blank_mismatch(listed, None) is None
+    assert blank_mismatch(listed[:1], {"R": 67}) is None
+    assert blank_mismatch(listed[1:], {"R": 67})["none_fit"] is True
