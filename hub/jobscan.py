@@ -29,7 +29,7 @@ from hub import checkin
 ID_RE = re.compile(r"^(?:[GC])?\d{1,9}$")
 TOKEN_RE = re.compile(r"^(?:(G|C|CL)[:-]?)?(\d{1,9})$", re.I)
 MAX_IDS = 60
-TIMEOUTS = {"status": 30, "lookup": 30, "confirm": 300}
+TIMEOUTS = {"status": 30, "lookup": 30, "preview": 45, "confirm": 300}
 NOT_CONNECTED = "Jobs arrived isn't connected to Optomate on this computer."
 TIMEOUT_CONFIRM = ("Optomate took too long, so some jobs may be done and some not. "
                    "Scan the cards again: finished jobs show grey and are never texted twice.")
@@ -61,8 +61,9 @@ def clean_ids(raw) -> tuple[list[str], list[str]]:
     return good, bad
 
 
-def run(cfg: dict, command: str, ids: list[str] | None = None) -> dict:
-    """Run the agent's engine. Never raises."""
+def run(cfg: dict, command: str, ids: list[str] | None = None,
+        own: list[str] | None = None) -> dict:
+    """Run the agent's engine. Never raises. own = glasses jobs switched to "Replacement lenses"."""
     if not connected(cfg):
         return {"ok": False, "connected": False, "error": NOT_CONNECTED}
     args = [command, "--json"]
@@ -70,6 +71,10 @@ def run(cfg: dict, command: str, ids: list[str] | None = None) -> dict:
         if not all(ID_RE.match(i) for i in ids):      # belt and braces
             return {"ok": False, "error": "Only job numbers can be checked."}
         args += ["--ids", ",".join(ids)]
+    if own:
+        if not all(ID_RE.match(i) for i in own):
+            return {"ok": False, "error": "Only job numbers can be checked."}
+        args += ["--own", ",".join(own)]
     python = (cfg.get("optomate_agent") or {}).get("python") or sys.executable
     try:
         proc = subprocess.run([python, "-m", "orders.jobscan", *args],
@@ -109,8 +114,24 @@ def lookup(cfg: dict, raw) -> dict:
     return out
 
 
-def confirm(cfg: dict, raw, expected) -> dict:
-    """expected = how many jobs the dialog promised; a mismatch changes nothing."""
+def _own(own_raw, good: list[str]) -> list[str]:
+    own_good, _ = clean_ids(own_raw)
+    return [i for i in own_good if i in good and i.startswith("G")]
+
+
+def preview(cfg: dict, raw, own_raw=None) -> dict:
+    """The text each scanned job would get (Mark, 4 Nov 2026: staff see what goes out).
+    A dry run of Confirm in the agent: nothing written, nothing sent."""
+    good, _ = clean_ids(raw)
+    if not good:
+        return {"ok": True, "texts": []}
+    return run(cfg, "preview", good, _own(own_raw, good))
+
+
+def confirm(cfg: dict, raw, expected, own_raw=None) -> dict:
+    """expected = how many jobs the dialog promised; a mismatch changes nothing.
+    own_raw = glasses jobs staff switched to "Replacement lenses" (own frame, patient has it;
+    Mark 4 Nov 2026) - only ones also being confirmed, glasses only."""
     good, _ = clean_ids(raw)
     if not good:
         return {"ok": False, "error": "No jobs to confirm."}
@@ -121,4 +142,4 @@ def confirm(cfg: dict, raw, expected) -> dict:
     if expected != len(good):
         return {"ok": False, "error": "The list changed while the box was open. Nothing changed - "
                                       "press Confirm again."}
-    return run(cfg, "confirm", good)
+    return run(cfg, "confirm", good, _own(own_raw, good))

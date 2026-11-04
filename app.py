@@ -755,11 +755,19 @@ def jobscan_lookup():
     return _no_store(jsonify(out)), (200 if out.get("ok") else 400)
 
 
+@app.route("/api/jobscan/preview", methods=["POST"])
+@staff_only
+def jobscan_preview():
+    data = request.get_json(silent=True) or {}
+    out = jobscan.preview(_integrations(), data.get("ids"), data.get("own"))
+    return _no_store(jsonify(out)), (200 if out.get("ok") else 400)
+
+
 @app.route("/api/jobscan/confirm", methods=["POST"])
 @staff_only
 def jobscan_confirm():
     data = request.get_json(silent=True) or {}
-    out = jobscan.confirm(_integrations(), data.get("ids"), data.get("expected"))
+    out = jobscan.confirm(_integrations(), data.get("ids"), data.get("expected"), data.get("own"))
     if out.get("ok"):
         c = out.get("counts") or {}
         logger.info("Jobs arrived: confirm %s - done %d, would %d, skipped %d, failed %d, texted %d",
