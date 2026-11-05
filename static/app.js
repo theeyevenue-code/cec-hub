@@ -52,6 +52,7 @@ async function initStaffPicker() {
     picker.addEventListener("change", () => {
         setStaff(picker.value);
         if (location.hash === "" || location.hash === "#/") renderHome();
+        if (location.hash === "#/queue") { wq.owner = null; renderWorkQueue(); }   // Yes / Not now depend on who is picked
     });
 }
 
@@ -66,6 +67,7 @@ const routes = [
     { re: /^#\/followups$/, fn: renderFollowups },
     { re: /^#\/letters$/, fn: renderLetters },
     { re: /^#\/todo$/, fn: renderTodo },
+    { re: /^#\/queue$/, fn: () => renderWorkQueue() },
     { re: /^#\/panel$/, fn: renderPanel },
     { re: /^#\/credits$/, fn: renderCredits },
     { re: /^#\/stock$/, fn: renderStock },
@@ -5114,3 +5116,148 @@ function jaResults(d) {
 
 initStaffPicker();
 route();
+
+/* --- To do + Waiting on Mark (work queue, 5 Nov 2026) --------------------------------------
+   One list of manual jobs and the questions waiting on Mark. Server: hub/workqueue.py.
+   Staff-locked like Check-in (items can name patients). Everything goes through esc().
+   Yes / Not now ONLY records Mark's answer in the list - it never sends, merges or runs anything. */
+
+const wq = { tab: "todo", owner: null, data: null, busy: false };
+
+function wqAge(r) {
+    if (r.age_days === null || r.age_days === undefined) return `<span class="wq-age wq-unknown">date unknown</span>`;
+    const d = r.age_days;
+    const label = d === 0 ? "today" : d === 1 ? "1 day" : `${d} days`;
+    return `<span class="wq-age${r.stale ? " wq-stale" : ""}">${esc(label)}${r.oldest ? "<small>Oldest</small>" : ""}</span>`;
+}
+
+function wqDate(iso) {
+    if (!iso) return "date unknown";
+    const d = new Date(String(iso).length <= 10 ? iso + "T00:00:00" : iso);
+    return isNaN(d) ? esc(iso) : d.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+}
+
+function wqWhen(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleDateString("en-AU", { day: "numeric", month: "short" }) + " " +
+        d.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+}
+
+async function renderWorkQueue(forceState) {
+    if (!forceState) {
+        view.innerHTML = `<div class="loading-panel">Getting the list…</div>`;
+        const r = await ciCall("/api/workqueue");
+        if (ciLocked(r)) { ciUnlockPanel(r.data, () => renderWorkQueue(), "To do"); return; }
+        if (r.status !== 200) { view.innerHTML = errorPanel(r.data.error || "Couldn't get the list."); return; }
+        wq.data = r.data;
+    } else {
+        wq.data = forceState;
+    }
+    const d = wq.data;
+    if (wq.owner === null) wq.owner = d.owners.includes(d.me) ? d.me : "All";
+    const isMark = d.me === "Mark";
+
+    const mine = wq.owner === "All" ? d.todos : d.todos.filter((r) => r.owner === wq.owner);
+    const oldest = mine.find((r) => r.age_days !== null);
+    const who = wq.owner === "All" ? "Everyone" : wq.owner;
+    const answer = wq.tab === "ask"
+        ? (d.waiting_on_mark ? `${d.waiting_on_mark} waiting on Mark` : "Nothing waiting on Mark")
+        : (mine.length ? `${who}: ${mine.length} ${mine.length === 1 ? "job" : "jobs"} to do` : `${who}: nothing to do`);
+    const sub = wq.tab === "ask" ? "" : (oldest && oldest.age_days > 0
+        ? `Oldest is ${oldest.age_days} ${oldest.age_days === 1 ? "day" : "days"} old.` : "");
+
+    const chip = (name, n) => `<button class="wq-chip" data-owner="${esc(name)}" aria-pressed="${wq.owner === name}">${esc(name)}<span class="wq-n">${n}</span></button>`;
+    const chips = chip("All", d.total_open) + d.owners.map((o) => chip(o, d.counts[o] || 0)).join("");
+
+    const todoRow = (r) => `<tr data-id="${esc(r.id)}">
+        <td data-label="Waiting">${wqAge(r)}</td>
+        <td data-label="Job"><div class="wq-what">${esc(r.text)}${r.came_back ? `<span class="wq-tag">came back</span>` : ""}</div>
+            ${r.detail ? `<div class="wq-detail">${esc(r.detail)}</div>` : ""}</td>
+        <td data-label="Owner" class="wq-meta">${esc(r.owner)}</td>
+        <td data-label="From" class="wq-meta">${esc(r.source || "")}${r.seen_count > 1 ? `<br>Seen ${r.seen_count} times, last ${esc(wqDate(r.last_seen))}` : ""}</td>
+        <td class="wq-act wq-actions"><button class="wq-btn" data-act="done">Done</button></td>
+    </tr>`;
+
+    const doneRow = (r) => `<tr data-id="${esc(r.id)}"><td>${esc(r.text)}</td>
+        <td class="wq-meta">${esc(r.done_by || "")}</td><td class="wq-meta">${esc(wqWhen(r.done_at))}</td>
+        <td class="wq-act"><button class="wq-btn wq-btn-quiet" data-act="reopen">Not done after all</button></td></tr>`;
+
+    const askRow = (r) => `<tr data-id="${esc(r.id)}">
+        <td data-label="Asked" class="wq-meta">${esc(wqDate(r.first_seen))}</td>
+        <td data-label="Question"><div class="wq-ask">${esc(r.text)}</div>
+            ${r.recommendation ? `<div class="wq-rec"><b>Recommended:</b> ${esc(r.recommendation)}</div>` : ""}
+            ${r.detail ? `<div class="wq-detail">${esc(r.detail)}</div>` : ""}</td>
+        <td data-label="From" class="wq-meta">${esc(r.origin || r.source || "")}</td>
+        <td class="wq-act wq-actions">
+            <button class="wq-btn" data-act="yes" ${isMark ? "" : "disabled"}>Yes</button>
+            <button class="wq-btn wq-btn-grey" data-act="not_now" ${isMark ? "" : "disabled"}>Not now</button></td>
+    </tr>`;
+
+    const answeredRow = (r) => `<tr data-id="${esc(r.id)}"><td>${esc(r.text)}</td>
+        <td>${r.answer === "yes" ? `<span class="wq-yes">Yes</span>` : `<span class="wq-notnow">Not now</span>`}</td>
+        <td class="wq-meta">${esc(r.answered_by || "")} ${esc(wqWhen(r.answered_at))}</td>
+        <td class="wq-act"><button class="wq-btn wq-btn-quiet" data-act="undo_answer" ${isMark ? "" : "disabled"}>Undo</button></td></tr>`;
+
+    const todoBody = `
+        <form id="wq-add" class="wq-add">
+            <input id="wq-text" type="text" maxlength="300" autocomplete="off" aria-label="New job"
+                   placeholder="Add a job - e.g. Ring Hoya about the missing credit">
+            <select id="wq-owner" aria-label="Owner">${d.owners.map((o) =>
+                `<option${o === (wq.owner !== "All" ? wq.owner : "Unassigned") ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>
+            <button class="btn" type="submit">Add</button>
+        </form>
+        ${mine.length ? `<table class="wq-table"><thead><tr><th>Waiting</th><th>Job</th><th>Owner</th><th>From</th><th></th></tr></thead>
+            <tbody>${mine.map(todoRow).join("")}</tbody></table>`
+            : `<div class="wq-empty">Nothing to do here. Well done.</div>`}
+        ${d.done.length ? `<details class="wq-done-list"><summary class="wq-meta">Done recently (${d.done.length}) - kept with who and when</summary>
+            <table class="wq-table"><tbody>${d.done.map(doneRow).join("")}</tbody></table></details>` : ""}`;
+
+    const askBody = `
+        <div class="wq-note"><b>Yes and Not now only save Mark's answer here.</b>
+            They do not merge, send, or change anything. The Claude session that asked reads the answer and carries on from there.
+            ${isMark ? "" : "<br>Only Mark can answer: pick Mark in <i>Who's using this?</i> at the top."}</div>
+        ${d.asks.length ? `<table class="wq-table"><thead><tr><th>Asked</th><th>Question and recommendation</th><th>From</th><th>Answer</th></tr></thead>
+            <tbody>${d.asks.map(askRow).join("")}</tbody></table>`
+            : `<div class="wq-empty">Nothing waiting on Mark.</div>`}
+        ${d.answered.length ? `<details class="wq-done-list"><summary class="wq-meta">Answered (${d.answered.length})</summary>
+            <table class="wq-table"><tbody>${d.answered.map(answeredRow).join("")}</tbody></table></details>` : ""}`;
+
+    view.innerHTML = `
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">To do</h1>
+        <div class="card">
+            <div class="wq-answer">${esc(answer)}${sub ? `<small>${esc(sub)}</small>` : ""}</div>
+            <div class="wq-tabs">
+                <button class="wq-tab" data-tab="todo" aria-pressed="${wq.tab === "todo"}">To do<span class="wq-n">${d.total_open}</span></button>
+                <button class="wq-tab" data-tab="ask" aria-pressed="${wq.tab === "ask"}">Waiting on Mark<span class="wq-n">${d.waiting_on_mark}</span></button>
+            </div>
+            ${wq.tab === "todo" ? `<div class="wq-chips" role="group" aria-label="Whose jobs">${chips}</div>` : ""}
+            <div id="wq-msg" class="wq-msg" role="alert"></div>
+            ${wq.tab === "todo" ? todoBody : askBody}
+        </div>`;
+
+    const say = (m) => { const el = document.getElementById("wq-msg"); if (el) el.textContent = m; };
+    view.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { wq.tab = b.dataset.tab; renderWorkQueue(wq.data); }));
+    view.querySelectorAll("[data-owner]").forEach((b) => b.addEventListener("click", () => { wq.owner = b.dataset.owner; renderWorkQueue(wq.data); }));
+    const send = async (body) => {
+        if (wq.busy) return;
+        wq.busy = true;
+        try {
+            const r = await ciCall("/api/workqueue", body);
+            if (ciLocked(r)) { ciUnlockPanel(r.data, () => renderWorkQueue(), "To do"); return; }
+            if (r.status !== 200) { say(r.data.error || "That didn't work."); return; }
+            renderWorkQueue(r.data);
+        } finally { wq.busy = false; }
+    };
+    view.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => {
+        send({ action: b.dataset.act, id: b.closest("tr").dataset.id });
+    }));
+    const f = document.getElementById("wq-add");
+    if (f) f.addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        const t = document.getElementById("wq-text").value.trim();
+        if (!t) { say("Type what needs doing first."); return; }
+        send({ action: "add", text: t, owner: document.getElementById("wq-owner").value });
+    });
+}

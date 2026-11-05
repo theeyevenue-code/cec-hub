@@ -23,6 +23,13 @@
       "link": "#/stocktake"
     },
     {
+      "id": "workqueue",
+      "icon": "✓",
+      "name": "To do",
+      "description": "Everything that needs a person, by owner. Includes what is waiting on Mark",
+      "link": "#/queue"
+    },
+    {
       "id": "todo",
       "icon": "✅",
       "name": "To-do list",

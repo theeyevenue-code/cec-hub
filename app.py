@@ -22,7 +22,7 @@ from pathlib import Path
 from flask import Flask, jsonify, make_response, request, send_from_directory
 
 from hub import checkin, integrations, jobscan, lenses, lensoptions, sendguide, sop_parser
-from hub import lenschat
+from hub import lenschat, workqueue
 from hub.assistant import core as assistant, registry as assistant_registry
 from hub.assistant.adapters import ReadContext
 
@@ -440,6 +440,51 @@ def staff_only(view):
             return refused
         return view(*args, **kwargs)
     return wrapped
+
+
+# --- Work queue ("To do" + "Waiting on Mark", 5 Nov 2026) --------------------------
+# Same staff guard as Check-in: items can name patients, so a computer other than the server
+# unlocks once with the staff code. Item text is never logged (counts and who-did-what only).
+# Recording a Yes / Not now only WRITES THE ANSWER into the list. No route here sends, merges,
+# runs a command or touches Optomate; the session that asked reads the answer and acts itself.
+
+def _wq_state():
+    state = workqueue.view()
+    state["me"] = (request.cookies.get("hub_staff") or "").strip()[:60]
+    return state
+
+
+@app.route("/api/workqueue", methods=["GET", "POST"])
+@staff_only
+def work_queue():
+    try:
+        if request.method == "POST":
+            body = request.get_json(silent=True) or {}
+            action, who = str(body.get("action") or ""), _staff_name()
+            if action == "add":
+                workqueue.add_item(text=body.get("text"), owner=body.get("owner") or "Unassigned",
+                                   source=body.get("source") or "", added_by=who)
+            elif action == "done":
+                workqueue.mark_done(body.get("id"), who)
+            elif action == "reopen":
+                workqueue.reopen(body.get("id"), who)
+            elif action in ("yes", "not_now"):
+                # Only Mark's answer counts. The who-is-this picker is a name, not a login,
+                # so this stops a slip by staff; it is not security.
+                if (request.cookies.get("hub_staff") or "").strip() != "Mark":
+                    return _no_store(jsonify({"error": "Only Mark can answer these. Pick Mark in "
+                                                       "'Who's using this?' at the top."})), 403
+                workqueue.record_answer(body.get("id"), action, "Mark")
+                logger.info("Work queue: Mark answered %s on a question (recorded only)", action)
+            elif action == "undo_answer":
+                if (request.cookies.get("hub_staff") or "").strip() != "Mark":
+                    return _no_store(jsonify({"error": "Only Mark can change his answers."})), 403
+                workqueue.undo_answer(body.get("id"), "Mark")
+            else:
+                return _no_store(jsonify({"error": "Unknown action."})), 400
+        return _no_store(jsonify(_wq_state()))
+    except workqueue.WorkQueueError as e:
+        return _no_store(jsonify({"error": str(e)})), 400
 
 
 @app.route("/api/checkin/staff/unlock", methods=["POST"])
