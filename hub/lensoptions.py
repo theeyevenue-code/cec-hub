@@ -350,6 +350,20 @@ def blank_fit(key, avail: dict, need: dict) -> tuple[bool, dict]:
     return all(v is not None for v in got.values()), got
 
 
+def largest_by_eye(key, avail: dict, need: dict) -> str:
+    """The biggest stock blank for each eye's own Rx. One size when the eyes agree ("65 mm"),
+    otherwise each eye, the short one first ("L 65 mm, R 70 mm"). A single figure across both
+    eyes hid the eye that was short: +1.75 comes 70 mm and +5.00 only 65 mm, and the page said
+    "largest 70 mm" against a 69 mm frame (Mark, 7 Nov 2026)."""
+    top = {s: max(avail.get(s, {}).get(key) or [], default=None) for s in need}
+    if len(set(top.values())) == 1:
+        v = next(iter(top.values()))
+        return _mm(v) if v is not None else ""
+    short = lambda s: top[s] is None or top[s] < need[s] - 1e-9
+    return ", ".join(f"{s} {_mm(top[s]) if top[s] is not None else 'not in stock'}"
+                     for s in sorted(top, key=lambda s: not short(s)))
+
+
 def blank_line(o: dict, key, avail: dict, need: dict | None, fits_at: list) -> tuple[bool, str]:
     """One plain verdict about the blank for one lens option."""
     if o.get("type") != "stock":
@@ -366,8 +380,8 @@ def blank_line(o: dict, key, avail: dict, need: dict | None, fits_at: list) -> t
             return True, f"Fits a {_mm(vals[0])} stock blank"
         return True, "Fits stock: " + ", ".join(f"{s} {_mm(v)}" for s, v in got.items())
     req = max(need.values())
-    have = max((b for v in sizes.values() for b in v), default=None)
-    line = f"Needs {_mm(req)}" + (f" - this lens only comes {_mm(have)} for this Rx" if have else "")
+    have = largest_by_eye(key, avail, need)
+    line = f"Needs {_mm(req)}" + (f" - this lens only comes {have} for this Rx" if have else "")
     if fits_at:
         line += f". Big enough stock: {', '.join(fits_at)}"
     else:
@@ -392,7 +406,8 @@ def blank_mismatch(listed: list, need: dict | None) -> dict | None:
         "need": _mm(max(need.values())),
         "none_fit": len(small) == len(stock),
         "lenses": [{"supplier": x.get("supplier") or "", "index": x.get("index") or "",
-                    "name": x.get("name") or "", "largest": _mm(max(x["blanks"])) if x.get("blanks") else ""}
+                    "name": x.get("name") or "",
+                    "largest": x.get("largest_by_eye") or (_mm(max(x["blanks"])) if x.get("blanks") else "")}
                    for x in small],
     }
 
@@ -435,6 +450,8 @@ def summarise(result: dict, sells: dict, avail: dict | None = None,
             picked = [b for b in got.values() if b]
             # the blank to order: the one that fits the frame, else the biggest there is
             x["blank_mm"] = max(picked) if ok and picked else (sizes[-1] if not ok else sizes[0])
+            if need and not ok:
+                x["largest_by_eye"] = largest_by_eye(key, avail, need)
         return x
     rest = [out(v) for v in ordered if v is not best]
 
