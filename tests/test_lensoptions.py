@@ -481,3 +481,26 @@ def test_blank_mismatch_flags_stock_too_small_for_the_frame():
     assert blank_mismatch(listed, None) is None
     assert blank_mismatch(listed[:1], {"R": 67}) is None
     assert blank_mismatch(listed[1:], {"R": 67})["none_fit"] is True
+
+
+def test_red_box_names_the_eye_that_is_short():
+    """Mark, 7 Nov 2026: right eye comes 70 mm, left only 65 mm, frame needs 69 mm. The box said
+    "largest 70 mm", which read as if a 1 mm PD nudge would fix it."""
+    from hub.lensoptions import blank_line, blank_mismatch, largest_by_eye
+    key = ("ZEISS", "ClearView FSV 1.67", "stock", "")
+    avail = {"R": {key: [70.0]}, "L": {key: [65.0]}}
+    need = {"R": 69, "L": 69}
+    assert largest_by_eye(key, avail, need) == "L 65 mm, R 70 mm"
+    ok, line = blank_line({"type": "stock"}, key, avail, need, [])
+    assert ok is False and "L 65 mm, R 70 mm" in line and "only comes 70 mm" not in line
+    listed = [{"type": "Stock", "fits": False, "index": "1.67", "supplier": "ZEISS", "name": "ClearView FSV",
+               "blanks": [65.0, 70.0], "largest_by_eye": largest_by_eye(key, avail, need)}]
+    assert blank_mismatch(listed, need)["lenses"][0]["largest"] == "L 65 mm, R 70 mm"
+
+
+def test_largest_by_eye_one_size_and_missing_eye():
+    from hub.lensoptions import largest_by_eye
+    key = ("a",)
+    assert largest_by_eye(key, {"R": {key: [65.0]}, "L": {key: [65.0]}}, {"R": 67, "L": 67}) == "65 mm"
+    assert largest_by_eye(key, {"R": {key: [70.0]}, "L": {}}, {"R": 67, "L": 67}) == "L not in stock, R 70 mm"
+    assert largest_by_eye(key, {"R": {}, "L": {}}, {"R": 67, "L": 67}) == ""
