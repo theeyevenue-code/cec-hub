@@ -12,6 +12,10 @@
     "logs_dir": "C:\\CEC\\CEC-Optomate-Agent\\logs",
     "_agent_dir_note": "Root of the Optomate agent. The Recalls and Check-in tiles run its engines from here (python -m recall... / python -m checkin.cli ...)."
   },
+  "pick_lens_job": {
+    "show": false,
+    "_note": "Pick a lens -> make the job (#/picklens, Mark 8 Nov 2026). false = every /api/picklens route answers 404 and the page says it is not switched on. Stays false until Mark says 'show the job button to staff'; a test copy can use CEC_HUB_PICK_LENS=1 instead. The job itself is made by the agent's orders/pickjob.py, which keeps its own DRY_RUN / WRITE_LIVE / ZZTEST_ONLY gates."
+  },
   "second_brain": {
     "dir": "C:\\Claude\\Claude Code\\Claude Second Brain",
     "_dir_note": "Root of the Second Brain clone on this machine. The Scanner page reads tools\\scanner-card\\scanner-card.partial.html out of it on every page load, so `git pull` there is the whole update: no copy, no restart. On the practice server the clone is at C:\\Users\\ConcordeyecareServer\\Claude\\cec-second-brain."

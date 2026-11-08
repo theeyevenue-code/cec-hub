@@ -1,0 +1,192 @@
+/* Pick a lens -> make the job (#/picklens). Scoped to .pj-page so no other Hub page changes.
+   Look: the approved reset site (Apple type scale, system font, three radii, pills), Mark's
+   readability standard (answer first and biggest, body 17px+, nothing under 14px, one colour one
+   meaning: green = stock that fits, amber = made to order, red = a problem). No emoji. */
+
+body.pj-body, body.pj-body main { background: #f5f5f7; }
+
+.pj-page {
+    --ink: #1d1d1f; --mute: #6e6e73; --rule: #e5e5ea; --card: #fff;
+    --stock: #1b6b47; --stock-bg: #e6f4ec; --grind: #9a5b00; --grind-bg: #fff3d9; --bad: #b3261e; --bad-bg: #fbe9e7;
+    --r: 20px; --rs: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 17px; line-height: 1.45; color: var(--ink); font-variant-numeric: tabular-nums;
+    max-width: 1080px; margin: 0 auto; padding: 8px 16px 64px;
+}
+.pj-page * { box-sizing: border-box; }
+.pj-page button, .pj-page input, .pj-page select { font: inherit; color: inherit; }
+
+/* top bar: Back, the four steps, the mode */
+.pj-topbar { display: flex; align-items: center; gap: 16px; padding: 10px 0 18px; flex-wrap: wrap; }
+.pj-back { display: inline-flex; align-items: center; min-height: 44px; padding: 0 20px; border-radius: 980px; border: 1px solid var(--rule);
+    background: var(--card); color: var(--ink); text-decoration: none; font-weight: 600; font-size: 17px; cursor: pointer; }
+.pj-back:hover { border-color: var(--ink); }
+.pj-steps { display: flex; gap: 6px 22px; list-style: none; margin: 0; padding: 0; flex: 1; flex-wrap: wrap; }
+.pj-steps li { display: flex; align-items: center; gap: 8px; font-size: 16px; color: var(--mute); font-weight: 500; }
+.pj-steps .pj-n { display: inline-flex; width: 28px; height: 28px; border-radius: 50%; align-items: center; justify-content: center;
+    border: 1.5px solid var(--rule); font-size: 15px; font-weight: 600; }
+.pj-steps .pj-on { color: var(--ink); font-weight: 700; }
+.pj-steps .pj-on .pj-n { background: var(--ink); color: #fff; border-color: var(--ink); }
+.pj-steps .pj-done .pj-n { background: var(--rule); border-color: var(--rule); color: var(--ink); }
+.pj-mode { font-size: 15px; font-weight: 600; padding: 6px 14px; border-radius: 980px; }
+.pj-mode-dry { background: var(--rule); color: var(--ink); }
+.pj-mode-live { background: var(--bad); color: #fff; }
+
+/* type */
+.pj-h1 { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    font-size: 36px; line-height: 1.08; letter-spacing: -0.02em; font-weight: 700; margin: 18px 0 6px; }
+.pj-h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 18px 0 10px; }
+.pj-h2 .pj-small { font-weight: 500; }
+.pj-lead { font-size: 19px; color: var(--mute); margin: 0 0 20px; }
+.pj-small { font-size: 15px; color: var(--mute); font-weight: 400; }
+.pj-span { grid-column: 1 / -1; }
+.pj-k { font-size: 14px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+.pj-loading { color: var(--mute); padding: 24px 0; font-size: 17px; }
+.pj-center { text-align: center; }
+
+/* cards and taps */
+.pj-card { background: var(--card); border-radius: var(--r); padding: 22px 24px; border: 1px solid var(--rule); margin: 0 0 16px; }
+.pj-tap { text-align: left; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; width: 100%; }
+.pj-tap:hover, .pj-tap:focus-visible { border-color: var(--ink); box-shadow: 0 6px 24px rgba(0, 0, 0, .08); transform: translateY(-1px); outline: none; }
+.pj-tap:active { transform: translateY(0) scale(.995); }
+.pj-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0 0 16px; }
+@media (max-width: 900px) { .pj-grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .pj-grid3 { grid-template-columns: 1fr; } }
+
+/* 1 Patient */
+.pj-person { display: flex; flex-direction: column; gap: 6px; min-height: 108px; justify-content: center; }
+.pj-person-name { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+.pj-person-sub { font-size: 16px; color: var(--mute); }
+.pj-find { display: flex; gap: 10px; margin: 8px 0 16px; }
+.pj-find input, .pj-scan input { flex: 1; min-height: 52px; font-size: 19px; padding: 0 18px; border: 1px solid #c7c7cc; border-radius: var(--rs); background: var(--card); }
+.pj-find input:focus, .pj-scan input:focus, .pj-typed input:focus { border-color: var(--ink); outline: none; box-shadow: 0 0 0 3px rgba(0, 0, 0, .08); }
+.pj-page .pj-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 0 26px; border-radius: 980px;
+    background: var(--ink); color: #fff; border: 1px solid var(--ink); font-weight: 600; font-size: 18px; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.pj-page .pj-btn:hover { background: #000; }
+.pj-page .pj-btn:disabled, .pj-page .pj-btn.pj-off { background: var(--rule); border-color: var(--rule); color: var(--mute); cursor: not-allowed; }
+.pj-page .pj-btn-quiet { background: var(--card); color: var(--ink); }
+.pj-page .pj-btn-quiet:hover { background: #f5f5f7; }
+.pj-page .zeiss-logo { height: 22px; width: auto; vertical-align: middle; }
+.pj-btn-big { min-height: 60px; font-size: 21px; padding: 0 36px; }
+.pj-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 24px 0 8px; text-align: center; }
+
+/* patient head and the Rx */
+.pj-phead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin: 4px 0 12px; }
+.pj-pname { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+.pj-rxcard { padding: 14px 24px; }
+.pj-rx { border-collapse: collapse; font-size: 19px; width: auto; }
+.pj-rx th, .pj-rx td { padding: 6px 18px 6px 0; text-align: left; border-bottom: 1px solid var(--rule); }
+.pj-rx thead th { font-size: 14px; color: var(--mute); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.pj-rx tbody th { font-weight: 700; padding-right: 22px; }
+.pj-rx tbody tr:last-child th, .pj-rx tbody tr:last-child td { border-bottom: none; }
+.pj-rx td { min-width: 56px; }
+.pj-comment { margin-top: 8px; }
+.pj-notes { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
+.pj-notes li { background: var(--grind-bg); color: #4d3200; border-radius: var(--rs); padding: 10px 16px; font-size: 16px; }
+.pj-note { background: var(--card); border: 1px solid var(--rule); border-radius: var(--rs); padding: 12px 16px; color: var(--mute); font-size: 16px; grid-column: 1 / -1; }
+
+/* segmented control (Rx 1 / Rx 2, lens type) */
+.pj-seg { display: inline-flex; flex-wrap: wrap; gap: 4px; background: var(--rule); padding: 4px; border-radius: 980px; margin: 0 0 18px; }
+.pj-seg button { border: none; background: transparent; border-radius: 980px; min-height: 44px; padding: 0 20px; font-size: 17px; font-weight: 600; color: var(--mute); cursor: pointer; }
+.pj-seg button.pj-seg-on { background: var(--card); color: var(--ink); box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
+.pj-onrx { font-size: 13px; font-weight: 700; margin-left: 8px; padding: 2px 8px; border-radius: 980px; background: var(--ink); color: #fff; }
+.pj-working { font-size: 17px; color: var(--mute); margin: -6px 0 12px; }
+
+/* lens cards */
+.pj-lens { display: flex; flex-direction: column; gap: 10px; min-height: 172px; }
+.pj-lens-bad { opacity: .75; }
+.pj-lens-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.pj-idx { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+.pj-lname { font-size: 20px; font-weight: 600; }
+.pj-price { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+.pj-price small { font-size: 13px; font-weight: 500; color: var(--mute); letter-spacing: 0; margin-top: 4px; }
+.pj-price-sm { font-size: 22px; }
+.pj-lens-mid { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
+.pj-lens-mid .zeiss-logo { height: 18px; width: auto; }
+.pj-sup { font-weight: 600; font-size: 16px; }
+.pj-chip { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border-radius: 980px; font-size: 14px; font-weight: 700; }
+.pj-chip-stock { background: var(--stock-bg); color: var(--stock); }
+.pj-chip-grind { background: var(--grind-bg); color: var(--grind); }
+.pj-chip-bad { background: var(--bad-bg); color: var(--bad); }
+.pj-chip-grey { background: var(--rule); color: var(--ink); }
+.pj-why { font-size: 16px; color: var(--ink); }
+.pj-lens-foot { margin-top: auto; font-size: 15px; }
+.pj-ready { color: var(--stock); font-weight: 600; }
+.pj-touch { color: var(--mute); font-weight: 600; }
+.pj-touchline { color: var(--bad); font-weight: 600; margin-top: 4px; }
+.pj-more { background: var(--card); border: 1px solid var(--rule); border-radius: var(--r); padding: 6px 24px; margin: 0 0 16px; }
+.pj-more > summary { cursor: pointer; font-size: 18px; font-weight: 600; padding: 12px 0; list-style: none; }
+.pj-more > summary::-webkit-details-marker { display: none; }
+.pj-more > summary::before { content: ""; display: inline-block; width: 8px; height: 8px; border-right: 2px solid var(--ink); border-bottom: 2px solid var(--ink);
+    transform: rotate(-45deg); margin: 0 14px 2px 4px; transition: transform .15s; }
+.pj-more[open] > summary::before { transform: rotate(45deg); }
+.pj-list { display: grid; gap: 8px; padding: 0 0 16px; }
+.pj-more-in { border: none; padding: 0; margin: 0 0 10px; }
+.pj-more-in > summary { font-size: 16px; color: var(--mute); }
+.pj-row { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, .8fr) auto minmax(0, 1.2fr) auto; align-items: center; gap: 14px;
+    background: var(--card); border: 1px solid var(--rule); border-radius: var(--rs); padding: 12px 16px; }
+.pj-row .pj-idx { font-size: 20px; }
+.pj-row .pj-lname { font-size: 17px; }
+.pj-row .zeiss-logo { height: 16px; width: auto; }
+.pj-row-price { font-size: 20px; font-weight: 700; text-align: right; }
+@media (max-width: 760px) { .pj-row { grid-template-columns: 1fr auto; } .pj-row > :nth-child(2), .pj-row > :nth-child(4) { display: none; } }
+
+/* 3 Frame */
+.pj-pickline { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; background: var(--card); border: 1px solid var(--rule); border-radius: var(--rs);
+    padding: 10px 18px; margin: 0 0 8px; }
+.pj-pickline .zeiss-logo { height: 18px; width: auto; }
+.pj-pickline .pj-price { margin-left: auto; }
+.pj-scan { display: flex; gap: 10px; margin: 0 0 14px; }
+.pj-scan input { font-size: 22px; min-height: 60px; letter-spacing: .02em; }
+.pj-framecard { padding: 4px 0 10px; }
+.pj-framecard .pj-h2 { margin: 6px 0 4px; }
+.pj-typed { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 18px; padding: 6px 0 14px; }
+.pj-typed label { display: flex; flex-direction: column; gap: 6px; font-size: 15px; font-weight: 600; color: var(--mute); }
+.pj-typed input { width: 120px; min-height: 48px; font-size: 20px; padding: 0 14px; border: 1px solid #c7c7cc; border-radius: var(--rs); }
+.pj-switch { display: inline-flex; flex-direction: row !important; align-items: center; gap: 10px; font-size: 17px !important; color: var(--ink) !important; min-height: 48px; cursor: pointer; }
+.pj-switch input { width: 24px; height: 24px; accent-color: var(--ink); }
+.pj-fact { display: flex; align-items: baseline; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 19px; }
+.pj-fact .pj-k { min-width: 150px; }
+.pj-verdict { margin: 16px 0 6px; padding: 18px 22px; border-radius: var(--rs); border: 2px solid var(--rule); font-size: 19px; }
+.pj-v-head { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+.pj-v-stock { border-color: var(--stock); } .pj-v-stock .pj-v-head { color: var(--stock); }
+.pj-v-grind { border-color: var(--grind); } .pj-v-grind .pj-v-head { color: var(--grind); }
+.pj-v-bad { border-color: var(--bad); } .pj-v-bad .pj-v-head { color: var(--bad); }
+
+/* 4 Check */
+.pj-check { padding: 6px 24px; }
+.pj-crow { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 18px; padding: 16px 0; border-bottom: 1px solid var(--rule); align-items: start; }
+.pj-crow:last-child { border-bottom: none; }
+.pj-crow .pj-k { padding-top: 4px; }
+.pj-cv { font-size: 19px; }
+.pj-cv .pj-rx { font-size: 18px; }
+.pj-req .pj-k::after { content: " · required"; text-transform: none; letter-spacing: 0; color: var(--bad); }
+.pj-heights { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; }
+.pj-h { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; }
+.pj-h input { width: 96px; min-height: 48px; font-size: 20px; padding: 0 14px; border: 1px solid #c7c7cc; border-radius: var(--rs); text-align: right; }
+.pj-select { min-height: 48px; font-size: 17px; padding: 0 14px; border: 1px solid #c7c7cc; border-radius: var(--rs); background: var(--card); max-width: 100%; }
+.pj-pricetable { border-collapse: collapse; font-size: 18px; width: 100%; max-width: 560px; }
+.pj-pricetable td { padding: 6px 12px 6px 0; border-bottom: 1px solid var(--rule); }
+.pj-pricetable .pj-num { text-align: right; white-space: nowrap; }
+.pj-pricetable .pj-total td { font-weight: 700; font-size: 20px; border-bottom: none; padding-top: 10px; }
+.pj-badword { color: var(--bad); font-weight: 700; }
+.pj-bad { background: var(--bad-bg); color: var(--bad); border-radius: var(--rs); padding: 16px 20px; margin: 0 0 16px; font-size: 17px; }
+.pj-bad-head { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+.pj-bad ul { margin: 0; padding-left: 20px; }
+.pj-bad li + li { margin-top: 4px; }
+
+/* result */
+.pj-result { padding: 40px 24px 32px; }
+.pj-result .pj-h1 { font-size: 40px; }
+.pj-result.pj-v-bad .pj-h1 { color: var(--bad); }
+.pj-body-table { border-collapse: collapse; font-size: 15px; width: 100%; margin: 0 0 12px; }
+.pj-body-table th { text-align: left; font-weight: 600; color: var(--mute); padding: 5px 16px 5px 0; white-space: nowrap; border-bottom: 1px solid var(--rule); }
+.pj-body-table td { padding: 5px 0; border-bottom: 1px solid var(--rule); word-break: break-word; }
+
+@media (max-width: 768px) {
+    .pj-h1 { font-size: 30px; }
+    .pj-crow { grid-template-columns: 1fr; gap: 6px; }
+    .pj-fact { flex-direction: column; gap: 2px; }
+    .pj-rx td { min-width: 44px; }
+    .pj-rx th, .pj-rx td { padding-right: 12px; }
+}

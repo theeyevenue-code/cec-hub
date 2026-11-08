@@ -723,6 +723,63 @@ def cmd_names(sql=None) -> dict:
     return {"names": name_words(vals)}
 
 
+# ---------------------------------------------------------------------------
+# A frame by its stock barcode (pick-lens job, 8 Nov 2026) - read only
+# ---------------------------------------------------------------------------
+
+BARCODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
+SUNGLASS_STOCK_TYPE = 3
+
+# Fictional frames for the fake ZZTEST people (same records as orders/pickjob.py::FixtureSource).
+FIXTURE_FRAME_RECORDS = {
+    "ZZFRAME5219": ["ZZFRAME5219", "ZZTEST Metal", "Gunmetal", "5219", "0", "57.0", "MIS", "2", "179.0000", "1"],
+    "ZZFRAME5818": ["ZZFRAME5818", "ZZTEST Aviator", "Gold", "5818", "0", "66.0", "MIS", "3", "249.0000", "1"],
+}
+
+
+def frame_by_barcode_query(barcode: str) -> str:
+    return (f"SELECT {_txt('f.BARCODE')}, {_txt('f.MODEL')}, {_txt('f.COLOUR_DESCRIPTION')}, {_txt('f.SIZE')}, "
+            "ISNULL(f.BRIDGE,0), ISNULL(f.DIAG,0), ISNULL(f.SUPPLIER_IDENTIFIER,''), ISNULL(f.STOCK_TYPE,0), "
+            "ISNULL(CAST(b.SELLINC AS varchar(20)),''), ISNULL(b.QOH,0) "
+            "FROM SPECFRAME f WITH (NOLOCK) LEFT JOIN SPECFRAME_BRANCH b WITH (NOLOCK) "
+            "ON b.SPECFRAMEID = f.ID AND b.BRANCH_IDENTIFIER = 'MJ' "
+            f"WHERE f.BARCODE = N'{_sql_str(barcode)}'")
+
+
+def build_frame_record(row: list[str] | None) -> dict | None:
+    """{"barcode", "model", "colour", "a", "dbl", "ed", "sunglass", "price", "qoh"} or None."""
+    if not row or len(row) < 10:
+        return None
+    a, dbl = split_size(row[3])
+    dbl = _mm(row[4], 10, 30) or dbl
+    ed = _mm(row[5], 30, 90)
+    try:
+        price = float(row[8]) if row[8].strip() else None
+    except ValueError:
+        price = None
+    try:
+        qoh = int(float(row[9]))
+    except ValueError:
+        qoh = 0
+    return {"barcode": row[0], "model": row[1], "colour": row[2], "a": a, "dbl": dbl, "ed": ed,
+            "sunglass": row[7].strip() == str(SUNGLASS_STOCK_TYPE), "price": price, "qoh": qoh}
+
+
+def cmd_frame(barcode: str, sql=None) -> dict:
+    barcode = str(barcode or "").strip()
+    if not BARCODE_RE.match(barcode):
+        raise BridgeError("That doesn't look like a frame barcode.")
+    if fixture_mode() and sql is None:
+        row = FIXTURE_FRAME_RECORDS.get(barcode.upper())
+    else:
+        rows = (sql or sqlq)(frame_by_barcode_query(barcode))
+        row = rows[0] if len(rows) == 1 else None
+    rec = build_frame_record(row)
+    if rec is None:
+        raise BridgeError("That frame barcode isn't in Optomate.")
+    return {"frame": rec}
+
+
 def main(argv=None) -> int:
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -740,6 +797,8 @@ def main(argv=None) -> int:
             result = cmd_rx(int(opts["--pid"]))
         elif cmd == "names" and not opts:
             result = cmd_names()
+        elif cmd == "frame" and set(opts) == {"--barcode"}:
+            result = cmd_frame(opts["--barcode"])
         else:
             result = {"error": "Bad command."}
     except BridgeError as exc:

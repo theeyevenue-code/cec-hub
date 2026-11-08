@@ -22,7 +22,7 @@ from pathlib import Path
 from flask import Flask, jsonify, make_response, request, send_from_directory
 
 from hub import checkin, integrations, jobscan, lenses, lensoptions, sendguide, sop_parser
-from hub import lenschat, workqueue
+from hub import lenschat, pickjob, workqueue
 from hub.assistant import core as assistant, registry as assistant_registry
 from hub.assistant.adapters import ReadContext
 
@@ -657,6 +657,77 @@ def lensoptions_rx():
     out = lensoptions.options(_integrations(), data.get("patient_id"), rows,
                               _pricing(), _sells(), frame)
     return _no_store(jsonify(out)), (400 if out.get("error") else 200)
+
+
+# --- Pick a lens -> make the job (hub/pickjob.py) -----------------------------------
+# Mark, 8 Nov 2026. HIDDEN: every route answers 404 until config\integrations.json
+# carries "pick_lens_job": {"show": true} (or CEC_HUB_PICK_LENS=1 on a test copy), so
+# staff see nothing until its turn on IDEAS.md. Same staff guard and privacy rules as
+# Lens options. The job itself is made by the agent's engine (orders/pickjob.py),
+# which honours its own DRY_RUN / WRITE_LIVE / ZZTEST_ONLY gates; the Hub never writes.
+
+def _picklens_off():
+    if pickjob.enabled(_integrations()):
+        return None
+    return _no_store(jsonify({"error": "Not switched on.", "enabled": False})), 404
+
+
+@app.route("/api/picklens/status")
+@staff_only
+def picklens_status():
+    return _picklens_off() or _no_store(jsonify(pickjob.status(_integrations())))
+
+
+@app.route("/api/picklens/options", methods=["POST"])
+@staff_only
+def picklens_options():
+    off = _picklens_off()
+    if off:
+        return off
+    data = request.get_json(silent=True) or {}
+    catalog = _catalog()
+    if catalog.get("message"):
+        return _no_store(jsonify({"error": catalog["message"]})), 503
+    rows = [l for l in catalog["lenses"] if l.get("orderable", True)]
+    frame = data.get("frame") if isinstance(data.get("frame"), dict) else None
+    picked = data.get("picked") if isinstance(data.get("picked"), dict) else None
+    out = pickjob.options(_integrations(), data.get("patient_id"), rows, _pricing(), _sells(), frame, picked)
+    return _no_store(jsonify(out)), (400 if out.get("error") else 200)
+
+
+@app.route("/api/picklens/frame", methods=["POST"])
+@staff_only
+def picklens_frame():
+    off = _picklens_off()
+    if off:
+        return off
+    data = request.get_json(silent=True) or {}
+    out = pickjob.frame(_integrations(), data.get("barcode"))
+    return _no_store(jsonify(out)), (400 if out.get("error") else 200)
+
+
+@app.route("/api/picklens/tints")
+@staff_only
+def picklens_tints():
+    return _picklens_off() or _no_store(jsonify(pickjob.tints(_integrations())))
+
+
+@app.route("/api/picklens/check", methods=["POST"])
+@staff_only
+def picklens_check():
+    off = _picklens_off()
+    if off:
+        return off
+    return _no_store(jsonify(pickjob.check(_integrations(), request.get_json(silent=True) or {}, _staff_name())))
+
+
+@app.route("/api/picklens/make", methods=["POST"])
+@staff_only
+def picklens_make():
+    off = _picklens_off()
+    if off:
+        return off
+    return _no_store(jsonify(pickjob.make(_integrations(), request.get_json(silent=True) or {}, _staff_name())))
 
 
 # --- Compare (hub/compare.py) - no AI; the Lens Finder box's chat is below ------

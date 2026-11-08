@@ -79,6 +79,7 @@ const routes = [
     { re: /^#\/checkin\/([0-9a-f]{32})$/, fn: (m) => renderCheckinCheck(m[1]) },
     { re: /^#\/sendguide$/, fn: renderSendGuide },
     { re: /^#\/lensoptions$/, fn: renderLensOptions },
+    { re: /^#\/picklens$/, fn: renderPickLens },           // hidden: static/picklens.js, no tile yet (Mark, 8 Nov 2026)
     { re: /^#\/stocktake$/, fn: renderStocktakeList },
     { re: /^#\/stocktake\/(\d{8}-\d{4}-[0-9a-f]{4})$/, fn: (m) => renderStocktake(m[1]) },
     { re: /^#\/jobs-arrived$/, fn: renderJobsArrived },

@@ -323,6 +323,8 @@ def _lens_out(o: dict, sells: dict, best_price) -> dict:
     return {
         "index": _fmt_index(o.get("index")), "category": CATEGORY_WORD.get(cat, cat),
         "name": name, "supplier": str(o.get("supplier") or ""),
+        # the price-book row's own name and material: the pick-lens job's link-table key (8 Nov 2026)
+        "raw_name": str(o.get("name") or ""), "material": str(o.get("material") or ""),
         "type": "Stock" if o.get("type") == "stock" else "Grind",
         "coating": str(o.get("coating") or ""), "code": str(o.get("code") or ""),
         "blank_mm": o.get("blank_mm"), "cost": price, "basis": o.get("basis") or "",
