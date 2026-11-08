@@ -330,8 +330,26 @@ def clean_request(data: dict, user: str) -> dict | None:
         "heights": {s: str(hts.get(s) or "")[:6] for s in ("R", "L")},
         "tint_barcode": str(data.get("tint_barcode") or "")[:40],
         "second_pair": bool(data.get("second_pair")),
+        # Mark, 9 Nov 2026: widen the job PD to fit a stock SV blank (the engine re-checks the rule)
+        "pd_shift": _clean_shift(data.get("pd_shift")),
         "user": str(user or "")[:40],
     }
+
+
+def _clean_shift(v) -> dict | None:
+    if not isinstance(v, dict):
+        return None
+    out = {}
+    for side in ("R", "L"):
+        try:
+            mm = float(v.get(side) or 0)
+        except (TypeError, ValueError):
+            return None
+        if mm < 0 or mm > 3:
+            return None
+        if mm:
+            out[side] = mm
+    return out or None
 
 
 def status(cfg: dict) -> dict:

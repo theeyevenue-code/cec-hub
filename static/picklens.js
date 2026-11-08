@@ -373,6 +373,7 @@ function pjTyped(ev) {
 // Re-run the options with the frame so the blank check and next best are the server's words.
 async function pjFrameApply() {
     const f = pj.frame || {};
+    pj.pdShift = null;            // a new frame means a new blank check: the PD change is asked again
     document.getElementById("pj-framecard").innerHTML = pjFrameCard();
     document.getElementById("pj-fit").innerHTML = `<div class="pj-loading">Checking the blank…</div>`;
     const frame = f.a ? { a: f.a, dbl: f.dbl, ed: f.ed } : null;
@@ -408,13 +409,24 @@ function pjFitPanel() {
             <div>${pjLensTitle(picked)} <span class="pj-small">${esc(line)}</span></div>
             ${!picked.link || !picked.link.ready ? `<div class="pj-small pj-touchline">${esc((picked.link || {}).why || "Not linked to Optomate yet")}: make this job in Touch.</div>` : ""}
         </div>`;
+        // Mark, 9 Nov 2026: a stock SV lens a little short can fit by widening the job PD (<= 0.7 prism, <= 3 mm)
+        const ps = bad && picked.pd_shift && picked.link && picked.link.ready ? picked.pd_shift : null;
+        if (ps) {
+            const on = pjShiftOn(picked);
+            verdict += `<div class="pj-verdict ${on ? "pj-v-stock" : ""} pj-shift">
+                <div class="pj-v-head">Or keep this lens: widen the PD</div>
+                <div>${esc(ps.line)}</div>
+                <div class="pj-small">The job gets the wider PD; the Rx keeps the measured one. The job note records both.</div>
+                <div class="pj-actions"><button class="pj-btn" type="button" id="pj-shift">${on ? "Using the PD change ✓" : "Use this PD change"}</button></div>
+            </div>`;
+        }
         const sug = nb && nb.suggest ? nb.suggest : [];
         if ((picked.fits === false || !ok) && sug.length) {
             verdict += `<div class="pj-h2">Next best <span class="pj-small">stock that fits first, then made to order</span></div>
                 <div class="pj-grid3">${sug.map((o, i) => pjLensCard(o, i, part.key)).join("")}</div>`;
         }
     }
-    const lensOk = !!(picked && picked.fits !== false && picked.link && picked.link.ready);
+    const lensOk = !!(picked && (picked.fits !== false || pjShiftOn(picked)) && picked.link && picked.link.ready);
     const frameOk = !!(pj.frame && (pj.frame.barcode || pj.frame.own));
     return `<div class="pj-card">${pdLine}${needLine}${verdict}${pjContinue(lensOk && frameOk,
         !lensOk ? "Pick a lens that fits and is ready for Optomate." : "Scan the frame, or tick Own frame, to go on. Typed sizes only check the blank.")}</div>`;
@@ -436,18 +448,40 @@ function pjContinue(ok, hint) {
 function pjWireFit(root) {
     const part = pjPart();
     pjWireLensCards(root, () => (part && part.answer && part.answer.next_best ? part.answer.next_best.suggest : []));
+    const sh = root.querySelector("#pj-shift");
+    if (sh) sh.addEventListener("click", () => {
+        const nb = part && part.answer && part.answer.next_best;
+        const p = nb && nb.picked;
+        pj.pdShift = pjShiftOn(p) ? null : { key: pjLensKey(p), shift: p.pd_shift.shift, ref: p.ref };
+        const fit = document.getElementById("pj-fit");
+        fit.innerHTML = pjFitPanel(); pjWireFit(fit);
+    });
     const next = root.querySelector("#pj-next");
     if (next) next.addEventListener("click", () => { pj.step = 4; pj.preview = null; pjDraw(); });
 }
 
 /* --- 4 Check --------------------------------------------------------------------------------- */
 
+// the PD change staff accepted, only while it is for the lens still picked
+function pjShiftOn(o) {
+    return !!(o && pj.pdShift && pj.pdShift.key === pjLensKey(o));
+}
+
+// the lens without its blank size (the blank changes once the frame is known)
+function pjLensKey(o) {
+    const r = { ...((o && o.ref) || {}) };
+    delete r.blank_mm;
+    return JSON.stringify(r);
+}
+
 function pjRequest() {
     const rx = pjRx(), o = pj.picked, f = pj.frame || {};
-    return { patient_id: pj.patient.id, rx_id: rx.rx_id, rx_saved_at: rx.saved_at || "", option: o.ref,
+    const shift = pjShiftOn(o) ? pj.pdShift : null;
+    return { patient_id: pj.patient.id, rx_id: rx.rx_id, rx_saved_at: rx.saved_at || "", option: shift ? shift.ref : o.ref,
              lens_use: o.use || "D", hub_pair_price: o.sell != null ? String(o.sell) : "",
              frame: { own: !!f.own, barcode: f.own ? "" : (f.barcode || ""), a: f.a || "", dbl: f.dbl || "", ed: f.ed || "" },
-             heights: pj.heights, tint_barcode: pj.tint, second_pair: pj.secondPair };
+             heights: pj.heights, tint_barcode: pj.tint, second_pair: pj.secondPair,
+             pd_shift: shift ? shift.shift : null };
 }
 
 async function pjDrawCheck(b) {
@@ -504,6 +538,7 @@ function pjDrawCheckBody(b) {
             ${row("Tint", tint)}
             ${row("Frame", frame)}
             ${row("Heights", heights, heightsNeeded ? "pj-req" : "")}
+            ${pv.pd_shift ? row("PD change", `<strong>${esc(pv.pd_shift)}</strong>`, "pj-req") : ""}
             ${pv.lens ? row("Price", price) : ""}
         </div>
         ${warnings}${refusals}${second}

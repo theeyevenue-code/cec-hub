@@ -44,7 +44,7 @@ import sys
 from decimal import Decimal
 from pathlib import Path
 
-from hub import checkin, lenses
+from hub import checkin, lenses, pdshift
 
 BRIDGE = Path(__file__).resolve().with_name("lens_bridge.py")
 HUB_ROOT = Path(__file__).resolve().parent.parent
@@ -434,7 +434,7 @@ def blank_mismatch(listed: list, need: dict | None) -> dict | None:
 
 
 def summarise(result: dict, sells: dict, avail: dict | None = None,
-              need: dict | None = None) -> dict:
+              need: dict | None = None, shift_ctx: dict | None = None) -> dict:
     """The engine's answer cut to what the page shows: one line per lens, each
     with its blank verdict; the cheapest that FITS leads (engine order, with
     stock lenses too small for the frame moved behind the ones that fit)."""
@@ -473,6 +473,12 @@ def summarise(result: dict, sells: dict, avail: dict | None = None,
             x["blank_mm"] = max(picked) if ok and picked else (sizes[-1] if not ok else sizes[0])
             if need and not ok:
                 x["largest_by_eye"] = largest_by_eye(key, avail, need)
+                if shift_ctx:
+                    big = {s: max(avail.get(s, {}).get(key) or [], default=None) for s in need}
+                    v = pdshift.find(shift_ctx["frame"], shift_ctx["pds"], shift_ctx["powers"], big)
+                    if v:
+                        x["pd_shift"] = v
+                        x["blank_mm"] = max(b for b in big.values() if b is not None)
         return x
     rest = [out(v) for v in ordered if v is not best]
 
@@ -532,7 +538,21 @@ def run_mode(rows: list, pricing: dict, sells: dict, q: dict,
         sizes = sorted({b for per in avail.values() for v in per.values() for b in v})
         est["min_stock"] = next((b for b in sizes if b >= max(need.values()) - 1e-9), None)
         est["stock_sizes"] = sizes
-    return summarise(res, sells, avail, need)
+    return summarise(res, sells, avail, need, _shift_ctx(q, est))
+
+
+def _shift_ctx(q: dict, est: dict | None) -> dict | None:
+    """Mark, 9 Nov 2026: the PD shift variation is single vision only, from both monocular PDs as
+    saved (not a halved binocular PD, not a distance PD standing in for a missing near PD)."""
+    if not est or q.get("kind") != "Single vision" or not q.get("pd_exact") or not est.get("frame"):
+        return None
+    powers = {}
+    for s, e in (("R", q.get("right")), ("L", q.get("left"))):
+        if e:
+            powers[s] = pdshift.horizontal_power(e["sph"], e["cyl"], (q.get("axes") or {}).get(s))
+    if set(powers) != set(est.get("pds") or {}):
+        return None
+    return {"frame": est["frame"], "pds": est["pds"], "powers": powers}
 
 
 # ---------------------------------------------------------------------------
@@ -618,7 +638,9 @@ def blank_estimate(frame: dict | None, pds: dict, multi: bool = False) -> dict |
     inputs = (f"A {a:g} · DBL {dbl:g} · ED " + (f"{ed:g}" if ed else "not known")
               + " · PD " + " / ".join(f"{s} {v:g}" for s, v in _eye_order(pds.items())))
     return {"value": max(per_eye.values()), "per_eye": per_eye, "inputs": inputs,
-            "working": working, "notes": notes, "approx": not ed}
+            "working": working, "notes": notes, "approx": not ed,
+            # for the PD shift variation (hub/pdshift.py): the numbers the estimate used
+            "frame": {"a": a, "dbl": dbl, "ed": ed}, "pds": dict(pds)}
 
 
 # ---------------------------------------------------------------------------
@@ -660,6 +682,8 @@ def options_for_rx(rx: dict, rows: list, pricing: dict, sells: dict,
                 if est and pd_note:
                     est["notes"].insert(0, pd_note)
                 part["blank"] = est
+                q["pd_exact"] = not pd_note and typ in pdshift.SV_PARTS
+                q["axes"] = {s: num((rx.get(k) or {}).get("axis")) for s, k in (("R", "right"), ("L", "left"))}
                 part["answer"] = run_mode(rows, pricing, sells, q, est)
             parts.append(part)
         tabs.append({"key": tab, "label": TAB_LABELS[tab], "written": tab in written,
