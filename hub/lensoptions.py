@@ -129,7 +129,8 @@ def recent(cfg: dict) -> dict:
     return {"date": str(data.get("date") or ""), "more": bool(data.get("more")),
             "test_day": len(args) > 3,
             "fixture": bool(data.get("fixture")),
-            "patients": [{"id": int(p["id"]), "name": _name(p), "saved": str(p.get("saved") or "")}
+            "patients": [{"id": int(p["id"]), "name": _name(p), "saved": str(p.get("saved") or ""),
+                          "saved_at": str(p.get("saved_at") or "")[:19], "optom": str(p.get("optom") or "")[:10]}
                          for p in data.get("patients") or [] if isinstance(p, dict) and p.get("id")]}
 
 
@@ -665,6 +666,7 @@ def options_for_rx(rx: dict, rows: list, pricing: dict, sells: dict,
                      "parts": parts})
     return {
         "rx_id": rx.get("rx_id"), "saved": rx.get("saved"), "saved_date": _dmy(rx.get("saved_date")),
+        "saved_at": str(rx.get("saved_at") or "")[:19],   # the stamp the pick-lens job checks the Rx against
         "rx_date": _dmy(rx.get("rx_date")), "optom": str(rx.get("optom") or ""),
         "right": rx.get("right"), "left": rx.get("left"),
         "type_note": lt.get("note") or "", "type_words": lt.get("words") or [],

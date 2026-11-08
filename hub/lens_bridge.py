@@ -22,7 +22,8 @@ Commands
       -> {"rxs": [...]} every SPECTACLE_RX row saved on the day of this
          patient's LATEST one (newest first; two on a day is usually a distance
          and a reading pair), each with both eyes verbatim and the lens type
-         read from the Rx comment.
+         read from the Rx comment. "Saved" = last saved (edited, else added),
+         the same stamp the recent list uses and the pick-lens job checks.
   names
       -> {"names": [...]} every given-name / surname word, lower case, for
          the Lens Finder chat's pre-send name check (kept in memory only).
@@ -126,7 +127,7 @@ def recent_query(day: str, top: int) -> str:
     lo, hi = _day_bounds(day)
     return (
         f"SELECT TOP {int(top)} s.PATIENTID, CONVERT(varchar(19), {SAVED_AT}, 120), "
-        f"{_txt('p.GIVEN')}, {_txt('p.SURNAME')} "
+        f"{_txt('p.GIVEN')}, {_txt('p.SURNAME')}, {_txt('s.USER_IDENTIFIER')} "
         "FROM SPECTACLE_RX s WITH (NOLOCK) JOIN PATIENT p WITH (NOLOCK) ON p.ID = s.PATIENTID "
         f"WHERE {SAVED_AT} >= '{lo}' AND {SAVED_AT} < '{hi}' "
         f"ORDER BY {SAVED_AT} DESC, s.ID DESC")
@@ -135,13 +136,13 @@ def recent_query(day: str, top: int) -> str:
 def rx_query(pid: int) -> str:
     eye = ", ".join(_txt(f"s.{side}_{c}") for side in ("RIGHT", "LEFT") for c in EYE_COLS)
     return (
-        f"SELECT TOP {MAX_SAME_DAY * 3} s.ID, CONVERT(varchar(19), s.DATE_ADDED, 120), "
+        f"SELECT TOP {MAX_SAME_DAY * 3} s.ID, CONVERT(varchar(19), {SAVED_AT}, 120), "
         "CONVERT(varchar(10), s.RXDATE, 120), "
         f"{_txt('s.USER_IDENTIFIER')}, "
         "ISNULL(CAST(s.RIGHT_EYE_ONLY AS int),0), ISNULL(CAST(s.LEFT_EYE_ONLY AS int),0), "
         f"{_comment('s.COMMENT')}, {_comment('s.PRACTICE_COMMENT')}, {eye} "
         f"FROM SPECTACLE_RX s WITH (NOLOCK) WHERE s.PATIENTID = {int(pid)} "
-        "ORDER BY s.DATE_ADDED DESC, s.ID DESC")
+        f"ORDER BY {SAVED_AT} DESC, s.ID DESC")
 
 
 def patient_query(pid: int) -> str:
@@ -549,7 +550,7 @@ def build_recent(rows: list[list[str]], n: int) -> dict:
             continue
         seen.add(pid)
         out.append({"id": int(pid), "given": row[2], "surname": row[3],
-                    "saved": clock(row[1]), "saved_at": row[1]})
+                    "saved": clock(row[1]), "saved_at": row[1], "optom": row[4] if len(row) > 4 else ""})
     return {"patients": out[:n], "more": len(out) > n}
 
 
@@ -640,7 +641,7 @@ def cmd_recent(day: str | None = None, n: int = DEFAULT_N, sql=None) -> dict:
     n = max(1, min(MAX_N, int(n)))
     if fixture_mode() and sql is None:
         db = fixture_db(day)
-        rows = sorted(([str(pid), r[0][1], *db["people"][pid][:2]] for pid, r in db["rx"].items()),
+        rows = sorted(([str(pid), r[0][1], *db["people"][pid][:2], r[0][3]] for pid, r in db["rx"].items()),
                       key=lambda x: x[1], reverse=True)
     else:
         rows = (sql or sqlq)(recent_query(day, 40))

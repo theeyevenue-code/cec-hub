@@ -262,6 +262,7 @@ def test_status_runs_the_engine_and_says_enabled(client):
 def test_options_route_decorates_with_links_best_and_next_best(client):
     d = client.post("/api/picklens/options", json={"patient_id": 77}).get_json()
     assert d["patient"]["name"] == "ZZTEST, Ann"
+    assert d["rxs"][0]["saved_at"] == "2026-11-03 15:00:00"      # the Rx-changed guard needs the stamp
     tab = next(t for t in d["rxs"][0]["tabs"] if t["key"] == "distance")
     a = tab["parts"][0]["answer"]
     assert a["best"] and all("link" in o and "ref" in o and o["use"] == "D" for o in a["best"] + a["rest"])

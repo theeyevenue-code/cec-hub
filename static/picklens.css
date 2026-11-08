@@ -95,6 +95,11 @@ body.pj-body, body.pj-body main { background: #f5f5f7; }
 /* lens cards */
 .pj-lens { display: flex; flex-direction: column; gap: 10px; min-height: 172px; }
 .pj-lens-bad { opacity: .75; }
+/* a lens Optomate doesn't know yet: still readable, clearly secondary, so nobody is drawn to a dead end */
+.pj-lens-touch { background: #f5f5f7; border-style: dashed; }
+.pj-lens-touch .pj-idx, .pj-lens-touch .pj-lname, .pj-lens-touch .pj-price, .pj-lens-touch .pj-why,
+.pj-lens-touch .pj-row-price, .pj-lens-touch .pj-sup { color: var(--mute); font-weight: 600; }
+.pj-lens-touch .zeiss-logo, .pj-lens-touch .pj-chip { opacity: .6; }
 .pj-lens-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .pj-idx { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
 .pj-lname { font-size: 20px; font-weight: 600; }
@@ -169,6 +174,7 @@ body.pj-body, body.pj-body main { background: #f5f5f7; }
 .pj-pricetable td { padding: 6px 12px 6px 0; border-bottom: 1px solid var(--rule); }
 .pj-pricetable .pj-num { text-align: right; white-space: nowrap; }
 .pj-pricetable .pj-total td { font-weight: 700; font-size: 20px; border-bottom: none; padding-top: 10px; }
+.pj-agree { margin-top: 8px; font-size: 17px; }
 .pj-badword { color: var(--bad); font-weight: 700; }
 .pj-bad { background: var(--bad-bg); color: var(--bad); border-radius: var(--rs); padding: 16px 20px; margin: 0 0 16px; font-size: 17px; }
 .pj-bad-head { font-size: 20px; font-weight: 800; margin-bottom: 6px; }

@@ -343,7 +343,7 @@ def client(tmp_path, monkeypatch):
 def test_recent_endpoint_no_store(client):
     r = client.get("/api/lensoptions/recent")
     assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
-    assert r.get_json()["patients"] == [{"id": 77, "name": "ZZTEST, Ann", "saved": "3:00pm"}]
+    assert r.get_json()["patients"] == [{"id": 77, "name": "ZZTEST, Ann", "saved": "3:00pm", "saved_at": "", "optom": ""}]
 
 
 def test_search_endpoint(client):

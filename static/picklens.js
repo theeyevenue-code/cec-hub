@@ -17,6 +17,23 @@ const PJ_STEPS = ["Patient", "Lens", "Frame", "Check"];
 
 function pjMoney(v) { return v == null || v === "" ? "" : "$" + Number(v).toFixed(2).replace(/\.00$/, ""); }
 function pjMoneyC(v) { return v == null || v === "" ? "" : "$" + Number(v).toFixed(2); }
+// "11:42am" when the Rx was saved today, else "Fri 6 Nov".
+function pjWhen(p) {
+    const d = String(p.saved_at || "").slice(0, 10);
+    const n = new Date();
+    const today = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+    if (!d || d === today) return p.saved || "";
+    const dt = new Date(d + "T00:00:00");
+    return isNaN(dt) ? d : dt.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+}
+
+// The product name as the price sheet and Optomate call it, without the index: "FSV Clear",
+// "Single Vision Grind", "Progressive Ultra HDV", "SmartLife Progressive Superb".
+function pjProduct(o) {
+    const raw = String(o.raw_name || o.lens || "").replace(/\s+1\.\d\d$/, "").trim();
+    return raw || (o.name && o.name.toLowerCase() !== String(o.type || "").toLowerCase() ? o.name : o.category || "");
+}
+
 function pjSupplier(s) { return /^zeiss$/i.test(s || "") ? ZEISS_LOGO : `<span class="pj-sup">${esc(s || "")}</span>`; }
 function pjReset() {
     Object.assign(pj, { step: 1, patient: null, data: null, rx: 0, tab: "", picked: null, frame: null, frameMode: "scan",
@@ -101,7 +118,7 @@ async function pjRecent() {
     const ps = d.patients || [];
     box.innerHTML = ps.length ? ps.map((p) => `<button class="pj-card pj-tap pj-person" type="button" data-pick="${esc(p.id)}">
             <span class="pj-person-name">${esc(p.name)}</span>
-            <span class="pj-person-sub">Rx saved ${esc(p.saved)}</span></button>`).join("")
+            <span class="pj-person-sub">Rx saved ${esc(pjWhen(p))}${p.optom ? " · " + esc(p.optom) : ""}</span></button>`).join("")
         : `<div class="pj-note">No spectacle Rx saved today yet. Search below.</div>`;
     if (d.fixture) box.insertAdjacentHTML("beforeend", `<div class="pj-small pj-span">Fake ZZTEST patients</div>`);
     pjWirePicks(box);
@@ -187,7 +204,7 @@ function pjPatientHead(rx) {
 }
 
 function pjLensTitle(o) {
-    return `<span class="pj-idx">${esc(o.index)}</span> <span class="pj-lname">${esc(o.name.toLowerCase() === o.type.toLowerCase() ? o.category : o.name)}</span>`;
+    return `<span class="pj-idx">${esc(o.index)}</span> <span class="pj-lname">${esc(pjProduct(o))}</span>`;
 }
 
 function pjKind(o) {
@@ -202,7 +219,8 @@ function pjReady(o) {
 }
 
 function pjLensCard(o, i, part) {
-    return `<button class="pj-card pj-tap pj-lens ${o.fits === false ? "pj-lens-bad" : ""}" type="button" data-lens="${i}" data-part="${esc(part)}">
+    const ready = !!(o.link && o.link.ready);
+    return `<button class="pj-card pj-tap pj-lens ${o.fits === false ? "pj-lens-bad" : ""} ${ready ? "" : "pj-lens-touch"}" type="button" data-lens="${i}" data-part="${esc(part)}">
         <div class="pj-lens-top">${pjLensTitle(o)}<span class="pj-price">${o.sell != null ? pjMoney(o.sell) : "—"}<small>a pair</small></span></div>
         <div class="pj-lens-mid">${pjSupplier(o.supplier)} ${pjKind(o)} <span class="pj-small">${esc(coatShort(o.coating))}</span></div>
         ${o.why ? `<div class="pj-why">${esc(o.why)}</div>` : ""}
@@ -247,7 +265,7 @@ function pjDrawLens(b) {
         const best = a.best || [];
         const rest = a.rest || [];
         // rows are numbered through best + rest, so a tap finds the same object either way
-        const rowOf = (o) => `<button class="pj-row pj-tap" type="button" data-lens="${best.length + rest.indexOf(o)}" data-part="${esc(part.key)}">
+        const rowOf = (o) => `<button class="pj-row pj-tap ${o.link && o.link.ready ? "" : "pj-lens-touch"}" type="button" data-lens="${best.length + rest.indexOf(o)}" data-part="${esc(part.key)}">
                     <span class="pj-row-name">${pjLensTitle(o)} <span class="pj-small">${esc(coatShort(o.coating))}</span></span>
                     <span>${pjSupplier(o.supplier)}</span>${pjKind(o)}<span class="pj-small">${pjReady(o)}</span>
                     <span class="pj-row-price">${o.sell != null ? pjMoney(o.sell) : `<span class="pj-small">not on price sheet</span>`}</span></button>`;
@@ -321,9 +339,8 @@ function pjDrawFrame(b) {
 function pjFrameCard() {
     const f = pj.frame;
     if (!f) return "";
+    if (f.own || f.source === "typed") return "";          // the typed boxes below already show it
     const size = [f.a != null ? `eye ${f.a}` : "", f.dbl != null ? `bridge ${f.dbl}` : "", f.ed != null ? `ED ${f.ed}` : ""].filter(Boolean).join(" · ");
-    if (f.own) return `<div class="pj-framecard"><div class="pj-h2">Own frame</div><div class="pj-small">${esc(size || "size not typed")}</div></div>`;
-    if (f.source === "typed") return `<div class="pj-framecard"><div class="pj-h2">Typed size</div><div class="pj-small">${esc(size)}</div></div>`;
     return `<div class="pj-framecard"><div class="pj-h2">${esc(f.model || f.barcode)}${f.colour ? ` <span class="pj-small">${esc(f.colour)}</span>` : ""}</div>
         <div class="pj-small">${esc(size || "no size on the frame record - type it below")}${f.price != null ? ` · ${pjMoneyC(f.price)}` : " · no price on the frame record"}${f.sunglass ? " · sunglass" : ""}</div></div>`;
 }
@@ -383,11 +400,12 @@ function pjFitPanel() {
     let verdict = "";
     if (picked) {
         const ok = picked.fits !== false && picked.link && picked.link.ready;
-        const line = picked.fits === false ? (nb && nb.problem) || picked.blank_line
-            : picked.type === "Stock" ? (picked.blank_line || "Stock blank fits") : "Made to order, cut to this frame";
-        verdict = `<div class="pj-verdict ${picked.fits === false ? "pj-v-bad" : picked.type === "Stock" ? "pj-v-stock" : "pj-v-grind"}">
-            <div class="pj-v-head">${picked.fits === false ? "Doesn't fit" : "Fits"}</div>
-            <div>${pjLensTitle(picked)} <span class="pj-small">${esc(line || "")}</span></div>
+        const bad = picked.fits === false;
+        const head = bad ? "Doesn't fit: " + pjFitWords((nb && nb.problem) || picked.blank_line || "") : "Fits";
+        const line = bad ? "" : picked.type === "Stock" ? (picked.blank_line || "Stock blank fits") : "Made to order, cut to this frame";
+        verdict = `<div class="pj-verdict ${bad ? "pj-v-bad" : picked.type === "Stock" ? "pj-v-stock" : "pj-v-grind"}">
+            <div class="pj-v-head">${esc(head)}</div>
+            <div>${pjLensTitle(picked)} <span class="pj-small">${esc(line)}</span></div>
             ${!picked.link || !picked.link.ready ? `<div class="pj-small pj-touchline">${esc((picked.link || {}).why || "Not linked to Optomate yet")}: make this job in Touch.</div>` : ""}
         </div>`;
         const sug = nb && nb.suggest ? nb.suggest : [];
@@ -400,6 +418,14 @@ function pjFitPanel() {
     const frameOk = !!(pj.frame && (pj.frame.barcode || pj.frame.own));
     return `<div class="pj-card">${pdLine}${needLine}${verdict}${pjContinue(lensOk && frameOk,
         !lensOk ? "Pick a lens that fits and is ready for Optomate." : "Scan the frame, or tick Own frame, to go on. Typed sizes only check the blank.")}</div>`;
+}
+
+// "Needs 74 mm - this lens only comes 70 mm for this Rx. Big enough stock: ..." -> "needs 74 mm, this lens comes 70 mm"
+function pjFitWords(line) {
+    const first = String(line || "").split(". ")[0];
+    const m = first.match(/Needs (\d+(?:\.\d+)? ?mm) - this lens only comes (.+?) for this Rx/i);
+    if (m) return `needs ${m[1]}, this lens comes ${m[2]}`;
+    return first ? first.charAt(0).toLowerCase() + first.slice(1) : "stock blank too small";
 }
 
 function pjContinue(ok, hint) {
@@ -453,13 +479,14 @@ function pjDrawCheckBody(b) {
     const hIn = (s) => `<label class="pj-h">${s === "R" ? "Right" : "Left"}<input data-h="${s}" inputmode="decimal" placeholder="mm" value="${esc(pj.heights[s] || "")}"></label>`;
     const heights = `<div class="pj-heights">${hIn("R")}${hIn("L")}<span class="pj-small">${heightsNeeded ? "Measured, in mm. Required for this lens." : "Optional for single vision."}</span></div>`;
     const tint = `<select id="pj-tint" class="pj-select"><option value="">None</option>${(pj.tints || []).map((t) => `<option value="${esc(t.barcode)}" ${t.barcode === pj.tint ? "selected" : ""}>${esc(t.description)} · ${pjMoneyC(t.sellinc)} a lens</option>`).join("")}</select>`;
-    const agree = pr.agree === true ? `<span class="pj-ready">Matches the price sheet</span>` : pr.agree === false ? `<span class="pj-badword">Prices don't agree</span>` : "";
+    const agree = pr.agree === true ? `<div class="pj-ready pj-agree">Lens price matches the price sheet (${pjMoney(pr.hub_pair)} a pair)</div>`
+        : pr.agree === false ? `<div class="pj-badword pj-agree">Prices don't agree</div>` : "";
     const price = pv.lens ? `<table class="pj-pricetable"><tbody>
         <tr><td>Lenses</td><td class="pj-num">${pjMoneyC(pr.lens_each)} x 2</td><td class="pj-num">${pjMoneyC(Number(pr.lens_each) * 2)}</td></tr>
         ${pv.coat && pv.coat.barcode ? `<tr><td>Coating add-on</td><td class="pj-num">${pjMoneyC(pr.coat_each)} x 2</td><td class="pj-num">${pjMoneyC(Number(pr.coat_each) * 2)}</td></tr>` : ""}
         ${pv.tint ? `<tr><td>Tint</td><td class="pj-num">${pjMoneyC(pr.tint_each)} x 2</td><td class="pj-num">${pjMoneyC(Number(pr.tint_each) * 2)}</td></tr>` : ""}
         ${pv.frame && !pv.frame.own ? `<tr><td>Frame</td><td></td><td class="pj-num">${pjMoneyC(pr.frame)}</td></tr>` : ""}
-        <tr class="pj-total"><td>Touch will charge</td><td class="pj-small">price sheet ${pjMoneyC(pr.hub_pair)} a pair</td><td class="pj-num">${pjMoneyC(pr.touch_total)}</td></tr>
+        <tr class="pj-total"><td>Total</td><td></td><td class="pj-num">${pjMoneyC(pr.touch_total)}</td></tr>
         </tbody></table>${agree}` : "";
     const refusals = (p.refusals || []).length ? `<div class="pj-bad"><div class="pj-bad-head">Can't make the job yet</div><ul>${p.refusals.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "";
     const warnings = (p.warnings || []).length ? `<ul class="pj-notes">${p.warnings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
