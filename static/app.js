@@ -1331,8 +1331,7 @@ function answerCardHTML(data, sells) {
     const alt = options.find((o) => o !== best && o.orderable && o.type !== best.type
         && !o.hard_under && o.standard_coating && o.price_now != null);
     const row = (l, cls) => {
-        const sell = sells[[l.supplier, l.name, fmtIndex(l.index), l.type].join("|")];
-        const sellPrice = sell ? (sell.byCoating[l.coating] != null ? sell.byCoating[l.coating] : sell.any) : null;
+        const sellPrice = sellFor(sells, l);
         const supCls = /zeiss$/i.test(l.supplier) ? "sup-zeiss" : /synchrony/i.test(l.supplier) ? "sup-sync" : "sup-other";
         const diff = l !== best && best.price_now != null && l.price_now != null ? l.price_now - best.price_now : null;
         return `<tr class="${cls} opt-${l.type}">
@@ -1399,8 +1398,7 @@ const OPT_TABLE_HEAD = `<tr>
 
 function optionRowHTML(g, best, sells) {
     const l = g.lead;
-    const sell = sells[[l.supplier, l.name, fmtIndex(l.index), l.type].join("|")];
-    const sellPrice = sell ? (sell.byCoating[l.coating] != null ? sell.byCoating[l.coating] : sell.any) : null;
+    const sellPrice = sellFor(sells, l);
     const blanks = g.blanks.size ? [...g.blanks].sort((a, b) => a - b).map((b) => parseFloat(b)).join(" / ") + "mm"
         : (l.type === "grind" ? "to size" : "—");
     const seenCoat = new Set([l.coating]);
@@ -1771,16 +1769,34 @@ function wireLensLookup(cat) {
 }
 
 // Sell prices + tier per product, so finder rows can show what a lens sells
-// for beside what it costs. Keyed on supplier|name|index|type.
+// for beside what it costs. Keyed on supplier|name|index|type|material: each
+// material (Clear, BluePro, PhotoFusion X, Polarised) has its own sheet price
+// (Mark, 8 Nov 2026). The key without the material is kept only when every
+// material of the lens sells at the same prices. Same rule as
+// hub/lensoptions.py sell_index(). A coating stored as null has no price.
 function sellIndex(cat) {
-    const idx = {};
+    const idx = {}, plain = {};
     for (const p of cat.products || []) {
         const byCoating = {};
-        for (const c of p.coatings || []) if (c.cec_price != null) byCoating[c.coating] = c.cec_price;
-        idx[[p.supplier, p.name, fmtIndex(p.index), p.type].join("|")] =
-            { tier: p.tier || "", byCoating, any: p.cec_price };
+        for (const c of p.coatings || []) byCoating[c.coating] = c.cec_price != null ? c.cec_price : null;
+        const k4 = [p.supplier, p.name, fmtIndex(p.index), p.type].join("|");
+        const entry = { tier: p.tier || "", byCoating, any: p.cec_price };
+        idx[k4 + "|" + (p.material || "")] = entry;
+        (plain[k4] = plain[k4] || []).push(entry);
+    }
+    const same = (a, b) => a.any === b.any && JSON.stringify(a.byCoating) === JSON.stringify(b.byCoating);
+    for (const [k4, list] of Object.entries(plain)) {
+        if (list.every((e) => same(e, list[0]))) idx[k4] = list[0];
     }
     return idx;
+}
+
+// One finder row's sell price per pair (its own material and coating), or null.
+function sellFor(sells, l) {
+    const k4 = [l.supplier, l.name, fmtIndex(l.index), l.type].join("|");
+    const sell = sells[k4 + "|" + (l.material || "")] || sells[k4];
+    if (!sell) return null;
+    return Object.prototype.hasOwnProperty.call(sell.byCoating, l.coating) ? sell.byCoating[l.coating] : sell.any;
 }
 
 async function renderLenses() {

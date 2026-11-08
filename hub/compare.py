@@ -420,7 +420,11 @@ def _line(k, fits, eyes, q, pricing, sells, others: int) -> dict:
     verified = bool(orderable and priced and range_ok and blank_ok is not False
                     and cstat in ("", "named"))
     basis = per_eye[eyes[0]]["basis"]
-    sell_by = sells.get((sup, name, _fmt_index(idx), typ)) or {}
+    # material-aware, same lookup as the Lens options page (Mark, 8 Nov 2026)
+    k4 = (sup, name, _fmt_index(idx), typ)
+    sell_by = sells.get(k4 + (str(mat or ""),))
+    if sell_by is None:
+        sell_by = sells.get(k4) or {}
     sell = sell_by.get(coat, sell_by.get(""))
     cat = lenses.normalise_category(first.get("category", ""))
     short = re.sub(r"\s+1\.\d\d$", "", str(name or "")).strip()

@@ -164,9 +164,13 @@ engine string (`band_text` / `range_text`), so they cannot disagree.
 
 ## Selling prices and tiers
 
-`config/cec_prices.json` (per machine; the shipped example is the 15 Sep 2026
-staff sheet) maps name snippets + index to the practice's per-pair price and
-tier name (Signature / Everyday / Essential / Screen Relief / Desk Pair /
-SV Premium / SV Standard), with add-ons for BluePro (+$50), photochromic
-(+$130) and the grind surcharge on single-vision grind rows (+$100). The
-library and the finder show it beside the cost.
+`config/cec_prices.json` (per machine, git-ignored; the shipped example is the
+QR price sheets in Drive, October 2026) maps name snippets + index to the
+practice's per-pair price and tier name, with add-ons for blue light (+$50),
+light-reactive (+$150) and the grind surcharge on single-vision grind rows
+(+$100). Every MATERIAL of a lens is its own product with its own price
+(Clear, BluePro, PhotoFusion X, Polarised; 8 Nov 2026), and a tier can be
+limited to materials or priced per coating; polarised and AdaptiveSun are
+priced only where the sheet prints them. The library, Lens options and
+compare show it beside the cost. After pulling a new example, copy it over
+`config/cec_prices.json` on the server: the live file is not in git.

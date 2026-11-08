@@ -275,15 +275,34 @@ def mode_question(rx: dict, typ: str, written_as: str = "") -> dict:
 # ---------------------------------------------------------------------------
 
 def sell_index(products: list) -> dict:
-    """(supplier, name, index, type) -> {coating: sell price per pair, "": any}.
-    Same key as the Lens Finder page's sellIndex()."""
-    idx = {}
+    """(supplier, name, index, type, material) -> {coating: sell price per pair
+    or None, "": cheapest}. Same key as the Lens Finder page's sellIndex().
+
+    Each material keeps its own price: Clear, BluePro, PhotoFusion X and
+    Polarised of one lens sell for different amounts (Mark, 8 Nov 2026). The
+    old material-less key (supplier, name, index, type) is kept only for a
+    lens whose materials all sell at the same prices, so nothing can borrow
+    another material's price. A coating listed with None has no sheet price."""
+    idx, plain = {}, {}
     for p in products or []:
-        by = {c.get("coating"): c.get("cec_price") for c in p.get("coatings") or []
-              if c.get("cec_price") is not None}
+        by = {c.get("coating"): c.get("cec_price") for c in p.get("coatings") or []}
         by[""] = p.get("cec_price")
-        idx[(p.get("supplier"), p.get("name"), _fmt_index(p.get("index")), p.get("type"))] = by
+        k4 = (p.get("supplier"), p.get("name"), _fmt_index(p.get("index")), p.get("type"))
+        idx[k4 + (str(p.get("material") or ""),)] = by
+        plain.setdefault(k4, []).append(by)
+    for k4, bys in plain.items():
+        if all(b == bys[0] for b in bys):
+            idx[k4] = bys[0]
     return idx
+
+
+def sell_for(sells: dict, o: dict):
+    """The sell price per pair for one engine row (its own material and coating), or None."""
+    k4 = (o.get("supplier"), o.get("name"), _fmt_index(o.get("index")), o.get("type"))
+    by = sells.get(k4 + (str(o.get("material") or ""),))
+    if by is None:
+        by = sells.get(k4) or {}
+    return by.get(o.get("coating"), by.get(""))
 
 
 def _fmt_index(v) -> str:
@@ -295,8 +314,7 @@ def _short(name) -> str:
 
 
 def _lens_out(o: dict, sells: dict, best_price) -> dict:
-    by = sells.get((o.get("supplier"), o.get("name"), _fmt_index(o.get("index")), o.get("type"))) or {}
-    sell = by.get(o.get("coating"), by.get(""))
+    sell = sell_for(sells, o)
     cat = lenses.normalise_category(o.get("category", ""))
     name = _short(o.get("name"))
     if cat == "Single vision":

@@ -383,7 +383,7 @@ def price_now(lens: dict, today=None, pricing: dict | None = None):
 
 def group_products(lenses: list, today=None, pricing: dict | None = None) -> list:
     """Collapse the flat rows into one product per supplier + lens + index +
-    type, for BROWSING. In the price files a lens repeats once per coating and
+    type + material, for BROWSING. In the price files a lens repeats once per coating and
     once per power band (each band carries the blank it needs), so a single
     lens can be 30-40 rows. Price only ever moves with coating — it's
     identical across the blank/power bands of a coating — so folding the
@@ -402,8 +402,13 @@ def group_products(lenses: list, today=None, pricing: dict | None = None) -> lis
     """
     groups, order = {}, []
     for l in lenses:
+        # Material is part of the product: Clear, BluePro, PhotoFusion X and
+        # Polarised of one lens are different lenses with different costs and
+        # sell prices. Folding them together showed every material at one
+        # price (Mark, 8 Nov 2026: Superb 1.50 PhotoFusion read $560, the sheet
+        # says $710).
         key = (l.get("supplier") or l.get("brand", ""), l.get("name", ""),
-               l.get("index"), l.get("type", ""))
+               l.get("index"), l.get("type", ""), l.get("material", "") or "")
         g = groups.get(key)
         if g is None:
             g = groups[key] = {
@@ -522,14 +527,27 @@ def attach_cec_price(products: list, cfg: dict | None) -> list:
     pair) and the practice's tier name, so the library can show them beside
     the supplier cost.
 
-    Current scheme — 'tiers': a list of {name, match, by_index, category?}.
+    Current scheme - 'tiers': a list of {name, match, by_index, category?}.
     A product belongs to the first tier whose snippet appears in
     supplier+brand+name (case-insensitive); its base price is by_index[index].
     'addons' then add to the base when the snippet appears in the product name,
-    material or coating (BluePro +$50, PhotoFusion +$130), and the special key
+    material or coating (BluePro +$50, PhotoFusion +$150), and the special key
     'grind' adds the made-to-order surcharge on single-vision grind rows.
-    'blank_names' suppress a price entirely (polarised is priced off the
-    sunglasses list).
+    'blank_names' suppress a price entirely when the snippet is in the name or
+    the material (AdaptiveSun, Polarised: not on the sheet unless a tier names
+    the material).
+
+    Optional tier keys (8 Nov 2026, so each material can carry its sheet price):
+      'materials'  the tier only takes products whose material is one of these
+                   (exact, case-insensitive). A tier that names a material also
+                   prices it when that material is in blank_names.
+      'by_coating' {coating: {index: price}} instead of by_index, for a lens the
+                   sheet prices per coating (Synchrony sun lenses: HC vs HMC+).
+                   A coating not listed gets no price.
+      'addons'     replaces the global addons for this tier ({} = none; its own
+                   'grind' key, default 0), for a sheet price that is already
+                   the whole price.
+    A price of null in by_index / by_coating means "not on the sheet".
 
     Legacy scheme (still honoured, for the Hoya file): 'design_prices'
     (name snippet + index), 'sv_tiers' (coating snippet + index) and
@@ -540,6 +558,11 @@ def attach_cec_price(products: list, cfg: dict | None) -> list:
     """
     cfg = cfg or {}
     blank = [b.strip().lower() for b in cfg.get("blank_names", []) if str(b).strip()]
+
+    def _addon_map(raw):
+        m = {str(k).strip().lower(): v for k, v in (raw or {}).items()}
+        return m, (m.pop("grind", 0) or 0)
+
     tiers = []
     for e in cfg.get("tiers", []) or []:
         snippets = e.get("match", [])
@@ -547,11 +570,20 @@ def attach_cec_price(products: list, cfg: dict | None) -> list:
             snippets = [snippets]
         snippets = [str(m).strip().lower() for m in snippets if str(m).strip()]
         by = {str(k).strip(): v for k, v in (e.get("by_index") or {}).items()}
-        if snippets and by:
-            tiers.append((str(e.get("name", "")).strip(), snippets, by,
-                          normalise_category(e.get("category")) if e.get("category") else None))
-    addons = {str(k).strip().lower(): v for k, v in (cfg.get("addons") or {}).items()}
-    grind_addon = addons.pop("grind", 0) or 0
+        by_coat = {str(c).strip().lower(): {str(k).strip(): v for k, v in (ix or {}).items()}
+                   for c, ix in (e.get("by_coating") or {}).items()}
+        mats = e.get("materials") or []
+        if isinstance(mats, str):
+            mats = [mats]
+        if snippets and (by or by_coat):
+            tiers.append({
+                "name": str(e.get("name", "")).strip(), "snippets": snippets,
+                "by": by, "by_coat": by_coat,
+                "cat": normalise_category(e.get("category")) if e.get("category") else None,
+                "materials": {str(m).strip().lower() for m in mats if str(m).strip()},
+                "addons": _addon_map(e["addons"]) if isinstance(e.get("addons"), dict) else None,
+            })
+    addons, grind_addon = _addon_map(cfg.get("addons"))
     surcharge = {str(k).strip().lower(): v
                  for k, v in (cfg.get("surcharge") or {}).items()}
     design = []
@@ -569,35 +601,50 @@ def attach_cec_price(products: list, cfg: dict | None) -> list:
 
     for p in products:
         label = f"{p.get('supplier', '')} {p.get('brand', '')} {p.get('name', '')}".lower()
+        material = str(p.get("material") or "").strip().lower()
         idx = _idx_key(p)
         cat = normalise_category(p.get("category", ""))
         is_sv = cat == "Single vision"
-        blanked = idx is None or any(b in label for b in blank)
-        p["tier"] = ""
-        base = None
-        if not blanked:
-            for name, snippets, by, tcat in tiers:
-                if tcat and tcat != cat:
+        tier = None
+        if idx is not None:
+            for t in tiers:
+                if t["cat"] and t["cat"] != cat:
                     continue
-                if any(m in label for m in snippets):
-                    p["tier"] = name
-                    base = by.get(idx)
+                if t["materials"] and material not in t["materials"]:
+                    continue
+                if any(m in label for m in t["snippets"]):
+                    tier = t
                     break
-            if base is None and not p["tier"]:
-                for m, by in design:
-                    if m in label and idx in by:
-                        base = by[idx]
-                        break
+        named = bool(tier and tier["materials"])
+        blanked = (idx is None or any(b in label for b in blank)
+                   or (not named and any(b in material for b in blank)))
+        p["tier"] = tier["name"] if tier and not blanked else ""
+        design_base = None
+        if not blanked and tier is None:
+            for m, by in design:
+                if m in label and idx in by:
+                    design_base = by[idx]
+                    break
         legacy_add = sum(v for k, v in surcharge.items() if k in label)
         for coat in p.get("coatings", []):
             price = None
             if not blanked:
                 cl = (coat.get("coating") or "").lower()
-                if base is not None:
-                    hay = f"{label} {p.get('material', '')} {cl}".lower()
-                    price = base + sum(v for k, v in addons.items()
-                                       if any(part.strip() and part.strip() in hay
-                                              for part in k.split("|")))
+                hay = f"{label} {material} {cl}".lower()
+                if tier is not None:
+                    base = (tier["by_coat"].get(cl.strip(), {}).get(idx) if tier["by_coat"]
+                            else tier["by"].get(idx))
+                    if base is not None:
+                        adds, grind = tier["addons"] if tier["addons"] is not None else (addons, grind_addon)
+                        price = base + sum(v for k, v in adds.items()
+                                           if any(part.strip() and part.strip() in hay
+                                                  for part in k.split("|")))
+                        if is_sv and p.get("type") == "grind":
+                            price += grind
+                elif design_base is not None:
+                    price = design_base + sum(v for k, v in addons.items()
+                                              if any(part.strip() and part.strip() in hay
+                                                     for part in k.split("|")))
                     if is_sv and p.get("type") == "grind":
                         price += grind_addon
                 elif is_sv and sv_tiers:
