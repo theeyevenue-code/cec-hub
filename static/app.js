@@ -5108,7 +5108,7 @@ function jaDialogText(ready) {
     const jobs = `${n} order${n === 1 ? "" : "s"}`;
     if (g.dry_run) return `TEST RUN for ${jobs}.\n\nNothing changes in Optomate and no one is texted. You will see what would happen.`;
     const parts = [];
-    if (ng) parts.push(g.write_live ? `GLASSES: ${ng} job${ng === 1 ? "" : "s"} marked received in Optomate (frame tilt and wrap are set to 0; the old values go in the job's comments).`
+    if (ng) parts.push(g.write_live ? `GLASSES: ${ng} job${ng === 1 ? "" : "s"} marked received in Optomate.`
                                     : `GLASSES: Optomate is NOT changed (writes are switched off).`);
     if (nc) parts.push(g.cl_write_live ? `CONTACTS: ${nc} order${nc === 1 ? "" : "s"} marked received in Optomate.`
                                        : `CONTACTS: Optomate is NOT changed (contacts writes are switched off).`);
