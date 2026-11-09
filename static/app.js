@@ -4810,12 +4810,48 @@ async function renderStocktake(sid) {
 
 const ja = { lines: new Map(), own: new Set(), gates: null, words: "", busy: false, seq: 0,
              texts: new Map(), pvSeq: 0, pvTimer: null, pvFor: "" };
+/* Plain words (Mark, 9 Nov 2026: "super clear, no ambiguity"): a status says what will happen
+   to this job when the button is pressed; every red or grey line says the one thing to do next. */
 const JA_STATE = {
-    ok: ["Ready to mark", "ja-ok"], received: ["Already in", "ja-grey"], looking: ["Checking…", "ja-wait"],
-    cancelled: ["Cancelled", "ja-red"], notfound: ["Not found", "ja-red"], bad: ["Not a job number", "ja-red"],
-    error: ["Couldn't check", "ja-red"], pick: ["Glasses or contacts?", "ja-wait"],
+    ok: ["Will be marked received", "ja-ok"], received: ["Nothing to do", "ja-grey"], looking: ["Checking…", "ja-wait"],
+    cancelled: ["Cancelled in Optomate", "ja-red"], notfound: ["No job with this number", "ja-red"],
+    bad: ["Not a job number", "ja-red"], error: ["Couldn't check Optomate", "ja-red"],
+    pick: ["Glasses or contacts?", "ja-wait"],
+};
+const JA_NEXT = {
+    cancelled: "Not marked, not texted. Check the job in Optomate.",
+    notfound: "Check the number on the bag and scan it again, or type it.",
+    bad: "Type the job number instead.",
+    error: "Scan it again. If it still fails, ask Mark.",
 };
 const JA_TYPE = { glasses: ["GLASSES", "ja-type-g"], contacts: ["CONTACTS", "ja-type-c"] };
+
+/* The agent's text verdict -> what staff do next, in plain words. Display only: the agent decides
+   who is texted; the no-action list mirrors its NO_ACTION_TEXT. Returns [chip class, words]. */
+function jaTextWord(text, call) {
+    const t = String(text || "");
+    if (!t) return ["", ""];
+    if (/^(Texted|Would text|Test text sent)/.test(t)) return ["", t.replace(/^Would text/, "Will text")];
+    if (/^not texted$/i.test(t)) return ["", "Not texted"];
+    if (/^No text: already texted/.test(t)) return ["ja-grey", "No text needed - already texted for this job"];
+    if (/^No text: Optomate texted/.test(t)) return ["ja-grey", "No text needed - " + t.slice(9)];
+    if (/^No text: contacts texts are OFF/.test(t)) return ["ja-grey", "No text - contacts texts are switched off"];
+    if (/^Not texted - /.test(t)) return ["ja-call", t];
+    const why = t.replace(/^No text:\s*/, "").replace(/\s*-\s*(call the patient|staff to call)$/i, "")
+        .replace(/^(Ortho-K|Scleral): no text$/i, "$1 lenses are never texted")
+        .replace(/^No lens on the order: no text$/i, "no lens on the order, so no text");
+    return ["ja-call", "Call the patient - " + why];
+}
+
+/* The live switches, in plain words (the agent's own line is the fallback). */
+function jaModeWords(g) {
+    if (!g) return ja.words;
+    const gl = g.write_live ? "marked received in Optomate" : "NOT changed in Optomate (switched off)";
+    const tx = { live: "patients are texted", test: "texts go to the test phone only", off: "no texts (switched off)" }[g.sms] || "no texts";
+    const cg = g.cl_write_live ? "marked received" : "NOT changed in Optomate";
+    const ct = { live: "texted", test: "test phone only", off: "no texts" }[g.cl_sms] || "no texts";
+    return `LIVE. Glasses jobs: ${gl}; ${tx}. Contacts: ${cg}; ${ct}.`;
+}
 
 function renderJobsArrived() {
     reloadIfHubChanged();      // empty list: nothing to lose
@@ -4823,13 +4859,17 @@ function renderJobsArrived() {
     ja.texts = new Map(); ja.pvFor = ""; clearTimeout(ja.pvTimer);
     view.innerHTML = `<div class="ja-page">
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
-        <h1 class="page-title">Jobs arrived</h1>
+        <h1 class="page-title">Jobs arrived from the lab</h1>
         <div id="ja-mode"></div>
-        <p class="ja-how">Scan each job card - glasses or contacts. Then press Confirm once.</p>
+        <ol class="ja-steps">
+            <li><b>1</b> Scan every job bag</li>
+            <li><b>2</b> Check each job's text</li>
+            <li><b>3</b> Press the button at the bottom: it marks the jobs received and texts the patients</li>
+        </ol>
         <form id="ja-scan" class="ja-scan" autocomplete="off">
             <input id="ja-in" type="text" inputmode="numeric" autocomplete="off" spellcheck="false"
-                   placeholder="Scan a job card" aria-label="Job number">
-            <button class="btn btn-quiet" type="submit">Add</button>
+                   placeholder="Scan the barcode, or type the job number" aria-label="Job number">
+            <button class="btn btn-quiet" type="submit">Add job</button>
         </form>
         <div id="ja-list"></div>
         <div id="ja-foot"></div>
@@ -4861,8 +4901,9 @@ async function jaLoadMode() {
     if (!d.ok) { box.innerHTML = `<div class="ja-banner ja-banner-red">${esc(d.error || "Not connected.")}</div>`; return; }
     ja.gates = d.gates; ja.words = d.mode_words || "";
     box.innerHTML = d.gates.dry_run
-        ? `<div class="ja-banner ja-banner-test"><strong>TEST MODE</strong> - nothing will be changed or texted${d.fixture ? " (fake ZZTEST jobs)" : ""}</div>`
-        : `<div class="ja-banner">${esc(ja.words)}</div>`;
+        ? `<div class="ja-banner ja-banner-test"><strong>TEST MODE</strong> - nothing changes in Optomate and no one is texted${d.fixture ? " (fake ZZTEST jobs)" : ""}</div>`
+        : `<div class="ja-banner">${esc(jaModeWords(d.gates))}</div>`;
+    jaDraw();      // the button names what the switches let it do
 }
 
 /* a scan -> "35144"; a picked / typed one -> "G35144" or "C5100"; anything else -> cleaned text */
@@ -4928,7 +4969,7 @@ function jaRow(l) {
         return `<tr class="ja-wait" data-ja-row="${esc(l.key)}">
             <td>${jaTypeCell("")}</td>
             <td class="ja-job">${esc(l.id)}</td>
-            <td colspan="4"><div class="ja-pickq">Glasses job AND contacts order - which card is this?</div>
+            <td colspan="4"><div class="ja-pickq">This number is both a glasses job and a contacts order. Press the one in your hand.</div>
                 <div class="ja-picks">${(l.options || []).map((o) => {
                     const t = JA_TYPE[o.type] || ["?", ""];
                     const st = (JA_STATE[o.state] || JA_STATE.error)[0];
@@ -4940,18 +4981,18 @@ function jaRow(l) {
     }
     const [word, cls] = JA_STATE[l.state] || JA_STATE.error;
     const extra = [];
-    if (l.call) extra.push(`<span class="ja-chip ja-call">${esc(l.call)}</span>`);
-    if (l.trial) extra.push(`<span class="ja-chip ja-plain">Trial</span>`);
+    if (l.trial) extra.push(`<span class="ja-chip ja-plain">Trial lenses</span>`);
     if (l.state === "ok" && l.type === "glasses") {
         const on = ja.own.has(l.key);
         extra.push(`<button type="button" class="ja-own${on ? " ja-own-on" : ""}" data-ja-own="${esc(l.key)}" aria-pressed="${on}">${on ? "✓ " : ""}Replacement lenses</button>`);
-        if (l.own_frame && !on) extra.push(`<div class="ja-why">Own frame in Optomate - does the patient have it? Press Replacement lenses.</div>`);
+        if (l.own_frame && !on) extra.push(`<div class="ja-why">Own frame in Optomate. If the patient kept the frame, press Replacement lenses: the text then says to bring the glasses in.</div>`);
     }
-    if (l.state === "ok") extra.push(jaTextPreview(l.key));
-    const why = [l.state !== "bad" && l.reason ? l.reason : "", l.note || ""].filter(Boolean);
+    if (l.state === "ok") extra.push(jaTextPreview(l.key, l));
+    const why = [!["bad", "cancelled"].includes(l.state) && l.reason && l.reason !== word ? l.reason : "",
+                 l.note || "", JA_NEXT[l.state] || ""].filter(Boolean);
     const others = (l.others || []).map((o) => o.old
-        ? `<div class="ja-other ja-other-old">Old open job - check: ${esc(o.what)}, job ${esc(o.job)} (ordered ${esc(o.ordered || "?")})</div>`
-        : `<div class="ja-other">Patient has another open order: ${esc(o.what)}, job ${esc(o.job)}</div>`).join("");
+        ? `<div class="ja-other ja-other-old">Old job still open - check it in Optomate: ${esc(o.what)}, job ${esc(o.job)} (ordered ${esc(o.ordered || "?")})</div>`
+        : `<div class="ja-other">Also open for this patient: ${esc(o.what)}, job ${esc(o.job)}</div>`).join("");
     return `<tr class="${cls}${others ? " ja-has-others" : ""}" data-ja-row="${esc(l.key)}">
         <td>${jaTypeCell(l.type)}</td>
         <td class="ja-job">${esc(l.id)}</td>
@@ -4964,11 +5005,21 @@ function jaRow(l) {
 }
 
 /* What this job's patient would be texted if Confirm were pressed now (agent dry run). */
-function jaTextPreview(key) {
+function jaTextPreview(key, line) {
     const t = ja.texts.get(key);
-    if (!t) return `<div class="ja-sms ja-sms-wait">Text: checking…</div>`;
-    if (t.message) return `<div class="ja-sms">${esc(t.text.replace(/^Would text/, "Texts"))}:<br>“${esc(t.message)}”</div>`;
-    return `<div class="ja-why">${esc(t.text || "No text")}</div>`;
+    if (!t) {
+        if (line && line.call) return jaCallChip(jaTextWord(line.call, true)[1]);     // known before the preview
+        return `<div class="ja-sms ja-sms-wait">Working out the text…</div>`;
+    }
+    if (t.unknown) return `<div class="ja-why">${esc(t.text)}</div>`;
+    if (t.message) return `<div class="ja-sms">${esc(t.text.replace(/^Would text/, "Will text"))}:<br>“${esc(t.message)}”</div>`;
+    const [cls, words] = jaTextWord(t.text, t.call);
+    if (cls === "ja-call") return jaCallChip(words);
+    return `<div class="ja-why">${esc(words || "No text")}</div>`;
+}
+
+function jaCallChip(words) {
+    return `<div class="ja-sms"><span class="ja-chip ja-call">${esc(words)}</span></div>`;
 }
 
 /* re-ask the agent whenever the ready list or the switches change (debounced) */
@@ -4989,7 +5040,8 @@ function jaPreviewSoon() {
         if (seq !== ja.pvSeq) return;
         const d = r.data || {};
         ja.texts = new Map((d.ok ? d.texts || [] : []).map((t) => [t.key, t]));
-        if (!d.ok) ids.forEach((k) => ja.texts.set(k, { key: k, text: "Couldn't preview the text - Confirm still checks everything", message: "" }));
+        if (!d.ok) ids.forEach((k) => ja.texts.set(k, { key: k, unknown: true, message: "",
+            text: "Couldn't show the text yet - the button still checks everything before texting" }));
         jaDraw();
     }, 500);
 }
@@ -5000,9 +5052,9 @@ function jaDraw() {
     if (!list) return;
     const rows = [...ja.lines.values()];
     list.innerHTML = rows.length ? `<table class="ja-table">
-        <thead><tr><th>Type</th><th>Job</th><th>Patient</th><th>Lens</th><th>Ordered</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Type</th><th>Job</th><th>Patient</th><th>Lens</th><th>Ordered</th><th>What will happen</th><th></th></tr></thead>
         <tbody>${rows.map(jaRow).join("")}</tbody></table>
-        <div class="ja-key"><span class="ja-chip ja-ok">Ready to mark</span> <span class="ja-chip ja-grey">Already in - skipped</span> <span class="ja-chip ja-red">Problem - skipped</span> <span class="ja-chip ja-amber">Pick glasses or contacts</span></div>`
+        <div class="ja-key"><span class="ja-chip ja-ok">Green: will be marked received</span> <span class="ja-chip ja-grey">Grey: nothing to do</span> <span class="ja-chip ja-red">Red: not done - see the line</span> <span class="ja-chip ja-amber">Amber: needs you - pick, or call the patient</span></div>`
         : `<div class="ja-empty">No jobs scanned yet.</div>`;
     list.querySelectorAll("[data-ja-remove]").forEach((b) => b.addEventListener("click", () => {
         ja.lines.delete(b.dataset.jaRemove); jaDraw(); document.getElementById("ja-in").focus();
@@ -5024,11 +5076,27 @@ function jaDraw() {
     const nc = ready.filter((l) => l.type === "contacts").length;
     const waiting = rows.some((l) => l.state === "looking");
     const picks = rows.filter((l) => l.state === "pick").length;
-    const what = nc && nc < n ? `${n - nc} glasses + ${nc} contacts` : `${n} ${nc ? "contacts order" : "job"}${n === 1 ? "" : "s"}`;
-    foot.innerHTML = `${picks ? `<div class="ja-banner ja-banner-test">${picks} line${picks === 1 ? "" : "s"} need${picks === 1 ? "s" : ""} Glasses or Contacts picked first - ${picks === 1 ? "it is" : "they are"} left out until then.</div>` : ""}
+    foot.innerHTML = `${picks ? `<div class="ja-banner ja-banner-test">${picks} job${picks === 1 ? "" : "s"}: press Glasses or Contacts first, or ${picks === 1 ? "it is" : "they are"} left out.</div>` : ""}
         <button id="ja-go" class="btn ja-go" type="button" ${n && !waiting && !ja.busy ? "" : "disabled"}>
-        Confirm ${what}</button><div id="ja-msg"></div>`;
+        ${esc(jaGoWords(n, nc))}</button><div id="ja-msg"></div>`;
     document.getElementById("ja-go").addEventListener("click", jaConfirm);
+}
+
+/* The button says exactly what pressing it does, as far as the switches allow. */
+function jaGoWords(n, nc) {
+    const ng = n - nc;
+    const s = (k) => (k === 1 ? "" : "s");
+    if (!n) return "Scan a job bag first";
+    const what = ng && nc ? `${ng} glasses job${s(ng)} + ${nc} contacts order${s(nc)}`
+        : nc ? `${nc} contacts order${s(nc)}` : `${ng} glasses job${s(ng)}`;
+    const g = ja.gates;
+    if (!g) return `Mark ${what} received + text the patients`;
+    if (g.dry_run) return `Test run: show what would happen to ${what}`;
+    const marks = (ng && g.write_live) || (nc && g.cl_write_live);
+    const parts = [marks ? `Mark ${what} received` : `${what}: Optomate not changed (switched off)`];
+    if (g.sms === "live") parts.push(n === 1 ? "text the patient" : "text the patients");
+    else if (g.sms === "test") parts.push("text the test phone only");
+    return parts.join(" + ");
 }
 
 function jaDialogText(ready) {
@@ -5038,20 +5106,20 @@ function jaDialogText(ready) {
     const ng = n - nc;
     const ncall = ready.filter((l) => l.call).length;
     const jobs = `${n} order${n === 1 ? "" : "s"}`;
-    if (g.dry_run) return `TEST MODE: show what would happen for ${jobs}.\n\nNothing will be changed in Optomate and no texts will be sent.`;
+    if (g.dry_run) return `TEST RUN for ${jobs}.\n\nNothing changes in Optomate and no one is texted. You will see what would happen.`;
     const parts = [];
-    if (ng) parts.push(g.write_live ? `GLASSES: mark ${ng} job${ng === 1 ? "" : "s"} received in Optomate (tilt and wrap become 0; the old values go in the job's comments).`
-                                    : `GLASSES: Optomate will NOT be changed (writes are switched off).`);
-    if (nc) parts.push(g.cl_write_live ? `CONTACTS: mark ${nc} order${nc === 1 ? "" : "s"} received in Optomate.`
-                                       : `CONTACTS: Optomate will NOT be changed (contacts writes are switched off).`);
+    if (ng) parts.push(g.write_live ? `GLASSES: ${ng} job${ng === 1 ? "" : "s"} marked received in Optomate (frame tilt and wrap are set to 0; the old values go in the job's comments).`
+                                    : `GLASSES: Optomate is NOT changed (writes are switched off).`);
+    if (nc) parts.push(g.cl_write_live ? `CONTACTS: ${nc} order${nc === 1 ? "" : "s"} marked received in Optomate.`
+                                       : `CONTACTS: Optomate is NOT changed (contacts writes are switched off).`);
     if (g.sms === "live") {
-        parts.push(`TEXTS: one text per patient, covering all their orders marked received here and naming their other open orders (no mobile or already texted = skipped).`);
-        if (nc && g.cl_sms !== "live") parts.push(`Contacts orders are left out of texts (contacts texts are switched off).`);
+        parts.push(`TEXTS: one text per patient saying their order is ready. It covers every order marked received here and names their other open orders. No mobile, or already texted = no text: call them.`);
+        if (nc && g.cl_sms !== "live") parts.push(`Contacts orders get no text (contacts texts are switched off).`);
     } else if (g.sms === "test") parts.push(`Texts go to the test phone only, not to patients.`);
-    else parts.push(`No texts will be sent (texts are switched off).`);
+    else parts.push(`No texts (texts are switched off).`);
     const nown = ready.filter((l) => ja.own.has(l.key)).length;
-    if (nown) parts.push(`${nown} replacement-lens job${nown === 1 ? " gets" : "s get"} the "bring in your glasses" text.`);
-    if (ncall) parts.push(`${ncall} ortho-K / scleral order${ncall === 1 ? " gets" : "s get"} NO text - call ${ncall === 1 ? "that patient" : "those patients"}.`);
+    if (nown) parts.push(`${nown} replacement-lens job${nown === 1 ? "" : "s"}: the text says to bring the glasses in.`);
+    if (ncall) parts.push(`${ncall} ortho-K / scleral order${ncall === 1 ? "" : "s"}: no text. Call ${ncall === 1 ? "that patient" : "those patients"}.`);
     if (g.write_live || g.sms === "live") parts.push(`This can't be undone.`);
     return parts.join("\n\n");
 }
@@ -5074,7 +5142,7 @@ async function jaConfirm() {
     let r;
     const own = ids.filter((k) => ja.own.has(k));
     try { r = await ciCall("/api/jobscan/confirm", { ids, expected: ids.length, own }); }
-    catch (e) { r = { status: 0, data: { error: "The Hub didn't answer. Scan the cards again: finished jobs show grey." } }; }
+    catch (e) { r = { status: 0, data: { error: "The Hub didn't answer. Scan the job bags again: finished jobs show grey." } }; }
     ja.busy = false;
     if (ciLocked(r)) { ciUnlockPanel(r.data, renderJobsArrived, "Jobs arrived"); return; }
     const d = r.data || {};
@@ -5082,32 +5150,34 @@ async function jaConfirm() {
     jaResults(d);
 }
 
-const JA_OUT = { done: ["Done", "ja-ok"], would: ["Would do", "ja-wait"], skipped: ["Skipped", "ja-grey"], failed: ["Failed", "ja-red"] };
+const JA_OUT = { done: ["Marked received", "ja-ok"], would: ["Test - would do", "ja-wait"], skipped: ["Not done", "ja-grey"], failed: ["Failed", "ja-red"] };
 
 function jaResults(d) {
     const c = d.counts || {};
-    const calls = (d.results || []).filter((x) => x.call).length;
+    const calls = (d.results || []).filter((x) => jaTextWord(x.text, x.call)[0] === "ja-call").length;
+    const s = (k) => (k === 1 ? "" : "s");
     const head = d.nothing_changed
-        ? `<div class="ja-banner ja-banner-test"><strong>TEST MODE - nothing was changed</strong></div>
+        ? `<div class="ja-banner ja-banner-test"><strong>TEST RUN - nothing was changed</strong></div>
            <div class="ja-answer">${c.would || 0} would be marked received</div>`
-        : `<div class="ja-answer">${c.done || 0} marked received · ${d.texted || 0} texted${c.failed ? ` · <span class="ja-bad">${c.failed} failed</span>` : ""}${calls ? ` · <span class="ja-callword">${calls} to call</span>` : ""}</div>`;
+        : `<div class="ja-answer">${c.done || 0} job${s(c.done || 0)} marked received · ${d.texted || 0} patient${s(d.texted || 0)} texted${c.failed ? ` · <span class="ja-bad">${c.failed} failed</span>` : ""}${calls ? ` · <span class="ja-callword">${calls} to call</span>` : ""}</div>`;
     view.innerHTML = `<div class="ja-page">
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
-        <h1 class="page-title">Jobs arrived</h1>
+        <h1 class="page-title">Jobs arrived from the lab</h1>
         ${head}
         <table class="ja-table ja-results">
-            <thead><tr><th>Type</th><th>Job</th><th>Patient</th><th>Result</th><th>Optomate</th><th>Text</th></tr></thead>
+            <thead><tr><th>Type</th><th>Job</th><th>Patient</th><th>Result</th><th>In Optomate</th><th>Text to the patient</th></tr></thead>
             <tbody>${(d.results || []).map((x) => {
                 const [word, cls] = JA_OUT[x.outcome] || JA_OUT.failed;
+                const [tcls, twords] = jaTextWord(x.text, x.call);
                 return `<tr class="${cls}">
                     <td>${jaTypeCell(x.type)}</td>
                     <td class="ja-job">${esc(x.id)}</td>
-                    <td class="ja-name">${esc(x.name)}${(x.others || []).map((o) => `<div class="ja-other${o.old ? " ja-other-old" : ""}">${o.old ? "Old open job - check" : "Still open"}: ${esc(o.what)}, job ${esc(o.job)}</div>`).join("")}</td>
+                    <td class="ja-name">${esc(x.name)}${(x.others || []).map((o) => `<div class="ja-other${o.old ? " ja-other-old" : ""}">${o.old ? "Old job still open - check it in Optomate" : "Also open"}: ${esc(o.what)}, job ${esc(o.job)}</div>`).join("")}</td>
                     <td><span class="ja-chip">${esc(word)}</span></td>
                     <td>${esc(x.write)}</td>
-                    <td>${x.own ? `<span class="ja-chip ja-plain">Replacement lenses</span> ` : ""}${x.call ? `<span class="ja-chip ja-call">${esc(x.text)}</span>` : esc(x.text)}${x.message ? `<div class="ja-sms">“${esc(x.message)}”</div>` : ""}${x.job_note ? `<div class="ja-why">${esc(x.job_note)}</div>` : ""}</td>
+                    <td>${x.own ? `<span class="ja-chip ja-plain">Replacement lenses</span> ` : ""}${tcls ? `<span class="ja-chip ${tcls}">${esc(twords)}</span>` : esc(twords)}${x.message ? `<div class="ja-sms">“${esc(x.message)}”</div>` : ""}${x.job_note ? `<div class="ja-why">${esc(x.job_note)}</div>` : ""}</td>
                 </tr>`; }).join("")}</tbody></table>
-        <button class="btn ja-go" type="button" id="ja-again">Scan more jobs</button>
+        <button class="btn ja-go" type="button" id="ja-again">Scan the next bags</button>
     </div>`;
     document.getElementById("ja-again").addEventListener("click", renderJobsArrived);
 }

@@ -103,13 +103,13 @@ def test_confirm_passes_ids(agent, calls):
 def test_confirm_timeout_says_rescan(agent, calls):
     calls.raise_exc = subprocess.TimeoutExpired("x", 1)
     out = jobscan.confirm(agent, ["1"], 1)
-    assert out["timeout"] and "Scan the cards again" in out["error"]
+    assert out["timeout"] and "Scan the job bags again" in out["error"]
 
 
 def test_unreadable_answer(agent, calls):
     calls.stdout = "Traceback...\n"
     assert "readable" in jobscan.lookup(agent, ["1"])["error"]
-    assert "Scan the cards again" in jobscan.confirm(agent, ["1"], 1)["error"]
+    assert "Scan the job bags again" in jobscan.confirm(agent, ["1"], 1)["error"]
 
 
 def test_engine_failure_to_start(agent, calls):
@@ -181,6 +181,19 @@ def test_tile_and_route_wired():
     js = (root / "static" / "app.js").read_text(encoding="utf-8")
     assert "#\\/jobs-arrived$/, fn: renderJobsArrived" in js
     assert "/api/jobscan/confirm" in js and "expected: ids.length" in js
+
+
+def test_page_uses_plain_words():
+    # Mark, 9 Nov 2026: a status says what will happen; no "mark" jargon, no bare "Confirm" button
+    from pathlib import Path
+    js = (Path(__file__).resolve().parent.parent / "static" / "app.js").read_text(encoding="utf-8")
+    block = js[js.index("const JA_STATE"):js.index("function renderWorkQueue")]
+    for old in ("Ready to mark", "Already in", "Would do", "Pick glasses or contacts", "which card is this",
+                "Confirm ${what}", "job card"):
+        assert old not in block, old
+    for new in ("Will be marked received", "Nothing to do", "Scan every job bag", "Check each job's text",
+                "Call the patient - ", "This can't be undone."):
+        assert new in block, new
 
 
 def test_confirm_passes_replacement_lens_jobs(agent, calls):

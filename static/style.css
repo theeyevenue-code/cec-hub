@@ -2209,7 +2209,11 @@ body.lens-mono main { background: #fafafa; }
 /* Readability standard: answer first and biggest, body 17px+, one colour one meaning:
    green = will be / was marked, grey = already in (skipped), red = problem, amber = test. */
 .ja-page { font-variant-numeric: tabular-nums; }
-.ja-how { font-size: 18px; color: var(--muted); margin: 6px 0 14px; }
+/* The three steps staff take, numbered, in one line (Mark, 9 Nov 2026: "even the process") */
+.ja-steps { display: flex; flex-wrap: wrap; gap: 8px 28px; list-style: none; margin: 10px 0 14px; padding: 0; font-size: 18px; color: var(--ink); }
+.ja-steps li { display: flex; align-items: center; gap: 10px; }
+.ja-steps b { display: inline-flex; flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: #fff;
+    align-items: center; justify-content: center; font-size: 16px; font-weight: 700; }
 .ja-banner { font-size: 18px; padding: 10px 16px; border-radius: 8px; margin: 8px 0;
     background: var(--info-bg); border: 1px solid var(--info-line); color: var(--info-ink); }
 .ja-banner-test { background: var(--amber-bg); border: 2px solid var(--amber-line); color: var(--amber-ink); font-size: 20px; }
@@ -2255,7 +2259,8 @@ tr.ja-flash td { animation: ja-flash 1.2s ease-out; }
 .ja-picks { display: flex; gap: 10px; flex-wrap: wrap; }
 .ja-pick { flex: 1 1 260px; text-align: left; font-size: 17px; padding: 10px 14px; border-radius: 10px; border: 2px solid; cursor: pointer; }
 .ja-pick span { display: block; font-size: 15px; font-weight: 400; margin-top: 2px; }
-.ja-chip.ja-call, .ja-key .ja-call { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber-ink); }
+/* amber = staff must call; it wins over the row colour (9 Nov 2026: a green "call" chip read as done) */
+.ja-table .ja-chip.ja-call, .ja-key .ja-call { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber-ink); }
 .ja-chip.ja-plain { background: #fff; border-color: #b5b5b5; color: #4a4a4a; }
 .ja-own { font: inherit; font-size: 15px; font-weight: 600; padding: 4px 12px; margin-left: 4px; border-radius: 999px; border: 1px solid #b5b5b5; background: #fff; color: #4a4a4a; cursor: pointer; }
 .ja-sms-wait { color: #6b6b6b; font-style: italic; }

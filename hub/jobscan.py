@@ -32,7 +32,7 @@ MAX_IDS = 60
 TIMEOUTS = {"status": 30, "lookup": 30, "preview": 45, "confirm": 300}
 NOT_CONNECTED = "Jobs arrived isn't connected to Optomate on this computer."
 TIMEOUT_CONFIRM = ("Optomate took too long, so some jobs may be done and some not. "
-                   "Scan the cards again: finished jobs show grey and are never texted twice.")
+                   "Scan the job bags again: finished jobs show grey and are never texted twice.")
 
 
 def connected(cfg: dict) -> bool:
@@ -94,7 +94,7 @@ def run(cfg: dict, command: str, ids: list[str] | None = None,
     if not isinstance(data, dict):
         if command == "confirm":
             return {"ok": False, "error": "The Jobs arrived helper didn't give a readable answer. "
-                                          "Scan the cards again to see which are done."}
+                                          "Scan the job bags again to see which are done."}
         return {"ok": False, "error": "The Jobs arrived helper didn't give a readable answer."}
     return data
 
@@ -106,7 +106,7 @@ def status(cfg: dict) -> dict:
 def lookup(cfg: dict, raw) -> dict:
     good, bad = clean_ids(raw)
     if not good and not bad:
-        return {"ok": False, "error": "Scan a job card first."}
+        return {"ok": False, "error": "Scan a job bag first."}
     out = run(cfg, "lookup", good) if good else {"ok": True, "lines": []}
     if out.get("ok"):
         out["lines"] = list(out.get("lines") or []) + [
@@ -134,12 +134,12 @@ def confirm(cfg: dict, raw, expected, own_raw=None) -> dict:
     Mark 4 Nov 2026) - only ones also being confirmed, glasses only."""
     good, _ = clean_ids(raw)
     if not good:
-        return {"ok": False, "error": "No jobs to confirm."}
+        return {"ok": False, "error": "No jobs to mark received."}
     try:
         expected = int(expected)
     except (TypeError, ValueError):
         expected = -1
     if expected != len(good):
         return {"ok": False, "error": "The list changed while the box was open. Nothing changed - "
-                                      "press Confirm again."}
+                                      "press the button again."}
     return run(cfg, "confirm", good, _own(own_raw, good))

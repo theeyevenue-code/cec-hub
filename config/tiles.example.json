@@ -118,7 +118,7 @@
       "id": "jobscan",
       "icon": "📥",
       "name": "Jobs arrived",
-      "description": "Scan the job cards, confirm once: marked received and the patient texted",
+      "description": "Scan the job bags: each job is marked received in Optomate and the patient is texted",
       "link": "#/jobs-arrived"
     },
     {
