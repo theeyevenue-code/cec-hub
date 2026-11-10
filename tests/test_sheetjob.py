@@ -636,3 +636,12 @@ def test_page_keeps_the_plain_sheet_choice_through_staff_and_shows_it_on_check()
     import price_sheet.build as build
     html = build.build()
     assert "st.lastChoice" in html and "staffbtn2" in html and "Sheet choice" in html and 'id="resumed"' in html
+
+
+def test_a_widened_pd_shows_as_its_own_row_on_the_job(c):
+    pick(c, "Mia")
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5319"})
+    r = c.post("/api/sheet/checks", json=body(frame={"barcode": "ZZFRAME5319"}, fix={"kind": "pd"})).get_json()
+    assert r["pd_job"] == {"to": {"R": 31.0, "L": 31.0}, "from": {"R": 30.0, "L": 30.0}}
+    plain = c.post("/api/sheet/checks", json=body()).get_json()
+    assert "pd_job" not in plain

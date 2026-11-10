@@ -646,6 +646,8 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
                                   "detail": f"Blank needed {_mm(est['value'])} ({res['blank']['label']})."}
                 if applied and applied["kind"] == "pd":
                     res["pd_shift"] = applied["shift"]
+                    # the job differs from the Rx as saved: staff must see it in the main table (10 Nov 2026)
+                    res["pd_job"] = {"to": applied["pd_to"], "from": applied["pd_from"]}
                     ref = {**key, "blank_mm": _item_blank(cfg, key)}
                     res["verdict"] = {"tone": "green", "head": f"Fits a {_mm(applied['blank'])} stock blank with the wider PD",
                                       "detail": applied["detail"]}
@@ -751,6 +753,7 @@ def _fixes(book, rx, rows, pricing, found, q, typ, cur, fit, nums, fix) -> list[
             if v:
                 out.append({"kind": "pd", "title": "Widen the PD", "best": "Keeps the price", "price": cur["quote"]["total"],
                             "detail": v["line"], "shift": {k: x for k, x in v["shift"].items() if x},
+                            "pd_from": v["pd_from"], "pd_to": v["pd_to"],
                             "blank": max(v["blank"].values()), "on": fix.get("kind") == "pd"})
     # 2 another stock lens that fits (other thicknesses on this tab, the patient's option kept)
     if tab in SV_TABS:

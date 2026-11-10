@@ -347,6 +347,7 @@ details summary { font-size:16px; font-weight:600; color:var(--btn); cursor:poin
 .cpop .ctable { margin-top:12px; }
 .cpop .kv { font-size:18px; }
 #s-frame .make .mode { display:none; }
+.kv b.flagtxt, b.flagtxt { color:var(--amber); }
 </style>
 </head>
 <body>
@@ -947,6 +948,7 @@ function drawChecks() {
   const blank = r.verdict ? r.verdict.head : "";
   const rows = [
     ["Rx as saved", rx.no_rx ? `<b class="red">NO RX - confirm the Rx in Optomate before ordering</b>` : `R ${esc(rx.right)}<br>L ${esc(rx.left)}<small>PD ${esc(rx.pd)}</small>`],
+    ...(r.pd_job ? [["PD on the job", `<b class="flagtxt">R ${esc(r.pd_job.to.R)} / L ${esc(r.pd_job.to.L)} (widened from ${esc(r.pd_job.from.R)} / ${esc(r.pd_job.from.L)})</b>`]] : []),
     ["Lens", `${esc(r.lens || "")}<small>${esc(r.option || "Clear")} · ${esc((r.made || "").replace(" - not checked, no Rx", ""))}</small>`],
     ["Frame", framed ? esc(frameWords()) + (fq.frame && fq.frame.price == null ? `<small class="red">No sell price</small>` : "") : "-"],
     ["Blank", framed && blank ? esc(blank) : "-"],
@@ -1044,6 +1046,7 @@ $("make").onclick = async () => {
                     : (r.refusals || []).map(x => `<div class="vline stop">${esc(x)}</div>`).join("");
   const rows = [
     ["Rx as saved", pv.no_rx ? `<b class="red">NO RX - confirm the Rx in Optomate before ordering</b>` : `R ${eyeRow((pv.rx || {}).right)}<br>L ${eyeRow((pv.rx || {}).left)}`],
+    ...(pv.pd_shift ? [["PD on the job", `<b class="flagtxt">${chk && chk.pd_job ? `R ${esc(chk.pd_job.to.R)} / L ${esc(chk.pd_job.to.L)} (widened from ${esc(chk.pd_job.from.R)} / ${esc(chk.pd_job.from.L)})` : esc(pv.pd_shift)}</b>`]] : []),
     ["Sheet choice", `${esc(sh.lens || "")}<small>${esc(sh.option || "Clear")} · ${esc(sh.made || "")}</small>`],
     ["Optomate lens", esc((pv.lens || {}).description || "-")],
     ["Frame", fr.own ? "Own frame" : esc(`${fr.model || ""} ${fr.colour || ""}`.trim() || "-")],
@@ -1051,7 +1054,7 @@ $("make").onclick = async () => {
   ];
   if (Object.keys(pv.heights || {}).length) rows.push(["Heights", Object.entries(pv.heights).map(([s2, v2]) => `${s2} ${esc(v2)}`).join(" / ")]);
   const details = [`Lens ${esc((pv.lens || {}).barcode || "-")} · ${esc((pv.lens || {}).use || "")}`, `Coat: ${esc((pv.coat || {}).description || "-")}`,
-    pv.tint ? `Tint: ${esc(pv.tint.description)} (${esc(pv.tint.barcode)})` : "", pv.pd_shift ? esc(pv.pd_shift) : "",
+    pv.tint ? `Tint: ${esc(pv.tint.description)} (${esc(pv.tint.barcode)})` : "",
     pr.touch_total ? `Touch will charge $${esc(pr.touch_total)} (lens x 2 + coat x 2${pv.tint ? " + tint x 2" : ""} + frame)` : "",
     fr.size ? `Frame ${esc(fr.size)}` : ""].filter(Boolean);
   $("cpop").innerHTML = `<div class="eyebrow">Check, then make the job · ${esc((pv.patient || {}).name || st.staff.name)}</div>${head}
