@@ -814,9 +814,18 @@ def _engine_request(s: dict, res: dict, data: dict) -> dict:
             "second_pair": bool(data.get("second_pair")), "pd_shift": res.get("pd_shift"), "rimless": bool(data.get("rimless"))}
 
 
+def zztest_only(cfg: dict) -> bool:
+    """The Hub's own test-only gate (config pick_lens_job.zztest_only; ON unless set to false): while on, Make
+    refuses any patient whose surname doesn't start with ZZTEST. The engine has its own (ZZTEST_ONLY)."""
+    return ((cfg or {}).get("pick_lens_job") or {}).get("zztest_only") is not False
+
+
 def job(cfg: dict, token, data: dict, rows: list, pricing: dict, user: str, command: str) -> dict:
     """Screen 6 (plan) and 7 (make): the checks again, then the engine. The engine re-reads Optomate fresh."""
     s = _need(token)
+    if zztest_only(cfg) and not str(s.get("surname") or "").strip().upper().startswith("ZZTEST"):
+        return {"ok": False, "created": None,
+                "refusals": ["Test mode: jobs can only be made for the ZZTEST test patient for now."]}
     res = checks(cfg, token, data, rows, pricing)
     if not res.get("can_make"):
         return {"ok": False, "refusals": [res.get("why") or "Not ready yet."], "checks": res}

@@ -62,6 +62,7 @@ PEOPLE = {
     9010: ("Noa", "ZZTEST-NORX", (), ""),
     9011: ("Uri", "ZZTEST-OLDRX", (_eye("-2.00", "-0.50", "90", pd="31"), _eye("-2.25", pd="31")), ""),
     9012: ("Viv", "ZZTEST-RECENT", (_eye("-1.00", pd="31"), _eye("-1.25", pd="31")), ""),
+    9013: ("Pat", "SAMPLE", (_eye("-1.00", pd="31"), _eye("-1.25", pd="31")), ""),
     9004: ("Priya", "ZZTEST-PRISM", (_eye("-1.00", pd="32", prism=("1.00", "IN", "", "")), _eye("-1.25", pd="32")), ""),
 }
 FRAMES = {"ZZFRAME5219": {"barcode": "ZZFRAME5219", "model": "ZZTEST Metal", "colour": "Gunmetal", "a": 52.0, "dbl": 19.0,
@@ -556,3 +557,23 @@ def test_no_ed_on_the_frame_is_estimated_from_eye_size_and_said_so(c, monkeypatc
         assert not t["blank"]["approx"] and t["blank"]["ed_note"] == "ED typed by staff."
     finally:
         FRAMES.pop("RB 3447V", None)
+
+
+
+# ---- gate C: the Hub refuses Make for anyone not ZZTEST while zztest_only is on (default ON) ----------------
+def test_hub_refuses_a_job_for_anyone_not_zztest(c):
+    pick(c, "Pat")                                                     # surname SAMPLE
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    n = len(c.sent)
+    for route in ("/api/sheet/plan", "/api/sheet/make"):
+        j = c.post(route, json=body()).get_json()
+        assert j["ok"] is False and j["refusals"] == ["Test mode: jobs can only be made for the ZZTEST test patient for now."]
+    assert [x for x in c.sent[n:] if x[0] in ("plan", "make")] == []   # the engine is never asked
+    assert sj.zztest_only({}) is True and sj.zztest_only({"pick_lens_job": {"zztest_only": False}}) is False
+
+
+def test_hub_lets_a_zztest_patient_through(c):
+    pick(c, "Mia")
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    c.post("/api/sheet/make", json=body())
+    assert c.sent[-1][0] == "make" and c.sent[-1][1]["patient_id"] == 9003
