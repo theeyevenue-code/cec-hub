@@ -1,7 +1,5 @@
 {
  "_readme": "Sheet map (iPad price sheet steps 2-3, 10 Nov 2026): every choice on the sheet -> the price-book row (supplier, lens, index, material, coating, stock/grind: the lens link table's key, agent repo pricing/lens_link.csv) and the Optomate tint item. {idx} is the thickness chosen. A choice with no row here is PRICE ONLY: the sheet still shows the price, and the Hub says 'Make this job in Touch'. Read by hub/sheetprice.py; proved against Optomate by the agent's sheet audit (python -m pricing.sheet_audit). Tint barcodes copied from Optomate's SPECTACLELENS_TINT list (MJ, read 10 Nov 2026): ZEISS Tint Solid $25 a lens, ZEISS Tint Gradient $35 a lens, Photofusion colours $0.",
- "synchrony": "Mark, 10 Nov 2026: Synchrony is made in Optomate as usual (it is usually a package), never from the sheet. Its rows stay here ONLY so the patient sheet's marks (suits / not made) stay exactly as they are; \"job\": false makes the Hub stop at Chosen and refuse a Make job.",
- "synchrony_stop": "Synchrony: make this job in Optomate as usual (packages).",
  "tabs": {
   "sv": {
    "use": "D",
@@ -18,7 +16,8 @@
     {"supplier": "Synchrony", "lens": "Progressive Ultra HDV {idx}",
      "material": {"clear": "Clear", "blue": "Clear", "photo": "Photochromic", "tint": "Clear"},
      "coating": {"clear": "HMC+", "blue": "HMC Blue", "photo": "HMC+", "tint": "HMC+"},
-     "job": false},
+     "photo_colours": ["Grey"],
+     "photo_note": "Essential light-reactive is the Synchrony photochromic lens, not PhotoFusion X: only the stock colour can go on the job."},
     {"supplier": "ZEISS", "lens": "SmartLife Progressive Superb {idx}",
      "material": {"clear": "Clear", "blue": "Clear BluePro", "photo": "PhotoFusionX", "tint": "Clear"},
      "coating": "DuraVision Plus Platinum UV"},
@@ -46,9 +45,9 @@
    "cards": [
     {"supplier": "Synchrony", "lens": "Bifocal D28 {idx}",
      "material": {"clear": "D28 Clear", "photo": "D28 Photo Grey/Brown", "polar": "D28 Polarised Grey/Brown"},
-     "coating": {"clear": "HMC+", "photo": "HMC+", "polar": "HMC+"}, "job": false},
+     "coating": {"clear": "HMC+", "photo": "HMC+", "polar": "HMC+"}},
     {"supplier": "Synchrony", "lens": "Bifocal D28 {idx}",
-     "material": {"clear": "D28 Clear"}, "coating": {"clear": "HC hard coat"}, "job": false}
+     "material": {"clear": "D28 Clear"}, "coating": {"clear": "HC hard coat"}}
    ]
   },
   "sun": {"price_only": "Sunglasses: price only in version 1. Make this job in Touch."},

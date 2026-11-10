@@ -225,7 +225,8 @@ def pricebook(book: dict, ch: dict, pr: dict | None = None) -> dict:
         coat = _pick(cm.get("coating"), k)
         if not mat or not coat:
             return {"ok": False, "why": "No price-book lens for this option."}
-        out["job"] = cm.get("job", True) is not False       # Synchrony: price and marks only, never a job
+        if k == "photo" and cm.get("photo_colours") and str(ch.get("pfx") or "Grey") not in cm["photo_colours"]:
+            return {"ok": False, "why": cm.get("photo_note") or "That colour can't go on the job."}
         key = {"supplier": cm["supplier"], "lens": cm["lens"].replace("{idx}", idx), "index": idx, "material": mat,
                "coating": coat, "stockgrind": "grind"}
     out["key"] = key
@@ -240,13 +241,6 @@ def pricebook(book: dict, ch: dict, pr: dict | None = None) -> dict:
             return {"ok": False, "why": "That PhotoFusion X colour isn't mapped to Optomate."}
         out.update(tint_barcode=bc, tint_kind="photofusion colour")
     return out
-
-
-def is_synchrony(book: dict, ch: dict) -> bool:
-    """Mark, 10 Nov 2026: any Synchrony product (by the sheet's product name, not the tier word) is made in
-    Optomate as usual (packages)."""
-    c = card(book, ch.get("tab"), ch.get("card")) or {}
-    return str(c.get("product") or "").strip().lower().startswith("synchrony")
 
 
 def quote(book: dict, ch: dict) -> dict:
