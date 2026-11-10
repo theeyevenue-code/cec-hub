@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lens price sheet</title>
+<style>
+/* iPad price sheet - MOCK-UP v4 (Mark, 9 Nov 2026: "too dense, too much happening").
+   One headline price per card (the 1.50 price), thinner indices as a small list under it, 1.53 off every row and kept as
+   a quiet "Other index" line, add-ons folded to one line that opens a pop-over, max four cards across.
+   Design tokens copied from second-brain price-lists/patient/CEC-*-2026-09.html (taken from zeiss.com.au).
+   Prices copied verbatim from the printed patient sheets (Sep-Oct 2026) and the staff scan sheets (Optomate's);
+   the only computed figure is the live total. Fake patients (ZZTEST) and frames only. Nothing is written anywhere. */
+@font-face { font-family:'Hind'; src:url(data:font/ttf;base64,{{F300}}); font-weight:300; }
+@font-face { font-family:'Hind'; src:url(data:font/ttf;base64,{{F400}}); font-weight:400; }
+@font-face { font-family:'Hind'; src:url(data:font/ttf;base64,{{F500}}); font-weight:500; }
+@font-face { font-family:'Hind'; src:url(data:font/ttf;base64,{{F600}}); font-weight:600; }
+@font-face { font-family:'Hind'; src:url(data:font/ttf;base64,{{F700}}); font-weight:700; }
+:root { --ink:#32373E; --black:#0E0F11; --grey:#606A76; --body:#4B535D; --line:#DCE3E9; --card:#F2F5F8; --blue:#0F2DB3; --btn:#0072EF;
+        --pale:#E8F1FF; --amber:#B25E00; --amberbg:#FFF4E5; --green:#1E7B34; --greenbg:#E9F6EC; }
+* { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html, body { background:#fff; color:var(--ink); font-family:'Hind', Arial, sans-serif; font-variant-numeric:tabular-nums; }
+body { width:1180px; height:820px; overflow:hidden; position:relative; margin:0 auto; }
+button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+.screen { position:absolute; inset:0; display:none; flex-direction:column; }
+.screen.on { display:flex; }
+
+/* header: the printed sheet's nav, with the sheet names as live tabs */
+.nav { height:78px; padding:0 40px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #E6EBF0; flex-shrink:0; }
+.navl { display:flex; align-items:center; gap:28px; }
+.zlogo { width:50px; height:50px; display:block; }
+.tabs { display:flex; gap:0; }
+.tab { font-size:17px; padding:10px 11px; color:var(--ink); white-space:nowrap; }
+.tab.on { font-weight:600; color:var(--black); box-shadow:inset 0 -3px 0 var(--blue); }
+.ceclogo { height:48px; }
+
+main { flex:1; padding:22px 40px 0; display:flex; flex-direction:column; min-height:0; position:relative; }
+.toprow { display:flex; justify-content:space-between; align-items:baseline; }
+.who { font-size:17px; color:var(--grey); }
+.who b { color:var(--black); font-weight:600; }
+.eyebrow { font-size:14px; font-weight:500; letter-spacing:1.4px; text-transform:uppercase; color:var(--grey); }
+h1 { font-size:36px; font-weight:700; color:var(--ink); line-height:1.05; margin-top:4px; letter-spacing:-0.3px; }
+.lead { font-size:21px; font-weight:300; color:var(--ink); margin-top:6px; line-height:1.2; }
+
+/* cards: four blocks on a shared row grid (head, price, body, add-ons) so every card lines up */
+.rows { display:grid; column-gap:20px; row-gap:0; margin-top:22px; grid-template-rows:repeat(4, auto) 1fr auto; }
+.card { background:var(--card); padding:20px 24px 16px; grid-row:1 / -1; display:grid; grid-template-rows:subgrid; align-content:start; text-align:left; position:relative; cursor:pointer; transition:transform .12s ease; }
+.card:active { transform:scale(.99); }
+.card.rec { box-shadow:inset 0 0 0 2px var(--blue); }
+.card.sel { box-shadow:inset 0 0 0 2px var(--green); }
+.chip { position:absolute; top:0; left:24px; transform:translateY(-50%); background:var(--blue); color:#fff; font-size:14px;
+        font-weight:600; letter-spacing:.6px; text-transform:uppercase; padding:4px 10px; }
+.chip.ok { background:var(--green); }
+.tag { font-size:14px; font-weight:500; letter-spacing:1.2px; text-transform:uppercase; color:var(--grey); }
+.tag.hi { color:var(--blue); }
+.tier { font-size:30px; font-weight:700; color:var(--ink); line-height:1.05; margin-top:5px; letter-spacing:-.3px; }
+.idx { font-size:38px; font-weight:700; color:var(--ink); line-height:1; letter-spacing:-.5px; }
+.name { font-size:22px; font-weight:600; color:var(--black); margin-top:5px; line-height:1.15; }
+.dist { font-size:28px; font-weight:700; color:var(--ink); line-height:1.1; margin-top:5px; letter-spacing:-.3px; }
+.dist small { display:block; font-size:17px; font-weight:400; color:var(--grey); margin-top:4px; letter-spacing:0; }
+.price { font-size:46px; font-weight:700; color:var(--blue); line-height:1; margin-top:14px; letter-spacing:-.5px; }
+.price small { font-size:15px; font-weight:400; color:var(--grey); margin-left:8px; letter-spacing:0; }
+.lens { font-size:16px; font-weight:400; color:var(--grey); margin-top:8px; line-height:1.35; }
+.desc { font-size:17px; color:var(--body); margin-top:10px; line-height:1.35; }
+.body { margin-top:12px; }
+.thin { border-top:1px solid var(--line); padding-top:8px; }
+.thin h4, .pgrid h4 { font-size:14px; font-weight:500; letter-spacing:1.2px; text-transform:uppercase; color:var(--grey); margin-bottom:3px; }
+.lr { display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:17px; color:var(--ink); padding:3px 8px; margin:0 -8px; line-height:1.3; }
+.lr b { font-weight:600; color:var(--ink); }
+.lr small { font-size:14px; color:var(--grey); margin-left:6px; }
+.lr .sy { font-style:normal; font-size:14px; font-weight:600; color:var(--blue); letter-spacing:.6px; text-transform:uppercase; margin-left:8px; }
+.lr .lp { color:var(--blue); white-space:nowrap; font-weight:600; }
+.lr.rec { background:var(--pale); }
+.pgrid table { width:100%; border-collapse:collapse; margin-top:2px; }
+.pgrid th { font-size:14px; font-weight:500; color:var(--grey); text-align:right; padding:2px 0 4px; letter-spacing:.3px; }
+.pgrid th:first-child { text-align:left; }
+.pgrid td { font-size:17px; padding:3px 0; border-top:1px solid var(--line); text-align:right; color:var(--blue); font-weight:600; }
+.pgrid td:first-child { text-align:left; color:var(--ink); }
+.pgrid td:first-child small { font-size:14px; color:var(--grey); margin-left:6px; font-weight:400; }
+.pgrid td.na { color:#9AA5B1; font-weight:400; }
+.more { margin-top:12px; border-top:1px solid var(--line); padding-top:9px; font-size:16px; color:var(--ink); line-height:1.35; }
+.more b { color:var(--blue); font-weight:600; white-space:nowrap; }
+.more .mh { font-size:14px; font-weight:500; letter-spacing:1.2px; text-transform:uppercase; color:var(--grey); display:block; margin-bottom:2px; }
+.other { font-size:14px; color:var(--grey); margin-top:8px; }
+.tapline { font-size:16px; font-weight:600; color:var(--btn); padding-top:14px; }
+.card.thick .tapline { color:var(--grey); font-weight:400; }
+.card.info { cursor:default; }
+.card.info:active { transform:none; }
+.facts { margin-top:12px; }
+.facts .lr { font-size:16px; color:var(--body); display:block; padding:4px 0; margin:0; border-top:1px solid var(--line); }
+
+/* one quiet line at the foot, as on the printed sheets since 28 Sep */
+.foot { margin-top:auto; padding:14px 0 18px; display:flex; justify-content:space-between; align-items:baseline; gap:30px; font-size:15px; color:var(--grey); line-height:1.4; }
+.foot .fl { flex:1; }
+.foot .fl span + span::before { content:'\00b7'; margin:0 10px; color:#9AA5B1; }
+.foot .fd { flex:none; white-space:nowrap; }
+
+/* pop-over: the add-on list for one card, in the pick-lens style */
+.scrim { position:absolute; inset:0; background:rgba(14,15,17,.42); display:none; z-index:5; }
+.scrim.on { display:block; }
+.pop { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:620px; background:#fff; z-index:7; padding:26px 30px 22px; display:none; box-shadow:0 20px 50px rgba(14,15,17,.25); }
+.pop.on { display:block; }
+.pop h3 { font-size:28px; font-weight:700; color:var(--ink); line-height:1.05; margin-top:4px; letter-spacing:-.3px; }
+.pop table { width:100%; border-collapse:collapse; margin-top:16px; }
+.pop td { padding:11px 0; border-top:1px solid var(--line); font-size:18px; vertical-align:top; }
+.pop td:first-child { font-weight:600; color:var(--black); width:44%; }
+.pop td.pp { text-align:right; color:var(--blue); font-weight:700; white-space:nowrap; width:16%; }
+.pop td.pd { color:var(--grey); font-size:15px; line-height:1.35; padding-left:16px; }
+.pop .popbtns { display:flex; gap:14px; margin-top:20px; align-items:center; }
+.pop .cta { width:260px; margin:0; height:54px; font-size:19px; }
+.pop .ghost { width:auto; padding:0 16px; margin:0; }
+
+/* options sheet (pick-lens style) */
+.sheet { position:absolute; left:0; right:0; bottom:0; background:#fff; z-index:6; padding:26px 40px 26px; transform:translateY(100%);
+         transition:transform .25s ease; display:grid; grid-template-columns:1fr 330px; gap:36px; max-height:740px; }
+.sheet.on { transform:none; }
+.sheet .left { max-height:688px; overflow:auto; padding-right:6px; }
+.sheet h3 { font-size:34px; font-weight:700; color:var(--ink); line-height:1.05; margin-top:4px; letter-spacing:-.3px; }
+.group { margin-top:15px; }
+.group h4 { font-size:14px; font-weight:500; letter-spacing:1.4px; text-transform:uppercase; color:var(--grey); margin-bottom:8px; }
+.group h4 span { text-transform:none; letter-spacing:0; font-weight:400; margin-left:10px; }
+.opts { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; }
+.opts.three { grid-template-columns:repeat(3, 1fr); }
+.opt { background:var(--card); padding:13px 16px; text-align:left; min-height:76px; position:relative; }
+.opt.on { background:var(--pale); box-shadow:inset 0 0 0 2px var(--btn); }
+.opt.off { opacity:.45; cursor:default; }
+.opt .on1 { font-size:19px; font-weight:600; color:var(--black); line-height:1.15; }
+.opt .op { font-size:19px; font-weight:700; color:var(--blue); margin-top:3px; }
+.opt .od { font-size:14px; color:var(--grey); margin-top:3px; line-height:1.25; }
+.opt .rc { position:absolute; top:-10px; right:8px; background:var(--blue); color:#fff; font-size:14px; font-weight:600; letter-spacing:.6px; text-transform:uppercase; padding:2px 7px; }
+.otherlink { font-size:15px; color:var(--btn); font-weight:600; margin-top:8px; display:inline-block; }
+/* colour chips: the chip IS the colour; depth chips show the colour at that depth */
+.chips { display:flex; gap:10px; flex-wrap:wrap; }
+.cchip { display:flex; align-items:center; gap:10px; background:var(--card); padding:8px 14px 8px 8px; min-height:52px; }
+.cchip.on { background:var(--pale); box-shadow:inset 0 0 0 2px var(--btn); }
+.cchip.off { opacity:.45; cursor:default; }
+.cchip .sw { width:36px; height:36px; border-radius:50%; flex:none; box-shadow:inset 0 0 0 1px rgba(0,0,0,.12); }
+.cchip .cn { font-size:17px; font-weight:600; color:var(--black); line-height:1.1; }
+.cchip .cn small { display:block; font-size:14px; font-weight:400; color:var(--grey); margin-top:1px; }
+.dchip { background:var(--card); padding:8px 8px 6px; min-width:72px; text-align:center; }
+.vdiv { width:1px; background:var(--line); margin:4px 4px; }
+.dchip.on { background:var(--pale); box-shadow:inset 0 0 0 2px var(--btn); }
+.dchip .lens2 { display:block; width:40px; height:26px; margin:0 auto 5px; border-radius:50% / 55%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.15); background:#fff; position:relative; overflow:hidden; }
+.dchip .lens2 i { position:absolute; inset:0; display:block; }
+.dchip .dn { font-size:16px; font-weight:600; color:var(--black); }
+.dchip .dd2 { font-size:14px; color:var(--grey); }
+.note { font-size:15.5px; color:var(--grey); margin-top:14px; line-height:1.35; }
+.total { background:var(--card); padding:22px; display:flex; flex-direction:column; }
+.total .tl { font-size:14px; font-weight:500; letter-spacing:1.4px; text-transform:uppercase; color:var(--grey); }
+.total .line { display:flex; justify-content:space-between; gap:10px; font-size:17px; padding:7px 0; border-bottom:1px solid var(--line); }
+.total .line b { font-weight:600; color:var(--black); white-space:nowrap; }
+.total .line small { display:block; font-size:14px; color:var(--grey); }
+.total .big { font-size:58px; font-weight:700; color:var(--blue); line-height:1; margin-top:14px; letter-spacing:-.6px; }
+.total .big small { font-size:16px; font-weight:400; color:var(--grey); margin-left:6px; letter-spacing:0; }
+.total .pair { font-size:15px; color:var(--grey); margin-top:6px; margin-bottom:14px; }
+.cta { background:var(--btn); color:#fff; font-size:21px; font-weight:600; height:60px; margin-top:auto; width:100%; }
+.cta:disabled { background:#B9C3CE; }
+.ghost { font-size:18px; color:var(--btn); font-weight:600; height:48px; width:100%; margin-top:4px; }
+
+/* chosen: the calm summary both read, then the staff step */
+.sum .sumgrid { display:grid; grid-template-columns:1fr 380px; gap:40px; margin-top:34px; align-items:start; }
+.sumlines { background:var(--card); padding:10px 30px; }
+.sumlines .line { display:flex; justify-content:space-between; gap:20px; font-size:21px; padding:14px 0; border-bottom:1px solid var(--line); }
+.sumlines .line:last-child { border:0; }
+.sumlines .line span:first-child { color:var(--grey); }
+.sumlines .line b { font-weight:600; color:var(--black); text-align:right; }
+.sumprice { background:var(--card); padding:26px 30px; }
+.sumprice .tl { font-size:14px; font-weight:500; letter-spacing:1.4px; text-transform:uppercase; color:var(--grey); }
+.sumprice .big { font-size:72px; font-weight:700; color:var(--blue); line-height:1; margin-top:12px; letter-spacing:-.8px; }
+.sumprice .pair { font-size:17px; color:var(--grey); margin-top:10px; }
+.staffrow { margin-top:auto; padding:22px 0 26px; border-top:1px solid var(--line); display:flex; align-items:center; gap:20px; }
+.staffrow .lab { font-size:14px; font-weight:500; letter-spacing:1.4px; text-transform:uppercase; color:var(--grey); margin-right:6px; }
+.staffrow .cta { width:300px; margin:0; }
+.staffrow .ghost { width:auto; padding:0 18px; }
+
+/* staff screens */
+.stopbar { background:var(--blue); color:#fff; height:56px; padding:0 40px; display:flex; align-items:center; justify-content:space-between; font-size:20px; font-weight:600; flex-shrink:0; }
+.stopbar span { font-weight:300; color:#DCE3E9; font-size:17px; }
+.pats { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px; margin-top:28px; }
+.pat { background:var(--card); padding:26px; text-align:left; }
+.pat .pn { font-size:28px; font-weight:700; color:var(--black); }
+.pat .pd { font-size:17px; color:var(--grey); margin-top:6px; }
+.pat .pg { font-size:17px; font-weight:600; color:var(--btn); margin-top:22px; border-top:1px solid var(--line); padding-top:12px; }
+.cols { display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-top:22px; flex:1; min-height:0; }
+.box { background:var(--card); padding:20px 24px; }
+.box h4 { font-size:14px; font-weight:500; letter-spacing:1.4px; text-transform:uppercase; color:var(--grey); margin-bottom:8px; }
+.kv { display:flex; justify-content:space-between; gap:14px; font-size:17px; padding:6px 0; border-bottom:1px solid var(--line); }
+.kv:last-child { border:0; }
+.kv span:first-child { color:var(--grey); white-space:nowrap; }
+.kv b { font-weight:600; color:var(--black); text-align:right; }
+.scan { display:flex; gap:12px; margin-top:4px; }
+.scan input { flex:1; height:56px; font:inherit; font-size:21px; padding:0 18px; border:2px solid var(--btn); background:#fff; outline:none; min-width:0; }
+.scan button { height:56px; padding:0 18px; background:#fff; border:1px solid var(--line); font-size:16px; font-weight:600; color:var(--btn); }
+.fway { display:flex; gap:20px; margin-top:8px; }
+.fway button { font-size:16px; font-weight:600; color:var(--btn); padding:4px 0; }
+.fbox { position:relative; }
+.dd { position:absolute; left:0; right:0; top:60px; background:#fff; z-index:8; display:none; box-shadow:0 12px 32px rgba(14,15,17,.18), 0 0 0 1px var(--line); }
+.dd.on { display:block; }
+.fr { display:grid; grid-template-columns:1fr 84px 54px 60px; gap:10px; align-items:center; width:100%; text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); font-size:16px; }
+.fr.sel { background:var(--pale); box-shadow:inset 3px 0 0 var(--btn); }
+.fr b { font-weight:600; color:var(--black); }
+.fr .fc { color:var(--grey); font-size:14px; }
+.fr .fs { font-size:14px; color:var(--grey); text-align:right; }
+.fr .fq { font-size:14px; text-align:right; }
+.fr .fq.none { color:var(--amber); }
+.fr .fpr { font-weight:600; text-align:right; }
+.dd mark { background:#FFF1B8; color:inherit; padding:0 1px; }
+.dd .more { font-size:14px; color:var(--grey); padding:8px 12px; border:0; margin:0; }
+.hts { display:flex; gap:12px; align-items:center; margin-top:10px; font-size:17px; }
+.hts input { width:86px; height:48px; font:inherit; font-size:20px; padding:0 12px; border:2px solid var(--btn); outline:none; }
+.hts .req { color:var(--amber); font-size:15px; }
+.verdict { padding:14px 16px; margin-top:12px; }
+.verdict .vh { font-size:20px; font-weight:700; }
+.verdict .vd { font-size:16px; margin-top:3px; line-height:1.35; }
+.v-bad { background:var(--amberbg); } .v-bad .vh { color:var(--amber); }
+.v-ok { background:var(--greenbg); } .v-ok .vh { color:var(--green); }
+.fix { display:grid; gap:10px; margin-top:10px; }
+.fixo { background:#fff; padding:12px 16px; text-align:left; box-shadow:inset 0 0 0 1px var(--line); display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.fixo.on { background:var(--pale); box-shadow:inset 0 0 0 2px var(--btn); }
+.fixo .fn { font-size:18px; font-weight:600; color:var(--black); }
+.fixo .fd { font-size:15px; color:var(--grey); margin-top:2px; }
+.fixo .fp { font-size:18px; font-weight:700; color:var(--blue); white-space:nowrap; }
+.fixo .best { font-size:14px; font-weight:600; letter-spacing:.8px; text-transform:uppercase; color:#fff; background:var(--green); padding:2px 7px; margin-left:8px; vertical-align:middle; }
+.make { display:flex; align-items:center; gap:18px; margin:16px 0 22px; }
+.make .cta { width:320px; margin:0; }
+.make .mode { font-size:16px; color:var(--grey); }
+.done { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0 100px; }
+.done .lead { font-size:23px; }
+.tick { width:96px; height:96px; background:var(--green); color:#fff; font-size:58px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.staffbtn { margin-top:30px; font-size:18px; color:var(--grey); border:1px solid var(--line); padding:14px 26px; }
+.mockflag { position:absolute; right:12px; top:3px; font-size:14px; color:#9AA5B1; z-index:9; }
+</style>
+</head>
+<body>
+
+<section class="screen on" id="s-staff">
+  <div class="stopbar">Lens price sheet on the iPad <span>Staff · pick the patient</span></div>
+  <main>
+    <div class="eyebrow">Step 1 of 3 · staff</div>
+    <h1>Whose lenses?</h1>
+    <div class="lead">The last three saved prescriptions. Only the first name shows on the price sheet.</div>
+    <div class="pats" id="pats"></div>
+  </main>
+</section>
+
+<section class="screen" id="s-sheet">
+  <div class="nav">
+    <div class="navl">{{ZEISS}}<div class="tabs" id="tabs"></div></div>
+    <img class="ceclogo" src="data:image/jpeg;base64,{{CEC}}" alt="Concord Eyecare">
+  </div>
+  <main id="page"></main>
+  <div class="scrim" id="scrim"></div>
+  <div class="pop" id="pop"></div>
+  <div class="sheet" id="sheet"></div>
+</section>
+
+<section class="screen" id="s-sum">
+  <div class="nav"><div class="navl">{{ZEISS}}</div><img class="ceclogo" src="data:image/jpeg;base64,{{CEC}}" alt="Concord Eyecare"></div>
+  <main class="sum">
+    <div class="toprow"><div class="eyebrow" id="sum-eye"></div><div class="who">Lenses for <b id="sum-who"></b></div></div>
+    <h1 id="sum-h1"></h1>
+    <div class="sumgrid">
+      <div class="sumlines" id="summary"></div>
+      <div class="sumprice"><div class="tl">Lenses, a pair</div><div class="big" id="sum-total"></div><div class="pair">Frame extra.</div></div>
+    </div>
+    <div class="staffrow"><span class="lab">Staff</span><button class="cta" id="toframe">Scan the frame &rarr;</button><button class="ghost" id="changelens">Change lens</button></div>
+  </main>
+</section>
+
+<section class="screen" id="s-frame">
+  <div class="stopbar">Frame and job <span id="fpat"></span></div>
+  <main>
+    <div class="eyebrow">Step 3 of 3 · staff</div>
+    <h1>Scan the frame.</h1>
+    <div class="cols">
+      <div>
+        <div class="box"><h4>Lens chosen</h4><div id="chosen"></div></div>
+        <div class="box" style="margin-top:16px">
+          <h4>Frame</h4>
+          <div class="fbox">
+            <div class="scan"><input id="bc" placeholder="Scan, or type brand, model, colour" autocomplete="off" spellcheck="false"><button id="demo">Demo scan</button></div>
+            <div class="dd" id="dd"></div>
+          </div>
+          <div class="fway"><button id="own">Own frame</button></div>
+          <div id="framefacts" style="margin-top:6px"></div>
+        </div>
+      </div>
+      <div class="box" id="checkbox"></div>
+    </div>
+    <div class="make">
+      <button class="cta" id="make" disabled>Make job in Optomate</button>
+      <div class="mode" id="makewhy">Dry run: shows the job, writes nothing.</div>
+    </div>
+  </main>
+</section>
+
+<section class="screen" id="s-done">
+  <div class="stopbar">Job ready <span>Next: Visustore, then invoice</span></div>
+  <div class="done">
+    <div class="tick">&#10003;</div>
+    <h1 style="margin-top:22px">Job made.</h1>
+    <div class="lead" id="donel"></div>
+    <button class="staffbtn" id="again">Next patient</button>
+  </div>
+</section>
+
+<div class="mockflag">Mock-up · fake patients · nothing is written</div>
+
+<script>
+/* ------------------------------------------------------------------------------------------------
+   PRICES - copied verbatim from the printed patient sheets (second-brain price-lists/patient, Sep-Oct 2026) and
+   the staff scan sheets (Tints, Myopia; Optomate's own prices, a pair). Office prices: Optomate price map (Oct 2026).
+   Tint on a stock single-vision lens = the lens made to order ($100) + the tint ($50 solid / $70 graduated), shown
+   as ONE add-on price with the breakdown underneath (Mark, 9 Nov 2026). Tint colours and depths = the ZEISS tints
+   held in Optomate (Kat's May 2026 ZEISS code list): Black, Grey, Brown, Pioneer G15 green; solid 85/75/60/25/12%,
+   graduated 90-40/75/25%. PhotoFusion X: stock lens is grey; other colours are a made-to-order lens (zeiss.com.au:
+   seven Rx colours, one FSV colour). Patient screens use tier names; staff screens product names (Mark, 22 Sep 2026).
+   ------------------------------------------------------------------------------------------------ */
+const T = (idx, name, price) => ({ idx, name, price });
+const O = (k, n, add, d, more = {}) => ({ k, n, add, d, ...more });
+const CLEAR = O("clear", "Clear", 0, "Everyday clear lens.");
+const BLUE_D = "Softens glare from screens and LED lights.", PHOTO_D = "Darkens outdoors, clears inside.";
+const TINT_D = "Black, grey, brown or green. Pick the depth.";
+// tint on a stock SV lens: grind $100 + tint $50 (graduated $70) - one price, breakdown in small text
+const TINT_SV  = O("tint", "Sun tint", 150, TINT_D, { mto:true, grad:170, breakdown:"Lens made to order $100 + tint $50. Graduated +$170." });
+const TINT_MF  = O("tint", "Sun tint", 50, TINT_D, { grad:70, breakdown:"Graduated +$70." });
+const SV_LOW  = [CLEAR, O("blue", "Blue-light filter", 50, BLUE_D), O("photo", "PhotoFusion X", 150, PHOTO_D, { photoStock:true }), TINT_SV];
+const SV_HIGH = (tint) => [CLEAR, O("blue", "Blue-light filter", 150, "Includes made to order.", { mto:true, incl:true }),
+                           O("photo", "PhotoFusion X", 250, "Includes made to order. Any colour.", { mto:true, incl:true }),
+                           ...(tint ? [TINT_SV] : [])];
+const AF_OPTS = [CLEAR, O("blue", "Blue-light filter", 50, BLUE_D), O("photo", "PhotoFusion X", 150, PHOTO_D)];
+const OF_OPTS = [CLEAR, O("blue", "Blue-light filter", 50, BLUE_D)];
+// multifocal, every index already made to order: tints +$50 / +$70; light-reactive not at 1.74 on Essential (printed sheet)
+const MF_OPTS = (c, idx) => [CLEAR, O("blue", "Blue-light filter", 50, BLUE_D),
+  O("photo", "Light-reactive", 150, PHOTO_D, { off:idx === "1.74" && !c.photo174, offwhy:"Not at 1.74 on Essential" }), TINT_MF];
+const THIN = (a, b, c, d) => [T("1.50","Standard",a), T("1.60","Thin & light",b), T("1.67","Ultra thin",c), T("1.74","Thinnest",d)];
+const R53 = (price) => ({ idx:"1.53", name:"Rimless", price });
+
+// ZEISS tint colours held in Optomate (Kat's ZEISS code list, May 2026): the chip shows the colour itself
+const TINT_COLOURS = [
+  { k:"Black", n:"Black", hex:"#15171A" }, { k:"Grey", n:"Grey", hex:"#5F666D" },
+  { k:"Brown", n:"Brown", hex:"#6B4420" }, { k:"Green", n:"Green", sub:"Pioneer G15", hex:"#3B5A48" }];
+const SOLID_DEPTHS = [["s85","85%"],["s75","75%"],["s60","60%"],["s25","25%"],["s12","12%"]], GRAD_DEPTHS = [["g9040","90/40%"],["g75","75%"],["g25","25%"]];
+const depthName = (k) => ([...SOLID_DEPTHS, ...GRAD_DEPTHS].find(d => d[0] === k) || ["", ""])[1];
+// PhotoFusion X colours (zeiss.com.au PhotoFusion X page, read 9 Nov 2026): stock lens grey only
+const PFX_COLOURS = [
+  { k:"Grey", hex:"#55595E", stock:true }, { k:"Brown", hex:"#6B4420" }, { k:"Extra Grey", hex:"#2E3236" }, { k:"Pioneer", hex:"#3B5A48" },
+  { k:"Black", hex:"#15171A" }, { k:"Blue", hex:"#2E4C8C" }, { k:"Burgundy", hex:"#6B2334" }];
+
+const PAGES = [
+ { key:"sv", tab:"Single vision", eyebrow:"ZEISS ClearView with DuraVision Platinum coating", h1:"Single vision lenses.",
+   lead:"Up to 3× the clear area of a standard stock lens, and up to 16% thinner.", cols:4, by:"index",
+   foot:[["On every lens: DuraVision Platinum UV. Scratch and dirt resistant, up to 50% fewer reflections, UV from all sides.", "Prices per pair."], "Lens and coating figures: ZEISS Vision Care · September 2026"],
+   cards:[
+    { idx:"1.50", name:"Standard",     price:200, product:"ZEISS ClearView FSV 1.50 DuraVision Platinum", stock:70, grind:100, opts:SV_LOW,
+      moreList:["Made to order","Blue light","PhotoFusion X","Tints"], moreFrom:[50,170] },
+    { idx:"1.60", name:"Thin & light", price:250, product:"ZEISS ClearView FSV 1.60 DuraVision Platinum", stock:70, grind:100, opts:SV_LOW,
+      moreList:["Made to order","Blue light","PhotoFusion X","Tints"], moreFrom:[50,170] },
+    { idx:"1.67", name:"Ultra thin",   price:350, product:"ZEISS ClearView FSV 1.67 DuraVision Platinum", stock:70, grind:100, opts:SV_HIGH(true),
+      moreList:["Blue light","PhotoFusion X","Tints"], moreFrom:[150,250] },
+    { idx:"1.74", name:"Thinnest",     price:500, product:"ZEISS ClearView FSV 1.74 DuraVision Platinum", stock:65, grind:100, opts:SV_HIGH(false),
+      moreList:["Blue light","PhotoFusion X"], moreFrom:[150,250] },
+   ]},
+ { key:"mf", tab:"Multifocal", eyebrow:"ZEISS SmartLife and Synchrony progressive lenses", h1:"Multifocal lenses.",
+   lead:"Distance, screen and reading in one lens, with no line.", cols:3, by:"tier", heights:true,
+   foot:[["Every multifocal made to order, up to two weeks.", "Scratch-resistant, anti-reflective.", "Prices per pair."], "October 2026"],
+   cards:[
+    { tag:"Best value", tier:"Essential", line:"Synchrony Ultra HDV", product:"Synchrony Ultra HDV", text:"Clear for everyday tasks.",
+      thick:THIN(420,540,640,760), other:R53(490), mf:true, moreList:["Blue light","Light-reactive","Tints"], moreFrom:[50,150] },
+    { tag:"Most popular", hi:true, tier:"Everyday", line:"ZEISS SmartLife Superb", product:"ZEISS SmartLife Superb", text:"Shaped to your face and frame.",
+      thick:THIN(560,690,760,860), other:R53(610), mf:true, photo174:true, moreList:["Blue light","Light-reactive","Tints"], moreFrom:[50,150] },
+    { tag:"Most advanced", tier:"Signature", line:"ZEISS SmartLife Individual 3", product:"ZEISS SmartLife Individual 3", text:"Personalised to how you use your eyes.",
+      thick:THIN(750,850,950,1050), other:R53(790), mf:true, photo174:true, moreList:["Blue light","Light-reactive","Tints"], moreFrom:[50,150] },
+   ]},
+ { key:"af", tab:"Anti-Fatigue", eyebrow:"ZEISS SmartLife Digital · under 45, tired eyes from screens", h1:"Anti-Fatigue lenses.",
+   lead:"Fresher eyes at five o’clock. Looks like a normal lens, with an easier near zone for screens and phones.", cols:4, by:"index", heights:true,
+   otherLine:"Other index: 1.53 rimless, $400.",
+   foot:[["7 in 10 wearers report less eye strain by evening.", "Made to order, up to two weeks.", "Prices per pair."], "Eye-strain figure: ZEISS wearer test, 2019 · October 2026"],
+   cards:["1.50","1.60","1.67","1.74"].map((idx, i) => ({ idx, name:["Standard","Thin & light","Ultra thin","Thinnest"][i], price:[350,450,560,740][i],
+      product:`ZEISS SmartLife Digital ${idx}`, line:"ZEISS SmartLife Digital", opts:AF_OPTS, moreList:["Blue light","PhotoFusion X"], moreFrom:[50,150] })) },
+ { key:"sun", tab:"Sunglasses", eyebrow:"Sun lenses made to your prescription, by ZEISS Vision Care", h1:"Prescription sunglasses.",
+   lead:"Your script in a sun lens. Tinted or polarised; then the coating and the thickness.", cols:2, by:"tier",
+   foot:[["Made to order, up to two weeks. Full UV.", "Light-reactive lenses from +$150.", "Multifocal sunglasses from $570.", "Prices per pair."], "October 2026"],
+   cards:[
+    { tag:"Everyday sun, any colour", tier:"Tinted", line:"Synchrony tinted · black, grey, brown or green", product:"Synchrony tinted",
+      text:"A solid sun tint in the colour and depth you want.", sun:true, tintPick:true, gradAdd:20, mirror:50,
+      grid:[["1.50", "Standard", 160, 250], ["1.60", "Thin", 270, 340], ["1.67", "Ultra thin", null, 470]],
+      basic:{ n:"Basic tint, stock lens", price:120, d:"Lighter scripts." },
+      moreList:["Graduated","Mirror finish","Basic tint $120"], moreFrom:[20,50] },
+    { tag:"Driving, water, bright roads", hi:true, tier:"Polarised", line:"Synchrony polarised · grey or brown", product:"Synchrony polarised",
+      text:"Cuts the hard glare that bounces off roads, water and car bonnets.", sun:true, polar:true, colours:["Grey","Brown"], mirror:50,
+      grid:[["1.50", "Standard", 250, 340], ["1.60", "Thin", 390, 450], ["1.67", "Ultra thin", null, 570]],
+      moreList:["Mirror finish"], moreFrom:[50,50] },
+   ]},
+ { key:"myo", tab:"Myopia control", eyebrow:"Myopia control spectacle lenses · for children", h1:"Myopia control lenses.",
+   lead:"Your optometrist recommends the lens for your child. All three are the same price band; the design differs.", cols:3, by:"tier",
+   foot:[["Made to order, up to two weeks.", "Prices per pair.", "MiyoSmart IQ facts: hoyavision.com/au, MiYOSMART iQ page, read 9 Nov 2026."], "Prices: Optomate, September 2026"],
+   cards:[
+    { tag:"Hoya", tier:"MiyoSmart IQ", product:"MiyoSmart IQ Spark", price:750, hi:true,
+      facts:["D.I.M.S. technology with Hoya’s Triple Enhanced Design.", "For children with progressing myopia, from age 4.", "Looks like a regular clear lens."],
+      opts:[O("clear","Clear",0,"Indistinguishable from a regular lens.")] },
+    { tag:"Essilor", tier:"Stellest 2.0", product:"Stellest 2.0", price:690, opts:[O("clear","Clear",0,"")] },
+    { tag:"ZEISS", tier:"MyoActive", product:"ZEISS MyoActive", price:690, opts:[O("clear","Clear",0,"")] },
+   ]},
+ { key:"office", tab:"Office", eyebrow:"ZEISS Office Lens Superb · multifocal wearers, at the desk", h1:"Office lenses.",
+   lead:"A desk pair a multifocal cannot match. Pick how far you need to see clearly. Not for driving.", cols:3, by:"dist", heights:true,
+   foot:[["Made to order, up to two weeks.", "Blue-light filter +$50 on every one.", "Prices per pair.", "Distances: ZEISS Office Lens white paper and zeiss.com.au (maximum intermediate distance)."], "October 2026"],
+   cards:[
+    { tag:"Closest", dist:"Clear to 1 metre", use:"Reading, paperwork and the laptop.", variant:"Book", product:"ZEISS Office Lens Superb Book",
+      thick:THIN(460,590,660,760), other:R53(510), opts:OF_OPTS, moreList:["Blue light"], moreFrom:[50,50] },
+    { tag:"Most desks", dist:"Clear to 2 metres", use:"Desk, screens and the person opposite.", variant:"Near", product:"ZEISS Office Lens Superb Near", hi:true,
+      thick:THIN(460,590,660,760), other:R53(510), opts:OF_OPTS, moreList:["Blue light"], moreFrom:[50,50] },
+    { tag:"Furthest", dist:"Clear to 4 metres", use:"Around the room: meetings, shop floor, kitchen.", variant:"Room", product:"ZEISS Office Lens Superb Room",
+      thick:THIN(460,590,660,760), other:R53(510), opts:OF_OPTS, moreList:["Blue light"], moreFrom:[50,50] },
+   ]},
+ { key:"bif", tab:"Bifocal", eyebrow:"Synchrony by ZEISS · bifocal", h1:"Bifocal lenses.",
+   lead:"Distance through the top, reading through the segment below.", cols:2, by:"index", heights:true,
+   foot:[["Made to order, up to two weeks.", "Prices per pair."], "September 2026"],
+   cards:[
+    { idx:"1.50", name:"Standard", price:240, product:"Synchrony Bifocal D28 1.50", line:"Synchrony Bifocal D28, clear, multicoated",
+      moreList:["Photochromic $300","Polarised grey $300"], moreFrom:null,
+      opts:[O("clear","Clear, multicoated",0,"Everyday clear lens.",{ price:240 }), O("photo","Photochromic, grey or brown",0,"Darkens outdoors, clears inside.",{ price:300 }), O("polar","Polarised grey, for sun",0,"Cuts glare off roads and water.",{ price:300 })] },
+    { idx:"1.60", name:"Thin & light", price:300, product:"Synchrony Bifocal D28 1.60", line:"Synchrony Bifocal D28, clear, hard coat", moreList:["Clear only at 1.60"], moreFrom:null,
+      opts:[O("clear","Clear, hard coat",0,"Everyday clear lens.",{ price:300 })] },
+   ]},
+];
+
+// fake patients (ZZTEST): the Rx type picks the first tab, rec = the Lens Finder's suggested index
+const PATS = [
+  { first:"Alex", sur:"ZZTEST", when:"Rx today 11:42 · MJ", rx:"R -3.25 / L -3.50 · PD 31 / 31", tab:"sv", rec:"1.60", thick:["1.50"], h:-3.4, pd:{R:31, L:31} },
+  { first:"Sam", sur:"ZZTEST-NEAR", when:"Rx today 10:40 · NK", rx:"R +1.00 / L +1.25 add +2.00 · PD 32 / 32", tab:"mf", rec:"1.60", thick:[], h:1.1, pd:{R:32, L:32} },
+  { first:"Jo", sur:"ZZTEST-HIGH", when:"Rx yesterday · MJ", rx:"R -6.50 / L -6.25 · PD 30 / 30", tab:"sv", rec:"1.67", thick:["1.50","1.60"], h:-6.4, pd:{R:30, L:30} },
+];
+const FRAMES = [
+  { bc:"35144", brand:"Ray-Ban", model:"RB5154 Clubmaster", colour:"Black", a:54, b:41, dbl:20, ed:58, price:289, qoh:2 },
+  { bc:"35190", brand:"Ray-Ban", model:"RB5154 Clubmaster", colour:"Havana", a:51, b:39, dbl:21, ed:55, price:289, qoh:1 },
+  { bc:"36021", brand:"Oakley", model:"OX8156 Holbrook RX", colour:"Satin black", a:56, b:40, dbl:18, ed:58, price:310, qoh:1 },
+  { bc:"34477", brand:"Hermase", model:"H2201", colour:"Tortoise", a:52, b:42, dbl:18, ed:54, price:249, qoh:3 },
+  { bc:"34478", brand:"Hermase", model:"H2201", colour:"Crystal grey", a:52, b:42, dbl:18, ed:54, price:249, qoh:0 },
+  { bc:"33910", brand:"Vycoz", model:"Mono", colour:"Black", a:48, b:30, dbl:22, ed:50, price:299, qoh:1 },
+  { bc:"35602", brand:"Bill Bass", model:"BB1012", colour:"Navy", a:53, b:38, dbl:17, ed:56, price:229, qoh:2 },
+];
+
+let st = {};
+const $ = (id) => document.getElementById(id);
+const money = (n) => "$" + n.toLocaleString("en-AU");
+const plus = (n) => n ? "+" + money(n) : "Included";
+const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+function show(id) { document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id)); }
+const page = () => PAGES.find(p => p.key === st.tab);
+
+/* ---- 1 staff: patient ---------------------------------------------------------------------- */
+function drawPats() {
+  $("pats").innerHTML = PATS.map((p, i) => `<button class="pat" data-i="${i}">
+    <div class="pn">${p.sur}, ${p.first}</div><div class="pd">${p.when}</div><div class="pd">${p.rx}</div>
+    <div class="pg">Lenses for ${p.first} &rarr;</div></button>`).join("");
+  document.querySelectorAll(".pat").forEach(b => b.onclick = () => { st = { p: PATS[+b.dataset.i], tab: PATS[+b.dataset.i].tab }; drawPage(); show("s-sheet"); });
+}
+
+/* ---- 2 price sheet (staff steer, patient watches) ------------------------------------------- */
+// card blocks: head | price | body | more  (one headline price per card; details on tap)
+function headHTML(pg, c) {
+  if (pg.by === "index") return `<div class="head"><div class="idx">${c.idx}</div><div class="name">${c.name}</div></div>`;
+  if (pg.by === "dist") return `<div class="head"><div class="tag ${c.hi ? "hi" : ""}">${esc(c.tag)}</div><div class="dist">${esc(c.dist)}<small>${esc(c.use)}</small></div></div>`;
+  return `<div class="head"><div class="tag ${c.hi ? "hi" : ""}">${esc(c.tag)}</div><div class="tier">${c.tier}</div>${c.line ? `<div class="lens">${esc(c.line)}</div>` : ""}</div>`;
+}
+function priceHTML(pg, c) {
+  const p = c.thick ? c.thick[0].price : c.grid ? c.grid[0][2] : c.price;
+  const small = c.thick ? (pg.by === "dist" ? "1.50 · a pair" : "1.50 Standard · a pair") : c.grid ? "1.50, hard coat · a pair" : "a pair";
+  return `<div class="price">${money(p)}<small>${small}</small></div>`;
+}
+function bodyHTML(pg, c, p) {
+  let h = "";
+  if (pg.by === "index" && c.line !== undefined) h += `<div class="lens">${esc(c.line)}</div>`;
+  if (pg.by === "index" && c.line === undefined) h += `<div class="lens">ZEISS ClearView · DuraVision Platinum UV</div>`;
+  if (pg.by === "dist") h += `<div class="lens">ZEISS Office Lens Superb <b>${esc(c.variant)}</b></div>`;
+  if (c.text) h += `<div class="desc">${esc(c.text)}</div>`;
+  if (c.facts) h += `<div class="facts">${c.facts.map(f => `<div class="lr">${esc(f)}</div>`).join("")}</div>`;
+  if (c.thick) h += `<div class="thin"><h4>Thinner</h4>` + c.thick.slice(1).map((t, j) => { const rec = t.idx === p.rec && pg.key !== "sun";
+      return `<div class="lr ${rec ? "rec" : ""}" data-t="${j + 1}"><span><b>${t.idx}</b><small>${esc(t.name)}</small>${rec ? `<i class="sy">Suits you</i>` : ""}</span><b class="lp">${money(t.price)}</b></div>`; }).join("") + `</div>`;
+  if (c.grid) h += `<div class="pgrid"><table><tr><th>Thickness</th><th>Hard coat</th><th>Anti-reflective</th></tr>` +
+      c.grid.map(g => `<tr><td><b>${g[0]}</b><small>${g[1]}</small></td><td class="${g[2] == null ? "na" : ""}">${g[2] == null ? "-" : money(g[2])}</td><td>${money(g[3])}</td></tr>`).join("") + `</table></div>`;
+  return `<div class="body">${h}</div>`;
+}
+function moreHTML(c) {
+  if (!c.moreList) return `<div class="more"></div>`;
+  const range = c.moreFrom ? (c.moreFrom[0] === c.moreFrom[1] ? `<b>+${money(c.moreFrom[0])}</b>` : `<b>+${money(c.moreFrom[0])} to +${money(c.moreFrom[1])}</b>`) : "";
+  const other = c.other ? `<div class="other">Other index: ${c.other.idx} ${c.other.name.toLowerCase()}, ${money(c.other.price)}.</div>` : "";
+  return `<div class="more" data-pop="1"><span class="mh">${c.moreFrom ? "Add-ons" : "Also"}</span>${c.moreList.map(esc).join(" · ")}${range ? " · " + range : ""}${other}</div>`;
+}
+function drawPage() {
+  const pg = page(), p = st.p;
+  $("tabs").innerHTML = PAGES.map(x => `<button class="tab ${x.key === st.tab ? "on" : ""}" data-k="${x.key}">${x.tab}</button>`).join("");
+  document.querySelectorAll(".tab").forEach(t => t.onclick = () => { st.tab = t.dataset.k; drawPage(); });
+  const cards = pg.cards.map((c, i) => {
+    const rec = pg.by === "index" && c.idx === p.rec, thick = pg.key === "sv" && p.thick.includes(c.idx);
+    const sel = st.chosen && st.chosen.tab === pg.key && st.chosen.i === i;
+    return `<div class="card ${rec && !sel ? "rec" : ""} ${thick ? "thick" : ""} ${sel ? "sel" : ""}" data-i="${i}" role="button">
+      ${sel ? `<span class="chip ok">Chosen</span>` : rec ? `<span class="chip">Suits your prescription</span>` : ""}
+      ${headHTML(pg, c)}${priceHTML(pg, c)}${bodyHTML(pg, c, p)}${moreHTML(c)}
+      <div class="spacer"></div><div class="tapline">${thick ? "Thicker for your prescription" : sel ? "Change &rarr;" : "Choose &rarr;"}</div></div>`;
+  }).join("");
+  const other = pg.otherLine ? `<div class="other" style="margin-top:12px">${esc(pg.otherLine)}</div>` : "";
+  const foot = pg.foot ? `<div class="foot"><div class="fl">${pg.foot[0].map(x => `<span>${esc(x)}</span>`).join("")}</div><div class="fd">${esc(pg.foot[1])}</div></div>` : "";
+  $("page").innerHTML = `<div class="toprow"><div class="eyebrow">${esc(pg.eyebrow)}</div><div class="who">Lenses for <b>${esc(p.first)}</b></div></div>
+    <h1>${pg.h1}</h1><div class="lead">${esc(pg.lead)}</div>
+    <div class="rows" style="grid-template-columns:repeat(${pg.cols}, 1fr)">${cards}</div>${other}${foot}`;
+  document.querySelectorAll(".card").forEach(b => b.onclick = (ev) => {
+    const row = ev.target.closest(".lr"), more = ev.target.closest(".more[data-pop]");
+    if (more) { openPop(+b.dataset.i); return; }
+    openSheet(+b.dataset.i, row && row.dataset.t != null ? { t:+row.dataset.t } : {});
+  });
+}
+
+/* ---- 2a pop-over: the full add-on list for one card ----------------------------------------- */
+function popRows(pg, c) {
+  const rows = [];
+  if (c.grind && !(c.opts || []).some(o => o.incl)) rows.push(["Made to order", plus(c.grind), "Grind, cut to the frame. Needed when the frame or script is outside the stock lens."]);
+  (c.opts || []).filter(o => o.k !== "clear").forEach(o => {
+    const price = o.off ? o.offwhy : o.price != null ? money(o.price) : plus(o.add);
+    rows.push([o.n, price, (o.breakdown ? o.breakdown + " " : "") + (o.d || "")]);
+  });
+  if (c.mf) { const l = MF_OPTS(c, "1.60"); l.filter(o => o.k !== "clear").forEach(o => rows.push([o.n, plus(o.add), (o.breakdown ? o.breakdown + " " : "") + o.d])); }
+  if (c.gradAdd) rows.push(["Graduated tint", plus(c.gradAdd), "Dark top, lighter bottom."]);
+  if (c.mirror) rows.push(["Mirror finish", plus(c.mirror), "Silver, blue or red, over the tint."]);
+  if (c.basic) rows.push([c.basic.n, money(c.basic.price), c.basic.d + " Hard coat, stock lens."]);
+  if (c.other) rows.push([`${c.other.idx} ${c.other.name}`, money(c.other.price), "Rimless frames. Blue-light and light-reactive not on 1.53."]);
+  return rows;
+}
+function openPop(i) {
+  const pg = page(), c = pg.cards[i];
+  st.popI = i;
+  const title = pg.by === "index" ? `${c.idx} ${c.name}` : pg.by === "dist" ? c.dist : c.tier;
+  $("pop").innerHTML = `<div class="eyebrow">Add-ons · ${esc(c.line || c.product)}</div><h3>${esc(title)}</h3>
+    <table>${popRows(pg, c).map(r => `<tr><td>${esc(r[0])}</td><td class="pp">${esc(r[1])}</td><td class="pd">${esc(r[2])}</td></tr>`).join("")}</table>
+    <div class="popbtns"><button class="cta" id="popchoose">Choose this lens &rarr;</button><button class="ghost" id="popback">Back</button></div>`;
+  $("scrim").classList.add("on"); $("pop").classList.add("on");
+  $("popback").onclick = closeAll;
+  $("popchoose").onclick = () => { $("pop").classList.remove("on"); openSheet(i, {}); };
+}
+function closeAll() { $("scrim").classList.remove("on"); $("sheet").classList.remove("on"); $("pop").classList.remove("on"); }
+$("scrim").onclick = closeAll;
+
+/* ---- 2b choice sheet ------------------------------------------------------------------------- */
+function openSheet(i, pre = {}) {
+  const pg = page(), c = pg.cards[i];
+  st.card = c; st.cardI = i; st.page = pg;
+  st.thickI = c.thick ? (pre.t != null ? pre.t : Math.max(0, c.thick.findIndex(t => t.idx === st.p.rec))) : null;
+  st.other = false;                                   // 1.53 only when asked for
+  st.gridI = c.grid ? 0 : null; st.coat = c.grid ? (c.grid[0][2] != null ? "hc" : "ar") : null;
+  st.opt = "clear"; st.colour = c.tintPick ? "Grey" : (c.colours ? c.colours[0] : null); st.depth = "s85";
+  st.pfx = "Grey"; st.mirror = false;
+  const list = optList();
+  if (pre.o && list && list.find(o => o.k === pre.o && !o.off)) st.opt = pre.o;
+  drawChoice();
+  $("scrim").classList.add("on"); $("sheet").classList.add("on");
+}
+function optList() {
+  const c = st.card;
+  if (c.opts) return c.opts;
+  if (c.mf) return MF_OPTS(c, curIdx());
+  return null;
+}
+function curIdx() { const c = st.card; return st.other && c.other ? c.other.idx : c.thick ? c.thick[st.thickI].idx : c.grid ? c.grid[st.gridI][0] : c.idx; }
+function curName() { const c = st.card; return st.other && c.other ? c.other.name : c.thick ? c.thick[st.thickI].name : c.grid ? c.grid[st.gridI][1] : c.name; }
+const tintOn = () => st.opt === "tint" || !!(st.card && st.card.tintPick);
+const isGrad = () => st.depth[0] === "g";
+function priceNow() {
+  const c = st.card, list = optList() || [];
+  const o = list.find(x => x.k === st.opt) || null;
+  let base = st.other && c.other ? c.other.price : c.thick ? c.thick[st.thickI].price : c.grid ? c.grid[st.gridI][st.coat === "hc" ? 2 : 3] : c.price;
+  if (o && o.price != null) base = o.price;                              // bifocal: each lens type is its own price
+  let optAdd = 0, grindAdd = 0, note = "";
+  if (o && o.k === "tint") { optAdd = isGrad() ? o.grad : o.add; }       // one price: grind + tint already inside
+  else if (o && o.price == null) optAdd = o.add;
+  if (o && o.k === "photo" && o.photoStock && st.pfx !== "Grey" && c.grind) { grindAdd = c.grind; note = "PhotoFusion X " + st.pfx + ": lens made to order"; }
+  const gradAdd = c.gradAdd && c.tintPick && isGrad() ? c.gradAdd : 0, mirrorAdd = st.mirror && c.mirror ? c.mirror : 0;
+  const mto = !!(o && (o.mto || (o.k === "photo" && st.pfx !== "Grey"))) || !!c.sun;
+  return { base, o, optAdd, grindAdd, gradAdd, mirrorAdd, note, mto, add: optAdd + grindAdd + gradAdd + mirrorAdd,
+           total: base + optAdd + grindAdd + gradAdd + mirrorAdd, abs: !!(o && o.price != null) };
+}
+function choiceTitle() {
+  const c = st.card, pg = st.page;
+  if (pg.by === "index") return `${c.idx} ${c.name}`;
+  if (pg.by === "dist") return `${c.dist} · ${curIdx()}`;
+  if (c.grid) return `${c.tier} · ${curIdx()} ${st.coat === "hc" ? "hard coat" : "anti-reflective"}`;
+  return c.thick ? `${c.tier} · ${curIdx()} ${curName()}` : c.tier;
+}
+function swatch(hex, depth) {
+  // the lens drawn at the tint's depth: a solid depth is one layer, a graduated one fades to the lighter figure
+  const label = depthName(depth), pct = parseInt(label), lo = depth[0] === "g" ? (label.includes("/") ? parseInt(label.split("/")[1]) : Math.round(pct / 3)) : null;
+  const bg = lo != null ? `linear-gradient(${hex}${a(pct)} 0%, ${hex}${a(pct)} 25%, ${hex}${a(lo)} 100%)` : `${hex}${a(pct)}`;
+  return `<span class="lens2"><i style="background:${bg}"></i></span>`;
+}
+const a = (pct) => Math.round(Math.min(96, pct) * 2.55).toString(16).padStart(2, "0");
+function drawChoice() {
+  const c = st.card, pg = st.page;
+  const list = optList();
+  if (list && !list.find(o => o.k === st.opt && !o.off)) st.opt = "clear";
+  const pr = priceNow();
+  const box = (k, on, off, title, price, desc, extra = "") =>
+    `<button class="opt ${on ? "on" : ""} ${off ? "off" : ""}" data-k="${k}" ${off ? "disabled" : ""}>${extra}<div class="on1">${title}</div><div class="op">${price}</div>${desc ? `<div class="od">${desc}</div>` : ""}</button>`;
+  let groups = "";
+  if (c.thick) {
+    groups += `<div class="group"><h4>Thickness</h4><div class="opts">` +
+      c.thick.map((t, i) => box("t" + i, !st.other && i === st.thickI, false, `${t.idx} ${esc(t.name)}`, money(t.price), "",
+        t.idx === st.p.rec ? `<span class="rc">Suits you</span>` : "")).join("") + `</div>` +
+      (c.other ? (st.other ? `<div class="opts" style="margin-top:10px">${box("x", true, false, `${c.other.idx} ${c.other.name}`, money(c.other.price), "Rimless frames.")}</div>`
+                           : `<button class="otherlink" data-k="x">Other index: ${c.other.idx} rimless, ${money(c.other.price)}</button>`) : "") + `</div>`;
+  }
+  if (c.grid) {
+    groups += `<div class="group"><h4>Thickness</h4><div class="opts three">` +
+      c.grid.map((g, i) => box("g" + i, i === st.gridI, false, `${g[0]} ${esc(g[1])}`, money(st.coat === "hc" && g[2] != null ? g[2] : g[3]), st.coat === "hc" && g[2] == null ? "Anti-reflective only" : "")).join("") + `</div></div>`;
+    const hc = c.grid[st.gridI][2];
+    groups += `<div class="group"><h4>Coating</h4><div class="chips">` +
+      `<button class="cchip ${st.coat === "hc" ? "on" : ""} ${hc == null ? "off" : ""}" data-k="khc" ${hc == null ? "disabled" : ""}><span class="cn">Hard coat<small>${hc == null ? "not made at this thickness" : "scratch-resistant only · " + money(hc)}</small></span></button>` +
+      `<button class="cchip ${st.coat === "ar" ? "on" : ""}" data-k="kar"><span class="cn">Anti-reflective<small>HMC+ back, or both sides · ${money(c.grid[st.gridI][3])}</small></span></button>` + `</div></div>`;
+  }
+  if (list && list.length > 1) {
+    groups += `<div class="group"><h4>Choose one</h4><div class="opts">` +
+      list.map(o => box("o" + o.k, st.opt === o.k, o.off, esc(o.n), o.price != null ? money(o.price) : plus(o.add), o.off ? esc(o.offwhy) : esc(o.breakdown || o.d))).join("") + `</div></div>`;
+  }
+  // tint: colour chips that ARE the colour, then the depths ZEISS makes (Optomate's ZEISS tint items)
+  if ((tintOn() && pr.o && pr.o.k === "tint") || c.tintPick) {
+    const col = TINT_COLOURS.find(x => x.k === st.colour) || TINT_COLOURS[1];
+    groups += `<div class="group"><h4>Colour</h4><div class="chips">` +
+      TINT_COLOURS.map(x => `<button class="cchip ${st.colour === x.k ? "on" : ""}" data-k="c${x.k}"><span class="sw" style="background:${x.hex}"></span><span class="cn">${x.n}${x.sub ? `<small>${x.sub}</small>` : ""}</span></button>`).join("") + `</div></div>`;
+    const gradPrice = c.tintPick ? plus(c.gradAdd) : pr.o ? "+" + money(pr.o.grad) + " instead of +" + money(pr.o.add) : "";
+    groups += `<div class="group"><h4>Depth <span>solid, then graduated (${gradPrice} · dark top, lighter bottom)</span></h4><div class="chips">` +
+      SOLID_DEPTHS.map(d => `<button class="dchip ${st.depth === d[0] ? "on" : ""}" data-k="d${d[0]}">${swatch(col.hex, d[0])}<div class="dn">${d[1]}</div></button>`).join("") +
+      `<span class="vdiv"></span>` +
+      GRAD_DEPTHS.map(d => `<button class="dchip ${st.depth === d[0] ? "on" : ""}" data-k="d${d[0]}">${swatch(col.hex, d[0])}<div class="dn">${d[1]}</div><div class="dd2">graduated</div></button>`).join("") + `</div></div>`;
+  }
+  if (c.colours && !c.tintPick) {
+    groups += `<div class="group"><h4>Colour</h4><div class="chips">` +
+      c.colours.map(k => { const x = TINT_COLOURS.find(y => y.k === k); return `<button class="cchip ${st.colour === k ? "on" : ""}" data-k="c${k}"><span class="sw" style="background:${x.hex}"></span><span class="cn">${k}<small>polarised 85%</small></span></button>`; }).join("") + `</div></div>`;
+  }
+  if (c.mirror) groups += `<div class="group"><h4>Mirror finish <span>${plus(c.mirror)} · silver, blue or red</span></h4><div class="chips"><button class="cchip ${st.mirror ? "on" : ""}" data-k="m"><span class="sw" style="background:linear-gradient(135deg,#F4F6F8,#9AA5B1)"></span><span class="cn">Mirror</span></button></div></div>`;
+  // PhotoFusion X colour: grey is the stock lens; another colour means a made-to-order lens
+  if (pr.o && pr.o.k === "photo" && pg.key !== "bif") {
+    const stockNote = pr.o.photoStock ? ` <span>grey is the stock lens · other colours made to order, +${money(c.grind)}</span>` : ` <span>any colour, same price</span>`;
+    groups += `<div class="group"><h4>PhotoFusion X colour${stockNote}</h4><div class="chips">` +
+      PFX_COLOURS.map(x => `<button class="cchip ${st.pfx === x.k ? "on" : ""}" data-k="p${x.k}"><span class="sw" style="background:${x.hex}"></span><span class="cn">${x.k}${pr.o.photoStock ? `<small>${x.stock ? "stock" : "made to order"}</small>` : ""}</span></button>`).join("") + `</div></div>`;
+  }
+  let note = "Made to order, up to two weeks.";
+  if (pg.key === "sv") note = pr.mto ? "Made to order at this choice. Up to two weeks." : `Stock lens. If the frame needs a lens made to order it is +${money(c.grind)}; we check when the frame is measured.`;
+  if (c.sun) note = "Made to order, up to two weeks. Full UV. Tint included in the price.";
+  const depthWords = () => `${st.colour} ${depthName(st.depth)}${isGrad() ? " graduated" : ""}`;
+  const lines = `<div class="line"><span>${esc(choiceTitle())}${pr.abs ? " · " + esc(pr.o.n) : ""}</span><b>${money(pr.base)}</b></div>`
+    + (list && list.length > 1 && !pr.abs && pr.o ? `<div class="line"><span>${esc(pr.o.n)}${pr.o.k === "tint" ? `<small>${isGrad() ? "graduated" : "solid"} · ${pr.o.mto ? "made to order $100 + tint " + money(pr.optAdd - 100) : "tint"}</small>` : ""}</span><b>${plus(pr.optAdd)}</b></div>` : "")
+    + (pr.grindAdd ? `<div class="line"><span>Made to order<small>${esc(pr.note)}</small></span><b>${plus(pr.grindAdd)}</b></div>` : "")
+    + ((tintOn() && pr.o && pr.o.k === "tint") || c.tintPick ? `<div class="line"><span>${esc(depthWords())}</span><b>${c.tintPick && isGrad() ? plus(c.gradAdd) : "Included"}</b></div>` : "")
+    + (c.colours && !c.tintPick ? `<div class="line"><span>${st.colour}</span><b>Included</b></div>` : "")
+    + (pr.o && pr.o.k === "photo" && pg.key !== "bif" ? `<div class="line"><span>Colour: ${st.pfx}</span><b>Included</b></div>` : "")
+    + (st.mirror && c.mirror ? `<div class="line"><span>Mirror finish</span><b>${plus(c.mirror)}</b></div>` : "");
+  $("sheet").innerHTML = `<div class="left">
+      <div class="eyebrow">${esc(c.line || c.product || pg.eyebrow)}</div>
+      <h3>${esc(choiceTitle())}</h3>${groups}<div class="note">${note}</div>
+    </div>
+    <div class="total"><div class="tl">Lenses</div>${lines}
+      <div class="big">${money(pr.total)}<small>a pair</small></div><div class="pair">Lenses only. Frame extra.</div>
+      <button class="cta" id="choose">Choose this lens</button><button class="ghost" id="back">Back to all lenses</button>
+    </div>`;
+  document.querySelectorAll(".opt:not(.off), .cchip:not(.off), .dchip, .otherlink").forEach(b => b.onclick = () => {
+    const k = b.dataset.k;
+    if (k === "x") st.other = !st.other;
+    else if (k[0] === "t") { st.thickI = +k.slice(1); st.other = false; }
+    else if (k[0] === "g") st.gridI = +k.slice(1);
+    else if (k === "khc") st.coat = "hc"; else if (k === "kar") st.coat = "ar";
+    else if (k[0] === "o") st.opt = k.slice(1);
+    else if (k[0] === "c") st.colour = k.slice(1);
+    else if (k[0] === "d") st.depth = k.slice(1);
+    else if (k[0] === "p") st.pfx = k.slice(1);
+    else if (k === "m") st.mirror = !st.mirror;
+    if (st.coat === "hc" && c.grid && c.grid[st.gridI][2] == null) st.coat = "ar";   // no hard-coat price at this thickness
+    drawChoice();
+  });
+  $("back").onclick = closeAll;
+  $("choose").onclick = () => { st.chosen = { tab:st.tab, i:st.cardI }; closeAll(); drawSum(); show("s-sum"); };
+}
+
+/* ---- 2c chosen: calm summary, then the staff step ------------------------------------------- */
+function extrasWords() {
+  const pr = priceNow(), c = st.card, bits = [];
+  if (pr.o && pr.o.k !== "clear") bits.push(pr.o.n + (pr.o.k === "photo" && st.page.key !== "bif" ? " " + st.pfx.toLowerCase() : ""));
+  if ((pr.o && pr.o.k === "tint") || c.tintPick) bits.push(`${st.colour} ${depthName(st.depth)}${isGrad() ? " graduated" : ""}`);
+  if (c.colours && !c.tintPick) bits.push(st.colour);
+  if (st.mirror && c.mirror) bits.push("mirror");
+  if (c.grid) bits.push(st.coat === "hc" ? "hard coat" : "HMC+");
+  return bits.join(" · ") || "Clear";
+}
+function drawSum() {
+  const pr = priceNow(), c = st.card, pg = st.page;
+  $("sum-eye").textContent = c.line || c.product || pg.eyebrow;
+  $("sum-who").textContent = st.p.first;
+  $("sum-h1").textContent = choiceTitle();
+  $("summary").innerHTML = `<div class="line"><span>Lens</span><b>${esc(choiceTitle())}${pr.abs ? " · " + esc(pr.o.n) : ""}</b></div>`
+    + (pr.o && !pr.abs && (optList() || []).length > 1 ? `<div class="line"><span>Option</span><b>${esc(pr.o.n)}${pr.optAdd ? ", " + plus(pr.optAdd) : ""}</b></div>` : "")
+    + (pr.grindAdd ? `<div class="line"><span>Made to order</span><b>${plus(pr.grindAdd)}</b></div>` : "")
+    + ((pr.o && pr.o.k === "tint") || c.tintPick ? `<div class="line"><span>Tint</span><b>${st.colour} ${depthName(st.depth)}${isGrad() ? " graduated" : ""}${c.tintPick && isGrad() ? ", " + plus(c.gradAdd) : ""}</b></div>` : "")
+    + (c.colours && !c.tintPick ? `<div class="line"><span>Colour</span><b>${st.colour}</b></div>` : "")
+    + (pr.o && pr.o.k === "photo" && pg.key !== "bif" ? `<div class="line"><span>Colour</span><b>${st.pfx}</b></div>` : "")
+    + (st.mirror && c.mirror ? `<div class="line"><span>Mirror</span><b>${plus(c.mirror)}</b></div>` : "");
+  $("sum-total").textContent = money(pr.total);
+}
+$("toframe").onclick = () => { drawFrame(); show("s-frame"); setTimeout(() => $("bc").focus(), 50); };
+$("changelens").onclick = () => { drawPage(); show("s-sheet"); };
+
+/* ---- 3 staff: frame, checks, heights, make job ------------------------------------------------ */
+function staffLens() {
+  const c = st.card;
+  if (c.thick || c.grid) return `${c.product} ${curIdx()}`;      // product names on staff screens
+  return c.product;
+}
+function isStockSV() { const pr = priceNow(); return st.page.key === "sv" && !pr.mto; }
+function needsHeights() { return !!(st.page.heights || st.card.heights); }
+function drawFrame() {
+  const p = st.p;
+  $("fpat").textContent = `${p.sur}, ${p.first} · ${p.rx}`;
+  $("chosen").innerHTML = `<div class="kv"><span>Lens</span><b>${esc(staffLens())}</b></div>
+    <div class="kv"><span>Option</span><b>${esc(extrasWords())}</b></div>
+    <div class="kv"><span>Made</span><b>${isStockSV() ? "Stock" : "Made to order"}</b></div>
+    <div class="kv"><span>Price</span><b>${money(priceNow().total)} a pair</b></div>`;
+  $("framefacts").innerHTML = ""; $("bc").value = ""; st.fix = null; st.frame = null; st.h = { R:"", L:"" };
+  $("checkbox").innerHTML = `<h4>Checks</h4><div class="note" style="margin-top:0">Scan or pick the frame to check the blank${needsHeights() ? " and type the heights" : ""}.</div>`;
+  canMake();
+}
+$("demo").onclick = () => { $("bc").value = "35144"; closeDD(); frameScanned(FRAMES[0]); };
+$("own").onclick = () => { closeDD(); frameScanned({ own:true, a:52, b:40, dbl:18, ed:54, price:0 }); };
+
+// one box: a scan is digits + Enter (exact barcode); typing drops down the matching frames, live
+let ddHits = [], ddSel = 0;
+function hl(text, words) {
+  let out = esc(text);
+  words.forEach(w => { if (w) out = out.split(new RegExp("(" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "i")).map((s, i) => i % 2 ? `<mark>${s}</mark>` : s).join(""); });
+  return out;
+}
+function closeDD() { $("dd").classList.remove("on"); }
+function drawDD() {
+  const q = $("bc").value.trim(), words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) { closeDD(); return; }
+  ddHits = FRAMES.filter(f => words.every(w => `${f.brand} ${f.model} ${f.colour} ${f.a} ${f.bc}`.toLowerCase().includes(w)))
+    .sort((x, y) => (y.qoh > 0) - (x.qoh > 0) || x.brand.localeCompare(y.brand));
+  ddSel = Math.min(ddSel, Math.max(ddHits.length - 1, 0));
+  $("dd").innerHTML = ddHits.length
+    ? ddHits.slice(0, 6).map((f, i) => `<button class="fr ${i === ddSel ? "sel" : ""}" data-i="${i}">
+        <span><b>${hl(f.brand + " " + f.model, words)}</b> <span class="fc">${hl(f.colour, words)}</span></span>
+        <span class="fs">${hl(String(f.a), words)} &#9633; ${f.dbl}</span><span class="fq ${f.qoh ? "" : "none"}">${f.qoh ? f.qoh + " in" : "none"}</span>
+        <span class="fpr">${money(f.price)}</span></button>`).join("")
+      + (ddHits.length > 6 ? `<div class="more">${ddHits.length - 6} more - keep typing</div>` : "")
+    : `<div class="more">No frame matches "${esc(q)}". Try fewer letters, or Own frame.</div>`;
+  $("dd").classList.add("on");
+  document.querySelectorAll("#dd .fr").forEach(b => b.onmousedown = (ev) => { ev.preventDefault(); pickDD(+b.dataset.i); });
+}
+function pickDD(i) { const f = ddHits[i]; if (!f) return; $("bc").value = `${f.brand} ${f.model} · ${f.colour}`; closeDD(); frameScanned(f); }
+$("bc").addEventListener("input", () => { ddSel = 0; drawDD(); });
+$("bc").addEventListener("blur", () => setTimeout(closeDD, 120));
+$("bc").addEventListener("keydown", (ev) => {
+  const open = $("dd").classList.contains("on");
+  if (ev.key === "ArrowDown" && open) { ddSel = Math.min(ddSel + 1, Math.min(ddHits.length, 6) - 1); drawDD(); ev.preventDefault(); }
+  else if (ev.key === "ArrowUp" && open) { ddSel = Math.max(ddSel - 1, 0); drawDD(); ev.preventDefault(); }
+  else if (ev.key === "Escape") closeDD();
+  else if (ev.key === "Enter") {
+    const v = $("bc").value.trim(), exact = FRAMES.find(f => f.bc === v);
+    if (exact) { closeDD(); frameScanned(exact); } else if (open) pickDD(ddSel);
+  }
+});
+
+function frameScanned(fr) {
+  const p = st.p, c = st.card;
+  st.frame = fr;
+  $("framefacts").innerHTML = fr.own
+    ? `<div class="kv"><span>Frame</span><b>Own frame</b></div><div class="kv"><span>Size</span><b>type A, B, DBL, ED: ${fr.a} &#9633; ${fr.dbl} · B ${fr.b} · ED ${fr.ed}</b></div>`
+    : `<div class="kv"><span>Frame</span><b>${esc(fr.brand + " " + fr.model)} · ${esc(fr.colour)}</b></div>
+       <div class="kv"><span>Size</span><b>${fr.a} &#9633; ${fr.dbl} · B ${fr.b} · ED ${fr.ed}</b></div><div class="kv"><span>Price</span><b>${money(fr.price)}</b></div>`;
+  const need = Math.max(...Object.values(p.pd).map(pd => Math.ceil(fr.ed + Math.max(fr.a + fr.dbl - 2 * pd, 0) + 2)));
+  let html = `<h4>Checks</h4><div class="kv"><span>PD, from the Rx</span><b>R ${p.pd.R} / L ${p.pd.L}</b></div>`;
+  if (!isStockSV()) {
+    html += `<div class="verdict v-ok"><div class="vh">Made to order</div><div class="vd">Cut to this frame - no stock blank to check.</div></div>`;
+    st.fix = "ok";
+  } else if (need <= c.stock) {
+    html += `<div class="kv"><span>Blank needed</span><b>${need} mm</b></div><div class="verdict v-ok"><div class="vh">Fits a ${c.stock} mm stock blank</div><div class="vd">${esc(staffLens())}, stock.</div></div>`;
+    st.fix = "ok";
+  } else {
+    // PD change (Mark 9 Nov 2026): SV stock only, under 0.7 prism total, 3 mm cap, 0.5 mm steps
+    let d = 0; while (Math.ceil(fr.ed + Math.max(fr.a + fr.dbl - 2 * (p.pd.R + d), 0) + 2) > c.stock && d <= 3) d += 0.5;
+    const total = d * 2, prism = Math.abs(p.h) * total / 10, pdOk = total <= 3 && prism < 0.7;
+    const up = st.page.cards.find(x => x.idx > c.idx && x.stock >= need);
+    st.fix = null;
+    html += `<div class="kv"><span>Blank needed</span><b>${need} mm</b></div>
+      <div class="verdict v-bad"><div class="vh">Stock blank too small</div><div class="vd">Needs ${need} mm. ${c.idx} stock comes ${c.stock} mm.</div></div>
+      <div class="fix">
+      ${pdOk ? `<button class="fixo" data-f="pd"><div><div class="fn">Widen the PD <span class="best">Keeps the price</span></div>
+        <div class="fd">PD R ${p.pd.R} &rarr; ${p.pd.R + d} / L ${p.pd.L} &rarr; ${p.pd.L + d} · ${total} mm, ${prism.toFixed(2)}&#916; ${p.h < 0 ? "base-in" : "base-out"} total</div></div><div class="fp">+$0</div></button>` : ""}
+      <button class="fixo" data-f="grind"><div><div class="fn">Made to order</div><div class="fd">${esc(staffLens())} grind, cut to the frame</div></div><div class="fp">+${money(c.grind)}</div></button>
+      ${up ? `<button class="fixo" data-f="up"><div><div class="fn">${up.idx} stock</div><div class="fd">${esc(up.product)}, ${up.stock} mm blank fits</div></div><div class="fp">+${money(up.price - c.price)}</div></button>` : ""}
+      </div><div class="note">${pdOk ? "" : "PD change not possible: over 3 mm or 0.7&#916;. "}Tell the patient if the price changes.</div>`;
+  }
+  if (needsHeights()) {
+    html += `<div style="margin-top:14px"><h4>Fitting heights</h4>
+      <div class="hts">R <input id="hR" inputmode="decimal" placeholder="mm"> L <input id="hL" inputmode="decimal" placeholder="mm">
+      <span class="req" id="hreq">Needed for this lens</span></div>
+      <div class="note">Frame depth B ${fr.b} mm. Check it meets the design's minimum fitting height.</div></div>`;
+  }
+  $("checkbox").innerHTML = html;
+  document.querySelectorAll(".fixo").forEach(b => b.onclick = () => {
+    st.fix = b.dataset.f; document.querySelectorAll(".fixo").forEach(x => x.classList.toggle("on", x === b)); canMake();
+  });
+  ["hR","hL"].forEach(id => { const el = $(id); if (el) el.oninput = () => { st.h[id.slice(1)] = el.value.trim(); canMake(); }; });
+  canMake();
+}
+function canMake() {
+  const hOk = !needsHeights() || (Number(st.h.R) > 0 && Number(st.h.L) > 0);
+  const ok = !!(st.frame && st.fix && hOk);
+  $("make").disabled = !ok;
+  if ($("hreq")) $("hreq").style.visibility = hOk ? "hidden" : "visible";
+  $("makewhy").textContent = !st.frame ? "Scan or pick the frame first." : !st.fix ? "Pick how to fix the blank." : !hOk ? "Type both fitting heights." : "Dry run: shows the job, writes nothing.";
+}
+$("make").onclick = () => {
+  const words = { ok:"", pd:", with the wider PD (noted on the job)", grind:", made to order", up:", in the thicker-index stock lens" }[st.fix];
+  $("donel").innerHTML = `${esc(st.p.sur)}, ${esc(st.p.first)} · ${esc(staffLens())} · ${esc(extrasWords())}${words}.<br>Open the job in Optomate, send it to Visustore, then press Patient Invoice.`;
+  show("s-done");
+};
+$("again").onclick = () => { st = {}; drawPats(); show("s-staff"); };
+drawPats();
+
+/* screenshots: ?go=<tab> [&p=i] [&card=i] [&t=thicknessI] [&opt=key] [&col=Colour] [&den=75%] [&pfx=Brown] [&coat=hc|ar] [&g=gridI]
+   [&step=pop|choice|sum|frame|check|search|done] */
+const q = new URLSearchParams(location.search), go = q.get("go") || q.get("tab") || location.hash.slice(1);
+if (go && PAGES.find(x => x.key === go)) {
+  const pi = +(q.get("p") || (go === "mf" || go === "office" || go === "bif" ? 1 : 0));
+  st = { p: PATS[pi], tab: go }; drawPage(); show("s-sheet");
+  const step = q.get("step"), ci = +(q.get("card") || 0);
+  if (step === "pop") openPop(ci);
+  else if (step) { $("sheet").style.transition = "none"; openSheet(ci, { t: q.get("t") != null ? +q.get("t") : undefined, o: q.get("opt") || undefined });
+    if (q.get("col")) st.colour = q.get("col"); if (q.get("den")) st.depth = q.get("den"); if (q.get("pfx")) st.pfx = q.get("pfx");
+    if (q.get("coat")) st.coat = q.get("coat"); if (q.get("g")) st.gridI = +q.get("g"); if (q.get("other")) st.other = true;
+    drawChoice();
+    if (step !== "choice") { st.chosen = { tab:st.tab, i:ci }; closeAll(); drawSum(); show("s-sum"); }
+    if (step === "frame" || step === "check" || step === "search" || step === "done") { drawFrame(); show("s-frame"); }
+    if (step === "check" || step === "done") { frameScanned(FRAMES[0]); document.querySelector('.fixo[data-f="pd"]')?.click(); }
+    if (step === "search") { $("bc").value = "black"; drawDD(); }
+    if (step === "done") { st.fix = st.fix || "ok"; $("make").click(); }
+  }
+}
+</script>
+</body>
+</html>
