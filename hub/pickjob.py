@@ -313,8 +313,10 @@ def clean_request(data: dict, user: str) -> dict | None:
     """Only the fields the engine expects, typed. None when the shape is wrong."""
     if not isinstance(data, dict):
         return None
+    no_rx = data.get("no_rx") is True              # Mark, 10 Nov 2026: a flagged job with NO Rx
     try:
-        pid, rx_id = int(data.get("patient_id")), int(data.get("rx_id"))
+        pid = int(data.get("patient_id"))
+        rx_id = None if no_rx else int(data.get("rx_id"))
     except (TypeError, ValueError):
         return None
     opt = data.get("option") if isinstance(data.get("option"), dict) else {}
@@ -331,7 +333,8 @@ def clean_request(data: dict, user: str) -> dict | None:
         "tint_barcode": str(data.get("tint_barcode") or "")[:40],
         "second_pair": bool(data.get("second_pair")),
         # Mark, 9 Nov 2026: widen the job PD to fit a stock SV blank (the engine re-checks the rule)
-        "pd_shift": _clean_shift(data.get("pd_shift")),
+        "pd_shift": None if no_rx else _clean_shift(data.get("pd_shift")),
+        "no_rx": no_rx, "no_rx_ack": no_rx and data.get("no_rx_ack") is True,
         "user": str(user or "")[:40],
     }
 

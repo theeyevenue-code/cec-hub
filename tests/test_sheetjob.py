@@ -464,21 +464,27 @@ def test_an_older_rx_needs_staff_to_confirm_and_is_flagged_over_two_years(c):
     assert recent["old"] is False and recent["date"] == "1 Jun 2025"
 
 
-def test_no_rx_works_price_only_and_refuses_the_job_with_the_next_step(c):
+def test_no_rx_job_needs_the_tick_carries_no_rx_and_is_flagged(c):
     r = _search_pick(c, "zztest noa")
     assert r == {"ok": True}
     d = c.get("/api/sheet/patient").get_json()
     assert d["no_rx"] and d["tabs"] == {} and d["first"] == "Noa"
     c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
-    ch = {"tab": "sv", "card": 1, "idx": "1.60", "opt": "blue"}
+    ch = {"tab": "sv", "card": 1, "idx": "1.60", "opt": "clear"}
     k = c.post("/api/sheet/checks", json=body(choice=ch)).get_json()
     assert k["no_rx"] and not k["can_make"] and k["why"] == sj.NO_RX_WHY
-    assert k["verdict"]["head"] == "Needs the Rx" and k["price"] == 300 and k["frame"]["barcode"] == "ZZFRAME5219"
-    assert k["rx"]["right"] == "No saved Rx"
-    for route in ("/api/sheet/plan", "/api/sheet/make"):
-        j = c.post(route, json=body(choice=ch)).get_json()
-        assert j["ok"] is False and j["refusals"] == [sj.NO_RX_WHY]
-    assert not [x for x in c.sent if x[0] in ("plan", "make")]
+    assert k["verdict"]["head"] == "Not checked - no Rx" and "not checked" in k["made"] and k["price"] == 250
+    assert k["ref"]["blank_mm"] == 75.0 and "75 mm" in k["verdict"]["detail"]      # largest linked stock blank, said so
+    assert k["rx"]["right"] == "No saved Rx" and k["frame"]["barcode"] == "ZZFRAME5219"
+    n = len(c.sent)
+    j = c.post("/api/sheet/make", json=body(choice=ch)).get_json()                 # no tick: refused, engine not asked
+    assert j["ok"] is False and j["refusals"] == [sj.NO_RX_WHY] and not [x for x in c.sent[n:] if x[0] == "make"]
+    ok = c.post("/api/sheet/checks", json=body(choice=ch, no_rx_ok=True)).get_json()
+    assert ok["can_make"], ok["why"]
+    j = c.post("/api/sheet/make", json=body(choice=ch, no_rx_ok=True)).get_json()
+    cmd, req = c.sent[-1]
+    assert cmd == "make" and req["no_rx"] is True and req["no_rx_ack"] is True and req["rx_id"] is None
+    assert req["pd_shift"] is None and req["hub_pair_price"] == "250" and j["no_rx"] is True
 
 
 def test_skipping_an_older_rx_is_price_only(c):
@@ -506,5 +512,6 @@ def test_the_choice_is_kept_for_the_patient_today_and_comes_back(c):
 def test_page_has_the_old_rx_question_and_resume():
     import price_sheet.build as build
     html = build.build()
-    assert "Use this Rx" in html and "No Rx: prices only" in html and "resumeChoice" in html
+    assert "Use this Rx" in html and "Don't use it: no Rx" in html and "resumeChoice" in html
+    assert "NO RX on this job" in html and "norxok" in html
     assert "Next, ask us to scan your frame." in html

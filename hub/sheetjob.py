@@ -58,7 +58,8 @@ _sessions: dict[str, dict] = {}
 # No saved Rx yet (Mark, 10 Nov 2026): the lens, option and frame staff chose are kept for that patient for the day,
 # so after the Rx is saved in Optomate, reopening the patient picks up where they left off. Memory only, no names.
 _kept: dict[tuple, dict] = {}
-NO_RX_WHY = "Save the Rx in Optomate, then reopen this patient to make the job."
+NO_RX_WHY = "Tick \"No Rx\" to make the job without an Rx (confirm the Rx in Optomate before ordering)."
+NO_RX_FLAG = "No Rx - confirm the Rx in Optomate before ordering"
 OLD_RX_DAYS = 730
 _lock = threading.RLock()
 
@@ -395,7 +396,7 @@ def staff_rx(s: dict) -> dict:
     if not rx:
         return {"name": f"{str(s.get('surname') or '').upper()}, {s.get('first') or ''}".strip(", "),
                 "right": "No saved Rx", "left": "No saved Rx", "pd": "Needs the Rx", "pd_missing": True, "saved": "",
-                "optom": "", "type": "", "no_rx": True, "warnings": ["No saved Rx: prices only. " + NO_RX_WHY]}
+                "optom": "", "type": "", "no_rx": True, "warnings": [NO_RX_FLAG + "."]}
     flags = lensoptions.rx_flags(rx) if rx else []
     if rx and not _type_of(rx):
         flags.append("Lens type not written on the Rx: confirm it with the optom.")
@@ -650,19 +651,64 @@ def _no_rx_checks(cfg: dict, s: dict, book: dict, ch: dict, data: dict) -> dict:
            "pd_shift": None, "fix": "", "ref": None, "stop": "", "start_price": q.get("total"), "price": q.get("total"),
            "lens_pair": q.get("lens_pair"), "tint_pair": q.get("tint_pair"), "price_changed": False,
            "lens": sheetprice.card_title(book, ch), "option": _option_words(book, ch, q) if q.get("ok") else "",
-           "made": "Made to order" if q.get("made") == "mto" else "Stock, if the Rx allows", "choice": ch,
-           "verdict": {"tone": "none", "head": "Needs the Rx",
-                       "detail": "Blank size, PD change and thickness are checked once the Rx is saved."}}
+           "made": ("Made to order" if q.get("made") == "mto" else "Stock") + " - not checked, no Rx", "choice": ch,
+           "verdict": {"tone": "amber", "head": "Not checked - no Rx",
+                       "detail": "Stock or made to order, blank size and PD change were not checked. The price is the one picked."}}
     if not q.get("ok"):
         res["stop"] = q.get("why") or "Not on the price sheet."
+    elif not q["map"].get("ok"):
+        res["stop"] = "Price only: make this job in Touch."
     fr_rec, nums, frame_problem = _frame_for(s, data.get("frame"))
     if fr_rec and not fr_rec.get("own"):
         res["frame"] = fr_rec
+        if fr_rec.get("price") is None:
+            res["stop"] = res["stop"] or "This frame has no sell price in Optomate. Fix the frame record or use Own frame."
         if not fr_rec.get("qoh"):
             res["warnings"].append("Optomate shows none on hand.")
-    res["can_make"], res["why"] = False, NO_RX_WHY
+    if not res["stop"]:
+        key = q["map"]["key"]
+        rows = pickjob.links(cfg)
+        k6 = pickjob._key({**key, "blank_mm": ""})[:6]
+        blank = ""
+        if key["stockgrind"] == "stock":
+            # no Rx, so no blank check: the largest linked stock blank of this lens, said so on the job's checks
+            sizes = sorted(float(r["blank_mm"]) for r in rows if pickjob._key(r)[:6] == k6 and str(r.get("lens_barcode") or "").strip()
+                           and str(r.get("blank_mm") or "").strip())
+            blank = sizes[-1] if sizes else ""
+        link = pickjob.link_for(rows, {**key, "blank_mm": blank})
+        if not link.get("ready"):
+            res["stop"] = "Not linked to Optomate yet. Make this job in Touch."
+        cat = next((r.get("category") for r in rows if pickjob._key(r)[:6] == k6), "") or ""
+        res["heights_needed"] = cat.lower() in HEIGHT_CATEGORIES or bool(sheetprice.page(book, ch["tab"]).get("heights"))
+        if data.get("rimless") and key["index"] not in RIMLESS:
+            res["stop"] = "Rimless frame: 1.53, 1.60 or 1.67 only. Change lens."
+        if not res["stop"]:
+            res["ref"] = {**key, "blank_mm": blank}
+            res["lens_use"] = USE[ch["tab"]]
+            res["tint_barcode"] = q["map"].get("tint_barcode") or ""
+            if blank:
+                res["verdict"]["detail"] += f" Ordered as the {_mm(blank)} stock blank."
+    fr = data.get("frame") if isinstance(data.get("frame"), dict) else {}
+    if res["stop"]:
+        res["can_make"], res["why"] = False, res["stop"]
+    elif not (fr.get("own") and nums) and not res.get("frame"):
+        res["can_make"], res["why"] = False, "Scan the frame, search by name, or Own frame."
+    elif res["heights_needed"] and not _heights_ok(data):
+        res["can_make"], res["why"] = False, "Type both fitting heights (10 to 40 mm)."
+    elif data.get("no_rx_ok") is not True:
+        res["can_make"], res["why"] = False, NO_RX_WHY
+    else:
+        res["can_make"], res["why"] = True, ""
     res["mode"] = mode_words(cfg, s)
     return res
+
+
+def _heights_ok(data: dict) -> bool:
+    h = data.get("heights") if isinstance(data.get("heights"), dict) else {}
+    try:
+        return all(10 <= float(h.get(x)) <= 40 for x in ("R", "L"))
+    except (TypeError, ValueError):
+        return False
 
 
 def _fixes(book, rx, rows, pricing, found, q, typ, cur, fit, nums, fix) -> list[dict]:
@@ -747,8 +793,9 @@ def mode_words(cfg: dict, s: dict) -> dict:
 def _engine_request(s: dict, res: dict, data: dict) -> dict:
     fr = data.get("frame") if isinstance(data.get("frame"), dict) else {}
     h = data.get("heights") if isinstance(data.get("heights"), dict) else {}
-    rx = s["rx"]
+    rx = s.get("rx") or {}
     return {"patient_id": s["pid"], "rx_id": rx.get("rx_id"), "rx_saved_at": str(rx.get("saved_at") or "")[:19],
+            "no_rx": not rx, "no_rx_ack": (not rx) and data.get("no_rx_ok") is True,
             "option": {k: res["ref"].get(k) for k in ("supplier", "lens", "index", "material", "coating", "stockgrind", "blank_mm")},
             "lens_use": res["lens_use"], "hub_pair_price": res["lens_pair"], "sheet_tint_pair": res["tint_pair"],
             "tint_barcode": res.get("tint_barcode") or "",
@@ -768,6 +815,7 @@ def job(cfg: dict, token, data: dict, rows: list, pricing: dict, user: str, comm
     eng = pickjob.run_engine(cfg, "plan" if command == "plan" else "make", {**pickjob.clean_request(req, user),
                                                                              "sheet_tint_pair": res["tint_pair"],
                                                                              "rimless": bool(data.get("rimless"))})
+    eng["no_rx"] = bool(res.get("no_rx"))
     pat = (eng.get("preview") or {}).get("patient")
     if isinstance(pat, dict):
         pat.pop("dob", None)                         # screens 5-7: no DOB (director's section 2)

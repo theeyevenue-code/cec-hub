@@ -326,6 +326,8 @@ main#page.tall { padding-top:26px; }
 #page.tall .thin h4 { margin-bottom:3px; }
 #page.tall .more { margin-top:12px; padding-top:9px; }
 #page.tall .tapline { padding-top:14px; }
+.told.norx { color:#B00020; }
+#donenorx { margin-top:18px; }
 </style>
 </head>
 <body>
@@ -418,6 +420,7 @@ main#page.tall { padding-top:26px; }
     <div class="tick" id="donetick">&#10003;</div>
     <h1 style="margin-top:22px" id="doneh">Job made.</h1>
     <div class="lead" id="donel"></div>
+    <div class="stop" id="donenorx" style="display:none">NO RX on this job: add or confirm the Rx in Optomate before sending to the lab.</div>
     <div class="donemode" id="donemode"></div>
     <ol class="steps" id="donesteps"><li>Link the Rx.</li><li>Patient Invoice.</li><li>Send to the lab.</li></ol>
     <button class="staffbtn" id="again">Next patient</button>
@@ -521,7 +524,7 @@ async function pickPatient(h) {
       <div class="pt">${esc(c.type)}</div>${c.old ? `<div class="ps">Over 2 years old: check with the optom.</div>` : ""}
       <div class="pg">Use this Rx?</div></div>
       <button class="pat" data-h="${esc(c.use)}"><div class="pn">Use this Rx</div><div class="pt">The sheet marks what suits it.</div><div class="pg">Use it &rarr;</div></button>
-      <button class="pat" data-h="${esc(c.skip)}"><div class="pn">No Rx: prices only</div><div class="pt">Save the Rx in Optomate later to make the job.</div><div class="pg">Prices only &rarr;</div></button>`;
+      <button class="pat" data-h="${esc(c.skip)}"><div class="pn">Don't use it: no Rx</div><div class="pt">The job is flagged NO RX; confirm the Rx in Optomate before ordering.</div><div class="pg">No Rx &rarr;</div></button>`;
     $("patlead").textContent = "This patient has no Rx saved today.";
     document.querySelectorAll("#pats button.pat").forEach(b => b.onclick = () => pickPatient(b.dataset.h));
     return;
@@ -843,7 +846,7 @@ $("changelens").onclick = () => { drawPage(); show("s-sheet"); };
 /* ---- 3 staff: frame, checks, heights, make job (screens 5-7) ----------------------------------
    Rule 1 of the director's doc: the page works nothing out. The blank, the verdict, the fixes and their
    prices, the PD change, the heights rule and whether Make may be pressed all come from /api/sheet/checks. */
-let chk = null, fq = { frame:null, own:false, rimless:false, fix:null, told:false, h:{ R:"", L:"" } }, ddHits = [], ddSel = 0, ddTimer = 0;
+let chk = null, fq = { frame:null, own:false, rimless:false, fix:null, told:false, noRxOk:false, h:{ R:"", L:"" } }, ddHits = [], ddSel = 0, ddTimer = 0;
 const choiceNow = () => ({ tab:st.tab, card:st.cardI, idx:curIdx(), opt:(priceNow().o || {}).k || "clear",
   colour:{ Green:"Green" }[st.colour] || st.colour, depth:st.depth, pfx:st.pfx });
 function frameReq() {
@@ -851,7 +854,7 @@ function frameReq() {
   return fq.frame ? { barcode:fq.frame.barcode } : {};
 }
 async function drawFrame() {
-  fq = { frame:null, own:false, rimless:false, fix:null, told:false, h:{ R:"", L:"" } }; chk = null;
+  fq = { frame:null, own:false, rimless:false, fix:null, told:false, noRxOk:false, h:{ R:"", L:"" } }; chk = null;
   $("bc").value = ""; $("framefacts").innerHTML = ""; ["oa","odbl","oed"].forEach(i => $(i).value = "");
   $("own").classList.remove("on"); $("rimless").classList.remove("on"); $("ownsize").style.display = "none";
   $("checkbox").innerHTML = `<h4>Checks</h4><div class="note" style="margin-top:0">Reading the Rx ...</div>`;
@@ -869,7 +872,7 @@ let checkSeq = 0;
 async function runChecks() {
   const seq = ++checkSeq;
   const r = await api("/api/sheet/checks", { version:DATA.version, choice:choiceNow(), frame:frameReq(), rimless:fq.rimless,
-    fix:fq.fix, heights:fq.h, told:fq.told });
+    fix:fq.fix, heights:fq.h, told:fq.told, no_rx_ok:fq.noRxOk });
   if (!r || seq !== checkSeq) return;
   chk = r; drawChecks();
 }
@@ -902,12 +905,14 @@ function drawChecks() {
       <div class="hts">R <input id="hR" inputmode="decimal" placeholder="mm" value="${esc(fq.h.R)}"> L <input id="hL" inputmode="decimal" placeholder="mm" value="${esc(fq.h.L)}">
       <span class="req">Typed, 10 to 40 mm</span></div></div>`;
   }
+  if (r.no_rx && !r.stop) h += `<label class="told norx"><input type="checkbox" id="norxok" ${fq.noRxOk ? "checked" : ""}> No Rx: make the job anyway. I'll confirm the Rx in Optomate before ordering.</label>`;
   if (r.price_changed) h += `<label class="told"><input type="checkbox" id="told" ${fq.told ? "checked" : ""}> Told the patient: was ${money(r.start_price)}, now ${money(r.price)}</label>`;
   $("checkbox").innerHTML = h;
   document.querySelectorAll(".fixo").forEach(b => b.onclick = () => {
     const f = r.fixes[+b.dataset.i]; fq.fix = f.on ? null : { kind:f.kind, idx:f.idx || "" }; fq.told = false; runChecks(); });
   ["hR","hL"].forEach(id => { const el = $(id); if (el) el.oninput = () => { fq.h[id.slice(1)] = el.value.trim(); clearTimeout(ddTimer); ddTimer = setTimeout(runChecks, 350); }; });
   if ($("told")) $("told").onchange = () => { fq.told = $("told").checked; runChecks(); };
+  if ($("norxok")) $("norxok").onchange = () => { fq.noRxOk = $("norxok").checked; runChecks(); };
   $("make").textContent = (r.mode && r.mode.button) || "Make job (dry run, nothing written)";
   $("make").disabled = !r.can_make;
   $("makewhy").textContent = r.can_make ? "" : r.why || "";
@@ -965,7 +970,7 @@ $("rimless").onclick = () => { fq.rimless = !fq.rimless; $("rimless").classList.
 ["oa","odbl","oed"].forEach(i => $(i).oninput = () => { clearTimeout(ddTimer); ddTimer = setTimeout(runChecks, 400); });
 
 /* ---- screen 6: check, then make the job (the engine's plan: exactly what will be written) ---- */
-const jobBody = () => ({ version:DATA.version, choice:choiceNow(), frame:frameReq(), rimless:fq.rimless, fix:fq.fix, heights:fq.h, told:fq.told });
+const jobBody = () => ({ version:DATA.version, choice:choiceNow(), frame:frameReq(), rimless:fq.rimless, fix:fq.fix, heights:fq.h, told:fq.told, no_rx_ok:fq.noRxOk });
 function eyeRow(e) { if (!e) return "-"; return [e.sph, e.cyl ? `/ ${e.cyl} x ${e.axis}` : "", e.add ? `add ${e.add}` : "", e.prism ? `prism ${e.prism}` : "", e.pd ? `PD ${e.pd}` : ""].filter(Boolean).map(esc).join(" "); }
 $("make").onclick = async () => {
   $("make").disabled = true;
@@ -975,9 +980,10 @@ $("make").onclick = async () => {
   const pv = r.preview || {}, pr = pv.price || {}, sh = r.sheet || {};
   const fr = pv.frame || {};
   $("cpop").innerHTML = `<div class="eyebrow">Staff · ${esc((pv.patient || {}).name || st.staff.name)}</div><h3>Check, then make the job.</h3>
+    ${r.no_rx ? `<div class="refuse">No Rx - confirm the Rx in Optomate before ordering.</div>` : ""}
     ${(r.refusals || []).map(x => `<div class="refuse">${esc(x)}</div>`).join("")}${(r.warnings || []).map(x => `<div class="warn">${esc(x)}</div>`).join("")}
     <div class="cg"><div>
-      <div class="kv"><span>Rx as saved</span><b>R ${eyeRow((pv.rx || {}).right)}<br>L ${eyeRow((pv.rx || {}).left)}<small>Rx #${esc((pv.rx || {}).id || "")}, saved ${esc((pv.rx || {}).saved || "")}</small></b></div>
+      <div class="kv"><span>Rx as saved</span><b>${pv.no_rx ? "NO RX on this job" : `R ${eyeRow((pv.rx || {}).right)}<br>L ${eyeRow((pv.rx || {}).left)}<small>Rx #${esc((pv.rx || {}).id || "")}, saved ${esc((pv.rx || {}).saved || "")}</small>`}</b></div>
       <div class="kv"><span>Lens</span><b>${esc((pv.lens || {}).description || sh.lens || "")}<small>Optomate ${esc((pv.lens || {}).barcode || "-")} · ${esc((pv.lens || {}).use || "")}</small></b></div>
       ${pv.tint ? `<div class="kv"><span>Tint</span><b>${esc(pv.tint.description)}<small>Optomate ${esc(pv.tint.barcode)}</small></b></div>` : ""}
       <div class="kv"><span>Coat</span><b>${esc((pv.coat || {}).description || "-")}</b></div>
@@ -1006,6 +1012,7 @@ async function confirmMake() {
   $("donel").innerHTML = made ? (r.verified ? "" : esc(r.next || "")) : r.ok ? "This is the job it would send. Nothing was written to Optomate." : (r.refusals || []).map(esc).join("<br>");
   $("donesteps").style.display = made || r.ok ? "" : "none";
   $("donemode").textContent = made ? "" : r.ok ? "When jobs are live, these are the steps in Touch." : "";
+  $("donenorx").style.display = r.no_rx && (made || r.ok) ? "" : "none";
   show("s-done");
 }
 $("again").onclick = nextPatient;
