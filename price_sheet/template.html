@@ -303,11 +303,15 @@ h1 { font-size:36px; font-weight:700; color:var(--ink); line-height:1.05; margin
 .addons { width:100%; border-collapse:collapse; margin-top:18px; }
 .addons th { font-size:15px; font-weight:500; letter-spacing:.3px; color:var(--grey); text-align:right; padding:0 0 8px; }
 .addons th:first-child { text-align:left; text-transform:uppercase; letter-spacing:1.2px; font-size:14px; }
-.addons td { font-size:18px; padding:7px 0; border-top:1px solid var(--line); text-align:right; color:var(--blue); font-weight:600; }
+.addons td { font-size:18px; padding:6px 0; border-top:1px solid var(--line); text-align:right; color:var(--blue); font-weight:600; }
 .addons td:first-child { text-align:left; color:var(--ink); font-weight:400; }
 .addons td.na { color:#9AA5B1; font-weight:400; }
 .toprow h1 { margin-top:0; }
 .quietnext { font-size:19px; color:var(--grey); margin-right:auto; }
+.addons td small { display:block; font-size:14px; font-weight:400; color:var(--grey); margin-top:1px; }
+.pline { font-size:17px; color:var(--ink); margin-top:10px; }
+.addons { table-layout:fixed; }
+.addons th:first-child, .addons td:first-child { width:30%; }
 </style>
 </head>
 <body>
@@ -555,29 +559,40 @@ function moreHTML(c) {
   return `<div class="more" data-pop="1"><span class="mh">${c.moreFrom ? "Add-ons" : "Also"}</span>${c.moreList.map(esc).join(" · ")}${range ? " · " + range : ""}${other}</div>`;
 }
 function addonRows(pg, c) {
-  // the card's own add-on list (what the pop-over showed), price column only; graduated tint on its own row
-  const rows = [];
-  // made to order: the card's own grind price (also at 1.67 / 1.74, where blue and PhotoFusion X already include it)
-  if (c.grind) rows.push(["Made to order", plus(c.grind)]);
-  const tint = (c.opts || (c.mf ? MF_OPTS(c, "1.60") : [])).find(o => o.k === "tint" && o.grad);
+  // [name, price, small note]: the card's own add-on list (what the pop-over showed), copied, never worked out
+  const rows = [], opts = c.opts || (c.mf ? MF_OPTS(c, "1.60") : []);
+  if (c.grind) rows.push(["Made to order", plus(c.grind), ""]);        // the card's own made-to-order price (prices.json "grind")
+  const tint = opts.find(o => o.k === "tint" && o.grad);
   popRows(pg, c).forEach(r => {
     if (r[0] === "Made to order" && c.grind) return;
-    if (tint && r[0] === tint.n) rows.push(["Sun tint, solid / graduated", `${plus(tint.add)} / ${plus(tint.grad)}`]);
-    else rows.push([r[0], r[1]]);
+    const o = opts.find(x => x.n === r[0]);
+    let note = "";
+    if (o && (o.incl || (o.k === "tint" && o.mto))) note = "incl. made to order";       // not on top of "Made to order"
+    else if (o && o.photoStock && c.grind) note = `grey; other colours ${plus(c.grind)}`;
+    if (tint && r[0] === tint.n) rows.push(["Sun tint, solid / graduated", `${plus(tint.add)} / ${plus(tint.grad)}`, note]);
+    else rows.push([r[0], r[1], note]);
   });
   return rows;
 }
 function addonsTable(pg) {
   const per = pg.cards.map(c => addonRows(pg, c));
-  const names = [];
+  const names = [], lines = [];
   per.forEach(rs => rs.forEach(r => { if (!names.includes(r[0])) names.push(r[0]); }));
-  if (!names.length) return "";
-  const head = pg.cards.map(c => pg.by === "index" ? `${c.idx} ${esc(c.name)}` : esc(pg.by === "dist" ? c.dist : c.tier));
-  return `<table class="addons"><tr><th>Add-ons, a pair</th>${head.map(x => `<th>${x}</th>`).join("")}</tr>` +
-    names.map(n => `<tr><td>${esc(n)}</td>${per.map((rs, i) => { const r = rs.find(x => x[0] === n);
+  const isAdd = (n) => per.every(rs => { const r = rs.find(x => x[0] === n); return !r || /^\+|^Included/.test(r[1]); });
+  const label = pg.cards.map(c => pg.by === "index" ? `${c.idx} ${c.name}` : pg.by === "dist" ? c.dist : c.tier);
+  // a whole-lens price (1.53 rimless, basic tint, a bifocal lens type) is not an add-on: one short line under the table
+  names.filter(n => !isAdd(n)).forEach(n => {
+    const have = per.map((rs, i) => [label[i], (rs.find(x => x[0] === n) || [])[1]]).filter(x => x[1]);
+    const all = have.length === pg.cards.length;
+    lines.push(`<div class="pline">${esc(n)}: ${have.map(x => all ? esc(x[1]) : `${esc(x[0])} ${esc(x[1])}`).join(" · ")}</div>`);
+  });
+  const adds = names.filter(isAdd);
+  const table = adds.length ? `<table class="addons"><tr><th>Add-ons, a pair</th>${label.map(x => `<th>${esc(x)}</th>`).join("")}</tr>` +
+    adds.map(n => `<tr><td>${esc(n)}</td>${per.map((rs, i) => { const r = rs.find(x => x[0] === n);
       // the headline already shows this patient's made-to-order price: say so, don't add it again
       const incl = r && n === "Made to order" && pg.by === "index" && (cardState(i, pg.cards[i].idx) || {}).state === "mto";
-      return `<td class="${r ? "" : "na"}">${incl ? "Included" : r ? esc(r[1]) : "-"}</td>`; }).join("")}</tr>`).join("") + `</table>`;
+      return `<td class="${r ? "" : "na"}">${incl ? "Included" : r ? esc(r[1]) + (r[2] ? `<small>${esc(r[2])}</small>` : "") : "-"}</td>`; }).join("")}</tr>`).join("") + `</table>` : "";
+  return table + lines.join("");
 }
 function drawPage() {
   const pg = page(), p = { ...st.p, rec: (ts() || {}).rec || null };
@@ -593,7 +608,7 @@ function drawPage() {
       ${headHTML(pg, c)}${priceHTML(pg, c, i, thick)}${bodyHTML(pg, c, p, i)}<div class="nomore"></div>
       <div class="spacer"></div><div class="tapline">${none ? "Not made in your prescription" : sel ? "Change &rarr;" : "Choose &rarr;"}</div></div>`;
   }).join("");
-  const other = pg.otherLine ? `<div class="other" style="margin-top:12px">${esc(pg.otherLine)}</div>` : "";
+  const other = pg.otherLine ? `<div class="pline">${esc(pg.otherLine)}</div>` : "";
   const foot = pg.footLine ? `<div class="foot"><div class="fl">${esc(pg.footLine)}</div></div>` : pg.foot ? `<div class="foot"><div class="fl">${pg.foot[0].map(x => `<span>${esc(x)}</span>`).join("")}</div><div class="fd">${esc(pg.foot[1])}</div></div>` : "";
   const quiet = t.note ? `<div class="quiet">${esc(t.note)}</div>` : "";
   $("page").innerHTML = `<div class="toprow"><h1>${pg.h1}</h1>${p.first ? `<div class="who">Lenses for <b>${esc(p.first)}</b></div>` : ""}</div>
