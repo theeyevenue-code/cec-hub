@@ -334,8 +334,7 @@
       250
      ]
     }
-   ],
-   "footLine": "Every lens: ZEISS ClearView with DuraVision Platinum UV · Figures: ZEISS Vision Care, September 2026 · Prices per pair"
+   ]
   },
   {
    "key": "mf",
@@ -490,15 +489,14 @@
       150
      ]
     }
-   ],
-   "footLine": "Made to order, up to two weeks · Prices per pair"
+   ]
   },
   {
    "key": "af",
    "tab": "Anti-Fatigue",
    "eyebrow": "ZEISS SmartLife Digital · under 45, tired eyes from screens",
    "h1": "Anti-Fatigue lenses.",
-   "lead": "Fresher eyes at five o’clock, for tired eyes from screens.",
+   "lead": "Fresher eyes at five o’clock. Looks like a normal lens, with an easier near zone for screens and phones.",
    "cols": 4,
    "by": "index",
    "heights": true,
@@ -576,15 +574,14 @@
       150
      ]
     }
-   ],
-   "footLine": "ZEISS SmartLife Digital, made to order, up to two weeks · Prices per pair"
+   ]
   },
   {
    "key": "sun",
    "tab": "Sunglasses",
    "eyebrow": "Sun lenses made to your prescription, by ZEISS Vision Care",
    "h1": "Prescription sunglasses.",
-   "lead": "Your prescription in a sun lens, tinted or polarised.",
+   "lead": "Your script in a sun lens. Tinted or polarised; then the coating and the thickness.",
    "cols": 2,
    "by": "tier",
    "foot": [
@@ -684,15 +681,14 @@
       50
      ]
     }
-   ],
-   "footLine": "Multifocal sunglasses from $570 · Made to order, up to two weeks · Full UV · Prices per pair"
+   ]
   },
   {
    "key": "myo",
    "tab": "Myopia control",
    "eyebrow": "Myopia control spectacle lenses · for children",
    "h1": "Myopia control lenses.",
-   "lead": "Your optometrist recommends the lens for your child.",
+   "lead": "Your optometrist recommends the lens for your child. All three are the same price band; the design differs.",
    "cols": 3,
    "by": "tier",
    "foot": [
@@ -752,15 +748,14 @@
       }
      ]
     }
-   ],
-   "footLine": "Made to order, up to two weeks · Prices per pair"
+   ]
   },
   {
    "key": "office",
    "tab": "Office",
    "eyebrow": "ZEISS Office Lens Superb · multifocal wearers, at the desk",
    "h1": "Office lenses.",
-   "lead": "Pick how far you need to see clearly at the desk. Not for driving.",
+   "lead": "A desk pair a multifocal cannot match. Pick how far you need to see clearly. Not for driving.",
    "cols": 3,
    "by": "dist",
    "heights": true,
@@ -901,8 +896,7 @@
       50
      ]
     }
-   ],
-   "footLine": "ZEISS Office Lens Superb, made to order, up to two weeks · Prices per pair"
+   ]
   },
   {
    "key": "bif",
@@ -976,8 +970,7 @@
       }
      ]
     }
-   ],
-   "footLine": "Synchrony bifocal D28, made to order, up to two weeks · Prices per pair"
+   ]
   },
   {
    "key": "syn",
@@ -985,7 +978,7 @@
    "small": true,
    "eyebrow": "Synchrony by ZEISS · single vision",
    "h1": "Essential single vision lenses.",
-   "lead": "Synchrony by ZEISS, anti-reflective multicoated.",
+   "lead": "Synchrony by ZEISS single vision lenses, anti-reflective multicoated.",
    "cols": 2,
    "by": "index",
    "foot": [
@@ -1036,8 +1029,7 @@
      ],
      "moreFrom": null
     }
-   ],
-   "footLine": "From 1.60, see ZEISS single vision · Prices per pair"
+   ]
   }
  ]
 }

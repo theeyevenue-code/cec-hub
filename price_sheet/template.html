@@ -299,15 +299,6 @@ h1 { font-size:36px; font-weight:700; color:var(--ink); line-height:1.05; margin
 .cpop .popbtns .cta { width:auto; padding:0 28px; white-space:nowrap; }
 .tab.small { font-size:14px; color:var(--grey); padding:10px 8px; margin-left:14px; align-self:center; }
 .tab.small.on { color:var(--black); }
-/* simplicity pass: one add-ons table under the cards */
-.addons { width:100%; border-collapse:collapse; margin-top:18px; }
-.addons th { font-size:15px; font-weight:500; letter-spacing:.3px; color:var(--grey); text-align:right; padding:0 0 8px; }
-.addons th:first-child { text-align:left; text-transform:uppercase; letter-spacing:1.2px; font-size:14px; }
-.addons td { font-size:18px; padding:7px 0; border-top:1px solid var(--line); text-align:right; color:var(--blue); font-weight:600; }
-.addons td:first-child { text-align:left; color:var(--ink); font-weight:400; }
-.addons td.na { color:#9AA5B1; font-weight:400; }
-.toprow h1 { margin-top:0; }
-.quietnext { font-size:19px; color:var(--grey); margin-right:auto; }
 </style>
 </head>
 <body>
@@ -359,7 +350,7 @@ h1 { font-size:36px; font-weight:700; color:var(--ink); line-height:1.05; margin
       <div class="sumlines" id="summary"></div>
       <div class="sumprice"><div class="tl">Lenses, a pair</div><div class="big" id="sum-total"></div><div class="pair">Frame extra.</div></div>
     </div>
-    <div class="staffrow" id="patrow"><span class="quietnext">Next, ask us to scan your frame.</span><button class="cta" id="backsheets">&larr; Back to the price sheets</button></div>
+    <div class="staffrow" id="patrow"><button class="cta" id="backsheets">&larr; Back to the price sheets</button></div>
     <div class="staffrow" id="staffrow"><span class="lab">Staff</span><button class="cta" id="toframe">Scan the frame &rarr;</button><button class="ghost" id="changelens">Change lens</button></div>
   </main>
 </section>
@@ -541,6 +532,11 @@ function priceHTML(pg, c, i, thick) {
 }
 function bodyHTML(pg, c, p, i) {
   let h = "";
+  if (pg.by === "index" && c.line !== undefined) h += `<div class="lens">${esc(c.line)}</div>`;
+  if (pg.by === "index" && c.line === undefined) h += `<div class="lens">ZEISS ClearView · DuraVision Platinum UV</div>`;
+  if (pg.by === "dist") h += `<div class="lens">ZEISS Office Lens Superb <b>${esc(c.variant)}</b></div>`;
+  if (c.text) h += `<div class="desc">${esc(c.text)}</div>`;
+  if (c.facts) h += `<div class="facts">${c.facts.map(f => `<div class="lr">${esc(f)}</div>`).join("")}</div>`;
   if (c.thick) h += `<div class="thin"><h4>Thinner</h4>` + c.thick.slice(1).map((t, j) => { const rec = t.idx === p.rec && pg.key !== "sun";
       const cs = cardState(i, t.idx), na = cs && cs.state === "none";
       return `<div class="lr ${rec && !na ? "rec" : ""} ${na ? "na" : ""}" data-t="${j + 1}"><span><b>${t.idx}</b><small>${esc(t.name)}</small>${rec && !na ? `<i class="sy">Suits you</i>` : ""}${na ? `<small class="nm">Not made in your prescription</small>` : ""}</span><b class="lp">${money(t.price)}</b></div>`; }).join("") + `</div>`;
@@ -554,31 +550,6 @@ function moreHTML(c) {
   const other = c.other ? `<div class="other">Other index: ${c.other.idx} ${c.other.name.toLowerCase()}, ${money(c.other.price)}.</div>` : "";
   return `<div class="more" data-pop="1"><span class="mh">${c.moreFrom ? "Add-ons" : "Also"}</span>${c.moreList.map(esc).join(" · ")}${range ? " · " + range : ""}${other}</div>`;
 }
-function addonRows(pg, c) {
-  // the card's own add-on list (what the pop-over showed), price column only; graduated tint on its own row
-  const rows = [];
-  // made to order: the card's own grind price (also at 1.67 / 1.74, where blue and PhotoFusion X already include it)
-  if (c.grind) rows.push(["Made to order", plus(c.grind)]);
-  const tint = (c.opts || (c.mf ? MF_OPTS(c, "1.60") : [])).find(o => o.k === "tint" && o.grad);
-  popRows(pg, c).forEach(r => {
-    if (r[0] === "Made to order" && c.grind) return;
-    if (tint && r[0] === tint.n) rows.push(["Sun tint, solid / graduated", `${plus(tint.add)} / ${plus(tint.grad)}`]);
-    else rows.push([r[0], r[1]]);
-  });
-  return rows;
-}
-function addonsTable(pg) {
-  const per = pg.cards.map(c => addonRows(pg, c));
-  const names = [];
-  per.forEach(rs => rs.forEach(r => { if (!names.includes(r[0])) names.push(r[0]); }));
-  if (!names.length) return "";
-  const head = pg.cards.map(c => pg.by === "index" ? `${c.idx} ${esc(c.name)}` : esc(pg.by === "dist" ? c.dist : c.tier));
-  return `<table class="addons"><tr><th>Add-ons, a pair</th>${head.map(x => `<th>${x}</th>`).join("")}</tr>` +
-    names.map(n => `<tr><td>${esc(n)}</td>${per.map((rs, i) => { const r = rs.find(x => x[0] === n);
-      // the headline already shows this patient's made-to-order price: say so, don't add it again
-      const incl = r && n === "Made to order" && pg.by === "index" && (cardState(i, pg.cards[i].idx) || {}).state === "mto";
-      return `<td class="${r ? "" : "na"}">${incl ? "Included" : r ? esc(r[1]) : "-"}</td>`; }).join("")}</tr>`).join("") + `</table>`;
-}
 function drawPage() {
   const pg = page(), p = { ...st.p, rec: (ts() || {}).rec || null };
   $("tabs").innerHTML = PAGES.map(x => `<button class="tab ${x.key === st.tab ? "on" : ""} ${x.small ? "small" : ""}" data-k="${x.key}">${x.tab}</button>`).join("");
@@ -590,15 +561,15 @@ function drawPage() {
     const sel = st.chosen && st.chosen.tab === pg.key && st.chosen.i === i;
     return `<div class="card ${rec && !sel ? "rec" : ""} ${sel ? "sel" : ""} ${none ? "nomade" : ""}" data-i="${i}" role="button">
       ${sel ? `<span class="chip ok">Chosen</span>` : rec ? `<span class="chip">Suits your prescription</span>` : ""}
-      ${headHTML(pg, c)}${priceHTML(pg, c, i, thick)}${bodyHTML(pg, c, p, i)}<div class="nomore"></div>
+      ${headHTML(pg, c)}${priceHTML(pg, c, i, thick)}${bodyHTML(pg, c, p, i)}${moreHTML(c)}
       <div class="spacer"></div><div class="tapline">${none ? "Not made in your prescription" : sel ? "Change &rarr;" : "Choose &rarr;"}</div></div>`;
   }).join("");
   const other = pg.otherLine ? `<div class="other" style="margin-top:12px">${esc(pg.otherLine)}</div>` : "";
-  const foot = pg.footLine ? `<div class="foot"><div class="fl">${esc(pg.footLine)}</div></div>` : pg.foot ? `<div class="foot"><div class="fl">${pg.foot[0].map(x => `<span>${esc(x)}</span>`).join("")}</div><div class="fd">${esc(pg.foot[1])}</div></div>` : "";
+  const foot = pg.foot ? `<div class="foot"><div class="fl">${pg.foot[0].map(x => `<span>${esc(x)}</span>`).join("")}</div><div class="fd">${esc(pg.foot[1])}</div></div>` : "";
   const quiet = t.note ? `<div class="quiet">${esc(t.note)}</div>` : "";
-  $("page").innerHTML = `<div class="toprow"><h1>${pg.h1}</h1>${p.first ? `<div class="who">Lenses for <b>${esc(p.first)}</b></div>` : ""}</div>
-    <div class="lead">${esc(pg.lead)}</div>${quiet}
-    <div class="rows" style="grid-template-columns:repeat(${pg.cols}, 1fr)">${cards}</div>${addonsTable(pg)}${other}${foot}`;
+  $("page").innerHTML = `<div class="toprow"><div class="eyebrow">${esc(pg.eyebrow)}</div>${p.first ? `<div class="who">Lenses for <b>${esc(p.first)}</b></div>` : ""}</div>
+    <h1>${pg.h1}</h1><div class="lead">${esc(pg.lead)}</div>${quiet}
+    <div class="rows" style="grid-template-columns:repeat(${pg.cols}, 1fr)">${cards}</div>${other}${foot}`;
   document.querySelectorAll(".card").forEach(b => b.onclick = (ev) => {
     const row = ev.target.closest(".lr"), more = ev.target.closest(".more[data-pop]");
     if (more) { openPop(+b.dataset.i); return; }
