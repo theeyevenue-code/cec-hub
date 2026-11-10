@@ -599,3 +599,40 @@ def test_a_lens_with_no_70mm_item_uses_its_standard_stock_item(monkeypatch):
     key = {"supplier": "Synchrony", "lens": "FSV Clear 1.56", "index": "1.56", "material": "Clear", "coating": "HMC+", "stockgrind": "stock"}
     assert sj._item_blank({}, key) == 73.0                                           # closest to 70; same barcode either way
     assert sj._item_blank({}, {**key, "stockgrind": "grind"}) == ""
+
+
+# ---- first live ZZTEST job (10 Nov 2026): the chosen option reaches the engine, or the job stops ----------------
+def test_photofusion_maps_to_its_own_lens_item_and_colour_note_never_a_tint():
+    book = sp.load()
+    st_ = sp.quote(book, {"tab": "sv", "card": 1, "idx": "1.60", "opt": "photo", "pfx": "Grey"})
+    assert st_["map"]["key"]["material"] == "PhotoFusionX" and st_["map"]["key"]["stockgrind"] == "stock"
+    assert st_["map"]["tint_barcode"] == "" and st_["map"]["pfx_colour"] == "Grey"
+    g = sp.quote(book, {"tab": "sv", "card": 1, "idx": "1.60", "opt": "photo", "pfx": "Brown"})
+    assert g["map"]["key"]["stockgrind"] == "grind" and g["map"]["key"]["material"] == "PhotoFusionX"
+    assert g["map"]["tint_barcode"] == "" and g["map"]["pfx_colour"] == "Brown"
+
+
+def test_an_unlinked_photofusion_stock_lens_stops_it_never_goes_as_clear(c):
+    pick(c, "Mia")
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    ch = {"tab": "sv", "card": 0, "idx": "1.50", "opt": "photo", "pfx": "Grey"}
+    r = c.post("/api/sheet/checks", json=body(choice=ch)).get_json()
+    assert not r["can_make"] and r["stop"]                                   # stops; never falls back to clear
+    n = len(c.sent)
+    j = c.post("/api/sheet/make", json=body(choice=ch)).get_json()
+    assert j["ok"] is False and [x for x in c.sent[n:] if x[0] == "make"] == []
+
+
+def test_the_engine_gets_the_option_the_page_chose(c):
+    pick(c, "Mia")
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    ch = {"tab": "sv", "card": 0, "idx": "1.50", "opt": "blue"}
+    c.post("/api/sheet/plan", json=body(choice=ch))
+    req = c.sent[-1][1]
+    assert req["option"]["material"] == "Clear BluePro" and req["hub_pair_price"] == "250"
+
+
+def test_page_keeps_the_plain_sheet_choice_through_staff_and_shows_it_on_check():
+    import price_sheet.build as build
+    html = build.build()
+    assert "st.lastChoice" in html and "staffbtn2" in html and "Sheet choice" in html and 'id="resumed"' in html

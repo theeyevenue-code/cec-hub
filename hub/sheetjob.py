@@ -663,6 +663,7 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
     if ref:
         res["lens_use"] = "N" if (ch["tab"] in SV_TABS and typ == "near") else USE[ch["tab"]]
         res["tint_barcode"] = qq["map"].get("tint_barcode") or ""
+        res["pfx_colour"] = qq["map"].get("pfx_colour") or ""
     res["price_changed"] = res["price"] is not None and res["start_price"] is not None and res["price"] != res["start_price"]
     res["can_make"], res["why"] = _can_make(res, data, s)
     res["mode"] = mode_words(cfg, s)
@@ -707,6 +708,7 @@ def _no_rx_checks(cfg: dict, s: dict, book: dict, ch: dict, data: dict) -> dict:
             res["ref"] = {**key, "blank_mm": blank}
             res["lens_use"] = USE[ch["tab"]]
             res["tint_barcode"] = q["map"].get("tint_barcode") or ""
+            res["pfx_colour"] = q["map"].get("pfx_colour") or ""
             if blank:
                 res["verdict"]["detail"] += " VisuStore picks the blank."
     fr = data.get("frame") if isinstance(data.get("frame"), dict) else {}
@@ -823,7 +825,8 @@ def _engine_request(s: dict, res: dict, data: dict) -> dict:
             "frame": ({"own": True, "a": fr.get("a"), "dbl": fr.get("dbl"), "ed": fr.get("ed")} if fr.get("own")
                       else {"own": False, "barcode": (res.get("frame") or {}).get("barcode")}),
             "heights": {x: h.get(x) for x in ("R", "L")} if res["heights_needed"] else {},
-            "second_pair": bool(data.get("second_pair")), "pd_shift": res.get("pd_shift"), "rimless": bool(data.get("rimless"))}
+            "second_pair": bool(data.get("second_pair")), "pd_shift": res.get("pd_shift"), "rimless": bool(data.get("rimless")),
+            "pfx_colour": res.get("pfx_colour") or ""}
 
 
 def zztest_only(cfg: dict) -> bool:
@@ -844,7 +847,8 @@ def job(cfg: dict, token, data: dict, rows: list, pricing: dict, user: str, comm
     req = _engine_request(s, res, data)
     eng = pickjob.run_engine(cfg, "plan" if command == "plan" else "make", {**pickjob.clean_request(req, user),
                                                                              "sheet_tint_pair": res["tint_pair"],
-                                                                             "rimless": bool(data.get("rimless"))})
+                                                                             "rimless": bool(data.get("rimless")),
+                                                                             "pfx_colour": str(req.get("pfx_colour") or "")[:20]})
     eng["no_rx"] = bool(res.get("no_rx"))
     pat = (eng.get("preview") or {}).get("patient")
     if isinstance(pat, dict):

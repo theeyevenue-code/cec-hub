@@ -243,11 +243,10 @@ def pricebook(book: dict, ch: dict, pr: dict | None = None) -> dict:
         if not bc:
             return {"ok": False, "why": "That tint colour and depth isn't mapped to an Optomate tint."}
         out.update(tint_barcode=bc, tint_kind="graduated" if _is_grad(ch.get("depth")) else "solid")
-    elif k == "photo" and key["material"] == "PhotoFusionX" and key["stockgrind"] == "grind":
-        bc = (book["map"].get("pfx_tints") or {}).get(str(ch.get("pfx") or "Grey"))
-        if not bc:
-            return {"ok": False, "why": "That PhotoFusion X colour isn't mapped to Optomate."}
-        out.update(tint_barcode=bc, tint_kind="photofusion colour")
+    elif k == "photo" and key["material"] == "PhotoFusionX":
+        # as staff key it in Touch (real jobs, Oct-Nov 2026): the PhotoFusion X LENS item, no tint line; the colour
+        # goes in the job comment. (10 Nov 2026: the $0 Photofusion colour tint items are not how jobs are keyed.)
+        out["pfx_colour"] = str(ch.get("pfx") or "Grey")
     return out
 
 

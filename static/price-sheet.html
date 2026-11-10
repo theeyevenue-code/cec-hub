@@ -381,7 +381,9 @@ main#page.tall { padding-top:26px; }
       <div class="sumlines" id="summary"></div>
       <div class="sumprice"><div class="tl">Lenses, a pair</div><div class="big" id="sum-total"></div><div class="pair">Frame extra.</div></div>
     </div>
+    <button class="staffcorner" id="staffbtn2">Staff</button>
     <div class="staffrow" id="patrow"><span class="quietnext">Next, ask us to scan your frame.</span><button class="cta" id="backsheets">&larr; Back to the price sheets</button></div>
+    <div class="warn" id="resumed" style="display:none"></div>
     <div class="staffrow" id="staffrow"><span class="lab">Staff</span><button class="cta" id="toframe">Scan the frame &rarr;</button><button class="ghost" id="changelens">Change lens</button></div>
   </main>
 </section>
@@ -483,10 +485,16 @@ async function padKey(k) {
   const r = await api("/api/sheet/unlock", { code }); code = ""; drawDots();
   if (!r) return;
   if (r.error) { $("codemsg").textContent = r.error; $("codemsg").className = "msg bad"; return; }
-  st = { p: VIEWER, tab:"sv" }; loadPatients();
+  st = { p: VIEWER, tab:"sv", carry: window.__carry || null }; loadPatients();
 }
-$("staffbtn").onclick = () => { code = ""; drawPad(); $("codemsg").textContent = ""; show("s-code"); };
+$("staffbtn").onclick = () => {
+  // 10 Nov 2026 (first live job): a lens chosen on the plain sheet must survive the staff code and the patient pick
+  st.carry = picked() ? null : (st.lastChoice || null);
+  window.__carry = st.carry;
+  code = ""; drawPad(); $("codemsg").textContent = ""; show("s-code");
+};
 $("codeback").onclick = () => show("s-sheet");
+$("staffbtn2").onclick = () => $("staffbtn").onclick();
 
 /* ---- 2 whose lenses? (staff only) ------------------------------------------------------------ */
 async function loadPatients() {
@@ -538,12 +546,14 @@ async function pickPatient(h) {
   }
   const s = await api("/api/sheet/patient");
   if (!s || s.error) return;
+  const carry = st.carry || window.__carry; window.__carry = null;
   st = { p: { first:s.first, tabs:s.tabs || {}, picked:true, noRx:!!s.no_rx }, tab:s.tab || "sv" };
-  if (s.resume && resumeChoice(s.resume)) return;          // picks up where they left off today
+  if (carry && resumeChoice({ choice: carry }, "The lens chosen on the sheet. Check the lens and option.")) return;
+  if (s.resume && resumeChoice(s.resume, "Picked up from earlier today. Check the lens and option, or Change lens.")) return;
   drawPage(); show("s-sheet");
 }
 // the choice kept for this patient today (no saved Rx yet, or the iPad was cleared): back on the Chosen screen
-function resumeChoice(k) {
+function resumeChoice(k, why) {
   const ch = k.choice || {}, pg = PAGES.find(x => x.key === ch.tab);
   if (!pg || !pg.cards[ch.card]) return false;
   st.tab = ch.tab; drawPage(); $("sheet").style.transition = "none";
@@ -554,6 +564,7 @@ function resumeChoice(k) {
   st.opt = ch.opt || "clear"; st.colour = ch.colour || st.colour; st.depth = ch.depth || st.depth; st.pfx = ch.pfx || st.pfx;
   st.resumeFrame = k.frame || null; st.resumeRimless = !!k.rimless;
   drawChoice(); $("sheet").style.transition = ""; $("choose").click();
+  $("resumed").textContent = why || ""; $("resumed").style.display = why ? "" : "none";
   return true;
 }
 
@@ -811,7 +822,9 @@ function drawChoice() {
     drawChoice();
   });
   $("back").onclick = closeAll;
-  $("choose").onclick = () => { st.chosen = { tab:st.tab, i:st.cardI }; closeAll(); drawSum(); show("s-sum"); };
+  $("choose").onclick = () => { st.chosen = { tab:st.tab, i:st.cardI };
+    st.lastChoice = { tab:st.tab, card:st.cardI, idx:curIdx(), opt:(priceNow().o || {}).k || "clear", colour:st.colour, depth:st.depth, pfx:st.pfx };
+    closeAll(); drawSum(); show("s-sum"); };
 }
 
 /* ---- 2c chosen: calm summary, then the staff step ------------------------------------------- */
@@ -825,6 +838,7 @@ function extrasWords() {
   return bits.join(" · ") || "Clear";
 }
 function drawSum() {
+  $("resumed").style.display = "none";
   const pr = priceNow(), c = st.card, pg = st.page;
   $("sum-eye").textContent = c.line || c.product || pg.eyebrow;
   $("sum-who").textContent = st.p.first;
@@ -843,7 +857,7 @@ function drawSum() {
   $("sum-total").textContent = money(pr.total);
 }
 $("toframe").onclick = () => { drawFrame(); show("s-frame"); setTimeout(() => $("bc").focus(), 50); };
-$("backsheets").onclick = () => { st.chosen = null; drawPage(); show("s-sheet"); };
+$("backsheets").onclick = () => { st.chosen = null; drawPage(); show("s-sheet"); };   // st.lastChoice stays for Staff
 $("changelens").onclick = () => { drawPage(); show("s-sheet"); };
 
 
@@ -992,6 +1006,7 @@ $("make").onclick = async () => {
     ${(r.refusals || []).map(x => `<div class="refuse">${esc(x)}</div>`).join("")}${(r.warnings || []).map(x => `<div class="warn">${esc(x)}</div>`).join("")}
     <div class="cg"><div>
       <div class="kv"><span>Rx as saved</span><b>${pv.no_rx ? "NO RX on this job" : `R ${eyeRow((pv.rx || {}).right)}<br>L ${eyeRow((pv.rx || {}).left)}<small>Rx #${esc((pv.rx || {}).id || "")}, saved ${esc((pv.rx || {}).saved || "")}</small>`}</b></div>
+      <div class="kv"><span>Sheet choice</span><b>${esc(sh.lens || "")} · ${esc(sh.option || "Clear")}<small>${esc(sh.made || "")}</small></b></div>
       <div class="kv"><span>Lens</span><b>${esc((pv.lens || {}).description || sh.lens || "")}<small>Optomate ${esc((pv.lens || {}).barcode || "-")} · ${esc((pv.lens || {}).use || "")}</small></b></div>
       ${pv.tint ? `<div class="kv"><span>Tint</span><b>${esc(pv.tint.description)}<small>Optomate ${esc(pv.tint.barcode)}</small></b></div>` : ""}
       <div class="kv"><span>Coat</span><b>${esc((pv.coat || {}).description || "-")}</b></div>
