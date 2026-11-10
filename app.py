@@ -19,10 +19,10 @@ import logging
 import os
 from pathlib import Path
 
-from flask import Flask, jsonify, make_response, request, send_from_directory
+from flask import Flask, Response, jsonify, make_response, redirect, request, send_from_directory
 
 from hub import checkin, integrations, jobscan, lenses, lensoptions, pricesheets, sendguide, sop_parser
-from hub import lenschat, pickjob, sheetjob, workqueue
+from hub import lenschat, pickjob, sheetdevice, sheetjob, workqueue
 from hub.assistant import core as assistant, registry as assistant_registry
 from hub.assistant.adapters import ReadContext
 
@@ -43,6 +43,7 @@ BASE_DIR = Path(__file__).parent
 IPAD_DIR = BASE_DIR / "ipad"                       # the iPad page's own files (no Hub links)
 EXAMPLE_CONFIG_DIR = BASE_DIR / "config"          # the committed *.example.json templates
 CONFIG_DIR = Path(os.getenv("CEC_HUB_CONFIG_DIR", str(EXAMPLE_CONFIG_DIR)))
+sheetdevice.PATH = Path(os.getenv("CEC_HUB_SHEET_DEVICES", str(CONFIG_DIR / "sheet_devices.json")))
 
 # Tests (and unusual machines) can repoint these with environment variables.
 SOPS_DIR = Path(os.getenv("CEC_HUB_SOPS_DIR", str(BASE_DIR / "sops")))
@@ -787,7 +788,7 @@ def _sheet(fn, *a, cookie: str | None = None, clear: bool = False, guard: bool =
         if r.body.get("expired"):
             resp.delete_cookie(sheetjob.COOKIE, path="/")
         return resp, r.status
-    resp = _no_store(jsonify(out))
+    resp = _keep_device(_no_store(jsonify(out)))
     if cookie:
         resp.set_cookie(sheetjob.COOKIE, cookie, max_age=sheetjob.IDLE_S + 60, httponly=True, samesite="Strict", path="/")
     if clear:
@@ -807,18 +808,87 @@ def _sheet_rows():
 
 
 def _sheet_staff():
-    """The Hub's normal staff guard for every sheet route that shows or acts on a patient (same rule as
-    staff_only: never the check-in iPad's device key; this computer, or a browser unlocked once with the staff
-    code - its HttpOnly cookie lasts checkin.STAFF_COOKIE_DAYS). No code each time (Mark, 10 Nov 2026)."""
+    """Who may see or act on a patient through the price sheet. Mark, 11 Nov 2026: "No codes the iPad is purely
+    for staff patients don't touch". Allowed: this computer; a staff iPad enrolled once from this computer
+    (hub/sheetdevice.py, HttpOnly device cookie); a front-desk computer already unlocked for staff pages. Never the
+    check-in iPad's device key. Everyone else gets "Staff iPad only" - no code pad, no patient data."""
     if request.headers.get("X-Checkin-Key"):
-        return _no_store(jsonify({"error": "Not from the iPad.", "ipad": True})), 403
+        return _no_store(jsonify({"error": "Staff iPad only.", "ipad_only": True})), 403
     if _from_this_computer():
         return None
-    cfg = _integrations()
-    if checkin.staff_cookie_ok(cfg, request.cookies.get(checkin.STAFF_COOKIE)):
+    if sheetdevice.ok(request.cookies.get(sheetdevice.COOKIE)):
         return None
-    return _no_store(jsonify({"staff_needed": True, "code_set": bool(checkin.staff_code(cfg)),
-                              "error": "Unlock this iPad once with the staff code."})), 403
+    if checkin.staff_cookie_ok(_integrations(), request.cookies.get(checkin.STAFF_COOKIE)):
+        return None
+    return _no_store(jsonify({"error": "Staff iPad only.", "ipad_only": True})), 403
+
+
+def _keep_device(resp):
+    """Re-set an enrolled iPad's cookie on each use, so one in daily use never reaches the 400-day limit."""
+    tok = request.cookies.get(sheetdevice.COOKIE)
+    if tok and sheetdevice.ok(tok):
+        resp.set_cookie(sheetdevice.COOKIE, tok, max_age=sheetdevice.COOKIE_DAYS * 86400, httponly=True,
+                        samesite="Strict", path="/")
+    return resp
+
+
+def _lan_address() -> str:
+    """This server's address on the practice network, for the setup link (no packet is sent)."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
+_DEV_CSS = ("<style>body{font:17px/1.5 system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 16px;color:#111}"
+            "h1{font-size:28px}code{font-size:20px;background:#f3f3f3;padding:6px 10px;display:inline-block;word-break:break-all}"
+            "button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#1d6b47;color:#fff}"
+            "table{border-collapse:collapse;margin-top:10px}td,th{padding:6px 14px 6px 0;text-align:left;border-bottom:1px solid #ddd}"
+            ".rm{background:#a33;font-size:15px;padding:6px 12px}</style>")
+
+
+@app.route("/sheet-device", methods=["GET", "POST"])
+def sheet_device_admin():
+    """Server only: make a one-time setup link for the staff iPad, and list / remove enrolled iPads."""
+    if not _from_this_computer():
+        return _no_store(Response("Server only.", 403, mimetype="text/plain"))
+    if request.method == "POST":
+        sheetdevice.remove(request.form.get("remove", ""))
+        return redirect("/sheet-device", 303)
+    host = request.host.split(":")
+    port = host[1] if len(host) > 1 else "80"
+    link = f"http://{_lan_address()}:{port}/sheet-device/{sheetdevice.new_setup()}"
+    rows = "".join(f"<tr><td>{html.escape(d['name'])}</td><td>{html.escape(d['added'])}</td><td><form method=post>"
+                   f"<button class=rm name=remove value='{html.escape(d['id'])}'>Remove</button></form></td></tr>"
+                   for d in sheetdevice.devices()) or "<tr><td colspan=3>None yet.</td></tr>"
+    out = (f"<!doctype html><meta charset=utf-8><title>Staff iPad setup</title>{_DEV_CSS}"
+            f"<h1>Staff iPad setup</h1><p>Open this link in Safari on the staff iPad. One use, 10 minutes.</p>"
+            f"<p><code>{html.escape(link)}</code></p><p>Reload this page for a new link.</p>"
+            f"<h2>Staff iPads</h2><table><tr><th>Name</th><th>Added</th><th></th></tr>{rows}</table>")
+    return _no_store(Response(out, mimetype="text/html"))
+
+
+@app.route("/sheet-device/<token>", methods=["GET", "POST"])
+def sheet_device_enrol(token):
+    """Opened on the staff iPad. GET shows one button (so a link preview can't use up the link); POST enrols."""
+    page = f"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>Staff iPad</title>{_DEV_CSS}"
+    if request.method == "GET":
+        return _no_store(Response(page + "<h1>Staff iPad</h1><p>Make this the staff iPad for the price sheet?</p>"
+                                  "<form method=post><button>Make this the staff iPad</button></form>", mimetype="text/html"))
+    dev = sheetdevice.enrol(token)
+    if not dev:
+        return _no_store(Response(page + "<h1>Link used or expired</h1><p>Make a new one on the server: "
+                                  "/sheet-device</p>", 403, mimetype="text/html"))
+    logger.info("Price sheet: staff iPad enrolled from %s", request.remote_addr)
+    resp = redirect("/price-sheet.html", 303)
+    resp.set_cookie(sheetdevice.COOKIE, dev, max_age=sheetdevice.COOKIE_DAYS * 86400, httponly=True,
+                    samesite="Lax", path="/")
+    return _no_store(resp)
 
 
 @app.route("/api/sheet/start", methods=["POST"])

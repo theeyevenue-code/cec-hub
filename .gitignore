@@ -18,3 +18,4 @@ config/lens_pricing.json
 config/lenschat.json
 config/assistant.json
 config/*.bak
+config/sheet_devices.json

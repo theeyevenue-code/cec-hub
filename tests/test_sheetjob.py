@@ -131,6 +131,8 @@ def c(tmp_path, monkeypatch):
                 "created": None, "why": "fixture"}
     monkeypatch.setattr(pk, "run_engine", engine)
     sj._sessions.clear()
+    from hub import sheetdevice
+    monkeypatch.setattr(sheetdevice, "PATH", tmp_path / "sheet_devices.json")
     with app_module.app.test_client() as client:
         client.environ_base["REMOTE_ADDR"] = "10.0.0.9"       # the iPad, not the server itself
         client.sent = sent
@@ -138,11 +140,20 @@ def c(tmp_path, monkeypatch):
     sj._sessions.clear()
 
 
+def enrol(c):
+    """The staff iPad, set up once from the server: no code ever typed on the iPad."""
+    from hub import sheetdevice
+    tok = sheetdevice.new_setup()
+    assert c.get(f"/sheet-device/{tok}").status_code == 200          # just a button: a link preview can't use it up
+    r = c.post(f"/sheet-device/{tok}")
+    assert r.status_code == 303 and r.headers["Location"].endswith("/price-sheet.html")
+    assert c.get_cookie("cec_sheet_device")
+
+
 def unlock(c):
-    """This iPad unlocked once (the Hub's own staff cookie), then Staff opens the list - no code each time."""
-    if not c.get_cookie("cec_checkin_staff"):
-        r = c.post("/api/checkin/staff/unlock", json={"code": "2468"})
-        assert r.status_code == 200, r.get_json()
+    """Staff on the enrolled staff iPad opens the list - no code."""
+    if not c.get_cookie("cec_sheet_device"):
+        enrol(c)
     r = c.post("/api/sheet/start")
     assert r.status_code == 200, r.get_json()
 
@@ -214,13 +225,16 @@ def test_the_page_carries_the_price_file_and_its_version_and_no_demo_data():
 
 
 # ---- the lock ----------------------------------------------------------------------------------
-def test_no_code_each_time_but_only_an_unlocked_ipad(c):
-    # Mark, 10 Nov 2026: "Take out test codes I don't think I'll give it to patients ever"
-    r = c.post("/api/sheet/start")                                     # a browser never unlocked: refused
-    assert r.status_code == 403 and r.get_json()["staff_needed"]
+def test_no_codes_staff_ipad_only(c):
+    # Mark, 11 Nov 2026: "No codes the iPad is purely for staff patients don't touch"
+    r = c.post("/api/sheet/start")                                     # an unknown device (a patient's phone): refused
+    assert r.status_code == 403 and r.get_json() == {"error": "Staff iPad only.", "ipad_only": True}
     assert c.get("/api/sheet/patients").status_code == 403
-    assert c.post("/api/checkin/staff/unlock", json={"code": "1111"}).status_code == 403
+    assert c.post("/api/sheet/search", json={"q": "zztest"}).status_code == 403
+    c.set_cookie("cec_sheet_device", "made-up")                         # a guessed cookie: refused
+    assert c.post("/api/sheet/start").status_code == 403
     assert c.post("/api/sheet/start", headers={"X-Checkin-Key": "x"}).status_code == 403   # never the check-in key
+    c.delete_cookie("cec_sheet_device")
     unlock(c)
     r = c.get("/api/sheet/patients")
     assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
@@ -662,3 +676,41 @@ def test_a_widened_pd_shows_as_its_own_row_on_the_job(c):
     assert r["pd_job"] == {"to": {"R": 31.0, "L": 31.0}, "from": {"R": 30.0, "L": 30.0}}
     plain = c.post("/api/sheet/checks", json=body()).get_json()
     assert "pd_job" not in plain
+
+
+# ---- staff iPad enrolment (11 Nov 2026) -------------------------------------------------------------
+def test_setup_page_is_server_only_and_links_are_one_use(c):
+    from hub import sheetdevice
+    assert c.get("/sheet-device").status_code == 403                 # from the iPad / LAN: no
+    r = c.get("/sheet-device", environ_base={"REMOTE_ADDR": "127.0.0.1"})
+    assert r.status_code == 200 and "/sheet-device/" in r.get_data(as_text=True)
+    tok = sheetdevice.new_setup()
+    assert c.post(f"/sheet-device/{tok}").status_code == 303
+    assert c.post(f"/sheet-device/{tok}").status_code == 403         # used
+    assert c.post("/sheet-device/guess").status_code == 403
+
+
+def test_removed_ipad_is_locked_out(c):
+    from hub import sheetdevice
+    enrol(c)
+    assert c.post("/api/sheet/start").status_code == 200
+    dev = sheetdevice.devices()[0]
+    assert "hash" not in dev and dev["name"] == "Staff iPad"
+    r = c.post("/sheet-device", data={"remove": dev["id"]}, environ_base={"REMOTE_ADDR": "127.0.0.1"})
+    assert r.status_code == 303 and sheetdevice.devices() == []
+    assert c.post("/api/sheet/start").status_code == 403
+
+
+def test_device_file_keeps_hashes_only(c):
+    from hub import sheetdevice
+    enrol(c)
+    text = sheetdevice.PATH.read_text(encoding="utf-8")
+    assert c.get_cookie("cec_sheet_device").value not in text
+
+
+def test_page_has_no_code_pad():
+    from price_sheet import build
+    html = build.build()
+    for gone in ("padKey", "Staff code", "checkin/staff/unlock"):
+        assert gone not in html
+    assert "Staff iPad only" in html

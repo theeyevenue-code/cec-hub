@@ -367,14 +367,9 @@ details summary { font-size:16px; font-weight:600; color:var(--btn); cursor:poin
 <section class="screen" id="s-code">
   <div class="stopbar">Lens price sheet <span>Staff only</span></div>
   <main>
-    <div class="eyebrow">Staff</div>
-    <h1>Staff code</h1>
-    <div class="lead">Once on this iPad. After that, Staff opens the patient list straight away.</div>
-    <div class="codewrap">
-      <div class="pad" id="pad"></div>
-      <div><div class="dots" id="dots"></div><div class="msg" id="codemsg"></div>
-        <button class="backlink" id="codeback">&larr; Back to the price sheet</button></div>
-    </div>
+    <h1>Staff iPad only</h1>
+    <div class="lead">The patient list opens only on the practice's staff iPad.</div>
+    <button class="backlink" id="codeback">&larr; Back to the price sheet</button>
   </main>
 </section>
 
@@ -492,29 +487,12 @@ async function api(path, body) {
   return d;
 }
 
-/* ---- 1 staff code: asked EVERY time the patient list opens (Mark, 10 Nov 2026) ---------------- */
-let code = "";
-function drawPad() {
-  $("pad").innerHTML = ["1","2","3","4","5","6","7","8","9","Clear","0","OK"].map(k => `<button class="${k.length > 1 ? "k2" : ""}" data-k="${k}">${k}</button>`).join("");
-  document.querySelectorAll("#pad button").forEach(b => b.onclick = () => padKey(b.dataset.k));
-  drawDots();
-}
-function drawDots() { $("dots").innerHTML = Array.from({ length: Math.max(4, code.length) }, (_, i) => `<i class="${i < code.length ? "on" : ""}"></i>`).join(""); }
-async function padKey(k) {
-  if (k === "Clear") code = ""; else if (k !== "OK") { if (code.length < 12) code += k; }
-  drawDots(); $("codemsg").textContent = ""; $("codemsg").className = "msg";
-  if (k !== "OK" || !code) return;
-  // once per iPad: the Hub's own staff unlock (an HttpOnly cookie, the same as every other Hub staff page)
-  const r = await api("/api/checkin/staff/unlock", { code }); code = ""; drawDots();
-  if (!r) return;
-  if (r.error) { $("codemsg").textContent = r.error; $("codemsg").className = "msg bad"; return; }
-  openStaff();
-}
-// Mark, 10 Nov 2026: "Take out test codes I don't think I'll give it to patients ever" - Staff goes straight to the list
+/* ---- 1 Staff: straight to the patient list on the staff iPad. Mark, 11 Nov 2026: "No codes the iPad is purely for
+   staff patients don't touch". Any other device gets "Staff iPad only" (no code pad, no patient data). ------------ */
 async function openStaff() {
   const r = await api("/api/sheet/start", {});
   if (!r) return;
-  if (r.staff_needed) { code = ""; drawPad(); $("codemsg").textContent = ""; show("s-code"); return; }
+  if (r.ipad_only) { show("s-code"); return; }
   if (r.error) { alert(r.error); return; }
   st = { p: VIEWER, tab:"sv", carry: window.__carry || null }; loadPatients();
 }
