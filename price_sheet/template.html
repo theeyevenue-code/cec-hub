@@ -316,114 +316,16 @@ h1 { font-size:36px; font-weight:700; color:var(--ink); line-height:1.05; margin
    graduated 90-40/75/25%. PhotoFusion X: stock lens is grey; other colours are a made-to-order lens (zeiss.com.au:
    seven Rx colours, one FSV colour). Patient screens use tier names; staff screens product names (Mark, 22 Sep 2026).
    ------------------------------------------------------------------------------------------------ */
-const T = (idx, name, price) => ({ idx, name, price });
-const O = (k, n, add, d, more = {}) => ({ k, n, add, d, ...more });
-const CLEAR = O("clear", "Clear", 0, "Everyday clear lens.");
-const BLUE_D = "Softens glare from screens and LED lights.", PHOTO_D = "Darkens outdoors, clears inside.";
-const TINT_D = "Black, grey, brown or green. Pick the depth.";
-// tint on a stock SV lens: grind $100 + tint $50 (graduated $70) - one price, breakdown in small text
-const TINT_SV  = O("tint", "Sun tint", 150, TINT_D, { mto:true, grad:170, breakdown:"Lens made to order $100 + tint $50. Graduated +$170." });
-const TINT_MF  = O("tint", "Sun tint", 50, TINT_D, { grad:70, breakdown:"Graduated +$70." });
-const SV_LOW  = [CLEAR, O("blue", "Blue-light filter", 50, BLUE_D), O("photo", "PhotoFusion X", 150, PHOTO_D, { photoStock:true }), TINT_SV];
-const SV_HIGH = (tint) => [CLEAR, O("blue", "Blue-light filter", 150, "Includes made to order.", { mto:true, incl:true }),
-                           O("photo", "PhotoFusion X", 250, "Includes made to order. Any colour.", { mto:true, incl:true }),
-                           ...(tint ? [TINT_SV] : [])];
-const AF_OPTS = [CLEAR, O("blue", "Blue-light filter", 50, BLUE_D), O("photo", "PhotoFusion X", 150, PHOTO_D)];
-const OF_OPTS = [CLEAR, O("blue", "Blue-light filter", 50, BLUE_D)];
-// multifocal, every index already made to order: tints +$50 / +$70; light-reactive not at 1.74 on Essential (printed sheet)
-const MF_OPTS = (c, idx) => [CLEAR, O("blue", "Blue-light filter", 50, BLUE_D),
-  O("photo", "Light-reactive", 150, PHOTO_D, { off:idx === "1.74" && !c.photo174, offwhy:"Not at 1.74 on Essential" }), TINT_MF];
-const THIN = (a, b, c, d) => [T("1.50","Standard",a), T("1.60","Thin & light",b), T("1.67","Ultra thin",c), T("1.74","Thinnest",d)];
-const R53 = (price) => ({ idx:"1.53", name:"Rimless", price });
-
-// ZEISS tint colours held in Optomate (Kat's ZEISS code list, May 2026): the chip shows the colour itself
-const TINT_COLOURS = [
-  { k:"Black", n:"Black", hex:"#15171A" }, { k:"Grey", n:"Grey", hex:"#5F666D" },
-  { k:"Brown", n:"Brown", hex:"#6B4420" }, { k:"Green", n:"Green", sub:"Pioneer G15", hex:"#3B5A48" }];
-const SOLID_DEPTHS = [["s85","85%"],["s75","75%"],["s60","60%"],["s25","25%"],["s12","12%"]], GRAD_DEPTHS = [["g9040","90/40%"],["g75","75%"],["g25","25%"]];
+/* PRICES live in ONE file, price_sheet/prices.json (Mark, 10 Nov 2026, steps 2-3): build.py inlines it here and the
+   Hub server reads the same file (hub/sheetprice.py) to price a job. The page never works a price out beyond the
+   live total. */
+const DATA = {{PRICES}};
+const SETS = DATA.optionSets;
+// multifocal: light-reactive is off at 1.74 unless the card says photo174 (printed sheet: not at 1.74 on Essential)
+const MF_OPTS = (c, idx) => SETS.MF.map(o => o.offIdx ? { ...o, off: idx === o.offIdx && !c.photo174 } : o);
+const TINT_COLOURS = DATA.tintColours, SOLID_DEPTHS = DATA.solidDepths, GRAD_DEPTHS = DATA.gradDepths, PFX_COLOURS = DATA.pfxColours;
 const depthName = (k) => ([...SOLID_DEPTHS, ...GRAD_DEPTHS].find(d => d[0] === k) || ["", ""])[1];
-// PhotoFusion X colours (zeiss.com.au PhotoFusion X page, read 9 Nov 2026): stock lens grey only
-const PFX_COLOURS = [
-  { k:"Grey", hex:"#55595E", stock:true }, { k:"Brown", hex:"#6B4420" }, { k:"Extra Grey", hex:"#2E3236" }, { k:"Pioneer", hex:"#3B5A48" },
-  { k:"Black", hex:"#15171A" }, { k:"Blue", hex:"#2E4C8C" }, { k:"Burgundy", hex:"#6B2334" }];
-
-const PAGES = [
- { key:"sv", tab:"Single vision", eyebrow:"ZEISS ClearView with DuraVision Platinum coating", h1:"Single vision lenses.",
-   lead:"Up to 3× the clear area of a standard stock lens, and up to 16% thinner.", cols:4, by:"index",
-   foot:[["On every lens: DuraVision Platinum UV. Scratch and dirt resistant, up to 50% fewer reflections, UV from all sides.", "Prices per pair."], "Lens and coating figures: ZEISS Vision Care · September 2026"],
-   cards:[
-    { idx:"1.50", name:"Standard",     price:200, product:"ZEISS ClearView FSV 1.50 DuraVision Platinum", stock:70, grind:100, opts:SV_LOW,
-      moreList:["Made to order","Blue light","PhotoFusion X","Tints"], moreFrom:[50,170] },
-    { idx:"1.60", name:"Thin & light", price:250, product:"ZEISS ClearView FSV 1.60 DuraVision Platinum", stock:70, grind:100, opts:SV_LOW,
-      moreList:["Made to order","Blue light","PhotoFusion X","Tints"], moreFrom:[50,170] },
-    { idx:"1.67", name:"Ultra thin",   price:350, product:"ZEISS ClearView FSV 1.67 DuraVision Platinum", stock:70, grind:100, opts:SV_HIGH(true),
-      moreList:["Blue light","PhotoFusion X","Tints"], moreFrom:[150,250] },
-    { idx:"1.74", name:"Thinnest",     price:500, product:"ZEISS ClearView FSV 1.74 DuraVision Platinum", stock:65, grind:100, opts:SV_HIGH(false),
-      moreList:["Blue light","PhotoFusion X"], moreFrom:[150,250] },
-   ]},
- { key:"mf", tab:"Multifocal", eyebrow:"ZEISS SmartLife and Synchrony progressive lenses", h1:"Multifocal lenses.",
-   lead:"Distance, screen and reading in one lens, with no line.", cols:3, by:"tier", heights:true,
-   foot:[["Every multifocal made to order, up to two weeks.", "Scratch-resistant, anti-reflective.", "Prices per pair."], "October 2026"],
-   cards:[
-    { tag:"Best value", tier:"Essential", line:"Synchrony Ultra HDV", product:"Synchrony Ultra HDV", text:"Clear for everyday tasks.",
-      thick:THIN(420,540,640,760), other:R53(490), mf:true, moreList:["Blue light","Light-reactive","Tints"], moreFrom:[50,150] },
-    { tag:"Most popular", hi:true, tier:"Everyday", line:"ZEISS SmartLife Superb", product:"ZEISS SmartLife Superb", text:"Shaped to your face and frame.",
-      thick:THIN(560,690,760,860), other:R53(610), mf:true, photo174:true, moreList:["Blue light","Light-reactive","Tints"], moreFrom:[50,150] },
-    { tag:"Most advanced", tier:"Signature", line:"ZEISS SmartLife Individual 3", product:"ZEISS SmartLife Individual 3", text:"Personalised to how you use your eyes.",
-      thick:THIN(750,850,950,1050), other:R53(790), mf:true, photo174:true, moreList:["Blue light","Light-reactive","Tints"], moreFrom:[50,150] },
-   ]},
- { key:"af", tab:"Anti-Fatigue", eyebrow:"ZEISS SmartLife Digital · under 45, tired eyes from screens", h1:"Anti-Fatigue lenses.",
-   lead:"Fresher eyes at five o’clock. Looks like a normal lens, with an easier near zone for screens and phones.", cols:4, by:"index", heights:true,
-   otherLine:"Other index: 1.53 rimless, $400.",
-   foot:[["7 in 10 wearers report less eye strain by evening.", "Made to order, up to two weeks.", "Prices per pair."], "Eye-strain figure: ZEISS wearer test, 2019 · October 2026"],
-   cards:["1.50","1.60","1.67","1.74"].map((idx, i) => ({ idx, name:["Standard","Thin & light","Ultra thin","Thinnest"][i], price:[350,450,560,740][i],
-      product:`ZEISS SmartLife Digital ${idx}`, line:"ZEISS SmartLife Digital", opts:AF_OPTS, moreList:["Blue light","PhotoFusion X"], moreFrom:[50,150] })) },
- { key:"sun", tab:"Sunglasses", eyebrow:"Sun lenses made to your prescription, by ZEISS Vision Care", h1:"Prescription sunglasses.",
-   lead:"Your script in a sun lens. Tinted or polarised; then the coating and the thickness.", cols:2, by:"tier",
-   foot:[["Made to order, up to two weeks. Full UV.", "Light-reactive lenses from +$150.", "Multifocal sunglasses from $570.", "Prices per pair."], "October 2026"],
-   cards:[
-    { tag:"Everyday sun, any colour", tier:"Tinted", line:"Synchrony tinted · black, grey, brown or green", product:"Synchrony tinted",
-      text:"A solid sun tint in the colour and depth you want.", sun:true, tintPick:true, gradAdd:20, mirror:50,
-      grid:[["1.50", "Standard", 160, 250], ["1.60", "Thin", 270, 340], ["1.67", "Ultra thin", null, 470]],
-      basic:{ n:"Basic tint, stock lens", price:120, d:"Lighter scripts." },
-      moreList:["Graduated","Mirror finish","Basic tint $120"], moreFrom:[20,50] },
-    { tag:"Driving, water, bright roads", hi:true, tier:"Polarised", line:"Synchrony polarised · grey or brown", product:"Synchrony polarised",
-      text:"Cuts the hard glare that bounces off roads, water and car bonnets.", sun:true, polar:true, colours:["Grey","Brown"], mirror:50,
-      grid:[["1.50", "Standard", 250, 340], ["1.60", "Thin", 390, 450], ["1.67", "Ultra thin", null, 570]],
-      moreList:["Mirror finish"], moreFrom:[50,50] },
-   ]},
- { key:"myo", tab:"Myopia control", eyebrow:"Myopia control spectacle lenses · for children", h1:"Myopia control lenses.",
-   lead:"Your optometrist recommends the lens for your child. All three are the same price band; the design differs.", cols:3, by:"tier",
-   foot:[["Made to order, up to two weeks.", "Prices per pair.", "MiyoSmart IQ facts: hoyavision.com/au, MiYOSMART iQ page, read 9 Nov 2026."], "Prices: Optomate, September 2026"],
-   cards:[
-    { tag:"Hoya", tier:"MiyoSmart IQ", product:"MiyoSmart IQ Spark", price:750, hi:true,
-      facts:["D.I.M.S. technology with Hoya’s Triple Enhanced Design.", "For children with progressing myopia, from age 4.", "Looks like a regular clear lens."],
-      opts:[O("clear","Clear",0,"Indistinguishable from a regular lens.")] },
-    { tag:"Essilor", tier:"Stellest 2.0", product:"Stellest 2.0", price:690, opts:[O("clear","Clear",0,"")] },
-    { tag:"ZEISS", tier:"MyoActive", product:"ZEISS MyoActive", price:690, opts:[O("clear","Clear",0,"")] },
-   ]},
- { key:"office", tab:"Office", eyebrow:"ZEISS Office Lens Superb · multifocal wearers, at the desk", h1:"Office lenses.",
-   lead:"A desk pair a multifocal cannot match. Pick how far you need to see clearly. Not for driving.", cols:3, by:"dist", heights:true,
-   foot:[["Made to order, up to two weeks.", "Blue-light filter +$50 on every one.", "Prices per pair.", "Distances: ZEISS Office Lens white paper and zeiss.com.au (maximum intermediate distance)."], "October 2026"],
-   cards:[
-    { tag:"Closest", dist:"Clear to 1 metre", use:"Reading, paperwork and the laptop.", variant:"Book", product:"ZEISS Office Lens Superb Book",
-      thick:THIN(460,590,660,760), other:R53(510), opts:OF_OPTS, moreList:["Blue light"], moreFrom:[50,50] },
-    { tag:"Most desks", dist:"Clear to 2 metres", use:"Desk, screens and the person opposite.", variant:"Near", product:"ZEISS Office Lens Superb Near", hi:true,
-      thick:THIN(460,590,660,760), other:R53(510), opts:OF_OPTS, moreList:["Blue light"], moreFrom:[50,50] },
-    { tag:"Furthest", dist:"Clear to 4 metres", use:"Around the room: meetings, shop floor, kitchen.", variant:"Room", product:"ZEISS Office Lens Superb Room",
-      thick:THIN(460,590,660,760), other:R53(510), opts:OF_OPTS, moreList:["Blue light"], moreFrom:[50,50] },
-   ]},
- { key:"bif", tab:"Bifocal", eyebrow:"Synchrony by ZEISS · bifocal", h1:"Bifocal lenses.",
-   lead:"Distance through the top, reading through the segment below.", cols:2, by:"index", heights:true,
-   foot:[["Made to order, up to two weeks.", "Prices per pair."], "September 2026"],
-   cards:[
-    { idx:"1.50", name:"Standard", price:240, product:"Synchrony Bifocal D28 1.50", line:"Synchrony Bifocal D28, clear, multicoated",
-      moreList:["Photochromic $300","Polarised grey $300"], moreFrom:null,
-      opts:[O("clear","Clear, multicoated",0,"Everyday clear lens.",{ price:240 }), O("photo","Photochromic, grey or brown",0,"Darkens outdoors, clears inside.",{ price:300 }), O("polar","Polarised grey, for sun",0,"Cuts glare off roads and water.",{ price:300 })] },
-    { idx:"1.60", name:"Thin & light", price:300, product:"Synchrony Bifocal D28 1.60", line:"Synchrony Bifocal D28, clear, hard coat", moreList:["Clear only at 1.60"], moreFrom:null,
-      opts:[O("clear","Clear, hard coat",0,"Everyday clear lens.",{ price:300 })] },
-   ]},
-];
+const PAGES = DATA.pages.map(pg => ({ ...pg, cards: pg.cards.map(c => typeof c.opts === "string" ? { ...c, opts: SETS[c.opts] } : c) }));
 
 // fake patients (ZZTEST): the Rx type picks the first tab, rec = the Lens Finder's suggested index
 const PATS = [

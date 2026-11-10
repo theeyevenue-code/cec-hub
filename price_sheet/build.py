@@ -2,8 +2,9 @@
 Source: local-reports/ipad-price-sheet/template.html (Mark: "that's the one"). Output: cec-hub static/price-sheet.html.
 Patient mode: opens straight on the sheet, no name, no "suits your prescription", no staff steps; the summary ends
 with "Back to the price sheets". Fonts and logos load from the Hub (/pricesheets/assets, /pricesheets/brand)."""
-import pathlib, sys
+import hashlib, json, pathlib, sys
 SRC = pathlib.Path(__file__).resolve().parent / "template.html"
+PRICES = pathlib.Path(__file__).resolve().parent / "prices.json"   # the one price file (steps 2-3)
 SB = pathlib.Path(r"C:\Users\ConcordeyecareServer\Claude\cec-second-brain")
 OUT = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else pathlib.Path(__file__).resolve().parent.parent / "static" / "price-sheet.html"
 s = SRC.read_text(encoding="utf-8")
@@ -19,6 +20,10 @@ for w, name in ((300, "Light"), (400, "Regular"), (500, "Medium"), (600, "SemiBo
     rep(f"url(data:font/ttf;base64,{{{{F{w}}}}})", f"url(/pricesheets/assets/fonts/Hind-{name}.ttf)")
 z = (SB / "price-lists/assets/zeiss-logo.svg").read_text(encoding="utf-8").replace("<svg ", '<svg class="zlogo" ', 1)
 s = s.replace("{{ZEISS}}", z)
+raw = PRICES.read_bytes()
+data = json.loads(raw.decode("utf-8"))
+data["version"] = hashlib.sha256(raw).hexdigest()[:12]   # the server refuses a page built from other prices
+rep("{{PRICES}}", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
 s = s.replace("data:image/jpeg;base64,{{CEC}}", "/pricesheets/brand/Concord%20Eyecare%20LOGO%20HORIZ.jpg")
 assert "{{" not in s, "placeholder left"
 
