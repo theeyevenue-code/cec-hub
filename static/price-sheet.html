@@ -329,12 +329,7 @@ main#page.tall { padding-top:26px; }
 .told.norx { color:#B00020; }
 #donenorx { margin-top:18px; }
 .oldrx { color:#B00020; font-weight:600; }
-/* add-ons bar under the cards (Mark, 10 Nov 2026) */
-.addonbar { background:var(--card); padding:14px 24px; margin-top:20px; font-size:17px; color:var(--ink); line-height:1.4; }
-.addonbar .mh { font-size:14px; font-weight:500; letter-spacing:1.2px; text-transform:uppercase; color:var(--grey); margin-right:8px; }
-.addonbar b { color:var(--blue); font-weight:600; white-space:nowrap; }
-.addonbar .abnote { font-size:15px; color:var(--grey); margin-top:4px; }
-#page.tall .addonbar { margin-top:14px; padding:10px 24px; }
+.nomore .other { margin-top:12px; }
 </style>
 </head>
 <body>
@@ -612,37 +607,8 @@ function moreHTML(c) {
   const other = c.other ? `<div class="other">Other index: ${c.other.idx} ${c.other.name.toLowerCase()}, ${money(c.other.price)}.</div>` : "";
   return `<div class="more" data-pop="1"><span class="mh">${c.moreFrom ? "Add-ons" : "Also"}</span>${c.moreList.map(esc).join(" · ")}${range ? " · " + range : ""}${other}</div>`;
 }
-function addonBar(pg) {
-  const label = (c) => pg.by === "index" ? c.idx : pg.by === "dist" ? (c.variant || c.dist) : c.tier;
-  const ranged = pg.cards.filter(c => c.moreFrom);
-  let main = "";
-  if (ranged.length) {
-    const names = [];
-    pg.cards.forEach(c => (c.moreList || []).forEach(n => { if (!names.includes(n)) names.push(n); }));
-    const lo = Math.min(...ranged.map(c => c.moreFrom[0])), hi = Math.max(...ranged.map(c => c.moreFrom[1]));
-    main = names.map(esc).join(" · ") + ` · <b>${lo === hi ? "+" + money(lo) : `from +${money(lo)} to +${money(hi)}`}</b>`;
-  } else {
-    main = pg.cards.filter(c => (c.moreList || []).length).map(c => `${esc(label(c))}: ${c.moreList.map(esc).join(" · ")}`).join(" &nbsp;·&nbsp; ");
-  }
-  // keep it honest: say which figures already include made to order (so nobody adds it twice)
-  const incl = {}, offers = {};
-  pg.cards.forEach(c => (c.opts || []).forEach(o => {
-    if (o.k === "clear") return;
-    (offers[o.n] = offers[o.n] || []).push(label(c));
-    if (o.incl || (o.k === "tint" && o.mto)) (incl[o.n] = incl[o.n] || []).push(label(c));
-  }));
-  const inclWords = Object.entries(incl).map(([n, ls]) => ls.length === offers[n].length ? n : `${n} at ${ls.join(", ")}`);
-  const note = inclWords.length ? `<div class="abnote">Includes made to order: ${inclWords.map(esc).join("; ")}.</div>` : "";
-  const others = pg.cards.filter(c => c.other);
-  let other = "";
-  if (others.length) {
-    const prices = [...new Set(others.map(c => c.other.price))];
-    other = `<div class="abnote">Other index ${esc(others[0].other.idx)} ${esc(others[0].other.name.toLowerCase())}: ` +
-      (prices.length === 1 ? money(prices[0]) : others.map(c => `${esc(label(c))} ${money(c.other.price)}`).join(" · ")) + `</div>`;
-  }
-  if (pg.otherLine) other += `<div class="abnote">${esc(pg.otherLine)}</div>`;
-  if (!main && !note && !other) return "";
-  return `<div class="addonbar">${main ? `<span class="mh">${ranged.length ? "Add-ons" : "Also"}</span> ${main}` : ""}${note}${other}</div>`;
+function otherIndexHTML(c) {
+  return `<div class="nomore">${c.other ? `<div class="other">Other index: ${c.other.idx} ${esc(c.other.name.toLowerCase())}, ${money(c.other.price)}.</div>` : ""}</div>`;
 }
 function drawPage() {
   const pg = page(), p = { ...st.p, rec: (ts() || {}).rec || null };
@@ -655,7 +621,7 @@ function drawPage() {
     const sel = st.chosen && st.chosen.tab === pg.key && st.chosen.i === i;
     return `<div class="card ${rec && !sel ? "rec" : ""} ${sel ? "sel" : ""} ${none ? "nomade" : ""}" data-i="${i}" role="button">
       ${sel ? `<span class="chip ok">Chosen</span>` : rec ? `<span class="chip">Suits your prescription</span>` : ""}
-      ${headHTML(pg, c)}${priceHTML(pg, c, i, thick)}${bodyHTML(pg, c, p, i)}<div class="nomore"></div>
+      ${headHTML(pg, c)}${priceHTML(pg, c, i, thick)}${bodyHTML(pg, c, p, i)}${otherIndexHTML(c)}
       <div class="spacer"></div><div class="tapline">${none ? "Not made in your prescription" : sel ? "Change &rarr;" : "Choose &rarr;"}</div></div>`;
   }).join("");
   const other = pg.otherLine ? `<div class="other" style="margin-top:12px">${esc(pg.otherLine)}</div>` : "";
@@ -664,7 +630,7 @@ function drawPage() {
   $("page").className = pg.cards.some(c => c.thick || c.grid) ? "tall" : "";
   $("page").innerHTML = `<div class="toprow"><div class="eyebrow">${esc(pg.eyebrow)}</div>${p.first ? `<div class="who">Lenses for <b>${esc(p.first)}</b></div>` : ""}</div>
     <h1>${pg.h1}</h1><div class="lead">${esc(pg.lead)}</div>${quiet}
-    <div class="rows" style="grid-template-columns:repeat(${pg.cols}, 1fr)">${cards}</div>${addonBar(pg)}${foot}`;
+    <div class="rows" style="grid-template-columns:repeat(${pg.cols}, 1fr)">${cards}</div>${other}${foot}`;
   document.querySelectorAll(".card").forEach(b => b.onclick = (ev) => {
     const row = ev.target.closest(".lr"), more = ev.target.closest(".more[data-pop]");
     if (more) { openPop(+b.dataset.i); return; }
@@ -709,7 +675,7 @@ function openSheet(i, pre = {}) {
   st.thickI = c.thick ? (pre.t != null ? pre.t : Math.max(0, c.thick.findIndex(t => t.idx === (ts() || {}).rec))) : null;
   st.other = false;                                   // 1.53 only when asked for
   st.gridI = c.grid ? 0 : null; st.coat = c.grid ? (c.grid[0][2] != null ? "hc" : "ar") : null;
-  st.opt = "clear"; st.colour = c.tintPick ? "Grey" : (c.colours ? c.colours[0] : null); st.depth = "s85";
+  st.opt = "clear"; st.colour = c.colours && !c.tintPick ? c.colours[0] : "Grey"; st.depth = "s85";
   st.pfx = "Grey"; st.mirror = false;
   const list = optList();
   if (pre.o && list && list.find(o => o.k === pre.o && !o.off)) st.opt = pre.o;
