@@ -22,7 +22,8 @@ Commands
       -> {"rxs": [...]} every SPECTACLE_RX row saved on the day of this
          patient's LATEST one (newest first; two on a day is usually a distance
          and a reading pair), each with both eyes verbatim and the lens type
-         read from the Rx comment.
+         read from the Rx comment. "Saved" = last saved (edited, else added),
+         the same stamp the recent list uses and the pick-lens job checks.
   names
       -> {"names": [...]} every given-name / surname word, lower case, for
          the Lens Finder chat's pre-send name check (kept in memory only).
@@ -126,7 +127,7 @@ def recent_query(day: str, top: int) -> str:
     lo, hi = _day_bounds(day)
     return (
         f"SELECT TOP {int(top)} s.PATIENTID, CONVERT(varchar(19), {SAVED_AT}, 120), "
-        f"{_txt('p.GIVEN')}, {_txt('p.SURNAME')} "
+        f"{_txt('p.GIVEN')}, {_txt('p.SURNAME')}, {_txt('s.USER_IDENTIFIER')} "
         "FROM SPECTACLE_RX s WITH (NOLOCK) JOIN PATIENT p WITH (NOLOCK) ON p.ID = s.PATIENTID "
         f"WHERE {SAVED_AT} >= '{lo}' AND {SAVED_AT} < '{hi}' "
         f"ORDER BY {SAVED_AT} DESC, s.ID DESC")
@@ -135,13 +136,13 @@ def recent_query(day: str, top: int) -> str:
 def rx_query(pid: int) -> str:
     eye = ", ".join(_txt(f"s.{side}_{c}") for side in ("RIGHT", "LEFT") for c in EYE_COLS)
     return (
-        f"SELECT TOP {MAX_SAME_DAY * 3} s.ID, CONVERT(varchar(19), s.DATE_ADDED, 120), "
+        f"SELECT TOP {MAX_SAME_DAY * 3} s.ID, CONVERT(varchar(19), {SAVED_AT}, 120), "
         "CONVERT(varchar(10), s.RXDATE, 120), "
         f"{_txt('s.USER_IDENTIFIER')}, "
         "ISNULL(CAST(s.RIGHT_EYE_ONLY AS int),0), ISNULL(CAST(s.LEFT_EYE_ONLY AS int),0), "
         f"{_comment('s.COMMENT')}, {_comment('s.PRACTICE_COMMENT')}, {eye} "
         f"FROM SPECTACLE_RX s WITH (NOLOCK) WHERE s.PATIENTID = {int(pid)} "
-        "ORDER BY s.DATE_ADDED DESC, s.ID DESC")
+        f"ORDER BY {SAVED_AT} DESC, s.ID DESC")
 
 
 def patient_query(pid: int) -> str:
@@ -549,7 +550,7 @@ def build_recent(rows: list[list[str]], n: int) -> dict:
             continue
         seen.add(pid)
         out.append({"id": int(pid), "given": row[2], "surname": row[3],
-                    "saved": clock(row[1]), "saved_at": row[1]})
+                    "saved": clock(row[1]), "saved_at": row[1], "optom": row[4] if len(row) > 4 else ""})
     return {"patients": out[:n], "more": len(out) > n}
 
 
@@ -640,7 +641,7 @@ def cmd_recent(day: str | None = None, n: int = DEFAULT_N, sql=None) -> dict:
     n = max(1, min(MAX_N, int(n)))
     if fixture_mode() and sql is None:
         db = fixture_db(day)
-        rows = sorted(([str(pid), r[0][1], *db["people"][pid][:2]] for pid, r in db["rx"].items()),
+        rows = sorted(([str(pid), r[0][1], *db["people"][pid][:2], r[0][3]] for pid, r in db["rx"].items()),
                       key=lambda x: x[1], reverse=True)
     else:
         rows = (sql or sqlq)(recent_query(day, 40))
@@ -723,6 +724,63 @@ def cmd_names(sql=None) -> dict:
     return {"names": name_words(vals)}
 
 
+# ---------------------------------------------------------------------------
+# A frame by its stock barcode (pick-lens job, 8 Nov 2026) - read only
+# ---------------------------------------------------------------------------
+
+BARCODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
+SUNGLASS_STOCK_TYPE = 3
+
+# Fictional frames for the fake ZZTEST people (same records as orders/pickjob.py::FixtureSource).
+FIXTURE_FRAME_RECORDS = {
+    "ZZFRAME5219": ["ZZFRAME5219", "ZZTEST Metal", "Gunmetal", "5219", "0", "57.0", "MIS", "2", "179.0000", "1"],
+    "ZZFRAME5818": ["ZZFRAME5818", "ZZTEST Aviator", "Gold", "5818", "0", "66.0", "MIS", "3", "249.0000", "1"],
+}
+
+
+def frame_by_barcode_query(barcode: str) -> str:
+    return (f"SELECT {_txt('f.BARCODE')}, {_txt('f.MODEL')}, {_txt('f.COLOUR_DESCRIPTION')}, {_txt('f.SIZE')}, "
+            "ISNULL(f.BRIDGE,0), ISNULL(f.DIAG,0), ISNULL(f.SUPPLIER_IDENTIFIER,''), ISNULL(f.STOCK_TYPE,0), "
+            "ISNULL(CAST(b.SELLINC AS varchar(20)),''), ISNULL(b.QOH,0) "
+            "FROM SPECFRAME f WITH (NOLOCK) LEFT JOIN SPECFRAME_BRANCH b WITH (NOLOCK) "
+            "ON b.SPECFRAMEID = f.ID AND b.BRANCH_IDENTIFIER = 'MJ' "
+            f"WHERE f.BARCODE = N'{_sql_str(barcode)}'")
+
+
+def build_frame_record(row: list[str] | None) -> dict | None:
+    """{"barcode", "model", "colour", "a", "dbl", "ed", "sunglass", "price", "qoh"} or None."""
+    if not row or len(row) < 10:
+        return None
+    a, dbl = split_size(row[3])
+    dbl = _mm(row[4], 10, 30) or dbl
+    ed = _mm(row[5], 30, 90)
+    try:
+        price = float(row[8]) if row[8].strip() else None
+    except ValueError:
+        price = None
+    try:
+        qoh = int(float(row[9]))
+    except ValueError:
+        qoh = 0
+    return {"barcode": row[0], "model": row[1], "colour": row[2], "a": a, "dbl": dbl, "ed": ed,
+            "sunglass": row[7].strip() == str(SUNGLASS_STOCK_TYPE), "price": price, "qoh": qoh}
+
+
+def cmd_frame(barcode: str, sql=None) -> dict:
+    barcode = str(barcode or "").strip()
+    if not BARCODE_RE.match(barcode):
+        raise BridgeError("That doesn't look like a frame barcode.")
+    if fixture_mode() and sql is None:
+        row = FIXTURE_FRAME_RECORDS.get(barcode.upper())
+    else:
+        rows = (sql or sqlq)(frame_by_barcode_query(barcode))
+        row = rows[0] if len(rows) == 1 else None
+    rec = build_frame_record(row)
+    if rec is None:
+        raise BridgeError("That frame barcode isn't in Optomate.")
+    return {"frame": rec}
+
+
 def main(argv=None) -> int:
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -740,6 +798,8 @@ def main(argv=None) -> int:
             result = cmd_rx(int(opts["--pid"]))
         elif cmd == "names" and not opts:
             result = cmd_names()
+        elif cmd == "frame" and set(opts) == {"--barcode"}:
+            result = cmd_frame(opts["--barcode"])
         else:
             result = {"error": "Bad command."}
     except BridgeError as exc:

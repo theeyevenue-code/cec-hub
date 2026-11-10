@@ -44,7 +44,7 @@ import sys
 from decimal import Decimal
 from pathlib import Path
 
-from hub import checkin, lenses
+from hub import checkin, lenses, pdshift
 
 BRIDGE = Path(__file__).resolve().with_name("lens_bridge.py")
 HUB_ROOT = Path(__file__).resolve().parent.parent
@@ -129,7 +129,8 @@ def recent(cfg: dict) -> dict:
     return {"date": str(data.get("date") or ""), "more": bool(data.get("more")),
             "test_day": len(args) > 3,
             "fixture": bool(data.get("fixture")),
-            "patients": [{"id": int(p["id"]), "name": _name(p), "saved": str(p.get("saved") or "")}
+            "patients": [{"id": int(p["id"]), "name": _name(p), "saved": str(p.get("saved") or ""),
+                          "saved_at": str(p.get("saved_at") or "")[:19], "optom": str(p.get("optom") or "")[:10]}
                          for p in data.get("patients") or [] if isinstance(p, dict) and p.get("id")]}
 
 
@@ -275,15 +276,34 @@ def mode_question(rx: dict, typ: str, written_as: str = "") -> dict:
 # ---------------------------------------------------------------------------
 
 def sell_index(products: list) -> dict:
-    """(supplier, name, index, type) -> {coating: sell price per pair, "": any}.
-    Same key as the Lens Finder page's sellIndex()."""
-    idx = {}
+    """(supplier, name, index, type, material) -> {coating: sell price per pair
+    or None, "": cheapest}. Same key as the Lens Finder page's sellIndex().
+
+    Each material keeps its own price: Clear, BluePro, PhotoFusion X and
+    Polarised of one lens sell for different amounts (Mark, 8 Nov 2026). The
+    old material-less key (supplier, name, index, type) is kept only for a
+    lens whose materials all sell at the same prices, so nothing can borrow
+    another material's price. A coating listed with None has no sheet price."""
+    idx, plain = {}, {}
     for p in products or []:
-        by = {c.get("coating"): c.get("cec_price") for c in p.get("coatings") or []
-              if c.get("cec_price") is not None}
+        by = {c.get("coating"): c.get("cec_price") for c in p.get("coatings") or []}
         by[""] = p.get("cec_price")
-        idx[(p.get("supplier"), p.get("name"), _fmt_index(p.get("index")), p.get("type"))] = by
+        k4 = (p.get("supplier"), p.get("name"), _fmt_index(p.get("index")), p.get("type"))
+        idx[k4 + (str(p.get("material") or ""),)] = by
+        plain.setdefault(k4, []).append(by)
+    for k4, bys in plain.items():
+        if all(b == bys[0] for b in bys):
+            idx[k4] = bys[0]
     return idx
+
+
+def sell_for(sells: dict, o: dict):
+    """The sell price per pair for one engine row (its own material and coating), or None."""
+    k4 = (o.get("supplier"), o.get("name"), _fmt_index(o.get("index")), o.get("type"))
+    by = sells.get(k4 + (str(o.get("material") or ""),))
+    if by is None:
+        by = sells.get(k4) or {}
+    return by.get(o.get("coating"), by.get(""))
 
 
 def _fmt_index(v) -> str:
@@ -295,8 +315,7 @@ def _short(name) -> str:
 
 
 def _lens_out(o: dict, sells: dict, best_price) -> dict:
-    by = sells.get((o.get("supplier"), o.get("name"), _fmt_index(o.get("index")), o.get("type"))) or {}
-    sell = by.get(o.get("coating"), by.get(""))
+    sell = sell_for(sells, o)
     cat = lenses.normalise_category(o.get("category", ""))
     name = _short(o.get("name"))
     if cat == "Single vision":
@@ -305,6 +324,8 @@ def _lens_out(o: dict, sells: dict, best_price) -> dict:
     return {
         "index": _fmt_index(o.get("index")), "category": CATEGORY_WORD.get(cat, cat),
         "name": name, "supplier": str(o.get("supplier") or ""),
+        # the price-book row's own name and material: the pick-lens job's link-table key (8 Nov 2026)
+        "raw_name": str(o.get("name") or ""), "material": str(o.get("material") or ""),
         "type": "Stock" if o.get("type") == "stock" else "Grind",
         "coating": str(o.get("coating") or ""), "code": str(o.get("code") or ""),
         "blank_mm": o.get("blank_mm"), "cost": price, "basis": o.get("basis") or "",
@@ -413,7 +434,7 @@ def blank_mismatch(listed: list, need: dict | None) -> dict | None:
 
 
 def summarise(result: dict, sells: dict, avail: dict | None = None,
-              need: dict | None = None) -> dict:
+              need: dict | None = None, shift_ctx: dict | None = None) -> dict:
     """The engine's answer cut to what the page shows: one line per lens, each
     with its blank verdict; the cheapest that FITS leads (engine order, with
     stock lenses too small for the frame moved behind the ones that fit)."""
@@ -452,6 +473,12 @@ def summarise(result: dict, sells: dict, avail: dict | None = None,
             x["blank_mm"] = max(picked) if ok and picked else (sizes[-1] if not ok else sizes[0])
             if need and not ok:
                 x["largest_by_eye"] = largest_by_eye(key, avail, need)
+                if shift_ctx:
+                    big = {s: max(avail.get(s, {}).get(key) or [], default=None) for s in need}
+                    v = pdshift.find(shift_ctx["frame"], shift_ctx["pds"], shift_ctx["powers"], big)
+                    if v:
+                        x["pd_shift"] = v
+                        x["blank_mm"] = max(b for b in big.values() if b is not None)
         return x
     rest = [out(v) for v in ordered if v is not best]
 
@@ -511,7 +538,21 @@ def run_mode(rows: list, pricing: dict, sells: dict, q: dict,
         sizes = sorted({b for per in avail.values() for v in per.values() for b in v})
         est["min_stock"] = next((b for b in sizes if b >= max(need.values()) - 1e-9), None)
         est["stock_sizes"] = sizes
-    return summarise(res, sells, avail, need)
+    return summarise(res, sells, avail, need, _shift_ctx(q, est))
+
+
+def _shift_ctx(q: dict, est: dict | None) -> dict | None:
+    """Mark, 9 Nov 2026: the PD shift variation is single vision only, from both monocular PDs as
+    saved (not a halved binocular PD, not a distance PD standing in for a missing near PD)."""
+    if not est or q.get("kind") != "Single vision" or not q.get("pd_exact") or not est.get("frame"):
+        return None
+    powers = {}
+    for s, e in (("R", q.get("right")), ("L", q.get("left"))):
+        if e:
+            powers[s] = pdshift.horizontal_power(e["sph"], e["cyl"], (q.get("axes") or {}).get(s))
+    if set(powers) != set(est.get("pds") or {}):
+        return None
+    return {"frame": est["frame"], "pds": est["pds"], "powers": powers}
 
 
 # ---------------------------------------------------------------------------
@@ -597,7 +638,9 @@ def blank_estimate(frame: dict | None, pds: dict, multi: bool = False) -> dict |
     inputs = (f"A {a:g} · DBL {dbl:g} · ED " + (f"{ed:g}" if ed else "not known")
               + " · PD " + " / ".join(f"{s} {v:g}" for s, v in _eye_order(pds.items())))
     return {"value": max(per_eye.values()), "per_eye": per_eye, "inputs": inputs,
-            "working": working, "notes": notes, "approx": not ed}
+            "working": working, "notes": notes, "approx": not ed,
+            # for the PD shift variation (hub/pdshift.py): the numbers the estimate used
+            "frame": {"a": a, "dbl": dbl, "ed": ed}, "pds": dict(pds)}
 
 
 # ---------------------------------------------------------------------------
@@ -639,12 +682,15 @@ def options_for_rx(rx: dict, rows: list, pricing: dict, sells: dict,
                 if est and pd_note:
                     est["notes"].insert(0, pd_note)
                 part["blank"] = est
+                q["pd_exact"] = not pd_note and typ in pdshift.SV_PARTS
+                q["axes"] = {s: num((rx.get(k) or {}).get("axis")) for s, k in (("R", "right"), ("L", "left"))}
                 part["answer"] = run_mode(rows, pricing, sells, q, est)
             parts.append(part)
         tabs.append({"key": tab, "label": TAB_LABELS[tab], "written": tab in written,
                      "parts": parts})
     return {
         "rx_id": rx.get("rx_id"), "saved": rx.get("saved"), "saved_date": _dmy(rx.get("saved_date")),
+        "saved_at": str(rx.get("saved_at") or "")[:19],   # the stamp the pick-lens job checks the Rx against
         "rx_date": _dmy(rx.get("rx_date")), "optom": str(rx.get("optom") or ""),
         "right": rx.get("right"), "left": rx.get("left"),
         "type_note": lt.get("note") or "", "type_words": lt.get("words") or [],
