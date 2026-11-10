@@ -299,6 +299,33 @@ h1 { font-size:36px; font-weight:700; color:var(--ink); line-height:1.05; margin
 .cpop .popbtns .cta { width:auto; padding:0 28px; white-space:nowrap; }
 .tab.small { font-size:14px; color:var(--grey); padding:10px 8px; margin-left:14px; align-self:center; }
 .tab.small.on { color:var(--black); }
+.quietnext { font-size:19px; color:var(--grey); margin-right:auto; }
+/* spacing pass (Mark, 10 Nov 2026: "prev version but just more space allowed between key items vertically") */
+main { padding-top:34px; }
+.lead { margin-top:10px; }
+.rows { margin-top:34px; }
+.card { padding:26px 24px 22px; }
+.name { margin-top:8px; }
+.price { margin-top:22px; }
+.body { margin-top:18px; }
+.lens { margin-top:10px; }
+.desc { margin-top:14px; }
+.thin { padding-top:12px; }
+.thin h4 { margin-bottom:6px; }
+.more { margin-top:20px; padding-top:14px; }
+.tapline { padding-top:22px; }
+/* tabs whose cards carry a thickness list or table (multifocal, office, sunglasses): lighter spacing so nothing scrolls */
+main#page.tall { padding-top:26px; }
+#page.tall .rows { margin-top:24px; }
+#page.tall .card { padding:22px 24px 16px; }
+#page.tall .price { margin-top:16px; }
+#page.tall .body { margin-top:12px; }
+#page.tall .lens { margin-top:8px; }
+#page.tall .desc { margin-top:10px; }
+#page.tall .thin { padding-top:8px; }
+#page.tall .thin h4 { margin-bottom:3px; }
+#page.tall .more { margin-top:12px; padding-top:9px; }
+#page.tall .tapline { padding-top:14px; }
 </style>
 </head>
 <body>
@@ -350,7 +377,7 @@ h1 { font-size:36px; font-weight:700; color:var(--ink); line-height:1.05; margin
       <div class="sumlines" id="summary"></div>
       <div class="sumprice"><div class="tl">Lenses, a pair</div><div class="big" id="sum-total"></div><div class="pair">Frame extra.</div></div>
     </div>
-    <div class="staffrow" id="patrow"><button class="cta" id="backsheets">&larr; Back to the price sheets</button></div>
+    <div class="staffrow" id="patrow"><span class="quietnext">Next, ask us to scan your frame.</span><button class="cta" id="backsheets">&larr; Back to the price sheets</button></div>
     <div class="staffrow" id="staffrow"><span class="lab">Staff</span><button class="cta" id="toframe">Scan the frame &rarr;</button><button class="ghost" id="changelens">Change lens</button></div>
   </main>
 </section>
@@ -488,6 +515,17 @@ async function pickPatient(h) {
   const r = await api("/api/sheet/pick", { h });
   if (!r) return;
   if (r.error) { $("phits").innerHTML = `<div class="stop">${esc(r.error)}</div>`; return; }
+  if (r.confirm) {    // an older saved Rx: staff confirm it before any mark shows (Mark, 10 Nov 2026)
+    const c = r.confirm;
+    $("pats").innerHTML = `<div class="pat"><div class="pn">Rx from ${esc(c.date)}${c.optom ? ", " + esc(c.optom) : ""}</div>
+      <div class="pt">${esc(c.type)}</div>${c.old ? `<div class="ps">Over 2 years old: check with the optom.</div>` : ""}
+      <div class="pg">Use this Rx?</div></div>
+      <button class="pat" data-h="${esc(c.use)}"><div class="pn">Use this Rx</div><div class="pt">The sheet marks what suits it.</div><div class="pg">Use it &rarr;</div></button>
+      <button class="pat" data-h="${esc(c.skip)}"><div class="pn">No Rx: prices only</div><div class="pt">Save the Rx in Optomate later to make the job.</div><div class="pg">Prices only &rarr;</div></button>`;
+    $("patlead").textContent = "This patient has no Rx saved today.";
+    document.querySelectorAll("#pats button.pat").forEach(b => b.onclick = () => pickPatient(b.dataset.h));
+    return;
+  }
   if (r.choose) {     // two Rx saved the same day: staff choose, labelled by the type written
     $("pats").innerHTML = r.choose.map(c => `<button class="pat" data-h="${esc(c.h)}"><div class="pn">${esc(c.type)}</div><div class="pt">Rx saved ${esc(c.time)}</div><div class="pg">This one &rarr;</div></button>`).join("");
     $("patlead").textContent = "Two prescriptions were saved today. Pick the one being made.";
@@ -497,7 +535,22 @@ async function pickPatient(h) {
   const s = await api("/api/sheet/patient");
   if (!s || s.error) return;
   st = { p: { first:s.first, tabs:s.tabs || {}, picked:true, noRx:!!s.no_rx }, tab:s.tab || "sv" };
+  if (s.resume && resumeChoice(s.resume)) return;          // picks up where they left off today
   drawPage(); show("s-sheet");
+}
+// the choice kept for this patient today (no saved Rx yet, or the iPad was cleared): back on the Chosen screen
+function resumeChoice(k) {
+  const ch = k.choice || {}, pg = PAGES.find(x => x.key === ch.tab);
+  if (!pg || !pg.cards[ch.card]) return false;
+  st.tab = ch.tab; drawPage(); $("sheet").style.transition = "none";
+  const c = pg.cards[ch.card];
+  openSheet(ch.card, {});
+  if (c.thick) { const t = c.thick.findIndex(x => x.idx === ch.idx); if (t >= 0) st.thickI = t; else if (c.other && c.other.idx === ch.idx) st.other = true; }
+  if (c.grid) { const g = c.grid.findIndex(x => x[0] === ch.idx); if (g >= 0) st.gridI = g; }
+  st.opt = ch.opt || "clear"; st.colour = ch.colour || st.colour; st.depth = ch.depth || st.depth; st.pfx = ch.pfx || st.pfx;
+  st.resumeFrame = k.frame || null; st.resumeRimless = !!k.rimless;
+  drawChoice(); $("sheet").style.transition = ""; $("choose").click();
+  return true;
 }
 
 /* ---- next patient / 5 minutes untouched: back to the plain sheet, everything cleared ---------- */
@@ -567,6 +620,7 @@ function drawPage() {
   const other = pg.otherLine ? `<div class="other" style="margin-top:12px">${esc(pg.otherLine)}</div>` : "";
   const foot = pg.foot ? `<div class="foot"><div class="fl">${pg.foot[0].map(x => `<span>${esc(x)}</span>`).join("")}</div><div class="fd">${esc(pg.foot[1])}</div></div>` : "";
   const quiet = t.note ? `<div class="quiet">${esc(t.note)}</div>` : "";
+  $("page").className = pg.cards.some(c => c.thick || c.grid) ? "tall" : "";
   $("page").innerHTML = `<div class="toprow"><div class="eyebrow">${esc(pg.eyebrow)}</div>${p.first ? `<div class="who">Lenses for <b>${esc(p.first)}</b></div>` : ""}</div>
     <h1>${pg.h1}</h1><div class="lead">${esc(pg.lead)}</div>${quiet}
     <div class="rows" style="grid-template-columns:repeat(${pg.cols}, 1fr)">${cards}</div>${other}${foot}`;
@@ -768,7 +822,7 @@ function drawSum() {
   $("sum-eye").textContent = c.line || c.product || pg.eyebrow;
   $("sum-who").textContent = st.p.first;
   $("sum-whobox").style.display = st.p.first ? "" : "none";
-  const job = picked() && !st.p.noRx;
+  const job = picked();             // no saved Rx: staff still choose the frame; the server says "Needs the Rx"
   $("staffrow").style.display = job ? "" : "none";
   $("patrow").style.display = job ? "none" : "";
   $("sum-h1").textContent = choiceTitle();
@@ -804,6 +858,11 @@ async function drawFrame() {
   $("chosen").innerHTML = "";
   if (!st.staff) { const r = await api("/api/sheet/staff"); if (!r) return; st.staff = r; }
   $("fpat").textContent = st.staff.name;
+  const rf = st.resumeFrame; st.resumeFrame = null;          // the frame kept for this patient today
+  if (st.resumeRimless) { fq.rimless = true; $("rimless").classList.add("on"); st.resumeRimless = false; }
+  if (rf && rf.own) { fq.own = true; $("own").classList.add("on"); $("ownsize").style.display = "";
+    $("oa").value = rf.a || ""; $("odbl").value = rf.dbl || ""; $("oed").value = rf.ed || ""; }
+  if (rf && rf.barcode) { scanBarcode(rf.barcode); return; }
   runChecks();
 }
 let checkSeq = 0;

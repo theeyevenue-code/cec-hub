@@ -613,6 +613,9 @@ def fixture_db(day: str) -> dict:
         9005: ("Jo", "ZZTEST-HIGH", "1985-03-14"),
         9006: ("Kim", "ZZTEST-CYL", "1992-08-08"),
         9007: ("Lee", "ZZTEST-DIGITAL", "1990-05-05"),
+        # no saved Rx / an old Rx (Mark, 10 Nov 2026: the sheet must work without a saved prescription)
+        9010: ("Noa", "ZZTEST-NORX", "1988-02-02"),
+        9011: ("Uri", "ZZTEST-OLDRX", "1975-07-07"),
     }
     rx = {
         9001: [["501", at("11:42"), day, "MJ", "0", "0", FOOTER % "", "",
@@ -633,6 +636,10 @@ def fixture_db(day: str) -> dict:
         9006: [["506", at("08:10"), day, "NK", "0", "0", FOOTER % "", "",
                 *_fx_eye("-0.50", "-3.50", "180", pd="32"),
                 *_fx_eye("-0.75", "-3.25", "10", pd="32")]],
+        9010: [],
+        9011: [["511", "2023-03-12 10:05:00", "2023-03-12", "NK", "0", "0", FOOTER % "", "",
+                *_fx_eye("-2.00", "-0.50", "90", pd="31"),
+                *_fx_eye("-2.25", pd="31")]],
         9007: [["507", at("07:50"), day, "MJ", "0", "0", FOOTER % "", "",
                 *_fx_eye("-1.50", "-0.25", "180", "+1.00", pd="31"),
                 *_fx_eye("-1.75", "", "", "+1.00", pd="31")]],
@@ -654,7 +661,8 @@ def cmd_recent(day: str | None = None, n: int = DEFAULT_N, sql=None) -> dict:
     n = max(1, min(MAX_N, int(n)))
     if fixture_mode() and sql is None:
         db = fixture_db(day)
-        rows = sorted(([str(pid), r[0][1], *db["people"][pid][:2], r[0][3]] for pid, r in db["rx"].items()),
+        rows = sorted(([str(pid), r[0][1], *db["people"][pid][:2], r[0][3]] for pid, r in db["rx"].items()
+                       if r and r[0][1].startswith(day)),
                       key=lambda x: x[1], reverse=True)
     else:
         rows = (sql or sqlq)(recent_query(day, 40))
@@ -665,7 +673,8 @@ def cmd_search(q: str, sql=None) -> dict:
     from hub import guide_search
     if fixture_mode() and sql is None:
         db = fixture_db(date.today().isoformat())
-        rows = [{"ID": pid, "GIVEN": g, "SURNAME": s, "BIRTHDATE": dob}
+        rows = [{"ID": pid, "GIVEN": g, "SURNAME": s, "BIRTHDATE": dob,
+                 "LAST_RX": (db["rx"].get(pid) or [["", "", ""]])[0][2]}
                 for pid, (g, s, dob) in db["people"].items()]
 
         def fetch(filt, top, spec):

@@ -1,5 +1,6 @@
 """iPad price sheet steps 2-3 (hub/sheetprice.py, hub/sheetjob.py, /api/sheet/*). Synthetic price books, a fake
 read-only bridge and a fake engine: nothing touches Optomate. Fake ZZTEST people only."""
+import datetime as dt
 import importlib
 import json
 
@@ -50,6 +51,7 @@ LINK_CSV = HEAD + (
     "Synchrony,Progressive Ultra HDV 1.50,1.50,Clear,HMC+,grind,,Progressive,,yes,20001267,Ultra HDV 1.50,210.00,20001325,0.00,addon,420.00,420.00,,yes,code,,unchecked,,\n"
 )
 
+OLD = {9011: "2023-03-12", 9012: "2025-06-01"}       # saved Rx dates that are not today
 PEOPLE = {
     9003: ("Mia", "ZZTEST", (_eye("-2.75", "-0.75", "180", pd="30"), _eye("-3.00", "-0.50", "10", pd="30")), ""),
     9005: ("Jo", "ZZTEST-HIGH", (_eye("-6.50", "-0.50", "180", pd="30"), _eye("-6.25", "-0.25", "170", pd="30")), ""),
@@ -57,6 +59,9 @@ PEOPLE = {
     9007: ("Lee", "ZZTEST-DIGITAL", (_eye("-1.50", "-0.25", "180", add="+1.00", pd="31"), _eye("-1.75", add="+1.00", pd="31")), ""),
     9008: ("Ola", "ZZTEST-DIGI60", (_eye("-1.50", add="+0.60", pd="31"), _eye("-1.75", add="+0.60", pd="31")), ""),
     9009: ("Ray", "ZZTEST-DIGIDIFF", (_eye("-1.50", add="+0.75", pd="31"), _eye("-1.75", add="+1.00", pd="31")), ""),
+    9010: ("Noa", "ZZTEST-NORX", (), ""),
+    9011: ("Uri", "ZZTEST-OLDRX", (_eye("-2.00", "-0.50", "90", pd="31"), _eye("-2.25", pd="31")), ""),
+    9012: ("Viv", "ZZTEST-RECENT", (_eye("-1.00", pd="31"), _eye("-1.25", pd="31")), ""),
     9004: ("Priya", "ZZTEST-PRISM", (_eye("-1.00", pd="32", prism=("1.00", "IN", "", "")), _eye("-1.25", pd="32")), ""),
 }
 FRAMES = {"ZZFRAME5219": {"barcode": "ZZFRAME5219", "model": "ZZTEST Metal", "colour": "Gunmetal", "a": 52.0, "dbl": 19.0,
@@ -68,19 +73,21 @@ FRAMES = {"ZZFRAME5219": {"barcode": "ZZFRAME5219", "model": "ZZTEST Metal", "co
 class Bridge:
     def __call__(self, cfg, *args):
         if args[0] == "recent":
-            return {"date": "2026-11-10", "more": False, "fixture": True,
-                    "patients": [{"id": pid, "given": g, "surname": s, "saved": "9:15am", "optom": "MJ"} for pid, (g, s, _, _) in PEOPLE.items()][:3]}
+            return {"date": dt.date.today().isoformat(), "more": False, "fixture": True,
+                    "patients": [{"id": pid, "given": g, "surname": s, "saved": "9:15am", "optom": "MJ"} for pid, (g, s, e, _) in PEOPLE.items()
+                                 if e and pid not in OLD][:3]}
         if args[0] == "search":
             hits = [(pid, g, sn) for pid, (g, sn, _, _) in PEOPLE.items() if g.lower() in args[2].lower()] or [(9004, "Priya", "ZZTEST-PRISM")]
             return {"patients": [{"id": pid, "given": g, "surname": sn, "dob": "1970-06-30", "last_rx": "2026-11-10"} for pid, g, sn in hits], "more": False}
         if args[0] == "rx":
             pid = int(args[2])
             g, s, eyes, comment = PEOPLE[pid]
-            right, left = (lb.parse_eye(e) for e in eyes)
+            saved = OLD.get(pid, dt.date.today().isoformat())
+            right, left = (lb.parse_eye(e) for e in eyes) if eyes else (None, None)
             return {"patient": {"id": pid, "given": g, "surname": s, "dob": "1970-01-01"}, "frame": None,
-                    "rxs": [{"rx_id": pid - 8500, "saved_at": "2026-11-10 09:15:00", "saved": "9:15am", "saved_date": "2026-11-10",
-                             "rx_date": "2026-11-10", "optom": "MJ", "right_only": False, "left_only": False, "right": right, "left": left,
-                             "lens_type": lb.detect_type(RTF % comment, "", bool(right["add"] or left["add"]), False)}]}
+                    "rxs": [] if not eyes else [{"rx_id": pid - 8500, "saved_at": f"{saved} 09:15:00", "saved": "9:15am", "saved_date": saved,
+                             "rx_date": saved, "optom": "NK" if pid in OLD else "MJ", "right_only": False, "left_only": False, "right": right, "left": left,
+                             "lens_type": lb.detect_type(RTF % comment, "", bool(right["add"] or left["add"]), False)}]}  # noqa: E501
         if args[0] == "frame":
             f = FRAMES.get(args[2])
             return {"frame": f} if f else {"error": "That frame barcode isn't in Optomate."}
@@ -435,3 +442,69 @@ def test_digital_add_rule_leaves_the_patient_sheet_alone(c):
     pick(c, "Ola")
     af = c.get("/api/sheet/patient").get_json()["tabs"]["af"]
     assert af["cards"][1]["1.60"]["state"] == "mto"
+
+
+
+# ---- no saved prescription (Mark, 10 Nov 2026: "a pathway where this will work without a saved prescription") ----
+def _search_pick(c, words):
+    unlock(c)
+    return c.post("/api/sheet/pick", json={"h": c.post("/api/sheet/search", json={"q": words}).get_json()["patients"][0]["h"]}).get_json()
+
+
+def test_an_older_rx_needs_staff_to_confirm_and_is_flagged_over_two_years(c):
+    r = _search_pick(c, "zztest uri")
+    conf = r["confirm"]
+    assert conf["date"] == "12 Mar 2023" and conf["optom"] == "NK" and conf["old"] is True
+    assert c.get("/api/sheet/patient").status_code == 403                  # nothing shows until staff choose
+    assert c.post("/api/sheet/pick", json={"h": conf["use"]}).get_json() == {"ok": True}
+    d = c.get("/api/sheet/patient").get_json()
+    assert not d.get("no_rx") and d["tabs"]["sv"]["cards"][0]["1.50"]["state"] == "stock"
+    c.post("/api/sheet/next")
+    recent = _search_pick(c, "zztest viv")["confirm"]
+    assert recent["old"] is False and recent["date"] == "1 Jun 2025"
+
+
+def test_no_rx_works_price_only_and_refuses_the_job_with_the_next_step(c):
+    r = _search_pick(c, "zztest noa")
+    assert r == {"ok": True}
+    d = c.get("/api/sheet/patient").get_json()
+    assert d["no_rx"] and d["tabs"] == {} and d["first"] == "Noa"
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    ch = {"tab": "sv", "card": 1, "idx": "1.60", "opt": "blue"}
+    k = c.post("/api/sheet/checks", json=body(choice=ch)).get_json()
+    assert k["no_rx"] and not k["can_make"] and k["why"] == sj.NO_RX_WHY
+    assert k["verdict"]["head"] == "Needs the Rx" and k["price"] == 300 and k["frame"]["barcode"] == "ZZFRAME5219"
+    assert k["rx"]["right"] == "No saved Rx"
+    for route in ("/api/sheet/plan", "/api/sheet/make"):
+        j = c.post(route, json=body(choice=ch)).get_json()
+        assert j["ok"] is False and j["refusals"] == [sj.NO_RX_WHY]
+    assert not [x for x in c.sent if x[0] in ("plan", "make")]
+
+
+def test_skipping_an_older_rx_is_price_only(c):
+    conf = _search_pick(c, "zztest uri")["confirm"]
+    c.post("/api/sheet/pick", json={"h": conf["skip"]})
+    assert c.get("/api/sheet/patient").get_json()["no_rx"] is True
+
+
+def test_the_choice_is_kept_for_the_patient_today_and_comes_back(c):
+    _search_pick(c, "zztest noa")
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    ch = {"tab": "sv", "card": 1, "idx": "1.60", "opt": "tint", "colour": "Brown", "depth": "g75"}
+    c.post("/api/sheet/checks", json=body(choice=ch, rimless=True))
+    c.post("/api/sheet/next")
+    _search_pick(c, "zztest noa")                                            # reopened later the same day
+    res = c.get("/api/sheet/patient").get_json()["resume"]
+    assert res["choice"] == {"tab": "sv", "card": 1, "idx": "1.60", "opt": "tint", "colour": "Brown", "depth": "g75", "pfx": "Grey"}
+    assert res["frame"]["barcode"] == "ZZFRAME5219" and res["rimless"] is True
+    sj._kept.clear()
+    c.post("/api/sheet/next")
+    _search_pick(c, "zztest noa")
+    assert c.get("/api/sheet/patient").get_json()["resume"] is None
+
+
+def test_page_has_the_old_rx_question_and_resume():
+    import price_sheet.build as build
+    html = build.build()
+    assert "Use this Rx" in html and "No Rx: prices only" in html and "resumeChoice" in html
+    assert "Next, ask us to scan your frame." in html

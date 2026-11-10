@@ -27,6 +27,7 @@ no surname, DOB, Rx numbers, optom or Rx warnings.
 """
 from __future__ import annotations
 
+import datetime as _dt
 import logging
 import secrets
 import threading
@@ -54,6 +55,11 @@ DIGITAL_STOP = "Digital needs an add of +0.50 to +1.25 on the Rx (same both eyes
 NOT_MADE = "Not made in your prescription"
 
 _sessions: dict[str, dict] = {}
+# No saved Rx yet (Mark, 10 Nov 2026): the lens, option and frame staff chose are kept for that patient for the day,
+# so after the Rx is saved in Optomate, reopening the patient picks up where they left off. Memory only, no names.
+_kept: dict[tuple, dict] = {}
+NO_RX_WHY = "Save the Rx in Optomate, then reopen this patient to make the job."
+OLD_RX_DAYS = 730
 _lock = threading.RLock()
 
 
@@ -127,10 +133,23 @@ def _need(token, *, listing: bool = False) -> dict:
     return s
 
 
-def _handle(s: dict, pid: int, rx_id=None) -> str:
+def _handle(s: dict, pid: int, rx_id=None, mode: str = "") -> str:
+    """mode: "" (today's Rx, or ask), "confirmed" (staff said use this older Rx), "norx" (price only)."""
     h = secrets.token_urlsafe(9)
-    s["handles"][h] = (int(pid), rx_id)
+    s["handles"][h] = (int(pid), rx_id, mode)
     return h
+
+
+def _today() -> str:
+    return _dt.date.today().isoformat()
+
+
+def _dmy_long(iso) -> str:
+    try:
+        d = _dt.date.fromisoformat(str(iso)[:10])
+    except ValueError:
+        return str(iso or "")
+    return f"{d.day} {d.strftime('%b %Y')}"
 
 
 # ---------------------------------------------------------------------------
@@ -194,11 +213,23 @@ def pick(cfg: dict, token, h) -> dict:
     ref = s["handles"].get(str(h or ""))
     if not ref:
         raise _err(400, "Pick the patient from the list again.")
-    pid, rx_id = ref
+    pid, rx_id, mode = ref
     data = _rx_data(cfg, pid)
     rxs = [r for r in data.get("rxs") or [] if isinstance(r, dict)]
+    if mode == "norx":
+        rxs = []
+    elif rxs and mode != "confirmed" and str(rxs[0].get("saved_date") or "")[:10] != _today():
+        # an older saved Rx: staff must say "use this" before any mark shows (Mark, 10 Nov 2026)
+        r0 = rxs[0]
+        try:
+            age = (_dt.date.today() - _dt.date.fromisoformat(str(r0.get("saved_date"))[:10])).days
+        except ValueError:
+            age = 0
+        return {"confirm": {"date": _dmy_long(r0.get("saved_date")), "optom": r0.get("optom") or "",
+                            "type": _type_of(r0) or "Type not written", "old": age > OLD_RX_DAYS,
+                            "use": _handle(s, pid, r0.get("rx_id"), "confirmed"), "skip": _handle(s, pid, None, "norx")}}
     if rx_id is None and len(rxs) > 1:
-        return {"choose": [{"h": _handle(s, pid, r.get("rx_id")), "type": _type_of(r) or "Type not written",
+        return {"choose": [{"h": _handle(s, pid, r.get("rx_id"), mode), "type": _type_of(r) or "Type not written",
                             "time": r.get("saved") or ""} for r in rxs]}
     rx = next((r for r in rxs if r.get("rx_id") == rx_id), rxs[0] if rxs else None)
     if rx is not None and _blank_sphere(rx):
@@ -334,11 +365,12 @@ def sheet(cfg: dict, token, rows: list, pricing: dict) -> dict:
     s = _need(token)
     book = sheetprice.load()
     rx = s.get("rx")
+    resume = _kept.get((s["pid"], _today()))
     if not rx:
-        return {"first": s.get("first", ""), "tab": "sv", "tabs": {}, "no_rx": True, "version": book["version"]}
+        return {"first": s.get("first", ""), "tab": "sv", "tabs": {}, "no_rx": True, "version": book["version"], "resume": resume}
     if "states" not in s:
         s["states"] = card_states(book, rx, rows, pricing)
-    return {"first": s.get("first", ""), "tab": first_tab(rx), "tabs": s["states"], "version": book["version"]}
+    return {"first": s.get("first", ""), "tab": first_tab(rx), "tabs": s["states"], "version": book["version"], "resume": resume}
 
 
 # ---------------------------------------------------------------------------
@@ -360,6 +392,10 @@ def _eye_words(e: dict | None) -> str:
 
 def staff_rx(s: dict) -> dict:
     rx = s.get("rx") or {}
+    if not rx:
+        return {"name": f"{str(s.get('surname') or '').upper()}, {s.get('first') or ''}".strip(", "),
+                "right": "No saved Rx", "left": "No saved Rx", "pd": "Needs the Rx", "pd_missing": True, "saved": "",
+                "optom": "", "type": "", "no_rx": True, "warnings": ["No saved Rx: prices only. " + NO_RX_WHY]}
     flags = lensoptions.rx_flags(rx) if rx else []
     if rx and not _type_of(rx):
         flags.append("Lens type not written on the Rx: confirm it with the optom.")
@@ -496,9 +532,13 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
     if str(data.get("version") or "") != book["version"]:
         raise _err(409, "Prices were updated. Reload.", reload=True)
     rx = s.get("rx")
-    if not rx:
-        raise _err(400, "No spectacle Rx saved for this patient. Make this job in Touch.")
     ch = _clean_choice(data.get("choice"))
+    fr_in = data.get("frame") if isinstance(data.get("frame"), dict) else {}
+    _kept[(s["pid"], _today())] = {"choice": {k: ch[k] for k in ("tab", "card", "idx", "opt", "colour", "depth", "pfx")},
+                                   "frame": {k: fr_in.get(k) for k in ("own", "barcode", "a", "dbl", "ed")},
+                                   "rimless": bool(data.get("rimless"))}
+    if not rx:
+        return _no_rx_checks(cfg, s, book, ch, data)
     if ch["tab"] not in USE:
         return {"stop": "Make this job in Touch.", "can_make": False, "why": "Price only in version 1.", "rx": staff_rx(s)}
     q, typ, kind = _question(rx, ch["tab"])
@@ -598,6 +638,29 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
         res["tint_barcode"] = qq["map"].get("tint_barcode") or ""
     res["price_changed"] = res["price"] is not None and res["start_price"] is not None and res["price"] != res["start_price"]
     res["can_make"], res["why"] = _can_make(res, data, s)
+    res["mode"] = mode_words(cfg, s)
+    return res
+
+
+def _no_rx_checks(cfg: dict, s: dict, book: dict, ch: dict, data: dict) -> dict:
+    """No saved Rx (Mark, 10 Nov 2026): the lens, option and frame still work; anything that needs the Rx says so;
+    no Make job. The Rx is never typed here or worked out: it comes only from Optomate."""
+    q = sheetprice.quote(book, ch)
+    res = {"rx": staff_rx(s), "no_rx": True, "fixes": [], "warnings": [], "heights_needed": False, "blank": None,
+           "pd_shift": None, "fix": "", "ref": None, "stop": "", "start_price": q.get("total"), "price": q.get("total"),
+           "lens_pair": q.get("lens_pair"), "tint_pair": q.get("tint_pair"), "price_changed": False,
+           "lens": sheetprice.card_title(book, ch), "option": _option_words(book, ch, q) if q.get("ok") else "",
+           "made": "Made to order" if q.get("made") == "mto" else "Stock, if the Rx allows", "choice": ch,
+           "verdict": {"tone": "none", "head": "Needs the Rx",
+                       "detail": "Blank size, PD change and thickness are checked once the Rx is saved."}}
+    if not q.get("ok"):
+        res["stop"] = q.get("why") or "Not on the price sheet."
+    fr_rec, nums, frame_problem = _frame_for(s, data.get("frame"))
+    if fr_rec and not fr_rec.get("own"):
+        res["frame"] = fr_rec
+        if not fr_rec.get("qoh"):
+            res["warnings"].append("Optomate shows none on hand.")
+    res["can_make"], res["why"] = False, NO_RX_WHY
     res["mode"] = mode_words(cfg, s)
     return res
 
