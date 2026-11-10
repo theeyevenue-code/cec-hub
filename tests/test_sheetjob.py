@@ -380,7 +380,7 @@ def test_synchrony_sv_prices_are_copied_per_card_never_worked_out():
     book = sp.load()
     q = lambda **kw: sp.quote(book, {"tab": "syn", "opt": "clear", **kw})   # noqa: E731
     assert q(card=0, idx="1.50")["total"] == 140 and q(card=0, idx="1.50", made="mto")["total"] == 200
-    assert q(card=2, idx="1.60", made="mto")["total"] == 290 and q(card=3, idx="1.67", made="mto")["total"] == 420
+    assert [c["idx"] for c in sp.page(book, "syn")["cards"]] == ["1.50", "1.56"]    # from 1.60: ZEISS (Mark, 10 Nov)
     assert q(card=1, idx="1.56")["total"] == 140 and not q(card=1, idx="1.56", made="mto")["ok"]   # 1.56: stock only
     k = q(card=0, idx="1.50", made="mto")["map"]["key"]
     assert (k["supplier"], k["lens"], k["coating"], k["stockgrind"]) == ("Synchrony", "Single Vision Grind 1.50", "HMC+", "grind")
