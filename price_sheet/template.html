@@ -328,6 +328,7 @@ main#page.tall { padding-top:26px; }
 #page.tall .tapline { padding-top:14px; }
 .told.norx { color:#B00020; }
 #donenorx { margin-top:18px; }
+.oldrx { color:#B00020; font-weight:600; }
 </style>
 </head>
 <body>
@@ -520,12 +521,11 @@ async function pickPatient(h) {
   if (r.error) { $("phits").innerHTML = `<div class="stop">${esc(r.error)}</div>`; return; }
   if (r.confirm) {    // an older saved Rx: staff confirm it before any mark shows (Mark, 10 Nov 2026)
     const c = r.confirm;
-    $("pats").innerHTML = `<div class="pat"><div class="pn">Rx from ${esc(c.date)}${c.optom ? ", " + esc(c.optom) : ""}</div>
-      <div class="pt">${esc(c.type)}</div>${c.old ? `<div class="ps">Over 2 years old: check with the optom.</div>` : ""}
-      <div class="pg">Use this Rx?</div></div>
-      <button class="pat" data-h="${esc(c.use)}"><div class="pn">Use this Rx</div><div class="pt">The sheet marks what suits it.</div><div class="pg">Use it &rarr;</div></button>
-      <button class="pat" data-h="${esc(c.skip)}"><div class="pn">Don't use it: no Rx</div><div class="pt">The job is flagged NO RX; confirm the Rx in Optomate before ordering.</div><div class="pg">No Rx &rarr;</div></button>`;
-    $("patlead").textContent = "This patient has no Rx saved today.";
+    // the Rx facts as the heading line, then just two choices (review, 10 Nov 2026)
+    $("patlead").innerHTML = `No Rx saved today. Newest: <b>Rx from ${esc(c.date)}${c.optom ? ", " + esc(c.optom) : ""}</b> · ${esc(c.type)}`
+      + (c.old ? ` <span class="oldrx">Over 2 years old: check with the optom.</span>` : "");
+    $("pats").innerHTML = `<button class="pat" data-h="${esc(c.use)}"><div class="pn">Use this Rx</div><div class="pt">The sheet marks what suits it.</div><div class="pg">Use it &rarr;</div></button>
+      <button class="pat" data-h="${esc(c.skip)}"><div class="pn">No Rx</div><div class="pt">The job is flagged NO RX: confirm the Rx in Optomate before ordering.</div><div class="pg">No Rx &rarr;</div></button>`;
     document.querySelectorAll("#pats button.pat").forEach(b => b.onclick = () => pickPatient(b.dataset.h));
     return;
   }

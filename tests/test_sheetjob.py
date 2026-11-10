@@ -512,6 +512,6 @@ def test_the_choice_is_kept_for_the_patient_today_and_comes_back(c):
 def test_page_has_the_old_rx_question_and_resume():
     import price_sheet.build as build
     html = build.build()
-    assert "Use this Rx" in html and "Don't use it: no Rx" in html and "resumeChoice" in html
+    assert "Use this Rx" in html and "Over 2 years old" in html and "resumeChoice" in html
     assert "NO RX on this job" in html and "norxok" in html
     assert "Next, ask us to scan your frame." in html
