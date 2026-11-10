@@ -475,7 +475,7 @@ def test_no_rx_job_needs_the_tick_carries_no_rx_and_is_flagged(c):
     k = c.post("/api/sheet/checks", json=body(choice=ch)).get_json()
     assert k["no_rx"] and not k["can_make"] and k["why"] == sj.NO_RX_WHY
     assert k["verdict"]["head"] == "Not checked - no Rx" and "not checked" in k["made"] and k["price"] == 250
-    assert k["ref"]["blank_mm"] == 75.0 and "75 mm" in k["verdict"]["detail"]      # largest linked stock blank, said so
+    assert k["ref"]["blank_mm"] == 70.0 and "VisuStore picks the blank" in k["verdict"]["detail"]   # the 70 mm item
     assert k["rx"]["right"] == "No saved Rx" and k["frame"]["barcode"] == "ZZFRAME5219"
     n = len(c.sent)
     j = c.post("/api/sheet/make", json=body(choice=ch)).get_json()                 # no tick: refused, engine not asked
@@ -577,3 +577,25 @@ def test_hub_lets_a_zztest_patient_through(c):
     c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
     c.post("/api/sheet/make", json=body())
     assert c.sent[-1][0] == "make" and c.sent[-1][1]["patient_id"] == 9003
+
+
+
+# ---- one Optomate item per stock lens: the 70 mm one (Mark, 10 Nov 2026: "just choose 70mm one") ----------
+def test_a_stock_job_orders_the_70mm_item_even_when_the_frame_needs_75(c):
+    pick(c, "Mia")
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5319"})                       # needs 72 mm
+    ch = {"tab": "sv", "card": 1, "idx": "1.60", "opt": "clear"}
+    r = c.post("/api/sheet/checks", json=body(choice=ch, frame={"barcode": "ZZFRAME5319"})).get_json()
+    assert r["verdict"]["head"] == "Fits a 75 mm stock blank"                           # the check on screen stays
+    assert r["ref"]["blank_mm"] == 70.0 and r["can_make"]                               # the item ordered is the 70 mm one
+    c.post("/api/sheet/plan", json=body(choice=ch, frame={"barcode": "ZZFRAME5319"}))
+    assert c.sent[-1][1]["option"]["blank_mm"] == 70.0
+
+
+def test_a_lens_with_no_70mm_item_uses_its_standard_stock_item(monkeypatch):
+    rows = [{"supplier": "Synchrony", "lens": "FSV Clear 1.56", "index": "1.56", "material": "Clear", "coating": "HMC+",
+             "stockgrind": "stock", "blank_mm": b, "lens_barcode": "20001305"} for b in ("65", "73")]
+    monkeypatch.setattr(pk, "links", lambda cfg: rows)
+    key = {"supplier": "Synchrony", "lens": "FSV Clear 1.56", "index": "1.56", "material": "Clear", "coating": "HMC+", "stockgrind": "stock"}
+    assert sj._item_blank({}, key) == 73.0                                           # closest to 70; same barcode either way
+    assert sj._item_blank({}, {**key, "stockgrind": "grind"}) == ""

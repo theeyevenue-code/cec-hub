@@ -512,6 +512,23 @@ def _stock_fit(rows: list, pricing: dict, rx: dict, q: dict, typ: str, key: dict
     return {**out, "fits": ok, "got": got, "need": need, "largest": largest}
 
 
+ITEM_BLANK = "70"     # Mark, 10 Nov 2026: a stock job orders the 70 mm item; VisuStore picks the real blank
+
+
+def _item_blank(cfg: dict, key: dict):
+    """The blank size of the ONE Optomate item a stock job orders: 70 mm when linked; else the linked blank closest
+    to 70 (a lens like Synchrony FSV 1.56 whose blanks share one barcode). The on-screen blank check is separate."""
+    if key.get("stockgrind") != "stock":
+        return ""
+    k6 = pickjob._key({**key, "blank_mm": ""})[:6]
+    sizes = [r.get("blank_mm") for r in pickjob.links(cfg) if pickjob._key(r)[:6] == k6
+             and str(r.get("lens_barcode") or "").strip() and str(r.get("blank_mm") or "").strip()]
+    if ITEM_BLANK in sizes:
+        return float(ITEM_BLANK)
+    nums = sorted((abs(float(b) - 70), float(b)) for b in sizes)
+    return nums[0][1] if nums else ""
+
+
 def _link(cfg: dict, key: dict) -> dict:
     """pickjob.link_for, but a stock lens with no blank chosen yet counts as linked when any of its blank
     sizes is (each size is checked again once the blank is known)."""
@@ -619,7 +636,7 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
                                             if est["approx"] else "ED typed by staff." if nums.get("ed_typed") else "")}
             if fit["fits"] is True:
                 b = max(v for v in fit["got"].values() if v)
-                ref = {**key, "blank_mm": b}
+                ref = {**key, "blank_mm": _item_blank(cfg, key)}
                 res["verdict"] = {"tone": "green", "head": f"Fits a {_mm(b)} stock blank",
                                   "detail": (f"Fix picked: {applied['title']}. " if applied else "")
                                   + f"Blank needed {_mm(est['value'])} ({res['blank']['label']})."}
@@ -629,7 +646,7 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
                                   "detail": f"Blank needed {_mm(est['value'])} ({res['blank']['label']})."}
                 if applied and applied["kind"] == "pd":
                     res["pd_shift"] = applied["shift"]
-                    ref = {**key, "blank_mm": applied["blank"]}
+                    ref = {**key, "blank_mm": _item_blank(cfg, key)}
                     res["verdict"] = {"tone": "green", "head": f"Fits a {_mm(applied['blank'])} stock blank with the wider PD",
                                       "detail": applied["detail"]}
             else:
@@ -637,10 +654,10 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
         if key["stockgrind"] == "grind":
             ref = {**key, "blank_mm": ""}
     if ref and ref.get("blank_mm"):
-        # a stock lens is one Optomate lens per blank size: the blank this job needs must be linked too
+        # the ONE Optomate item this stock lens orders (70 mm; VisuStore picks the real blank) must be linked
         lk = _link(cfg, ref)
         if not lk.get("ready"):
-            res["stop"] = f"The {_mm(ref['blank_mm'])} blank of this lens isn't linked to Optomate yet. Make this job in Touch."
+            res["stop"] = "Not linked to Optomate yet. Make this job in Touch."
             ref = None
     res["ref"] = ref
     if ref:
@@ -678,12 +695,7 @@ def _no_rx_checks(cfg: dict, s: dict, book: dict, ch: dict, data: dict) -> dict:
         key = q["map"]["key"]
         rows = pickjob.links(cfg)
         k6 = pickjob._key({**key, "blank_mm": ""})[:6]
-        blank = ""
-        if key["stockgrind"] == "stock":
-            # no Rx, so no blank check: the largest linked stock blank of this lens, said so on the job's checks
-            sizes = sorted(float(r["blank_mm"]) for r in rows if pickjob._key(r)[:6] == k6 and str(r.get("lens_barcode") or "").strip()
-                           and str(r.get("blank_mm") or "").strip())
-            blank = sizes[-1] if sizes else ""
+        blank = _item_blank(cfg, key)          # no Rx, no blank check: the lens's one stock item (70 mm)
         link = pickjob.link_for(rows, {**key, "blank_mm": blank})
         if not link.get("ready"):
             res["stop"] = "Not linked to Optomate yet. Make this job in Touch."
@@ -696,7 +708,7 @@ def _no_rx_checks(cfg: dict, s: dict, book: dict, ch: dict, data: dict) -> dict:
             res["lens_use"] = USE[ch["tab"]]
             res["tint_barcode"] = q["map"].get("tint_barcode") or ""
             if blank:
-                res["verdict"]["detail"] += f" Ordered as the {_mm(blank)} stock blank."
+                res["verdict"]["detail"] += " VisuStore picks the blank."
     fr = data.get("frame") if isinstance(data.get("frame"), dict) else {}
     if res["stop"]:
         res["can_make"], res["why"] = False, res["stop"]
