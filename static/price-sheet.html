@@ -5,12 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lens price sheets</title>
 <style>
-/* iPad price sheet - MOCK-UP v4 (Mark, 9 Nov 2026: "too dense, too much happening").
+/* iPad price sheet (Hub). Steps 2-3 (Mark, 10 Nov 2026): the staff side and Make job; every check comes from the
+   server (hub/sheetjob.py), the prices from ONE file (price_sheet/prices.json). Step 1 notes follow.
+   iPad price sheet - MOCK-UP v4 (Mark, 9 Nov 2026: "too dense, too much happening").
    One headline price per card (the 1.50 price), thinner indices as a small list under it, 1.53 off every row and kept as
    a quiet "Other index" line, add-ons folded to one line that opens a pop-over, max four cards across.
    Design tokens copied from second-brain price-lists/patient/CEC-*-2026-09.html (taken from zeiss.com.au).
    Prices copied verbatim from the printed patient sheets (Sep-Oct 2026) and the staff scan sheets (Optomate's);
-   the only computed figure is the live total. Fake patients (ZZTEST) and frames only. Nothing is written anywhere. */
+   the only computed figure is the live total. (Step 1's fake patients and frames are gone: steps 2-3.) */
 @font-face { font-family:'Hind'; src:url(/pricesheets/assets/fonts/Hind-Light.ttf); font-weight:300; }
 @font-face { font-family:'Hind'; src:url(/pricesheets/assets/fonts/Hind-Regular.ttf); font-weight:400; }
 @font-face { font-family:'Hind'; src:url(/pricesheets/assets/fonts/Hind-Medium.ttf); font-weight:500; }
@@ -230,49 +232,131 @@ h1 { font-size:36px; font-weight:700; color:var(--ink); line-height:1.05; margin
 .tick { width:96px; height:96px; background:var(--green); color:#fff; font-size:58px; font-weight:700; display:flex; align-items:center; justify-content:center; }
 .staffbtn { margin-top:30px; font-size:18px; color:var(--grey); border:1px solid var(--line); padding:14px 26px; }
 .mockflag { position:absolute; right:12px; top:3px; font-size:14px; color:#9AA5B1; z-index:9; }
+
+/* ---- steps 2-3 (Mark, 10 Nov 2026): staff side; every check from the server ---- */
+.staffcorner { position:absolute; right:14px; bottom:10px; font-size:14px; color:#9AA5B1; padding:8px 12px; z-index:4; }
+.card.nomade { opacity:.55; }
+.card.nomade .tapline { color:var(--grey); font-weight:400; }
+.mtonote { font-size:15px; color:var(--grey); margin-top:6px; }
+.lr.na b.lp, .lr.na b { color:#9AA5B1; }
+.lr.na small.nm { color:var(--grey); }
+.quiet { font-size:17px; color:var(--grey); margin-top:14px; }
+/* staff code */
+.codewrap { display:flex; gap:60px; margin-top:30px; align-items:flex-start; }
+.dots { display:flex; gap:16px; margin-top:18px; }
+.dots i { width:22px; height:22px; border-radius:50%; box-shadow:inset 0 0 0 2px var(--grey); display:block; }
+.dots i.on { background:var(--ink); box-shadow:none; }
+.pad { display:grid; grid-template-columns:repeat(3, 110px); gap:14px; }
+.pad button { height:84px; background:var(--card); font-size:32px; font-weight:600; color:var(--black); }
+.pad button.k2 { font-size:19px; color:var(--btn); }
+.msg { font-size:18px; color:var(--amber); margin-top:16px; min-height:26px; }
+.msg.bad { color:#B00020; }
+/* patient pick */
+.pat .pt { font-size:17px; color:var(--grey); margin-top:6px; }
+.pat.stop { opacity:.6; }
+.pat .ps { font-size:16px; color:#B00020; margin-top:10px; font-weight:600; }
+.find { margin-top:30px; max-width:720px; position:relative; }
+.find h4 { font-size:14px; font-weight:500; letter-spacing:1.4px; text-transform:uppercase; color:var(--grey); margin-bottom:8px; }
+.find input { width:100%; height:56px; font:inherit; font-size:21px; padding:0 18px; border:2px solid var(--btn); outline:none; }
+.hits { background:#fff; box-shadow:0 12px 32px rgba(14,15,17,.18), 0 0 0 1px var(--line); margin-top:4px; }
+.hit { display:flex; justify-content:space-between; width:100%; text-align:left; padding:12px 16px; border-bottom:1px solid var(--line); font-size:18px; }
+.hit small { color:var(--grey); font-size:15px; }
+.hit mark, .fr mark { background:#FFF1B8; color:inherit; padding:0 1px; }
+.backlink { align-self:flex-start; font-size:17px; color:var(--btn); font-weight:600; margin-top:24px; }
+/* frame + checks */
+.switches { display:flex; gap:22px; margin-top:10px; flex-wrap:wrap; }
+.sw2 { display:flex; align-items:center; gap:10px; font-size:17px; font-weight:600; color:var(--black); }
+.sw2 i { width:46px; height:28px; border-radius:14px; background:#C9D2DC; position:relative; display:block; transition:background .15s; }
+.sw2 i::after { content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; transition:left .15s; }
+.sw2.on i { background:var(--btn); }
+.sw2.on i::after { left:21px; }
+.own { display:flex; gap:10px; margin-top:10px; align-items:center; font-size:16px; color:var(--grey); }
+.own input { width:78px; height:46px; font:inherit; font-size:19px; padding:0 10px; border:2px solid var(--btn); outline:none; }
+.checks { overflow:auto; }
+.warn { background:var(--amberbg); color:var(--amber); font-size:16px; padding:8px 12px; margin-bottom:8px; line-height:1.35; }
+.stop { background:#FDECEE; color:#B00020; font-size:17px; font-weight:600; padding:10px 14px; margin-top:10px; }
+.v-blue { background:var(--pale); } .v-blue .vh { color:var(--blue); }
+.v-none { background:var(--card); box-shadow:inset 0 0 0 1px var(--line); } .v-none .vh { color:var(--ink); }
+.fixo .fp small { display:block; font-size:13px; font-weight:400; color:var(--grey); text-align:right; }
+.told { display:flex; gap:10px; align-items:center; margin-top:12px; font-size:17px; font-weight:600; color:var(--black); }
+.told input { width:24px; height:24px; }
+.work { font-size:14px; color:var(--grey); margin-top:4px; line-height:1.35; }
+/* check pop-over (screen 6) */
+.cpop { width:900px; max-height:760px; overflow:auto; }
+.cpop .cg { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:12px; }
+.cpop .kv b small { display:block; font-size:13px; color:var(--grey); font-weight:400; }
+.cpop .refuse { background:#FDECEE; color:#B00020; font-size:16px; font-weight:600; padding:8px 12px; margin-top:8px; }
+.cpop .warn { margin-top:8px; margin-bottom:0; }
+.steps { text-align:left; font-size:21px; margin-top:22px; line-height:1.6; }
+.donemode { font-size:17px; color:var(--grey); margin-top:10px; }
+#s-frame .cols { grid-template-rows:minmax(0, 1fr); margin-top:16px; }
+#s-frame h1 { font-size:32px; }
+#s-frame .make .cta { width:auto; padding:0 28px; white-space:nowrap; }
+#s-frame .make { margin:14px 0 18px; }
+.checks .verdict { margin-top:10px; }
+.checks .fixo { padding:9px 14px; }
+.checks .kv { padding:5px 0; }
+.cpop .popbtns .cta { width:auto; padding:0 28px; white-space:nowrap; }
 </style>
 </head>
 <body>
 
-<section class="screen on" id="s-staff">
-  <div class="stopbar">Lens price sheet on the iPad <span>Staff · pick the patient</span></div>
-  <main>
-    <div class="eyebrow">Step 1 of 3 · staff</div>
-    <h1>Whose lenses?</h1>
-    <div class="lead">The last three saved prescriptions. Only the first name shows on the price sheet.</div>
-    <div class="pats" id="pats"></div>
-  </main>
-</section>
-
-<section class="screen" id="s-sheet">
+<section class="screen on" id="s-sheet">
   <div class="nav">
     <div class="navl"><svg class="zlogo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 581 585"><g fill-rule="evenodd"><path d="M571.01 8.866H7.088v567.8l4.006-1.803c88.145-39.665 182.299-59.778 279.458-59.778 97.16 0 191.314 20.113 278.456 59.778l4.007 1.803 1.002-567.8h-3.005" fill="#0F2DB3"/><path d="M77.202 181.488c-27.045 0-29.048 26.694-29.048 26.694h-12.02v-39.545h98.161s0 30.56-29.047 62.994c0 0-27.045 32.072-28.046 46.085h16.026c23.038 0 25.04-26.674 25.04-26.674h13.022v39.625H31.126s-3.005-30.019 31.05-66.499c0 0 22.037-23.899 27.045-42.77l-12.02.09M326.61 290.577v-12.941h-3.005c-5.008 0-10.016-4.407-10.016-9.796v-76.465c0-5.4 5.008-9.806 10.016-9.806h3.005v-12.932h-65.106v12.932h3.004c6.01 0 10.017 4.407 10.017 9.806v76.465c0 5.389-4.007 9.796-10.017 9.796h-3.004v12.941h65.106m-78.128.09v-39.625h-13.021s-3.005 26.674-26.043 26.674h-13.021v-41.588h5.008c5.008 0 10.016 4.397 10.016 9.876v4.948h13.022v-42.68H211.42v4.938c0 5.48-5.008 9.887-10.016 9.887h-5.008v-41.609h13.021c23.038 0 26.043 26.694 26.043 26.694h13.021v-39.645H145.313v13.032h3.005c5.008 0 9.015 4.407 9.015 9.806v76.465c0 5.389-4.007 9.796-9.015 9.796h-3.005v12.941l103.17.09m146.239-109.179c27.044 0 29.047 26.694 29.047 26.694h12.02v-39.545h-93.152s-15.025 19.412 24.039 62.994c0 0 27.044 32.072 28.046 46.085h-16.026c-23.038 0-25.041-26.674-25.041-26.674h-13.022v39.625h94.155s17.027-18.51-25.042-66.499c0 0-23.037-22.917-27.044-42.77l12.02.09m110.18 0c26.043 0 28.046 26.694 28.046 26.694h13.022v-39.545h-94.155s-15.024 19.412 24.04 62.994c0 0 27.044 32.072 28.046 46.085h-16.026c-22.037 0-25.042-26.674-25.042-26.674h-13.02v39.625h94.153s17.028-18.51-25.04-66.499c0 0-22.037-22.917-26.043-42.77l12.02.09" fill="#fff"/></g></svg><div class="tabs" id="tabs"></div></div>
     <img class="ceclogo" src="/pricesheets/brand/Concord%20Eyecare%20LOGO%20HORIZ.jpg" alt="Concord Eyecare">
   </div>
   <main id="page"></main>
+  <button class="staffcorner" id="staffbtn">Staff</button>
   <div class="scrim" id="scrim"></div>
   <div class="pop" id="pop"></div>
   <div class="sheet" id="sheet"></div>
 </section>
 
+<section class="screen" id="s-code">
+  <div class="stopbar">Lens price sheet <span>Staff only</span></div>
+  <main>
+    <div class="eyebrow">Staff</div>
+    <h1>Staff code</h1>
+    <div class="lead">Asked every time the patient list opens.</div>
+    <div class="codewrap">
+      <div class="pad" id="pad"></div>
+      <div><div class="dots" id="dots"></div><div class="msg" id="codemsg"></div>
+        <button class="backlink" id="codeback">&larr; Back to the price sheet</button></div>
+    </div>
+  </main>
+</section>
+
+<section class="screen" id="s-staff">
+  <div class="stopbar">Lens price sheet <span>Staff only · pick the patient, then turn the iPad round</span></div>
+  <main>
+    <div class="eyebrow">Staff</div>
+    <h1>Whose lenses?</h1>
+    <div class="lead" id="patlead">The last three saved prescriptions. Only the first name shows on the price sheet.</div>
+    <div class="pats" id="pats"></div>
+    <div class="find"><h4>Or search</h4><input id="pq" placeholder="Surname and first name" autocomplete="off" spellcheck="false"><div class="hits" id="phits"></div></div>
+    <button class="backlink" id="patback">&larr; Back to the price sheet</button>
+  </main>
+</section>
+
 <section class="screen" id="s-sum">
   <div class="nav"><div class="navl"><svg class="zlogo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 581 585"><g fill-rule="evenodd"><path d="M571.01 8.866H7.088v567.8l4.006-1.803c88.145-39.665 182.299-59.778 279.458-59.778 97.16 0 191.314 20.113 278.456 59.778l4.007 1.803 1.002-567.8h-3.005" fill="#0F2DB3"/><path d="M77.202 181.488c-27.045 0-29.048 26.694-29.048 26.694h-12.02v-39.545h98.161s0 30.56-29.047 62.994c0 0-27.045 32.072-28.046 46.085h16.026c23.038 0 25.04-26.674 25.04-26.674h13.022v39.625H31.126s-3.005-30.019 31.05-66.499c0 0 22.037-23.899 27.045-42.77l-12.02.09M326.61 290.577v-12.941h-3.005c-5.008 0-10.016-4.407-10.016-9.796v-76.465c0-5.4 5.008-9.806 10.016-9.806h3.005v-12.932h-65.106v12.932h3.004c6.01 0 10.017 4.407 10.017 9.806v76.465c0 5.389-4.007 9.796-10.017 9.796h-3.004v12.941h65.106m-78.128.09v-39.625h-13.021s-3.005 26.674-26.043 26.674h-13.021v-41.588h5.008c5.008 0 10.016 4.397 10.016 9.876v4.948h13.022v-42.68H211.42v4.938c0 5.48-5.008 9.887-10.016 9.887h-5.008v-41.609h13.021c23.038 0 26.043 26.694 26.043 26.694h13.021v-39.645H145.313v13.032h3.005c5.008 0 9.015 4.407 9.015 9.806v76.465c0 5.389-4.007 9.796-9.015 9.796h-3.005v12.941l103.17.09m146.239-109.179c27.044 0 29.047 26.694 29.047 26.694h12.02v-39.545h-93.152s-15.025 19.412 24.039 62.994c0 0 27.044 32.072 28.046 46.085h-16.026c-23.038 0-25.041-26.674-25.041-26.674h-13.022v39.625h94.155s17.027-18.51-25.042-66.499c0 0-23.037-22.917-27.044-42.77l12.02.09m110.18 0c26.043 0 28.046 26.694 28.046 26.694h13.022v-39.545h-94.155s-15.024 19.412 24.04 62.994c0 0 27.044 32.072 28.046 46.085h-16.026c-22.037 0-25.042-26.674-25.042-26.674h-13.02v39.625h94.153s17.028-18.51-25.04-66.499c0 0-22.037-22.917-26.043-42.77l12.02.09" fill="#fff"/></g></svg></div><img class="ceclogo" src="/pricesheets/brand/Concord%20Eyecare%20LOGO%20HORIZ.jpg" alt="Concord Eyecare"></div>
   <main class="sum">
-    <div class="toprow"><div class="eyebrow" id="sum-eye"></div><div class="who">Lenses for <b id="sum-who"></b></div></div>
+    <div class="toprow"><div class="eyebrow" id="sum-eye"></div><div class="who" id="sum-whobox">Lenses for <b id="sum-who"></b></div></div>
     <h1 id="sum-h1"></h1>
     <div class="sumgrid">
       <div class="sumlines" id="summary"></div>
       <div class="sumprice"><div class="tl">Lenses, a pair</div><div class="big" id="sum-total"></div><div class="pair">Frame extra.</div></div>
     </div>
-    <div class="staffrow" id="patrow" style="display:none"><button class="cta" id="backsheets">&larr; Back to the price sheets</button></div>
+    <div class="staffrow" id="patrow"><button class="cta" id="backsheets">&larr; Back to the price sheets</button></div>
     <div class="staffrow" id="staffrow"><span class="lab">Staff</span><button class="cta" id="toframe">Scan the frame &rarr;</button><button class="ghost" id="changelens">Change lens</button></div>
   </main>
 </section>
 
 <section class="screen" id="s-frame">
-  <div class="stopbar">Frame and job <span id="fpat"></span></div>
+  <div class="stopbar">Frame and checks <span id="fpat"></span></div>
   <main>
-    <div class="eyebrow">Step 3 of 3 · staff</div>
+    <div class="eyebrow">Staff</div>
     <h1>Scan the frame.</h1>
     <div class="cols">
       <div>
@@ -280,44 +364,38 @@ h1 { font-size:36px; font-weight:700; color:var(--ink); line-height:1.05; margin
         <div class="box" style="margin-top:16px">
           <h4>Frame</h4>
           <div class="fbox">
-            <div class="scan"><input id="bc" placeholder="Scan, or type brand, model, colour" autocomplete="off" spellcheck="false"><button id="demo">Demo scan</button></div>
+            <div class="scan"><input id="bc" placeholder="Scan, or type brand, model, colour" autocomplete="off" spellcheck="false"></div>
             <div class="dd" id="dd"></div>
           </div>
-          <div class="fway"><button id="own">Own frame</button></div>
+          <div class="switches"><button class="sw2" id="own"><i></i>Own frame</button><button class="sw2" id="rimless"><i></i>Rimless</button></div>
+          <div class="own" id="ownsize" style="display:none">Eye <input id="oa" inputmode="decimal"> Bridge <input id="odbl" inputmode="decimal"> ED <input id="oed" inputmode="decimal" placeholder="if known"></div>
           <div id="framefacts" style="margin-top:6px"></div>
         </div>
       </div>
-      <div class="box" id="checkbox"></div>
+      <div class="box checks" id="checkbox"></div>
     </div>
     <div class="make">
-      <button class="cta" id="make" disabled>Make job in Optomate</button>
-      <div class="mode" id="makewhy">Dry run: shows the job, writes nothing.</div>
+      <button class="cta" id="make" disabled>Make job (dry run, nothing written)</button>
+      <div class="mode" id="makewhy"></div>
     </div>
   </main>
+  <div class="scrim" id="scrim2"></div>
+  <div class="pop cpop" id="cpop"></div>
 </section>
 
 <section class="screen" id="s-done">
-  <div class="stopbar">Job ready <span>Next: Visustore, then invoice</span></div>
+  <div class="stopbar">Job <span>Staff only</span></div>
   <div class="done">
-    <div class="tick">&#10003;</div>
-    <h1 style="margin-top:22px">Job made.</h1>
+    <div class="tick" id="donetick">&#10003;</div>
+    <h1 style="margin-top:22px" id="doneh">Job made.</h1>
     <div class="lead" id="donel"></div>
+    <div class="donemode" id="donemode"></div>
+    <ol class="steps" id="donesteps"><li>Link the Rx.</li><li>Patient Invoice.</li><li>Send to the lab.</li></ol>
     <button class="staffbtn" id="again">Next patient</button>
   </div>
 </section>
 
-<div class="mockflag" id="mockflag" style="display:none">Demo · fake patients · nothing is written</div>
-
 <script>
-/* ------------------------------------------------------------------------------------------------
-   PRICES - copied verbatim from the printed patient sheets (second-brain price-lists/patient, Sep-Oct 2026) and
-   the staff scan sheets (Tints, Myopia; Optomate's own prices, a pair). Office prices: Optomate price map (Oct 2026).
-   Tint on a stock single-vision lens = the lens made to order ($100) + the tint ($50 solid / $70 graduated), shown
-   as ONE add-on price with the breakdown underneath (Mark, 9 Nov 2026). Tint colours and depths = the ZEISS tints
-   held in Optomate (Kat's May 2026 ZEISS code list): Black, Grey, Brown, Pioneer G15 green; solid 85/75/60/25/12%,
-   graduated 90-40/75/25%. PhotoFusion X: stock lens is grey; other colours are a made-to-order lens (zeiss.com.au:
-   seven Rx colours, one FSV colour). Patient screens use tier names; staff screens product names (Mark, 22 Sep 2026).
-   ------------------------------------------------------------------------------------------------ */
 /* PRICES live in ONE file, price_sheet/prices.json (Mark, 10 Nov 2026, steps 2-3): build.py inlines it here and the
    Hub server reads the same file (hub/sheetprice.py) to price a job. The page never works a price out beyond the
    live total. */
@@ -329,37 +407,110 @@ const TINT_COLOURS = DATA.tintColours, SOLID_DEPTHS = DATA.solidDepths, GRAD_DEP
 const depthName = (k) => ([...SOLID_DEPTHS, ...GRAD_DEPTHS].find(d => d[0] === k) || ["", ""])[1];
 const PAGES = DATA.pages.map(pg => ({ ...pg, cards: pg.cards.map(c => typeof c.opts === "string" ? { ...c, opts: SETS[c.opts] } : c) }));
 
-// fake patients (ZZTEST): the Rx type picks the first tab, rec = the Lens Finder's suggested index
-const PATS = [
-  { first:"Alex", sur:"ZZTEST", when:"Rx today 11:42 · MJ", rx:"R -3.25 / L -3.50 · PD 31 / 31", tab:"sv", rec:"1.60", thick:["1.50"], h:-3.4, pd:{R:31, L:31} },
-  { first:"Sam", sur:"ZZTEST-NEAR", when:"Rx today 10:40 · NK", rx:"R +1.00 / L +1.25 add +2.00 · PD 32 / 32", tab:"mf", rec:"1.60", thick:[], h:1.1, pd:{R:32, L:32} },
-  { first:"Jo", sur:"ZZTEST-HIGH", when:"Rx yesterday · MJ", rx:"R -6.50 / L -6.25 · PD 30 / 30", tab:"sv", rec:"1.67", thick:["1.50","1.60"], h:-6.4, pd:{R:30, L:30} },
-];
-const FRAMES = [
-  { bc:"35144", brand:"Ray-Ban", model:"RB5154 Clubmaster", colour:"Black", a:54, b:41, dbl:20, ed:58, price:289, qoh:2 },
-  { bc:"35190", brand:"Ray-Ban", model:"RB5154 Clubmaster", colour:"Havana", a:51, b:39, dbl:21, ed:55, price:289, qoh:1 },
-  { bc:"36021", brand:"Oakley", model:"OX8156 Holbrook RX", colour:"Satin black", a:56, b:40, dbl:18, ed:58, price:310, qoh:1 },
-  { bc:"34477", brand:"Hermase", model:"H2201", colour:"Tortoise", a:52, b:42, dbl:18, ed:54, price:249, qoh:3 },
-  { bc:"34478", brand:"Hermase", model:"H2201", colour:"Crystal grey", a:52, b:42, dbl:18, ed:54, price:249, qoh:0 },
-  { bc:"33910", brand:"Vycoz", model:"Mono", colour:"Black", a:48, b:30, dbl:22, ed:50, price:299, qoh:1 },
-  { bc:"35602", brand:"Bill Bass", model:"BB1012", colour:"Navy", a:53, b:38, dbl:17, ed:56, price:229, qoh:2 },
-];
-
-let st = {};
+/* No patient data is in this file (director's rule 3): it is served without the staff code. Names and the
+   Rx arrive only through the locked /api/sheet calls, served no-store, after the staff code. */
+const VIEWER = { first:"", tabs:{} };
+let st = { p: VIEWER, tab:"sv" };
 const $ = (id) => document.getElementById(id);
-const money = (n) => "$" + n.toLocaleString("en-AU");
+const money = (n) => "$" + Number(n).toLocaleString("en-AU");
 const plus = (n) => n ? "+" + money(n) : "Included";
-const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
 function show(id) { document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id)); }
 const page = () => PAGES.find(p => p.key === st.tab);
+const picked = () => !!st.p.first || !!st.p.picked;
 
-/* ---- 1 staff: patient ---------------------------------------------------------------------- */
-function drawPats() {
-  $("pats").innerHTML = PATS.map((p, i) => `<button class="pat" data-i="${i}">
-    <div class="pn">${p.sur}, ${p.first}</div><div class="pd">${p.when}</div><div class="pd">${p.rx}</div>
-    <div class="pg">Lenses for ${p.first} &rarr;</div></button>`).join("");
-  document.querySelectorAll(".pat").forEach(b => b.onclick = () => { st = { p: PATS[+b.dataset.i], tab: PATS[+b.dataset.i].tab }; drawPage(); show("s-sheet"); });
+// one way to the server; a time-out or "pick again" sends the iPad back to the plain sheet
+async function api(path, body) {
+  let r, d;
+  try {
+    r = await fetch(path, { method: body ? "POST" : "GET", credentials:"same-origin", cache:"no-store",
+      headers: body ? { "Content-Type":"application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+    d = await r.json();
+  } catch (e) { alert("Can't reach the Hub. Nothing was made."); return null; }
+  if (r.status === 401 || (d && d.expired)) { resetAll(); return null; }
+  if (d && d.reload) { alert(d.error); location.reload(); return null; }
+  if (!r.ok && !("error" in (d || {}))) { alert("The Hub said no."); return null; }
+  if (!r.ok) { return { error: d.error, status: r.status, ...d }; }
+  return d;
 }
+
+/* ---- 1 staff code: asked EVERY time the patient list opens (Mark, 10 Nov 2026) ---------------- */
+let code = "";
+function drawPad() {
+  $("pad").innerHTML = ["1","2","3","4","5","6","7","8","9","Clear","0","OK"].map(k => `<button class="${k.length > 1 ? "k2" : ""}" data-k="${k}">${k}</button>`).join("");
+  document.querySelectorAll("#pad button").forEach(b => b.onclick = () => padKey(b.dataset.k));
+  drawDots();
+}
+function drawDots() { $("dots").innerHTML = Array.from({ length: Math.max(4, code.length) }, (_, i) => `<i class="${i < code.length ? "on" : ""}"></i>`).join(""); }
+async function padKey(k) {
+  if (k === "Clear") code = ""; else if (k !== "OK") { if (code.length < 12) code += k; }
+  drawDots(); $("codemsg").textContent = ""; $("codemsg").className = "msg";
+  if (k !== "OK" || !code) return;
+  const r = await api("/api/sheet/unlock", { code }); code = ""; drawDots();
+  if (!r) return;
+  if (r.error) { $("codemsg").textContent = r.error; $("codemsg").className = "msg bad"; return; }
+  st = { p: VIEWER, tab:"sv" }; loadPatients();
+}
+$("staffbtn").onclick = () => { code = ""; drawPad(); $("codemsg").textContent = ""; show("s-code"); };
+$("codeback").onclick = () => show("s-sheet");
+
+/* ---- 2 whose lenses? (staff only) ------------------------------------------------------------ */
+async function loadPatients() {
+  $("pats").innerHTML = `<div class="note">Reading today's prescriptions ...</div>`; $("pq").value = ""; $("phits").innerHTML = "";
+  show("s-staff");
+  const r = await api("/api/sheet/patients");
+  if (!r) return;
+  if (r.error) { $("pats").innerHTML = `<div class="stop">${esc(r.error)}</div>`; return; }
+  $("patlead").textContent = r.none ? "No Rx saved today. Search below." : "The last three saved prescriptions. Only the first name shows on the price sheet.";
+  $("pats").innerHTML = r.patients.slice(0, 3).map(p => `<button class="pat ${p.stop ? "stop" : ""}" data-h="${esc(p.h)}" ${p.stop ? "disabled" : ""}>
+    <div class="pn">${esc(p.name)}</div><div class="pt">Rx today ${esc(p.time)}${p.optom ? " · " + esc(p.optom) : ""}</div>
+    <div class="pt">${p.type ? esc(p.type) + " written" : "Lens type not written"}${p.two ? " · one of two Rx today" : ""}</div>
+    ${p.stop ? `<div class="ps">${esc(p.stop)}</div>` : `<div class="pg">Lenses for ${esc(p.name.split(", ").pop())} &rarr;</div>`}</button>`).join("");
+  document.querySelectorAll("#pats .pat").forEach(b => b.onclick = () => pickPatient(b.dataset.h));
+  setTimeout(() => $("pq").focus(), 50);
+}
+let pqTimer = 0;
+$("pq").addEventListener("input", () => { clearTimeout(pqTimer); pqTimer = setTimeout(searchPatients, 250); });
+async function searchPatients() {
+  const q = $("pq").value.trim(), words = q.toLowerCase().split(/[\s,]+/).filter(Boolean);
+  if (q.length < 2) { $("phits").innerHTML = ""; return; }
+  const r = await api("/api/sheet/search", { q });
+  if (!r || $("pq").value.trim() !== q) return;
+  if (r.error) { $("phits").innerHTML = `<div class="hit">${esc(r.error)}</div>`; return; }
+  $("phits").innerHTML = (r.patients || []).slice(0, 6).map(p => `<button class="hit" data-h="${esc(p.h)}"><span>${hl(p.name, words)}</span><small>${p.last_rx ? "last Rx " + esc(p.last_rx) : "no spectacle Rx"}</small></button>`).join("")
+    + (r.more ? `<div class="hit"><small>More match - keep typing</small></div>` : "") + (!(r.patients || []).length ? `<div class="hit"><small>No one matches "${esc(q)}".</small></div>` : "");
+  document.querySelectorAll("#phits .hit[data-h]").forEach(b => b.onclick = () => pickPatient(b.dataset.h));
+}
+$("patback").onclick = nextPatient;
+async function pickPatient(h) {
+  const r = await api("/api/sheet/pick", { h });
+  if (!r) return;
+  if (r.error) { $("phits").innerHTML = `<div class="stop">${esc(r.error)}</div>`; return; }
+  if (r.choose) {     // two Rx saved the same day: staff choose, labelled by the type written
+    $("pats").innerHTML = r.choose.map(c => `<button class="pat" data-h="${esc(c.h)}"><div class="pn">${esc(c.type)}</div><div class="pt">Rx saved ${esc(c.time)}</div><div class="pg">This one &rarr;</div></button>`).join("");
+    $("patlead").textContent = "Two prescriptions were saved today. Pick the one being made.";
+    document.querySelectorAll("#pats .pat").forEach(b => b.onclick = () => pickPatient(b.dataset.h));
+    return;
+  }
+  const s = await api("/api/sheet/patient");
+  if (!s || s.error) return;
+  st = { p: { first:s.first, tabs:s.tabs || {}, picked:true, noRx:!!s.no_rx }, tab:s.tab || "sv" };
+  drawPage(); show("s-sheet");
+}
+
+/* ---- next patient / 5 minutes untouched: back to the plain sheet, everything cleared ---------- */
+async function nextPatient() { try { await fetch("/api/sheet/next", { method:"POST", credentials:"same-origin" }); } catch (e) {} resetAll(); }
+function resetAll() {
+  st = { p: VIEWER, tab:"sv" }; chk = null; closeAll();
+  ["scrim2","cpop"].forEach(i => $(i).classList.remove("on"));
+  drawPage(); show("s-sheet");
+}
+let idleT = 0;
+function poke() { clearTimeout(idleT); idleT = setTimeout(() => { if (picked() || !$("s-sheet").classList.contains("on")) nextPatient(); }, 5 * 60 * 1000); }
+["pointerdown","keydown"].forEach(e => addEventListener(e, poke, true)); poke();
+const ts = () => (st.p.tabs || {})[st.tab];
+const cardState = (i, idx) => { const t = ts(); return t && !t.plain && t.cards && t.cards[i] ? t.cards[i][idx] : null; };
+const optState = (i, idx, k) => { const c = cardState(i, idx); return c ? (c.opts || {})[k] : null; };
 
 /* ---- 2 price sheet (staff steer, patient watches) ------------------------------------------- */
 // card blocks: head | price | body | more  (one headline price per card; details on tap)
@@ -368,12 +519,16 @@ function headHTML(pg, c) {
   if (pg.by === "dist") return `<div class="head"><div class="tag ${c.hi ? "hi" : ""}">${esc(c.tag)}</div><div class="dist">${esc(c.dist)}<small>${esc(c.use)}</small></div></div>`;
   return `<div class="head"><div class="tag ${c.hi ? "hi" : ""}">${esc(c.tag)}</div><div class="tier">${c.tier}</div>${c.line ? `<div class="lens">${esc(c.line)}</div>` : ""}</div>`;
 }
-function priceHTML(pg, c) {
+function priceHTML(pg, c, i, thick) {
+  // one block (the cards share a six-row grid): the price, then the Rx notes under it
+  const cs = pg.by === "index" ? cardState(i, c.idx) : null, tn = thick ? `<div class="mtonote">Thicker for your prescription</div>` : "";
+  if (cs && cs.state === "mto" && cs.price != null && pg.key === "sv")       // the sheet's own made-to-order price, from the server
+    return `<div><div class="price">${money(cs.price)}<small>a pair</small></div><div class="mtonote">Made to order for your prescription</div>${tn}</div>`;
   const p = c.thick ? c.thick[0].price : c.grid ? c.grid[0][2] : c.price;
   const small = c.thick ? (pg.by === "dist" ? "1.50 · a pair" : "1.50 Standard · a pair") : c.grid ? "1.50, hard coat · a pair" : "a pair";
-  return `<div class="price">${money(p)}<small>${small}</small></div>`;
+  return `<div><div class="price">${money(p)}<small>${small}</small></div>${tn}</div>`;
 }
-function bodyHTML(pg, c, p) {
+function bodyHTML(pg, c, p, i) {
   let h = "";
   if (pg.by === "index" && c.line !== undefined) h += `<div class="lens">${esc(c.line)}</div>`;
   if (pg.by === "index" && c.line === undefined) h += `<div class="lens">ZEISS ClearView · DuraVision Platinum UV</div>`;
@@ -381,7 +536,8 @@ function bodyHTML(pg, c, p) {
   if (c.text) h += `<div class="desc">${esc(c.text)}</div>`;
   if (c.facts) h += `<div class="facts">${c.facts.map(f => `<div class="lr">${esc(f)}</div>`).join("")}</div>`;
   if (c.thick) h += `<div class="thin"><h4>Thinner</h4>` + c.thick.slice(1).map((t, j) => { const rec = t.idx === p.rec && pg.key !== "sun";
-      return `<div class="lr ${rec ? "rec" : ""}" data-t="${j + 1}"><span><b>${t.idx}</b><small>${esc(t.name)}</small>${rec ? `<i class="sy">Suits you</i>` : ""}</span><b class="lp">${money(t.price)}</b></div>`; }).join("") + `</div>`;
+      const cs = cardState(i, t.idx), na = cs && cs.state === "none";
+      return `<div class="lr ${rec && !na ? "rec" : ""} ${na ? "na" : ""}" data-t="${j + 1}"><span><b>${t.idx}</b><small>${esc(t.name)}</small>${rec && !na ? `<i class="sy">Suits you</i>` : ""}${na ? `<small class="nm">Not made in your prescription</small>` : ""}</span><b class="lp">${money(t.price)}</b></div>`; }).join("") + `</div>`;
   if (c.grid) h += `<div class="pgrid"><table><tr><th>Thickness</th><th>Hard coat</th><th>Anti-reflective</th></tr>` +
       c.grid.map(g => `<tr><td><b>${g[0]}</b><small>${g[1]}</small></td><td class="${g[2] == null ? "na" : ""}">${g[2] == null ? "-" : money(g[2])}</td><td>${money(g[3])}</td></tr>`).join("") + `</table></div>`;
   return `<div class="body">${h}</div>`;
@@ -393,21 +549,24 @@ function moreHTML(c) {
   return `<div class="more" data-pop="1"><span class="mh">${c.moreFrom ? "Add-ons" : "Also"}</span>${c.moreList.map(esc).join(" · ")}${range ? " · " + range : ""}${other}</div>`;
 }
 function drawPage() {
-  const pg = page(), p = st.p;
+  const pg = page(), p = { ...st.p, rec: (ts() || {}).rec || null };
   $("tabs").innerHTML = PAGES.map(x => `<button class="tab ${x.key === st.tab ? "on" : ""}" data-k="${x.key}">${x.tab}</button>`).join("");
   document.querySelectorAll(".tab").forEach(t => t.onclick = () => { st.tab = t.dataset.k; drawPage(); });
+  const t = ts() || {};
   const cards = pg.cards.map((c, i) => {
-    const rec = pg.by === "index" && c.idx === p.rec, thick = pg.key === "sv" && p.thick.includes(c.idx);
+    const states = Object.values((t.cards || [])[i] || {}), none = states.length && states.every(x => x.state === "none");
+    const rec = !none && pg.by === "index" && c.idx === p.rec, thick = !none && pg.by === "index" && (t.thicker || []).includes(c.idx);
     const sel = st.chosen && st.chosen.tab === pg.key && st.chosen.i === i;
-    return `<div class="card ${rec && !sel ? "rec" : ""} ${thick ? "thick" : ""} ${sel ? "sel" : ""}" data-i="${i}" role="button">
+    return `<div class="card ${rec && !sel ? "rec" : ""} ${sel ? "sel" : ""} ${none ? "nomade" : ""}" data-i="${i}" role="button">
       ${sel ? `<span class="chip ok">Chosen</span>` : rec ? `<span class="chip">Suits your prescription</span>` : ""}
-      ${headHTML(pg, c)}${priceHTML(pg, c)}${bodyHTML(pg, c, p)}${moreHTML(c)}
-      <div class="spacer"></div><div class="tapline">${thick ? "Thicker for your prescription" : sel ? "Change &rarr;" : "Choose &rarr;"}</div></div>`;
+      ${headHTML(pg, c)}${priceHTML(pg, c, i, thick)}${bodyHTML(pg, c, p, i)}${moreHTML(c)}
+      <div class="spacer"></div><div class="tapline">${none ? "Not made in your prescription" : sel ? "Change &rarr;" : "Choose &rarr;"}</div></div>`;
   }).join("");
   const other = pg.otherLine ? `<div class="other" style="margin-top:12px">${esc(pg.otherLine)}</div>` : "";
   const foot = pg.foot ? `<div class="foot"><div class="fl">${pg.foot[0].map(x => `<span>${esc(x)}</span>`).join("")}</div><div class="fd">${esc(pg.foot[1])}</div></div>` : "";
+  const quiet = t.note ? `<div class="quiet">${esc(t.note)}</div>` : "";
   $("page").innerHTML = `<div class="toprow"><div class="eyebrow">${esc(pg.eyebrow)}</div>${p.first ? `<div class="who">Lenses for <b>${esc(p.first)}</b></div>` : ""}</div>
-    <h1>${pg.h1}</h1><div class="lead">${esc(pg.lead)}</div>
+    <h1>${pg.h1}</h1><div class="lead">${esc(pg.lead)}</div>${quiet}
     <div class="rows" style="grid-template-columns:repeat(${pg.cols}, 1fr)">${cards}</div>${other}${foot}`;
   document.querySelectorAll(".card").forEach(b => b.onclick = (ev) => {
     const row = ev.target.closest(".lr"), more = ev.target.closest(".more[data-pop]");
@@ -449,7 +608,7 @@ $("scrim").onclick = closeAll;
 function openSheet(i, pre = {}) {
   const pg = page(), c = pg.cards[i];
   st.card = c; st.cardI = i; st.page = pg;
-  st.thickI = c.thick ? (pre.t != null ? pre.t : Math.max(0, c.thick.findIndex(t => t.idx === st.p.rec))) : null;
+  st.thickI = c.thick ? (pre.t != null ? pre.t : Math.max(0, c.thick.findIndex(t => t.idx === (ts() || {}).rec))) : null;
   st.other = false;                                   // 1.53 only when asked for
   st.gridI = c.grid ? 0 : null; st.coat = c.grid ? (c.grid[0][2] != null ? "hc" : "ar") : null;
   st.opt = "clear"; st.colour = c.tintPick ? "Grey" : (c.colours ? c.colours[0] : null); st.depth = "s85";
@@ -478,10 +637,15 @@ function priceNow() {
   if (o && o.k === "tint") { optAdd = isGrad() ? o.grad : o.add; }       // one price: grind + tint already inside
   else if (o && o.price == null) optAdd = o.add;
   if (o && o.k === "photo" && o.photoStock && st.pfx !== "Grey" && c.grind) { grindAdd = c.grind; note = "PhotoFusion X " + st.pfx + ": lens made to order"; }
+  else if (st.page && st.page.key === "sv" && c.grind && o && !o.mto && optState(st.cardI, curIdx(), o.k) === "mto") { grindAdd = c.grind; note = "Made to order for your prescription"; }
   const gradAdd = c.gradAdd && c.tintPick && isGrad() ? c.gradAdd : 0, mirrorAdd = st.mirror && c.mirror ? c.mirror : 0;
-  const mto = !!(o && (o.mto || (o.k === "photo" && st.pfx !== "Grey"))) || !!c.sun;
+  const mto = !!(o && (o.mto || (o.k === "photo" && st.pfx !== "Grey"))) || !!c.sun || grindAdd > 0;
   return { base, o, optAdd, grindAdd, gradAdd, mirrorAdd, note, mto, add: optAdd + grindAdd + gradAdd + mirrorAdd,
            total: base + optAdd + grindAdd + gradAdd + mirrorAdd, abs: !!(o && o.price != null) };
+}
+function notMade() {
+  const o = priceNow().o, cs = cardState(st.cardI, curIdx());
+  return !!(cs && (cs.state === "none" || (o && (cs.opts || {})[o.k] === "none")));
 }
 function choiceTitle() {
   const c = st.card, pg = st.page;
@@ -500,15 +664,15 @@ const a = (pct) => Math.round(Math.min(96, pct) * 2.55).toString(16).padStart(2,
 function drawChoice() {
   const c = st.card, pg = st.page;
   const list = optList();
-  if (list && !list.find(o => o.k === st.opt && !o.off)) st.opt = "clear";
+  if (list && !list.find(o => o.k === st.opt && !o.off && optState(st.cardI, curIdx(), o.k) !== "none")) st.opt = "clear";
   const pr = priceNow();
   const box = (k, on, off, title, price, desc, extra = "") =>
     `<button class="opt ${on ? "on" : ""} ${off ? "off" : ""}" data-k="${k}" ${off ? "disabled" : ""}>${extra}<div class="on1">${title}</div><div class="op">${price}</div>${desc ? `<div class="od">${desc}</div>` : ""}</button>`;
   let groups = "";
   if (c.thick) {
     groups += `<div class="group"><h4>Thickness</h4><div class="opts">` +
-      c.thick.map((t, i) => box("t" + i, !st.other && i === st.thickI, false, `${t.idx} ${esc(t.name)}`, money(t.price), "",
-        t.idx === st.p.rec ? `<span class="rc">Suits you</span>` : "")).join("") + `</div>` +
+      c.thick.map((t, i) => box("t" + i, !st.other && i === st.thickI, (cardState(st.cardI, t.idx) || {}).state === "none", `${t.idx} ${esc(t.name)}`, money(t.price), (cardState(st.cardI, t.idx) || {}).state === "none" ? "Not made in your prescription" : "",
+        t.idx === (ts() || {}).rec ? `<span class="rc">Suits you</span>` : "")).join("") + `</div>` +
       (c.other ? (st.other ? `<div class="opts" style="margin-top:10px">${box("x", true, false, `${c.other.idx} ${c.other.name}`, money(c.other.price), "Rimless frames.")}</div>`
                            : `<button class="otherlink" data-k="x">Other index: ${c.other.idx} rimless, ${money(c.other.price)}</button>`) : "") + `</div>`;
   }
@@ -522,7 +686,8 @@ function drawChoice() {
   }
   if (list && list.length > 1) {
     groups += `<div class="group"><h4>Choose one</h4><div class="opts">` +
-      list.map(o => box("o" + o.k, st.opt === o.k, o.off, esc(o.n), o.price != null ? money(o.price) : plus(o.add), o.off ? esc(o.offwhy) : esc(o.breakdown || o.d))).join("") + `</div></div>`;
+      list.map(o => { const na = optState(st.cardI, curIdx(), o.k) === "none";
+        return box("o" + o.k, st.opt === o.k, o.off || na, esc(o.n), o.price != null ? money(o.price) : plus(o.add), o.off ? esc(o.offwhy) : na ? "Not made in your prescription" : esc(o.breakdown || o.d)); }).join("") + `</div></div>`;
   }
   // tint: colour chips that ARE the colour, then the depths ZEISS makes (Optomate's ZEISS tint items)
   if ((tintOn() && pr.o && pr.o.k === "tint") || c.tintPick) {
@@ -547,7 +712,7 @@ function drawChoice() {
       PFX_COLOURS.map(x => `<button class="cchip ${st.pfx === x.k ? "on" : ""}" data-k="p${x.k}"><span class="sw" style="background:${x.hex}"></span><span class="cn">${x.k}${pr.o.photoStock ? `<small>${x.stock ? "stock" : "made to order"}</small>` : ""}</span></button>`).join("") + `</div></div>`;
   }
   let note = "Made to order, up to two weeks.";
-  if (pg.key === "sv") note = pr.mto ? "Made to order at this choice. Up to two weeks." : `Stock lens. If the frame needs a lens made to order it is +${money(c.grind)}; we check when the frame is measured.`;
+  if (pg.key === "sv") note = pr.grindAdd && pr.note === "Made to order for your prescription" ? "Made to order for your prescription. Up to two weeks." : pr.mto ? "Made to order at this choice. Up to two weeks." : `Stock lens. If the frame needs a lens made to order it is +${money(c.grind)}; we check when the frame is measured.`;
   if (c.sun) note = "Made to order, up to two weeks. Full UV. Tint included in the price.";
   const depthWords = () => `${st.colour} ${depthName(st.depth)}${isGrad() ? " graduated" : ""}`;
   const lines = `<div class="line"><span>${esc(choiceTitle())}${pr.abs ? " · " + esc(pr.o.n) : ""}</span><b>${money(pr.base)}</b></div>`
@@ -563,7 +728,7 @@ function drawChoice() {
     </div>
     <div class="total"><div class="tl">Lenses</div>${lines}
       <div class="big">${money(pr.total)}<small>a pair</small></div><div class="pair">Lenses only. Frame extra.</div>
-      <button class="cta" id="choose">Choose this lens</button><button class="ghost" id="back">Back to all lenses</button>
+      <button class="cta" id="choose" ${notMade() ? "disabled" : ""}>${notMade() ? "Not made in your prescription" : "Choose this lens"}</button><button class="ghost" id="back">Back to all lenses</button>
     </div>`;
   document.querySelectorAll(".opt:not(.off), .cchip:not(.off), .dchip, .otherlink").forEach(b => b.onclick = () => {
     const k = b.dataset.k;
@@ -597,9 +762,10 @@ function drawSum() {
   const pr = priceNow(), c = st.card, pg = st.page;
   $("sum-eye").textContent = c.line || c.product || pg.eyebrow;
   $("sum-who").textContent = st.p.first;
-  $("sum-who").parentElement.style.display = st.p.first ? "" : "none";
-  $("staffrow").style.display = PATIENT ? "none" : "";
-  $("patrow").style.display = PATIENT ? "" : "none";
+  $("sum-whobox").style.display = st.p.first ? "" : "none";
+  const job = picked() && !st.p.noRx;
+  $("staffrow").style.display = job ? "" : "none";
+  $("patrow").style.display = job ? "none" : "";
   $("sum-h1").textContent = choiceTitle();
   $("summary").innerHTML = `<div class="line"><span>Lens</span><b>${esc(choiceTitle())}${pr.abs ? " · " + esc(pr.o.n) : ""}</b></div>`
     + (pr.o && !pr.abs && (optList() || []).length > 1 ? `<div class="line"><span>Option</span><b>${esc(pr.o.n)}${pr.optAdd ? ", " + plus(pr.optAdd) : ""}</b></div>` : "")
@@ -611,153 +777,180 @@ function drawSum() {
   $("sum-total").textContent = money(pr.total);
 }
 $("toframe").onclick = () => { drawFrame(); show("s-frame"); setTimeout(() => $("bc").focus(), 50); };
+$("backsheets").onclick = () => { st.chosen = null; drawPage(); show("s-sheet"); };
 $("changelens").onclick = () => { drawPage(); show("s-sheet"); };
 
-/* ---- 3 staff: frame, checks, heights, make job ------------------------------------------------ */
-function staffLens() {
-  const c = st.card;
-  if (c.thick || c.grid) return `${c.product} ${curIdx()}`;      // product names on staff screens
-  return c.product;
-}
-function isStockSV() { const pr = priceNow(); return st.page.key === "sv" && !pr.mto; }
-function needsHeights() { return !!(st.page.heights || st.card.heights); }
-function drawFrame() {
-  const p = st.p;
-  $("fpat").textContent = `${p.sur}, ${p.first} · ${p.rx}`;
-  $("chosen").innerHTML = `<div class="kv"><span>Lens</span><b>${esc(staffLens())}</b></div>
-    <div class="kv"><span>Option</span><b>${esc(extrasWords())}</b></div>
-    <div class="kv"><span>Made</span><b>${isStockSV() ? "Stock" : "Made to order"}</b></div>
-    <div class="kv"><span>Price</span><b>${money(priceNow().total)} a pair</b></div>`;
-  $("framefacts").innerHTML = ""; $("bc").value = ""; st.fix = null; st.frame = null; st.h = { R:"", L:"" };
-  $("checkbox").innerHTML = `<h4>Checks</h4><div class="note" style="margin-top:0">Scan or pick the frame to check the blank${needsHeights() ? " and type the heights" : ""}.</div>`;
-  canMake();
-}
-$("demo").onclick = () => { $("bc").value = "35144"; closeDD(); frameScanned(FRAMES[0]); };
-$("own").onclick = () => { closeDD(); frameScanned({ own:true, a:52, b:40, dbl:18, ed:54, price:0 }); };
 
-// one box: a scan is digits + Enter (exact barcode); typing drops down the matching frames, live
-let ddHits = [], ddSel = 0;
+/* ---- 3 staff: frame, checks, heights, make job (screens 5-7) ----------------------------------
+   Rule 1 of the director's doc: the page works nothing out. The blank, the verdict, the fixes and their
+   prices, the PD change, the heights rule and whether Make may be pressed all come from /api/sheet/checks. */
+let chk = null, fq = { frame:null, own:false, rimless:false, fix:null, told:false, h:{ R:"", L:"" } }, ddHits = [], ddSel = 0, ddTimer = 0;
+const choiceNow = () => ({ tab:st.tab, card:st.cardI, idx:curIdx(), opt:(priceNow().o || {}).k || "clear",
+  colour:{ Green:"Green" }[st.colour] || st.colour, depth:st.depth, pfx:st.pfx });
+function frameReq() {
+  if (fq.own) return { own:true, a:$("oa").value.trim(), dbl:$("odbl").value.trim(), ed:$("oed").value.trim() };
+  return fq.frame ? { barcode:fq.frame.barcode } : {};
+}
+async function drawFrame() {
+  fq = { frame:null, own:false, rimless:false, fix:null, told:false, h:{ R:"", L:"" } }; chk = null;
+  $("bc").value = ""; $("framefacts").innerHTML = ""; ["oa","odbl","oed"].forEach(i => $(i).value = "");
+  $("own").classList.remove("on"); $("rimless").classList.remove("on"); $("ownsize").style.display = "none";
+  $("checkbox").innerHTML = `<h4>Checks</h4><div class="note" style="margin-top:0">Reading the Rx ...</div>`;
+  $("chosen").innerHTML = "";
+  if (!st.staff) { const r = await api("/api/sheet/staff"); if (!r) return; st.staff = r; }
+  $("fpat").textContent = st.staff.name;
+  runChecks();
+}
+let checkSeq = 0;
+async function runChecks() {
+  const seq = ++checkSeq;
+  const r = await api("/api/sheet/checks", { version:DATA.version, choice:choiceNow(), frame:frameReq(), rimless:fq.rimless,
+    fix:fq.fix, heights:fq.h, told:fq.told });
+  if (!r || seq !== checkSeq) return;
+  chk = r; drawChecks();
+}
+function verdictHTML(v) {
+  if (!v) return "";
+  const cls = { green:"v-ok", amber:"v-bad", blue:"v-blue", none:"v-none" }[v.tone] || "v-none";
+  return `<div class="verdict ${cls}"><div class="vh">${esc(v.head)}</div><div class="vd">${esc(v.detail || "")}</div></div>`;
+}
+function drawChecks() {
+  const r = chk, rx = r.rx || st.staff;
+  $("chosen").innerHTML = r.lens ? `<div class="kv"><span>Lens</span><b>${esc(r.lens)}</b></div>
+    <div class="kv"><span>Option</span><b>${esc(r.option || "Clear")}</b></div>
+    <div class="kv"><span>Made</span><b>${esc(r.made || "")}</b></div>
+    <div class="kv"><span>Price</span><b>${r.price != null ? money(r.price) + " a pair" : "-"}</b></div>` : "";
+  let h = `<h4>Checks</h4>`;
+  (rx.warnings || []).forEach(w => h += `<div class="warn">${esc(w)}</div>`);
+  (r.warnings || []).forEach(w => h += `<div class="warn">${esc(w)}</div>`);
+  h += `<div class="kv"><span>Rx as saved</span><b>R ${esc(rx.right)}<br>L ${esc(rx.left)}</b></div>
+        <div class="kv"><span>PD, from the Rx</span><b>${esc(rx.pd)}</b></div>`;
+  if (r.blank) h += `<div class="kv"><span>Blank needed (${esc(r.blank.label)})</span><b>${Object.entries(r.blank.per_eye).sort((x, y) => x[0] < y[0] ? 1 : -1).map(([s, v]) => `${s} ${v} mm`).join(" / ")}</b></div>
+        <div class="work">${r.blank.working.map(esc).join("<br>")}</div>`;
+  h += verdictHTML(r.verdict);
+  if (r.fixes && r.fixes.length) {
+    h += `<div class="fix">` + r.fixes.map((f, i) => `<button class="fixo ${f.on ? "on" : ""}" data-i="${i}"><div><div class="fn">${i + 1}. ${esc(f.title)}${f.best ? ` <span class="best">${esc(f.best)}</span>` : ""}</div>
+        <div class="fd">${esc(f.detail)}</div></div><div class="fp">${money(f.price)}<small>a pair</small></div></button>`).join("") + `</div>`;
+  }
+  if (r.stop) h += `<div class="stop">${esc(r.stop)}</div>`;
+  if (r.heights_needed && !r.stop) {
+    h += `<div style="margin-top:14px"><h4>Fitting heights</h4>
+      <div class="hts">R <input id="hR" inputmode="decimal" placeholder="mm" value="${esc(fq.h.R)}"> L <input id="hL" inputmode="decimal" placeholder="mm" value="${esc(fq.h.L)}">
+      <span class="req">Typed, 10 to 40 mm</span></div></div>`;
+  }
+  if (r.price_changed) h += `<label class="told"><input type="checkbox" id="told" ${fq.told ? "checked" : ""}> Told the patient: was ${money(r.start_price)}, now ${money(r.price)}</label>`;
+  $("checkbox").innerHTML = h;
+  document.querySelectorAll(".fixo").forEach(b => b.onclick = () => {
+    const f = r.fixes[+b.dataset.i]; fq.fix = f.on ? null : { kind:f.kind, idx:f.idx || "" }; fq.told = false; runChecks(); });
+  ["hR","hL"].forEach(id => { const el = $(id); if (el) el.oninput = () => { fq.h[id.slice(1)] = el.value.trim(); clearTimeout(ddTimer); ddTimer = setTimeout(runChecks, 350); }; });
+  if ($("told")) $("told").onchange = () => { fq.told = $("told").checked; runChecks(); };
+  $("make").textContent = (r.mode && r.mode.button) || "Make job (dry run, nothing written)";
+  $("make").disabled = !r.can_make;
+  $("makewhy").textContent = r.can_make ? "" : r.why || "";
+}
+
+// one box: digits + Enter = a barcode; typing narrows a live list from Optomate (read only)
 function hl(text, words) {
   let out = esc(text);
   words.forEach(w => { if (w) out = out.split(new RegExp("(" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "i")).map((s, i) => i % 2 ? `<mark>${s}</mark>` : s).join(""); });
   return out;
 }
 function closeDD() { $("dd").classList.remove("on"); }
-function drawDD() {
+async function searchFrames() {
   const q = $("bc").value.trim(), words = q.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!words.length) { closeDD(); return; }
-  ddHits = FRAMES.filter(f => words.every(w => `${f.brand} ${f.model} ${f.colour} ${f.a} ${f.bc}`.toLowerCase().includes(w)))
-    .sort((x, y) => (y.qoh > 0) - (x.qoh > 0) || x.brand.localeCompare(y.brand));
-  ddSel = Math.min(ddSel, Math.max(ddHits.length - 1, 0));
+  if (q.length < 2 || /^\d+$/.test(q)) { closeDD(); return; }
+  const r = await api("/api/sheet/frame", { q });
+  if (!r || $("bc").value.trim() !== q) return;
+  ddHits = r.frames || []; ddSel = Math.min(ddSel, Math.max(ddHits.length - 1, 0));
   $("dd").innerHTML = ddHits.length
     ? ddHits.slice(0, 6).map((f, i) => `<button class="fr ${i === ddSel ? "sel" : ""}" data-i="${i}">
-        <span><b>${hl(f.brand + " " + f.model, words)}</b> <span class="fc">${hl(f.colour, words)}</span></span>
-        <span class="fs">${hl(String(f.a), words)} &#9633; ${f.dbl}</span><span class="fq ${f.qoh ? "" : "none"}">${f.qoh ? f.qoh + " in" : "none"}</span>
-        <span class="fpr">${money(f.price)}</span></button>`).join("")
-      + (ddHits.length > 6 ? `<div class="more">${ddHits.length - 6} more - keep typing</div>` : "")
+        <span><b>${hl((f.brand ? f.brand + " " : "") + f.model, words)}</b> <span class="fc">${hl(f.colour || "", words)}</span></span>
+        <span class="fs">${hl(String(f.a || ""), words)} &#9633; ${f.dbl || ""}</span><span class="fq ${f.qoh ? "" : "none"}">${f.qoh ? f.qoh + " in" : "none"}</span>
+        <span class="fpr">${f.price != null ? money(f.price) : "-"}</span></button>`).join("")
+      + (ddHits.length > 6 || r.more ? `<div class="more">More frames match - keep typing</div>` : "")
     : `<div class="more">No frame matches "${esc(q)}". Try fewer letters, or Own frame.</div>`;
   $("dd").classList.add("on");
   document.querySelectorAll("#dd .fr").forEach(b => b.onmousedown = (ev) => { ev.preventDefault(); pickDD(+b.dataset.i); });
 }
-function pickDD(i) { const f = ddHits[i]; if (!f) return; $("bc").value = `${f.brand} ${f.model} · ${f.colour}`; closeDD(); frameScanned(f); }
-$("bc").addEventListener("input", () => { ddSel = 0; drawDD(); });
-$("bc").addEventListener("blur", () => setTimeout(closeDD, 120));
+function pickDD(i) { const f = ddHits[i]; if (!f) return; $("bc").value = `${f.brand ? f.brand + " " : ""}${f.model} · ${f.colour}`; closeDD(); frameChosen(f); }
+async function scanBarcode(v) {
+  const r = await api("/api/sheet/frame", { barcode:v });
+  if (!r) return;
+  if (r.error) { $("framefacts").innerHTML = `<div class="stop">${esc(r.error)}</div>`; fq.frame = null; runChecks(); return; }
+  frameChosen(r.frame);
+}
+function frameChosen(f) {
+  fq.frame = f; fq.own = false; fq.fix = null; fq.told = false; $("own").classList.remove("on"); $("ownsize").style.display = "none";
+  $("framefacts").innerHTML = `<div class="kv"><span>Frame</span><b>${esc((f.brand ? f.brand + " " : "") + f.model)} · ${esc(f.colour || "")}</b></div>
+    <div class="kv"><span>Size</span><b>${f.a || "?"} &#9633; ${f.dbl || "?"}${f.ed ? " · ED " + f.ed : " · ED not on the record"}</b></div>
+    <div class="kv"><span>Price</span><b>${f.price != null ? money(f.price) : "No sell price"}</b></div>`;
+  runChecks();
+}
+$("bc").addEventListener("input", () => { ddSel = 0; clearTimeout(ddTimer); ddTimer = setTimeout(searchFrames, 250); });
+$("bc").addEventListener("blur", () => setTimeout(closeDD, 150));
 $("bc").addEventListener("keydown", (ev) => {
-  const open = $("dd").classList.contains("on");
-  if (ev.key === "ArrowDown" && open) { ddSel = Math.min(ddSel + 1, Math.min(ddHits.length, 6) - 1); drawDD(); ev.preventDefault(); }
-  else if (ev.key === "ArrowUp" && open) { ddSel = Math.max(ddSel - 1, 0); drawDD(); ev.preventDefault(); }
+  const open = $("dd").classList.contains("on"), n = Math.min(ddHits.length, 6);
+  if (ev.key === "ArrowDown" && open) { ddSel = Math.min(ddSel + 1, n - 1); searchFrames(); ev.preventDefault(); }
+  else if (ev.key === "ArrowUp" && open) { ddSel = Math.max(ddSel - 1, 0); searchFrames(); ev.preventDefault(); }
   else if (ev.key === "Escape") closeDD();
-  else if (ev.key === "Enter") {
-    const v = $("bc").value.trim(), exact = FRAMES.find(f => f.bc === v);
-    if (exact) { closeDD(); frameScanned(exact); } else if (open) pickDD(ddSel);
-  }
+  else if (ev.key === "Enter") { const v = $("bc").value.trim(); if (/^[A-Za-z0-9._-]+$/.test(v) && !open) { closeDD(); scanBarcode(v); } else if (open) pickDD(ddSel); }
 });
+$("own").onclick = () => { fq.own = !fq.own; fq.frame = null; fq.fix = null; $("own").classList.toggle("on", fq.own); $("ownsize").style.display = fq.own ? "" : "none";
+  $("framefacts").innerHTML = fq.own ? `<div class="note">No frame on the job; the job comment says OWN FRAME. Tick Own Frame in Touch before invoicing.</div>` : ""; runChecks(); };
+$("rimless").onclick = () => { fq.rimless = !fq.rimless; $("rimless").classList.toggle("on", fq.rimless); runChecks(); };
+["oa","odbl","oed"].forEach(i => $(i).oninput = () => { clearTimeout(ddTimer); ddTimer = setTimeout(runChecks, 400); });
 
-function frameScanned(fr) {
-  const p = st.p, c = st.card;
-  st.frame = fr;
-  $("framefacts").innerHTML = fr.own
-    ? `<div class="kv"><span>Frame</span><b>Own frame</b></div><div class="kv"><span>Size</span><b>type A, B, DBL, ED: ${fr.a} &#9633; ${fr.dbl} · B ${fr.b} · ED ${fr.ed}</b></div>`
-    : `<div class="kv"><span>Frame</span><b>${esc(fr.brand + " " + fr.model)} · ${esc(fr.colour)}</b></div>
-       <div class="kv"><span>Size</span><b>${fr.a} &#9633; ${fr.dbl} · B ${fr.b} · ED ${fr.ed}</b></div><div class="kv"><span>Price</span><b>${money(fr.price)}</b></div>`;
-  const need = Math.max(...Object.values(p.pd).map(pd => Math.ceil(fr.ed + Math.max(fr.a + fr.dbl - 2 * pd, 0) + 2)));
-  let html = `<h4>Checks</h4><div class="kv"><span>PD, from the Rx</span><b>R ${p.pd.R} / L ${p.pd.L}</b></div>`;
-  if (!isStockSV()) {
-    html += `<div class="verdict v-ok"><div class="vh">Made to order</div><div class="vd">Cut to this frame - no stock blank to check.</div></div>`;
-    st.fix = "ok";
-  } else if (need <= c.stock) {
-    html += `<div class="kv"><span>Blank needed</span><b>${need} mm</b></div><div class="verdict v-ok"><div class="vh">Fits a ${c.stock} mm stock blank</div><div class="vd">${esc(staffLens())}, stock.</div></div>`;
-    st.fix = "ok";
-  } else {
-    // PD change (Mark 9 Nov 2026): SV stock only, under 0.7 prism total, 3 mm cap, 0.5 mm steps
-    let d = 0; while (Math.ceil(fr.ed + Math.max(fr.a + fr.dbl - 2 * (p.pd.R + d), 0) + 2) > c.stock && d <= 3) d += 0.5;
-    const total = d * 2, prism = Math.abs(p.h) * total / 10, pdOk = total <= 3 && prism < 0.7;
-    const up = st.page.cards.find(x => x.idx > c.idx && x.stock >= need);
-    st.fix = null;
-    html += `<div class="kv"><span>Blank needed</span><b>${need} mm</b></div>
-      <div class="verdict v-bad"><div class="vh">Stock blank too small</div><div class="vd">Needs ${need} mm. ${c.idx} stock comes ${c.stock} mm.</div></div>
-      <div class="fix">
-      ${pdOk ? `<button class="fixo" data-f="pd"><div><div class="fn">Widen the PD <span class="best">Keeps the price</span></div>
-        <div class="fd">PD R ${p.pd.R} &rarr; ${p.pd.R + d} / L ${p.pd.L} &rarr; ${p.pd.L + d} · ${total} mm, ${prism.toFixed(2)}&#916; ${p.h < 0 ? "base-in" : "base-out"} total</div></div><div class="fp">+$0</div></button>` : ""}
-      <button class="fixo" data-f="grind"><div><div class="fn">Made to order</div><div class="fd">${esc(staffLens())} grind, cut to the frame</div></div><div class="fp">+${money(c.grind)}</div></button>
-      ${up ? `<button class="fixo" data-f="up"><div><div class="fn">${up.idx} stock</div><div class="fd">${esc(up.product)}, ${up.stock} mm blank fits</div></div><div class="fp">+${money(up.price - c.price)}</div></button>` : ""}
-      </div><div class="note">${pdOk ? "" : "PD change not possible: over 3 mm or 0.7&#916;. "}Tell the patient if the price changes.</div>`;
-  }
-  if (needsHeights()) {
-    html += `<div style="margin-top:14px"><h4>Fitting heights</h4>
-      <div class="hts">R <input id="hR" inputmode="decimal" placeholder="mm"> L <input id="hL" inputmode="decimal" placeholder="mm">
-      <span class="req" id="hreq">Needed for this lens</span></div>
-      <div class="note">Frame depth B ${fr.b} mm. Check it meets the design's minimum fitting height.</div></div>`;
-  }
-  $("checkbox").innerHTML = html;
-  document.querySelectorAll(".fixo").forEach(b => b.onclick = () => {
-    st.fix = b.dataset.f; document.querySelectorAll(".fixo").forEach(x => x.classList.toggle("on", x === b)); canMake();
-  });
-  ["hR","hL"].forEach(id => { const el = $(id); if (el) el.oninput = () => { st.h[id.slice(1)] = el.value.trim(); canMake(); }; });
-  canMake();
-}
-function canMake() {
-  const hOk = !needsHeights() || (Number(st.h.R) > 0 && Number(st.h.L) > 0);
-  const ok = !!(st.frame && st.fix && hOk);
-  $("make").disabled = !ok;
-  if ($("hreq")) $("hreq").style.visibility = hOk ? "hidden" : "visible";
-  $("makewhy").textContent = !st.frame ? "Scan or pick the frame first." : !st.fix ? "Pick how to fix the blank." : !hOk ? "Type both fitting heights." : "Dry run: shows the job, writes nothing.";
-}
-$("make").onclick = () => {
-  const words = { ok:"", pd:", with the wider PD (noted on the job)", grind:", made to order", up:", in the thicker-index stock lens" }[st.fix];
-  $("donel").innerHTML = `${esc(st.p.sur)}, ${esc(st.p.first)} · ${esc(staffLens())} · ${esc(extrasWords())}${words}.<br>Open the job in Optomate, send it to Visustore, then press Patient Invoice.`;
-  show("s-done");
+/* ---- screen 6: check, then make the job (the engine's plan: exactly what will be written) ---- */
+const jobBody = () => ({ version:DATA.version, choice:choiceNow(), frame:frameReq(), rimless:fq.rimless, fix:fq.fix, heights:fq.h, told:fq.told });
+function eyeRow(e) { if (!e) return "-"; return [e.sph, e.cyl ? `/ ${e.cyl} x ${e.axis}` : "", e.add ? `add ${e.add}` : "", e.prism ? `prism ${e.prism}` : "", e.pd ? `PD ${e.pd}` : ""].filter(Boolean).map(esc).join(" "); }
+$("make").onclick = async () => {
+  $("make").disabled = true;
+  const r = await api("/api/sheet/plan", jobBody());
+  $("make").disabled = !(chk && chk.can_make);
+  if (!r) return;
+  const pv = r.preview || {}, pr = pv.price || {}, sh = r.sheet || {};
+  const fr = pv.frame || {};
+  $("cpop").innerHTML = `<div class="eyebrow">Staff · ${esc((pv.patient || {}).name || st.staff.name)}</div><h3>Check, then make the job.</h3>
+    ${(r.refusals || []).map(x => `<div class="refuse">${esc(x)}</div>`).join("")}${(r.warnings || []).map(x => `<div class="warn">${esc(x)}</div>`).join("")}
+    <div class="cg"><div>
+      <div class="kv"><span>Rx as saved</span><b>R ${eyeRow((pv.rx || {}).right)}<br>L ${eyeRow((pv.rx || {}).left)}<small>Rx #${esc((pv.rx || {}).id || "")}, saved ${esc((pv.rx || {}).saved || "")}</small></b></div>
+      <div class="kv"><span>Lens</span><b>${esc((pv.lens || {}).description || sh.lens || "")}<small>Optomate ${esc((pv.lens || {}).barcode || "-")} · ${esc((pv.lens || {}).use || "")}</small></b></div>
+      ${pv.tint ? `<div class="kv"><span>Tint</span><b>${esc(pv.tint.description)}<small>Optomate ${esc(pv.tint.barcode)}</small></b></div>` : ""}
+      <div class="kv"><span>Coat</span><b>${esc((pv.coat || {}).description || "-")}</b></div>
+      ${pv.pd_shift ? `<div class="kv"><span>PD</span><b>${esc(pv.pd_shift)}</b></div>` : ""}
+    </div><div>
+      <div class="kv"><span>Lenses, sheet</span><b>${sh.price != null ? money(sh.price) : "-"}</b></div>
+      <div class="kv"><span>Lenses, Optomate</span><b>${pr.lens_pair ? "$" + esc(pr.lens_pair) : "-"}${pr.tint_pair && pr.tint_pair !== "0.00" ? ` + tint $${esc(pr.tint_pair)}` : ""}<small>lens x 2 + coat x 2${pv.tint ? " + tint x 2" : ""}</small></b></div>
+      <div class="kv"><span>Frame</span><b>${fr.own ? "Own frame" : esc(`${fr.model || ""} ${fr.colour || ""}`)}${fr.sellinc ? ` · $${esc(fr.sellinc)}` : ""}<small>${esc(fr.size || "")}</small></b></div>
+      <div class="kv"><span>Heights</span><b>${Object.keys(pv.heights || {}).length ? Object.entries(pv.heights).map(([s, v]) => `${s} ${esc(v)}`).join(" / ") : "none"}</b></div>
+      <div class="kv"><span>Touch will charge</span><b>${pr.touch_total ? "$" + esc(pr.touch_total) : "-"}<small>Before discounts and health fund</small></b></div>
+    </div></div>
+    <div class="popbtns"><button class="cta" id="confirm" ${r.ok ? "" : "disabled"}>${esc((r.mode_words || {}).button || "Make job (dry run, nothing written)")}</button><button class="ghost" id="cback">Back</button></div>`;
+  $("scrim2").classList.add("on"); $("cpop").classList.add("on");
+  $("cback").onclick = () => { $("scrim2").classList.remove("on"); $("cpop").classList.remove("on"); };
+  $("confirm").onclick = confirmMake;
 };
-$("again").onclick = () => { st = {}; drawPats(); show("s-staff"); };
-/* Hub patient price sheet (Mark 10 Nov 2026, step 1): no patients, no staff steps; ?staff=demo keeps the old demo. */
-const PATIENT = new URLSearchParams(location.search).get("staff") !== "demo";
-const VIEWER = { first:"", sur:"", rec:null, thick:[], h:0, pd:{} };
-$("backsheets").onclick = () => { st.chosen = null; drawPage(); show("s-sheet"); };
+async function confirmMake() {
+  $("confirm").disabled = true;
+  const r = await api("/api/sheet/make", jobBody());
+  $("scrim2").classList.remove("on"); $("cpop").classList.remove("on");
+  if (!r) return;
+  const made = r.created;
+  $("doneh").textContent = made ? `Job ${made} made.` : r.ok ? "Dry run: nothing was made." : "Not made.";
+  $("donetick").style.background = made ? "" : r.ok ? "var(--btn)" : "#B00020";
+  $("donetick").innerHTML = made || r.ok ? "&#10003;" : "!";
+  $("donel").innerHTML = made ? (r.verified ? "" : esc(r.next || "")) : r.ok ? "This is the job it would send. Nothing was written to Optomate." : (r.refusals || []).map(esc).join("<br>");
+  $("donesteps").style.display = made || r.ok ? "" : "none";
+  $("donemode").textContent = made ? "" : r.ok ? "When jobs are live, these are the steps in Touch." : "";
+  show("s-done");
+}
+$("again").onclick = nextPatient;
+
+/* ---- start: the plain patient sheet (no patient data), the tab from the address (#mf, #af ...) ---- */
 function fit() { const k = Math.min(innerWidth / 1180, innerHeight / 820); document.body.style.transform = k < 1 || k > 1 ? `scale(${k})` : ""; }
 addEventListener("resize", fit); fit();
-if (!PATIENT) $("mockflag").style.display = "";
-if (PATIENT) { st = { p: VIEWER, tab: (location.hash.slice(1) && PAGES.find(x => x.key === location.hash.slice(1))) ? location.hash.slice(1) : "sv" }; drawPage(); show("s-sheet"); }
-else drawPats();
-
-/* screenshots: ?go=<tab> [&p=i] [&card=i] [&t=thicknessI] [&opt=key] [&col=Colour] [&den=75%] [&pfx=Brown] [&coat=hc|ar] [&g=gridI]
-   [&step=pop|choice|sum|frame|check|search|done] */
-const q = new URLSearchParams(location.search), go = q.get("go") || q.get("tab") || location.hash.slice(1);
-if (go && PAGES.find(x => x.key === go)) {
-  const pi = +(q.get("p") || (go === "mf" || go === "office" || go === "bif" ? 1 : 0));
-  st = { p: PATIENT ? VIEWER : PATS[pi], tab: go }; drawPage(); show("s-sheet");
-  const step = q.get("step"), ci = +(q.get("card") || 0);
-  if (step === "pop") openPop(ci);
-  else if (step) { $("sheet").style.transition = "none"; openSheet(ci, { t: q.get("t") != null ? +q.get("t") : undefined, o: q.get("opt") || undefined });
-    if (q.get("col")) st.colour = q.get("col"); if (q.get("den")) st.depth = q.get("den"); if (q.get("pfx")) st.pfx = q.get("pfx");
-    if (q.get("coat")) st.coat = q.get("coat"); if (q.get("g")) st.gridI = +q.get("g"); if (q.get("other")) st.other = true;
-    drawChoice();
-    if (step !== "choice") { st.chosen = { tab:st.tab, i:ci }; closeAll(); drawSum(); show("s-sum"); }
-    if (step === "frame" || step === "check" || step === "search" || step === "done") { drawFrame(); show("s-frame"); }
-    if (step === "check" || step === "done") { frameScanned(FRAMES[0]); document.querySelector('.fixo[data-f="pd"]')?.click(); }
-    if (step === "search") { $("bc").value = "black"; drawDD(); }
-    if (step === "done") { st.fix = st.fix || "ok"; $("make").click(); }
-  }
-}
+st = { p: VIEWER, tab: (location.hash.slice(1) && PAGES.find(x => x.key === location.hash.slice(1))) ? location.hash.slice(1) : "sv" };
+drawPage(); show("s-sheet");
 </script>
 </body>
 </html>

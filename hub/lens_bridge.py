@@ -609,6 +609,9 @@ def fixture_db(day: str) -> dict:
         9002: ("Sam", "ZZTEST-NEAR", "1958-09-12"),
         9003: ("Mia", "ZZTEST", "2001-01-20"),
         9004: ("Priya", "ZZTEST-PRISM", "1970-06-30"),
+        # iPad sheet steps 2-3 (10 Nov 2026): high minus and high cyl, same people as the agent's FixtureSource
+        9005: ("Jo", "ZZTEST-HIGH", "1985-03-14"),
+        9006: ("Kim", "ZZTEST-CYL", "1992-08-08"),
     }
     rx = {
         9001: [["501", at("11:42"), day, "MJ", "0", "0", FOOTER % "", "",
@@ -623,6 +626,12 @@ def fixture_db(day: str) -> dict:
         9004: [["504", at("08:50"), day, "MJ", "0", "0", FOOTER % "Occ MF\\par ", "",
                 *_fx_eye("+2.50", "", "", "+2.00", "+1.00", "32", ("1.00", "IN", "", "")),
                 *_fx_eye("+2.75", "-0.25", "75", "+2.00", "+1.00", "32")]],
+        9005: [["505", at("08:30"), day, "MJ", "0", "0", FOOTER % "", "",
+                *_fx_eye("-6.50", "-0.50", "180", pd="30"),
+                *_fx_eye("-6.25", "-0.25", "170", pd="30")]],
+        9006: [["506", at("08:10"), day, "NK", "0", "0", FOOTER % "", "",
+                *_fx_eye("-0.50", "-3.50", "180", pd="32"),
+                *_fx_eye("-0.75", "-3.25", "10", pd="32")]],
     }
     return {"people": people, "rx": rx}
 
@@ -735,13 +744,16 @@ SUNGLASS_STOCK_TYPE = 3
 FIXTURE_FRAME_RECORDS = {
     "ZZFRAME5219": ["ZZFRAME5219", "ZZTEST Metal", "Gunmetal", "5219", "0", "57.0", "MIS", "2", "179.0000", "1"],
     "ZZFRAME5818": ["ZZFRAME5818", "ZZTEST Aviator", "Gold", "5818", "0", "66.0", "MIS", "3", "249.0000", "1"],
+    "ZZFRAME5319": ["ZZFRAME5319", "ZZTEST Panto", "Crystal", "5319", "0", "58.0", "MIS", "2", "199.0000", "3"],
+    "ZZFRAME5420": ["ZZFRAME5420", "ZZTEST Round", "Tortoise", "5420", "0", "58.0", "MIS", "2", "229.0000", "0"],
+    "ZZFRAME5617": ["ZZFRAME5617", "ZZTEST Square", "Black", "5617", "0", "60.0", "MIS", "2", "289.0000", "2"],
 }
 
 
 def frame_by_barcode_query(barcode: str) -> str:
     return (f"SELECT {_txt('f.BARCODE')}, {_txt('f.MODEL')}, {_txt('f.COLOUR_DESCRIPTION')}, {_txt('f.SIZE')}, "
             "ISNULL(f.BRIDGE,0), ISNULL(f.DIAG,0), ISNULL(f.SUPPLIER_IDENTIFIER,''), ISNULL(f.STOCK_TYPE,0), "
-            "ISNULL(CAST(b.SELLINC AS varchar(20)),''), ISNULL(b.QOH,0) "
+            f"ISNULL(CAST(b.SELLINC AS varchar(20)),''), ISNULL(b.QOH,0), {_txt('f.BRAND_IDENTIFIER')} "
             "FROM SPECFRAME f WITH (NOLOCK) LEFT JOIN SPECFRAME_BRANCH b WITH (NOLOCK) "
             "ON b.SPECFRAMEID = f.ID AND b.BRANCH_IDENTIFIER = 'MJ' "
             f"WHERE f.BARCODE = N'{_sql_str(barcode)}'")
@@ -763,7 +775,41 @@ def build_frame_record(row: list[str] | None) -> dict | None:
     except ValueError:
         qoh = 0
     return {"barcode": row[0], "model": row[1], "colour": row[2], "a": a, "dbl": dbl, "ed": ed,
-            "sunglass": row[7].strip() == str(SUNGLASS_STOCK_TYPE), "price": price, "qoh": qoh}
+            "sunglass": row[7].strip() == str(SUNGLASS_STOCK_TYPE), "price": price, "qoh": qoh,
+            "brand": row[10].strip() if len(row) > 10 else ""}
+
+
+FRAME_WORD_RE = re.compile(r"^[A-Za-z0-9.\-/]{1,30}$")
+FRAME_TOP = 12
+
+
+def frames_search_query(words: list[str], top: int = FRAME_TOP) -> str:
+    """Frames whose brand, model, colour, size or barcode hold EVERY typed word (read only).
+    Frames on hand first. Words are checked against FRAME_WORD_RE before they get here."""
+    cols = ("f.MODEL", "f.COLOUR_DESCRIPTION", "f.BRAND_IDENTIFIER", "f.SIZE", "f.BARCODE")
+    where = " AND ".join("(" + " OR ".join(f"{c} LIKE N'%{_sql_str(w)}%'" for c in cols) + ")" for w in words)
+    return (f"SELECT TOP {int(top) + 1} {_txt('f.BARCODE')}, {_txt('f.MODEL')}, {_txt('f.COLOUR_DESCRIPTION')}, "
+            f"{_txt('f.SIZE')}, ISNULL(f.BRIDGE,0), ISNULL(f.DIAG,0), ISNULL(f.SUPPLIER_IDENTIFIER,''), "
+            "ISNULL(f.STOCK_TYPE,0), ISNULL(CAST(b.SELLINC AS varchar(20)),''), ISNULL(b.QOH,0), "
+            f"{_txt('f.BRAND_IDENTIFIER')} "
+            "FROM SPECFRAME f WITH (NOLOCK) LEFT JOIN SPECFRAME_BRANCH b WITH (NOLOCK) "
+            "ON b.SPECFRAMEID = f.ID AND b.BRANCH_IDENTIFIER = 'MJ' "
+            f"WHERE {where} ORDER BY CASE WHEN ISNULL(b.QOH,0) > 0 THEN 0 ELSE 1 END, f.BRAND_IDENTIFIER, f.MODEL")
+
+
+def cmd_frames(q: str, sql=None) -> dict:
+    """Frame search by name (iPad sheet steps 2-3): typing narrows a live list. Read only."""
+    words = [w for w in str(q or "").split() if w][:4]
+    if not words or any(not FRAME_WORD_RE.match(w) for w in words) or sum(len(w) for w in words) < 2:
+        raise BridgeError("Type a brand, model, colour or size.")
+    if fixture_mode() and sql is None:
+        rows = [r + ["ZZ"] for r in FIXTURE_FRAME_RECORDS.values()
+                if all(any(w.lower() in str(v).lower() for v in (r[0], r[1], r[2], r[3], "ZZ")) for w in words)]
+        rows.sort(key=lambda r: (float(r[9]) <= 0, r[1]))
+    else:
+        rows = (sql or sqlq)(frames_search_query(words))
+    recs = [x for x in (build_frame_record(r) for r in rows) if x]
+    return {"frames": recs[:FRAME_TOP], "more": len(recs) > FRAME_TOP}
 
 
 def cmd_frame(barcode: str, sql=None) -> dict:
@@ -772,6 +818,7 @@ def cmd_frame(barcode: str, sql=None) -> dict:
         raise BridgeError("That doesn't look like a frame barcode.")
     if fixture_mode() and sql is None:
         row = FIXTURE_FRAME_RECORDS.get(barcode.upper())
+        row = row + ["ZZ"] if row else None
     else:
         rows = (sql or sqlq)(frame_by_barcode_query(barcode))
         row = rows[0] if len(rows) == 1 else None
@@ -800,6 +847,8 @@ def main(argv=None) -> int:
             result = cmd_names()
         elif cmd == "frame" and set(opts) == {"--barcode"}:
             result = cmd_frame(opts["--barcode"])
+        elif cmd == "frames" and set(opts) == {"--q"}:
+            result = cmd_frames(opts["--q"])
         else:
             result = {"error": "Bad command."}
     except BridgeError as exc:

@@ -22,7 +22,7 @@ from pathlib import Path
 from flask import Flask, jsonify, make_response, request, send_from_directory
 
 from hub import checkin, integrations, jobscan, lenses, lensoptions, pricesheets, sendguide, sop_parser
-from hub import lenschat, pickjob, workqueue
+from hub import lenschat, pickjob, sheetjob, workqueue
 from hub.assistant import core as assistant, registry as assistant_registry
 from hub.assistant.adapters import ReadContext
 
@@ -422,6 +422,10 @@ def _staff_refusal():
     if request.headers.get("X-Checkin-Key"):
         logger.warning("Check-in: staff route refused - request carried the iPad device key")
         return _no_store(jsonify({"error": "Not from the iPad.", "ipad": True})), 403
+    # iPad price sheet (10 Nov 2026): a browser tied to a patient on the sheet reaches no other staff page
+    if sheetjob.locked(request.cookies.get(sheetjob.COOKIE)):
+        return _no_store(jsonify({"error": "This iPad is on the price sheet. Press Next patient first.",
+                                  "sheet_locked": True})), 403
     if _from_this_computer():
         return None
     cfg = _integrations()
@@ -763,6 +767,114 @@ def picklens_make():
     if off:
         return off
     return _no_store(jsonify(pickjob.make(_integrations(), request.get_json(silent=True) or {}, _staff_name())))
+
+
+# --- iPad price sheet, staff side and Make job (hub/sheetjob.py) ---------------------
+# Mark, 10 Nov 2026 (steps 2-3). Hidden behind the same switch as Pick a lens. These routes do NOT use
+# the staff cookie: the iPad unlocks with the staff code each time the patient list opens, and the
+# sheet's own HttpOnly cookie then ties it to one patient (the server keeps who; the page never sends a
+# patient number). Answers are no-store; nothing about a patient is logged. The job is made by the
+# agent's engine, which honours DRY_RUN / WRITE_LIVE / ZZTEST_ONLY; the Hub never writes.
+
+def _sheet(fn, *a, cookie: str | None = None, clear: bool = False):
+    off = _picklens_off()
+    if off:
+        return off
+    try:
+        out = fn(*a)
+    except sheetjob.Refusal as r:
+        resp = _no_store(jsonify(r.body))
+        if r.body.get("expired"):
+            resp.delete_cookie(sheetjob.COOKIE, path="/")
+        return resp, r.status
+    resp = _no_store(jsonify(out))
+    if cookie:
+        resp.set_cookie(sheetjob.COOKIE, cookie, max_age=sheetjob.IDLE_S + 60, httponly=True, samesite="Strict", path="/")
+    if clear:
+        resp.delete_cookie(sheetjob.COOKIE, path="/")
+    return resp
+
+
+def _sheet_token():
+    return request.cookies.get(sheetjob.COOKIE)
+
+
+def _sheet_rows():
+    catalog = _catalog()
+    if catalog.get("message"):
+        raise sheetjob.Refusal(503, {"error": catalog["message"]})
+    return [l for l in catalog["lenses"] if l.get("orderable", True)]
+
+
+@app.route("/api/sheet/unlock", methods=["POST"])
+def sheet_unlock():
+    off = _picklens_off()
+    if off:
+        return off
+    sheetjob.end(_sheet_token())                       # a new code = a new look at the list, nothing carried over
+    data = request.get_json(silent=True) or {}
+    try:
+        token = sheetjob.unlock(_integrations(), data.get("code", ""))
+    except sheetjob.Refusal as r:
+        return _no_store(jsonify(r.body)), r.status
+    return _sheet(lambda: {"ok": True}, cookie=token)
+
+
+@app.route("/api/sheet/patients")
+def sheet_patients():
+    return _sheet(sheetjob.patients, _integrations(), _sheet_token())
+
+
+@app.route("/api/sheet/search", methods=["POST"])
+def sheet_search():
+    return _sheet(sheetjob.search, _integrations(), _sheet_token(), (request.get_json(silent=True) or {}).get("q", ""))
+
+
+@app.route("/api/sheet/pick", methods=["POST"])
+def sheet_pick():
+    return _sheet(sheetjob.pick, _integrations(), _sheet_token(), (request.get_json(silent=True) or {}).get("h", ""))
+
+
+@app.route("/api/sheet/patient")
+def sheet_patient():
+    return _sheet(lambda: sheetjob.sheet(_integrations(), _sheet_token(), _sheet_rows(), _pricing()))
+
+
+@app.route("/api/sheet/staff")
+def sheet_staff():
+    return _sheet(lambda: sheetjob.staff_rx(sheetjob._need(_sheet_token())))
+
+
+@app.route("/api/sheet/frame", methods=["POST"])
+def sheet_frame():
+    data = request.get_json(silent=True) or {}
+    return _sheet(sheetjob.frame_lookup, _integrations(), _sheet_token(), data.get("barcode", ""), data.get("q", ""))
+
+
+@app.route("/api/sheet/checks", methods=["POST"])
+def sheet_checks():
+    data = request.get_json(silent=True) or {}
+    return _sheet(lambda: sheetjob.checks(_integrations(), _sheet_token(), data, _sheet_rows(), _pricing()))
+
+
+@app.route("/api/sheet/plan", methods=["POST"])
+def sheet_plan():
+    data = request.get_json(silent=True) or {}
+    return _sheet(lambda: sheetjob.job(_integrations(), _sheet_token(), data, _sheet_rows(), _pricing(),
+                                       _staff_name(), "plan"))
+
+
+@app.route("/api/sheet/make", methods=["POST"])
+def sheet_make():
+    data = request.get_json(silent=True) or {}
+    return _sheet(lambda: sheetjob.job(_integrations(), _sheet_token(), data, _sheet_rows(), _pricing(),
+                                       _staff_name(), "make"))
+
+
+@app.route("/api/sheet/next", methods=["POST"])
+def sheet_next():
+    sheetjob.end(_sheet_token())
+    return _sheet(lambda: {"ok": True}, clear=True)
 
 
 # --- Compare (hub/compare.py) - no AI; the Lens Finder box's chat is below ------
