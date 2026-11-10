@@ -370,3 +370,44 @@ def test_frame_name_search_is_a_select_with_safe_words_only(monkeypatch):
 
 def test_lens_options_pd_shift_stops_for_prism():
     assert lo._shift_ctx({"kind": "Single vision", "pd_exact": True, "prism": True}, {"frame": {"a": 52}}) is None
+
+
+# ---- Synchrony: made in Optomate as usual (Mark, 10 Nov 2026) ------------------------------------
+SYNC = "Synchrony: make this job in Optomate as usual (packages)."
+
+
+def test_synchrony_is_found_by_product_not_tier_word():
+    book = sp.load()
+    assert sp.is_synchrony(book, {"tab": "mf", "card": 0})          # Essential = Synchrony Ultra HDV
+    assert not sp.is_synchrony(book, {"tab": "mf", "card": 1})      # Everyday = ZEISS SmartLife Superb
+    assert all(sp.is_synchrony(book, {"tab": "bif", "card": i}) for i in (0, 1))
+    assert all(sp.is_synchrony(book, {"tab": "sun", "card": i}) for i in (0, 1))
+    assert not any(sp.is_synchrony(book, {"tab": "sv", "card": i}) for i in range(4))
+
+
+def test_synchrony_stops_at_chosen_and_the_server_refuses_a_job(c):
+    pick(c, "Alex")
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    ch = {"tab": "mf", "card": 0, "idx": "1.50", "opt": "clear"}
+    r = c.post("/api/sheet/checks", json=body(choice=ch, heights={"R": "20", "L": "20"})).get_json()
+    assert r["synchrony"] and not r["can_make"] and r["stop"] == SYNC and r["fixes"] == []
+    for route in ("/api/sheet/plan", "/api/sheet/make"):
+        n = len(c.sent)
+        j = c.post(route, json=body(choice=ch, heights={"R": "20", "L": "20"})).get_json()
+        assert j["ok"] is False and j["refusals"] == [SYNC] and j["created"] is None
+        assert [x for x in c.sent[n:] if x[0] in ("plan", "make")] == []        # the engine is never asked
+    bif = c.post("/api/sheet/make", json=body(choice={"tab": "bif", "card": 1, "idx": "1.60", "opt": "clear"})).get_json()
+    assert bif["refusals"] == [SYNC]
+
+
+def test_synchrony_patient_marks_stay_as_they_were(c):
+    pick(c, "Alex")
+    mf = c.get("/api/sheet/patient").get_json()["tabs"]["mf"]
+    assert mf["cards"][0]["1.50"]["state"] == "mto"                  # Essential still marked like any card
+
+
+def test_page_has_the_synchrony_line_and_no_new_patient_words():
+    import price_sheet.build as build
+    html = build.build()
+    assert 'id="syncrow"' in html and "/^synchrony/i" in html
+    assert SYNC in html

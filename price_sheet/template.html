@@ -297,6 +297,7 @@ h1 { font-size:36px; font-weight:700; color:var(--ink); line-height:1.05; margin
 .checks .fixo { padding:9px 14px; }
 .checks .kv { padding:5px 0; }
 .cpop .popbtns .cta { width:auto; padding:0 28px; white-space:nowrap; }
+.syncline { font-size:20px; font-weight:600; color:var(--black); margin-right:auto; }
 </style>
 </head>
 <body>
@@ -350,6 +351,7 @@ h1 { font-size:36px; font-weight:700; color:var(--ink); line-height:1.05; margin
     </div>
     <div class="staffrow" id="patrow"><button class="cta" id="backsheets">&larr; Back to the price sheets</button></div>
     <div class="staffrow" id="staffrow"><span class="lab">Staff</span><button class="cta" id="toframe">Scan the frame &rarr;</button><button class="ghost" id="changelens">Change lens</button></div>
+    <div class="staffrow" id="syncrow" style="display:none"><span class="lab">Staff</span><span class="syncline" id="syncline"></span><button class="ghost" id="changelens2">Change lens</button><button class="ghost" id="nextpat2">Next patient</button></div>
   </main>
 </section>
 
@@ -764,7 +766,10 @@ function drawSum() {
   $("sum-who").textContent = st.p.first;
   $("sum-whobox").style.display = st.p.first ? "" : "none";
   const job = picked() && !st.p.noRx;
-  $("staffrow").style.display = job ? "" : "none";
+  const sync = /^synchrony/i.test(String((st.card || {}).product || ""));
+  $("staffrow").style.display = job && !sync ? "" : "none";
+  $("syncrow").style.display = job && sync ? "" : "none";
+  $("syncline").textContent = sync ? (DATA.synchronyStop || "Synchrony: make this job in Optomate as usual (packages).") : "";
   $("patrow").style.display = job ? "none" : "";
   $("sum-h1").textContent = choiceTitle();
   $("summary").innerHTML = `<div class="line"><span>Lens</span><b>${esc(choiceTitle())}${pr.abs ? " · " + esc(pr.o.n) : ""}</b></div>`
@@ -777,6 +782,8 @@ function drawSum() {
   $("sum-total").textContent = money(pr.total);
 }
 $("toframe").onclick = () => { drawFrame(); show("s-frame"); setTimeout(() => $("bc").focus(), 50); };
+$("changelens2").onclick = () => { drawPage(); show("s-sheet"); };
+$("nextpat2").onclick = () => nextPatient();
 $("backsheets").onclick = () => { st.chosen = null; drawPage(); show("s-sheet"); };
 $("changelens").onclick = () => { drawPage(); show("s-sheet"); };
 

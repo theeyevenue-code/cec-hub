@@ -479,6 +479,10 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
     if not rx:
         raise _err(400, "No spectacle Rx saved for this patient. Make this job in Touch.")
     ch = _clean_choice(data.get("choice"))
+    if sheetprice.is_synchrony(book, ch):
+        # Mark, 10 Nov 2026: Synchrony stops at Chosen; no frame, no checks, no Make job
+        stop = book["map"].get("synchrony_stop") or "Synchrony: make this job in Optomate as usual (packages)."
+        return {"stop": stop, "synchrony": True, "can_make": False, "why": stop, "rx": staff_rx(s), "fixes": [], "warnings": []}
     if ch["tab"] not in USE:
         return {"stop": "Make this job in Touch.", "can_make": False, "why": "Price only in version 1.", "rx": staff_rx(s)}
     q, typ, kind = _question(rx, ch["tab"])
@@ -676,6 +680,10 @@ def _engine_request(s: dict, res: dict, data: dict) -> dict:
 def job(cfg: dict, token, data: dict, rows: list, pricing: dict, user: str, command: str) -> dict:
     """Screen 6 (plan) and 7 (make): the checks again, then the engine. The engine re-reads Optomate fresh."""
     s = _need(token)
+    book = sheetprice.load()
+    if sheetprice.is_synchrony(book, _clean_choice((data or {}).get("choice") if isinstance(data, dict) else None)):
+        return {"ok": False, "created": None, "synchrony": True,
+                "refusals": [book["map"].get("synchrony_stop") or "Synchrony: make this job in Optomate as usual (packages)."]}
     res = checks(cfg, token, data, rows, pricing)
     if not res.get("can_make"):
         return {"ok": False, "refusals": [res.get("why") or "Not ready yet."], "checks": res}
