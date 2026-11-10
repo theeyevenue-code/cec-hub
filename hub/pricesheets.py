@@ -25,47 +25,17 @@ SHEETS = (
 SLUGS = tuple(s[0] for s in SHEETS)
 _DATED = re.compile(r"^CEC-([A-Za-z]+)-(\d{4})-(\d{2})\.html$")
 
-SCREEN_CSS = """
-<style id="hub-screen">
-/* Hub screen additions (not on the printed sheet): tappable menu, tap a card to see it large. */
-html, body { overflow-x:hidden; }
-.navlinks { gap:7mm !important; font-size:15px !important; }
-.navlinks a { color:inherit; text-decoration:none; padding:4mm 0; }
-.navlinks a.on { font-weight:600; color:#0E0F11; border-bottom:2px solid #0F2DB3; }
-.hub-home { font-size:15px; color:#606A76; text-decoration:none; margin-right:4mm; }
-.card { cursor:pointer; transition:transform .15s ease; }
-.card:active { transform:scale(.99); }
-#hub-shade { position:fixed; inset:0; background:rgba(14,15,17,.55); display:none; align-items:center;
-             justify-content:center; z-index:50; }
-#hub-shade.show { display:flex; }
-#hub-shade .card { transform:scale(1.6); transform-origin:center; cursor:default; box-shadow:0 8px 40px rgba(0,0,0,.25);
-                   max-width:80mm; }
-#hub-shade .close { position:absolute; top:6mm; right:8mm; color:#fff; font:600 14px Hind,Arial,sans-serif; }
-@media print { #hub-shade, .hub-home { display:none !important; } }
-</style>
-"""
+# The screen additions live in static/pricesheets-screen.js (served fresh: no restart to tweak them).
+SCREEN_JS_FILE = Path(__file__).resolve().parent.parent / "static" / "pricesheets-screen.js"
 
-SCREEN_JS = """
-<script id="hub-screen-js">
-(function () {
-  function fit() {
-    var w = document.documentElement.clientWidth, b = document.body;
-    b.style.zoom = ""; var full = b.scrollWidth || w;
-    if (full > w) b.style.zoom = (w / full).toFixed(3);
-  }
-  window.addEventListener("resize", fit); window.addEventListener("load", fit); fit();
-  var shade = document.createElement("div"); shade.id = "hub-shade";
-  document.body.appendChild(shade);
-  shade.addEventListener("click", function () { shade.className = ""; shade.innerHTML = ""; });
-  document.querySelectorAll("main .card").forEach(function (c) {
-    c.addEventListener("click", function () {
-      shade.innerHTML = '<span class="close">Close</span>';
-      shade.appendChild(c.cloneNode(true)); shade.className = "show";
-    });
-  });
-})();
-</script>
-"""
+
+def screen_tag() -> str:
+    """The script tag, versioned by the file's change time so an edit reaches the iPad without a restart."""
+    try:
+        v = int(SCREEN_JS_FILE.stat().st_mtime)
+    except OSError:
+        v = 0
+    return f'<script id="hub-screen-js" src="/pricesheets-screen.js?v={v}"></script>'
 
 
 def sheets_dir(cfg: dict) -> Path:
@@ -119,9 +89,9 @@ def render(cfg: dict, slug: str) -> str | None:
     html = html.replace("../assets/", "/pricesheets/assets/")
     html = html.replace("../../raw-sources/Assets/", "/pricesheets/brand/")
     html = html.replace('<div class="navr">', '<div class="navr"><a class="hub-home" href="/">Hub</a>', 1)
-    head_add = '<meta name="viewport" content="width=device-width, initial-scale=1">' + SCREEN_CSS
+    head_add = '<meta name="viewport" content="width=device-width, initial-scale=1">'
     html = html.replace("</head>", head_add + "</head>", 1)
-    html = html.replace("</body>", SCREEN_JS + "</body>", 1)
+    html = html.replace("</body>", screen_tag() + "</body>", 1)
     return html
 
 
