@@ -750,7 +750,7 @@ def cmd_names(sql=None) -> dict:
 # A frame by its stock barcode (pick-lens job, 8 Nov 2026) - read only
 # ---------------------------------------------------------------------------
 
-BARCODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
+BARCODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,39}$")   # real barcodes can hold a space ("RB 3447V")
 SUNGLASS_STOCK_TYPE = 3
 
 # Fictional frames for the fake ZZTEST people (same records as orders/pickjob.py::FixtureSource).
@@ -796,11 +796,21 @@ FRAME_WORD_RE = re.compile(r"^[A-Za-z0-9.\-/]{1,30}$")
 FRAME_TOP = 12
 
 
+def real_frames() -> bool:
+    """A fixture test copy may still read REAL frames (read only) so the frame step can be tried with the frames on
+    the wall (Mark, 10 Nov 2026). Patients stay fake."""
+    return (os.environ.get("CEC_HUB_REAL_FRAMES", "") or "").strip().lower() in ("1", "true", "yes")
+
+
 def frames_search_query(words: list[str], top: int = FRAME_TOP) -> str:
     """Frames whose brand, model, colour, size or barcode hold EVERY typed word (read only).
     Frames on hand first. Words are checked against FRAME_WORD_RE before they get here."""
     cols = ("f.MODEL", "f.COLOUR_DESCRIPTION", "f.BRAND_IDENTIFIER", "f.SIZE", "f.BARCODE")
-    where = " AND ".join("(" + " OR ".join(f"{c} LIKE N'%{_sql_str(w)}%'" for c in cols) + ")" for w in words)
+    # brand words match with spaces, hyphens and dots ignored: "ray-ban" and "ray ban" both find RAYBAN
+    squash = "REPLACE(REPLACE(REPLACE(ISNULL(f.BRAND_IDENTIFIER,''),' ',''),'-',''),'.','')"
+    where = " AND ".join("(" + " OR ".join([f"{c} LIKE N'%{_sql_str(w)}%'" for c in cols]
+                                            + [f"{squash} LIKE N'%{_sql_str(re.sub(r'[-. ]', '', w))}%'"]) + ")"
+                         for w in words)
     return (f"SELECT TOP {int(top) + 1} {_txt('f.BARCODE')}, {_txt('f.MODEL')}, {_txt('f.COLOUR_DESCRIPTION')}, "
             f"{_txt('f.SIZE')}, ISNULL(f.BRIDGE,0), ISNULL(f.DIAG,0), ISNULL(f.SUPPLIER_IDENTIFIER,''), "
             "ISNULL(f.STOCK_TYPE,0), ISNULL(CAST(b.SELLINC AS varchar(20)),''), ISNULL(b.QOH,0), "
@@ -815,12 +825,13 @@ def cmd_frames(q: str, sql=None) -> dict:
     words = [w for w in str(q or "").split() if w][:4]
     if not words or any(not FRAME_WORD_RE.match(w) for w in words) or sum(len(w) for w in words) < 2:
         raise BridgeError("Type a brand, model, colour or size.")
+    rows = []
     if fixture_mode() and sql is None:
-        rows = [r + ["ZZ"] for r in FIXTURE_FRAME_RECORDS.values()
-                if all(any(w.lower() in str(v).lower() for v in (r[0], r[1], r[2], r[3], "ZZ")) for w in words)]
+        rows = [r + ["ZZ TEST FRAME"] for r in FIXTURE_FRAME_RECORDS.values()
+                if all(any(w.lower() in str(v).lower() for v in (r[0], r[1], r[2], r[3], "ZZ TEST FRAME")) for w in words)]
         rows.sort(key=lambda r: (float(r[9]) <= 0, r[1]))
-    else:
-        rows = (sql or sqlq)(frames_search_query(words))
+    if not (fixture_mode() and sql is None) or real_frames():
+        rows += (sql or sqlq)(frames_search_query(words))
     recs = [x for x in (build_frame_record(r) for r in rows) if x]
     return {"frames": recs[:FRAME_TOP], "more": len(recs) > FRAME_TOP}
 
@@ -829,10 +840,11 @@ def cmd_frame(barcode: str, sql=None) -> dict:
     barcode = str(barcode or "").strip()
     if not BARCODE_RE.match(barcode):
         raise BridgeError("That doesn't look like a frame barcode.")
+    row = None
     if fixture_mode() and sql is None:
         row = FIXTURE_FRAME_RECORDS.get(barcode.upper())
-        row = row + ["ZZ"] if row else None
-    else:
+        row = row + ["ZZ TEST FRAME"] if row else None
+    if row is None and (not (fixture_mode() and sql is None) or real_frames()):
         rows = (sql or sqlq)(frame_by_barcode_query(barcode))
         row = rows[0] if len(rows) == 1 else None
     rec = build_frame_record(row)

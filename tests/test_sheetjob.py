@@ -515,3 +515,44 @@ def test_page_has_the_old_rx_question_and_resume():
     assert "Use this Rx" in html and "Over 2 years old" in html and "resumeChoice" in html
     assert "NO RX on this job" in html and "norxok" in html
     assert "Next, ask us to scan your frame." in html
+
+
+# ---- real frames for testing (Mark, 10 Nov 2026: "the frame check needs to be built so i can test it out") ----
+def test_frame_search_matches_brand_words_with_spaces_and_hyphens_ignored():
+    q = lb.frames_search_query(["ray-ban"])
+    assert "REPLACE(REPLACE(REPLACE(ISNULL(f.BRAND_IDENTIFIER,'')" in q and "LIKE N'%rayban%'" in q
+
+
+def test_a_real_barcode_with_a_space_is_looked_up(monkeypatch):
+    seen = []
+    row = ["RB 3447V", "344V", "gun metal", "5021", "0", "0", "LUX", "2", "207.0000", "1", "RAYBAN"]
+    got = lb.cmd_frame("RB 3447V", sql=lambda q: seen.append(q) or [row])
+    assert got["frame"]["barcode"] == "RB 3447V" and got["frame"]["ed"] is None and got["frame"]["brand"] == "RAYBAN"
+    assert "N'RB 3447V'" in seen[0]
+
+
+def test_fixture_copy_reads_real_frames_only_when_switched_on(monkeypatch):
+    monkeypatch.setenv("LENS_OPTIONS_FIXTURE", "1")
+    calls = []
+    monkeypatch.setattr(lb, "sqlq", lambda q: calls.append(q) or [])
+    monkeypatch.delenv("CEC_HUB_REAL_FRAMES", raising=False)
+    lb.cmd_frames("zztest")
+    assert calls == []                                              # plain fixture copy: test frames only
+    monkeypatch.setenv("CEC_HUB_REAL_FRAMES", "1")
+    got = lb.cmd_frames("zztest")
+    assert len(calls) == 1 and calls[0].startswith("SELECT")         # read only
+    assert all(f["brand"] == "ZZ TEST FRAME" for f in got["frames"])  # test frames labelled
+
+
+def test_no_ed_on_the_frame_is_estimated_from_eye_size_and_said_so(c, monkeypatch):
+    FRAMES["RB 3447V"] = {"barcode": "RB 3447V", "model": "344V", "colour": "gun metal", "a": 50.0, "dbl": 21.0, "ed": None,
+                          "price": 207.0, "qoh": 1, "brand": "RAYBAN"}
+    try:
+        pick(c, "Mia")
+        c.post("/api/sheet/frame", json={"barcode": "RB 3447V"})
+        r = c.post("/api/sheet/checks", json=body(frame={"barcode": "RB 3447V"})).get_json()
+        assert r["blank"]["approx"] and "ED estimated from eye size" in r["blank"]["ed_note"] and r["verdict"]["tone"] == "green"
+        t = c.post("/api/sheet/checks", json=body(frame={"barcode": "RB 3447V", "ed_typed": "60"})).get_json()
+        assert not t["blank"]["approx"] and t["blank"]["ed_note"] == "ED typed by staff."
+    finally:
+        FRAMES.pop("RB 3447V", None)

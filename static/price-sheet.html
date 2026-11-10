@@ -851,7 +851,7 @@ const choiceNow = () => ({ tab:st.tab, card:st.cardI, idx:curIdx(), opt:(priceNo
   colour:{ Green:"Green" }[st.colour] || st.colour, depth:st.depth, pfx:st.pfx });
 function frameReq() {
   if (fq.own) return { own:true, a:$("oa").value.trim(), dbl:$("odbl").value.trim(), ed:$("oed").value.trim() };
-  return fq.frame ? { barcode:fq.frame.barcode } : {};
+  return fq.frame ? { barcode:fq.frame.barcode, ed_typed:fq.edTyped || "" } : {};
 }
 async function drawFrame() {
   fq = { frame:null, own:false, rimless:false, fix:null, told:false, noRxOk:false, h:{ R:"", L:"" } }; chk = null;
@@ -894,6 +894,8 @@ function drawChecks() {
         <div class="kv"><span>PD, from the Rx</span><b>${esc(rx.pd)}</b></div>`;
   if (r.blank) h += `<div class="kv"><span>Blank needed (${esc(r.blank.label)})</span><b>${Object.entries(r.blank.per_eye).sort((x, y) => x[0] < y[0] ? 1 : -1).map(([s, v]) => `${s} ${v} mm`).join(" / ")}</b></div>
         <div class="work">${r.blank.working.map(esc).join("<br>")}</div>`;
+  if (r.blank && r.blank.ed_note) h += `<div class="warn">${esc(r.blank.ed_note)}</div>`;
+  if (fq.frame && !fq.frame.ed && !fq.own) h += `<div class="hts">ED, if you know it <input id="edt" inputmode="decimal" placeholder="mm" value="${esc(fq.edTyped || "")}"><span class="req">optional</span></div>`;
   h += verdictHTML(r.verdict);
   if (r.fixes && r.fixes.length) {
     h += `<div class="fix">` + r.fixes.map((f, i) => `<button class="fixo ${f.on ? "on" : ""}" data-i="${i}"><div><div class="fn">${i + 1}. ${esc(f.title)}${f.best ? ` <span class="best">${esc(f.best)}</span>` : ""}</div>
@@ -912,6 +914,7 @@ function drawChecks() {
     const f = r.fixes[+b.dataset.i]; fq.fix = f.on ? null : { kind:f.kind, idx:f.idx || "" }; fq.told = false; runChecks(); });
   ["hR","hL"].forEach(id => { const el = $(id); if (el) el.oninput = () => { fq.h[id.slice(1)] = el.value.trim(); clearTimeout(ddTimer); ddTimer = setTimeout(runChecks, 350); }; });
   if ($("told")) $("told").onchange = () => { fq.told = $("told").checked; runChecks(); };
+  if ($("edt")) $("edt").oninput = () => { fq.edTyped = $("edt").value.trim(); clearTimeout(ddTimer); ddTimer = setTimeout(runChecks, 400); };
   if ($("norxok")) $("norxok").onchange = () => { fq.noRxOk = $("norxok").checked; runChecks(); };
   $("make").textContent = (r.mode && r.mode.button) || "Make job (dry run, nothing written)";
   $("make").disabled = !r.can_make;
@@ -949,9 +952,10 @@ async function scanBarcode(v) {
   frameChosen(r.frame);
 }
 function frameChosen(f) {
-  fq.frame = f; fq.own = false; fq.fix = null; fq.told = false; $("own").classList.remove("on"); $("ownsize").style.display = "none";
+  fq.frame = f; fq.own = false; fq.fix = null; fq.told = false; fq.edTyped = ""; $("own").classList.remove("on"); $("ownsize").style.display = "none";
   $("framefacts").innerHTML = `<div class="kv"><span>Frame</span><b>${esc((f.brand ? f.brand + " " : "") + f.model)} · ${esc(f.colour || "")}</b></div>
     <div class="kv"><span>Size</span><b>${f.a || "?"} &#9633; ${f.dbl || "?"}${f.ed ? " · ED " + f.ed : " · ED not on the record"}</b></div>
+    ${f.sunglass ? `<div class="kv"><span>Type</span><b>Sunglass frame</b></div>` : ""}
     <div class="kv"><span>Price</span><b>${f.price != null ? money(f.price) : "No sell price"}</b></div>`;
   runChecks();
 }

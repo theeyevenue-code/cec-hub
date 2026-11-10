@@ -412,7 +412,8 @@ def staff_rx(s: dict) -> dict:
 
 def _frame_out(f: dict) -> dict:
     return {"barcode": f.get("barcode"), "brand": f.get("brand") or "", "model": f.get("model"), "colour": f.get("colour"),
-            "a": f.get("a"), "dbl": f.get("dbl"), "ed": f.get("ed"), "price": f.get("price"), "qoh": f.get("qoh")}
+            "a": f.get("a"), "dbl": f.get("dbl"), "ed": f.get("ed"), "price": f.get("price"), "qoh": f.get("qoh"),
+            "sunglass": bool(f.get("sunglass"))}
 
 
 def frame_lookup(cfg: dict, token, barcode="", q="") -> dict:
@@ -485,7 +486,13 @@ def _frame_for(s: dict, fr) -> tuple[dict | None, dict | None, str]:
     f = (s.get("frame_cache") or {}).get(bc)
     if not f:
         return None, None, "Scan the frame again."
-    nums = lensoptions.clean_frame({"a": f.get("a"), "dbl": f.get("dbl"), "ed": f.get("ed"), "source": "scan"})
+    ed = f.get("ed")
+    if not ed and fr.get("ed_typed"):
+        # Optomate has no ED for this frame: staff may type it (a frame size, like Own frame; never an Rx number)
+        ed = lensoptions._f(fr.get("ed_typed"), 30, 90)
+    nums = lensoptions.clean_frame({"a": f.get("a"), "dbl": f.get("dbl"), "ed": ed, "source": "scan"})
+    if nums is not None:
+        nums["ed_typed"] = bool(ed and not f.get("ed"))
     return f, nums, "" if nums and nums.get("dbl") is not None else "The frame record has no eye size or bridge: type it as Own frame."
 
 
@@ -607,7 +614,9 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
             est = fit["est"]
             if est:
                 res["blank"] = {"per_eye": est["per_eye"], "working": est["working"], "approx": est["approx"],
-                                "label": "approximate" if est["approx"] else "estimate", "notes": est["notes"]}
+                                "label": "approximate" if est["approx"] else "estimate", "notes": est["notes"],
+                                "ed_note": ("No ED on the frame record: ED estimated from eye size (eye size + 2)."
+                                            if est["approx"] else "ED typed by staff." if nums.get("ed_typed") else "")}
             if fit["fits"] is True:
                 b = max(v for v in fit["got"].values() if v)
                 ref = {**key, "blank_mm": b}
