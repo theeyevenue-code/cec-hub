@@ -33,13 +33,12 @@ import secrets
 import threading
 import time
 
-from hub import checkin, lenses, lensoptions, pdshift, pickjob, sheetprice
+from hub import lenses, lensoptions, pdshift, pickjob, sheetprice
 
 logger = logging.getLogger("cec_hub.sheetjob")
 
 COOKIE = "cec_sheet"
 IDLE_S = 5 * 60                 # 5 minutes untouched: back to the sheet, everything cleared
-LIST_S = 2 * 60                 # one staff-code unlock = one look at the patient list
 RIMLESS = ("1.53", "1.60", "1.67")
 HEIGHT_CATEGORIES = {"progressive", "anti-fatigue", "occupational", "bifocal"}
 USE = {"sv": "D", "mf": "M", "af": "M", "office": "M", "bif": "B", "syn": "D"}
@@ -106,14 +105,14 @@ def locked(token) -> bool:
         return str(token or "") in _sessions
 
 
-def unlock(cfg: dict, code) -> str:
-    ok, why = checkin.staff_code_ok(cfg, code)
-    if not ok:
-        raise _err(403, why)
+def start() -> str:
+    """Open the patient list on this iPad. Mark, 10 Nov 2026 (decision 1 reversed): "Take out test codes I don't think
+    I'll give it to patients ever" - no code each time. The route is guarded like every other Hub page that shows
+    patients (app.py staff_only: this computer, or a browser unlocked ONCE with the staff code)."""
     token = secrets.token_urlsafe(24)
     with _lock:
-        _sessions[token] = {"touched": _now(), "list_until": _now() + LIST_S, "handles": {}, "pid": None}
-    logger.info("Price sheet: staff code typed, patient list opened")
+        _sessions[token] = {"touched": _now(), "handles": {}, "pid": None}
+    logger.info("Price sheet: patient list opened")
     return token
 
 
@@ -127,8 +126,8 @@ def _need(token, *, listing: bool = False) -> dict:
     if s is None:
         raise _err(401, "Timed out. Back to the price sheet.", expired=True)
     if listing:
-        if s.get("pid") or _now() > s.get("list_until", 0):
-            raise _err(403, "Type the staff code to see the patient list.", staff_needed=True)
+        if s.get("pid"):                                 # one patient at a time: Next patient first
+            raise _err(403, "Press Next patient first.")
     elif not s.get("pid"):
         raise _err(403, "Pick the patient first.", staff_needed=True)
     return s
@@ -238,7 +237,7 @@ def pick(cfg: dict, token, h) -> dict:
     p = data.get("patient") or {}
     with _lock:
         s.update(pid=pid, rx=rx, first=str(p.get("given") or "").strip(), surname=str(p.get("surname") or "").strip(),
-                 handles={}, list_until=0, frame_cache={})
+                 handles={}, frame_cache={})
     logger.info("Price sheet: a patient was picked (iPad now tied to that patient)")
     return {"ok": True}
 

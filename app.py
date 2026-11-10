@@ -776,8 +776,8 @@ def picklens_make():
 # patient number). Answers are no-store; nothing about a patient is logged. The job is made by the
 # agent's engine, which honours DRY_RUN / WRITE_LIVE / ZZTEST_ONLY; the Hub never writes.
 
-def _sheet(fn, *a, cookie: str | None = None, clear: bool = False):
-    off = _picklens_off()
+def _sheet(fn, *a, cookie: str | None = None, clear: bool = False, guard: bool = True):
+    off = _picklens_off() or (_sheet_staff() if guard else None)
     if off:
         return off
     try:
@@ -806,18 +806,28 @@ def _sheet_rows():
     return [l for l in catalog["lenses"] if l.get("orderable", True)]
 
 
-@app.route("/api/sheet/unlock", methods=["POST"])
-def sheet_unlock():
-    off = _picklens_off()
+def _sheet_staff():
+    """The Hub's normal staff guard for every sheet route that shows or acts on a patient (same rule as
+    staff_only: never the check-in iPad's device key; this computer, or a browser unlocked once with the staff
+    code - its HttpOnly cookie lasts checkin.STAFF_COOKIE_DAYS). No code each time (Mark, 10 Nov 2026)."""
+    if request.headers.get("X-Checkin-Key"):
+        return _no_store(jsonify({"error": "Not from the iPad.", "ipad": True})), 403
+    if _from_this_computer():
+        return None
+    cfg = _integrations()
+    if checkin.staff_cookie_ok(cfg, request.cookies.get(checkin.STAFF_COOKIE)):
+        return None
+    return _no_store(jsonify({"staff_needed": True, "code_set": bool(checkin.staff_code(cfg)),
+                              "error": "Unlock this iPad once with the staff code."})), 403
+
+
+@app.route("/api/sheet/start", methods=["POST"])
+def sheet_start():
+    off = _picklens_off() or _sheet_staff()
     if off:
         return off
-    sheetjob.end(_sheet_token())                       # a new code = a new look at the list, nothing carried over
-    data = request.get_json(silent=True) or {}
-    try:
-        token = sheetjob.unlock(_integrations(), data.get("code", ""))
-    except sheetjob.Refusal as r:
-        return _no_store(jsonify(r.body)), r.status
-    return _sheet(lambda: {"ok": True}, cookie=token)
+    sheetjob.end(_sheet_token())                       # a fresh look at the list, nothing carried over
+    return _sheet(lambda: {"ok": True}, cookie=sheetjob.start())
 
 
 @app.route("/api/sheet/patients")
@@ -874,7 +884,7 @@ def sheet_make():
 @app.route("/api/sheet/next", methods=["POST"])
 def sheet_next():
     sheetjob.end(_sheet_token())
-    return _sheet(lambda: {"ok": True}, clear=True)
+    return _sheet(lambda: {"ok": True}, clear=True, guard=False)
 
 
 # --- Compare (hub/compare.py) - no AI; the Lens Finder box's chat is below ------

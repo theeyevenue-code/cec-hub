@@ -369,7 +369,7 @@ details summary { font-size:16px; font-weight:600; color:var(--btn); cursor:poin
   <main>
     <div class="eyebrow">Staff</div>
     <h1>Staff code</h1>
-    <div class="lead">Asked every time the patient list opens.</div>
+    <div class="lead">Once on this iPad. After that, Staff opens the patient list straight away.</div>
     <div class="codewrap">
       <div class="pad" id="pad"></div>
       <div><div class="dots" id="dots"></div><div class="msg" id="codemsg"></div>
@@ -504,16 +504,25 @@ async function padKey(k) {
   if (k === "Clear") code = ""; else if (k !== "OK") { if (code.length < 12) code += k; }
   drawDots(); $("codemsg").textContent = ""; $("codemsg").className = "msg";
   if (k !== "OK" || !code) return;
-  const r = await api("/api/sheet/unlock", { code }); code = ""; drawDots();
+  // once per iPad: the Hub's own staff unlock (an HttpOnly cookie, the same as every other Hub staff page)
+  const r = await api("/api/checkin/staff/unlock", { code }); code = ""; drawDots();
   if (!r) return;
   if (r.error) { $("codemsg").textContent = r.error; $("codemsg").className = "msg bad"; return; }
+  openStaff();
+}
+// Mark, 10 Nov 2026: "Take out test codes I don't think I'll give it to patients ever" - Staff goes straight to the list
+async function openStaff() {
+  const r = await api("/api/sheet/start", {});
+  if (!r) return;
+  if (r.staff_needed) { code = ""; drawPad(); $("codemsg").textContent = ""; show("s-code"); return; }
+  if (r.error) { alert(r.error); return; }
   st = { p: VIEWER, tab:"sv", carry: window.__carry || null }; loadPatients();
 }
 $("staffbtn").onclick = () => {
   // 10 Nov 2026 (first live job): a lens chosen on the plain sheet must survive the staff code and the patient pick
   st.carry = picked() ? null : (st.lastChoice || null);
   window.__carry = st.carry;
-  code = ""; drawPad(); $("codemsg").textContent = ""; show("s-code");
+  openStaff();
 };
 $("codeback").onclick = () => show("s-sheet");
 $("staffbtn2").onclick = () => $("staffbtn").onclick();

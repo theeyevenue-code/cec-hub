@@ -139,7 +139,11 @@ def c(tmp_path, monkeypatch):
 
 
 def unlock(c):
-    r = c.post("/api/sheet/unlock", json={"code": "2468"})
+    """This iPad unlocked once (the Hub's own staff cookie), then Staff opens the list - no code each time."""
+    if not c.get_cookie("cec_checkin_staff"):
+        r = c.post("/api/checkin/staff/unlock", json={"code": "2468"})
+        assert r.status_code == 200, r.get_json()
+    r = c.post("/api/sheet/start")
     assert r.status_code == 200, r.get_json()
 
 
@@ -210,9 +214,13 @@ def test_the_page_carries_the_price_file_and_its_version_and_no_demo_data():
 
 
 # ---- the lock ----------------------------------------------------------------------------------
-def test_patient_list_needs_the_code_every_time(c):
-    assert c.get("/api/sheet/patients").status_code == 401
-    assert c.post("/api/sheet/unlock", json={"code": "1111"}).status_code == 403
+def test_no_code_each_time_but_only_an_unlocked_ipad(c):
+    # Mark, 10 Nov 2026: "Take out test codes I don't think I'll give it to patients ever"
+    r = c.post("/api/sheet/start")                                     # a browser never unlocked: refused
+    assert r.status_code == 403 and r.get_json()["staff_needed"]
+    assert c.get("/api/sheet/patients").status_code == 403
+    assert c.post("/api/checkin/staff/unlock", json={"code": "1111"}).status_code == 403
+    assert c.post("/api/sheet/start", headers={"X-Checkin-Key": "x"}).status_code == 403   # never the check-in key
     unlock(c)
     r = c.get("/api/sheet/patients")
     assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
@@ -239,14 +247,23 @@ def test_the_server_uses_its_own_patient_not_the_pages(c):
     assert "dob" not in json.dumps(r.get_json()["preview"]["patient"])
 
 
-def test_list_window_and_idle_time_out(c, monkeypatch):
+def test_list_stays_open_until_idle_and_reopens_without_a_code(c, monkeypatch):
     t = [1000.0]
     monkeypatch.setattr(sj, "_now", lambda: t[0])
     unlock(c)
-    t[0] += sj.LIST_S + 1
-    assert c.get("/api/sheet/patients").status_code == 403           # one code, one look
+    t[0] += 200                                                        # no 2-minute window any more
+    assert c.get("/api/sheet/patients").status_code == 200
     t[0] += sj.IDLE_S + 1
     assert c.get("/api/sheet/patients").status_code == 401           # 5 minutes untouched: cleared
+    assert c.post("/api/sheet/start").status_code == 200             # Staff again: straight back to the list
+    assert c.get("/api/sheet/patients").status_code == 200
+
+
+def test_next_patient_then_staff_needs_no_code(c):
+    pick(c, "Mia")
+    assert c.post("/api/sheet/next").status_code == 200
+    assert c.post("/api/sheet/start").status_code == 200
+    assert c.get("/api/sheet/patients").status_code == 200
 
 
 # ---- screen 3: the patient's view ------------------------------------------------------------------
