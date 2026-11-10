@@ -21,7 +21,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, make_response, request, send_from_directory
 
-from hub import checkin, integrations, jobscan, lenses, lensoptions, sendguide, sop_parser
+from hub import checkin, integrations, jobscan, lenses, lensoptions, pricesheets, sendguide, sop_parser
 from hub import lenschat, pickjob, workqueue
 from hub.assistant import core as assistant, registry as assistant_registry
 from hub.assistant.adapters import ReadContext
@@ -617,6 +617,41 @@ def sendguide_print(guide_id):
 def sendguide_send():
     return _json(sendguide.send(_integrations(), request.get_json(silent=True) or {},
                                 _staff_name()))
+
+
+# --- Patient price sheets on screen (hub/pricesheets.py) ---------------------
+# Mark, 10 Nov 2026. The approved printed sheets, served unchanged plus a tappable
+# menu. No patient data, so no staff code: this page is shown to patients.
+
+@app.route("/pricesheets/")
+def pricesheets_index():
+    found = pricesheets.available(_integrations())
+    if not found:
+        return _no_store(make_response("No price sheets found on this computer.", 404))
+    resp = make_response("", 302)
+    resp.headers["Location"] = f"/pricesheets/{found[0][0]}"
+    return resp
+
+
+@app.route("/pricesheets/<slug>")
+def pricesheets_sheet(slug):
+    if slug not in pricesheets.SLUGS:
+        return _no_store(make_response("Not found", 404))
+    html = pricesheets.render(_integrations(), slug)
+    if html is None:
+        return _no_store(make_response("That price sheet isn't on this computer.", 404))
+    resp = make_response(html)
+    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+    return _no_store(resp)
+
+
+@app.route("/pricesheets/<kind>/<path:filename>")
+def pricesheets_asset(kind, filename):
+    base = pricesheets.asset_dirs(_integrations()).get(kind)
+    if base is None or not base.is_dir():
+        return make_response("Not found", 404)
+    # send_from_directory refuses anything outside the folder.
+    return send_from_directory(base, filename)
 
 
 # --- Lens options (hub/lensoptions.py) ----------------------------------------
