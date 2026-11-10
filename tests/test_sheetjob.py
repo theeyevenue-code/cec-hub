@@ -54,6 +54,9 @@ PEOPLE = {
     9003: ("Mia", "ZZTEST", (_eye("-2.75", "-0.75", "180", pd="30"), _eye("-3.00", "-0.50", "10", pd="30")), ""),
     9005: ("Jo", "ZZTEST-HIGH", (_eye("-6.50", "-0.50", "180", pd="30"), _eye("-6.25", "-0.25", "170", pd="30")), ""),
     9001: ("Alex", "ZZTEST", (_eye("+1.00", "-0.50", "90", add="+2.00", pd="31.5"), _eye("+1.25", add="+2.00", pd="32")), ""),
+    9007: ("Lee", "ZZTEST-DIGITAL", (_eye("-1.50", "-0.25", "180", add="+1.00", pd="31"), _eye("-1.75", add="+1.00", pd="31")), ""),
+    9008: ("Ola", "ZZTEST-DIGI60", (_eye("-1.50", add="+0.60", pd="31"), _eye("-1.75", add="+0.60", pd="31")), ""),
+    9009: ("Ray", "ZZTEST-DIGIDIFF", (_eye("-1.50", add="+0.75", pd="31"), _eye("-1.75", add="+1.00", pd="31")), ""),
     9004: ("Priya", "ZZTEST-PRISM", (_eye("-1.00", pd="32", prism=("1.00", "IN", "", "")), _eye("-1.25", pd="32")), ""),
 }
 FRAMES = {"ZZFRAME5219": {"barcode": "ZZFRAME5219", "model": "ZZTEST Metal", "colour": "Gunmetal", "a": 52.0, "dbl": 19.0,
@@ -68,7 +71,8 @@ class Bridge:
             return {"date": "2026-11-10", "more": False, "fixture": True,
                     "patients": [{"id": pid, "given": g, "surname": s, "saved": "9:15am", "optom": "MJ"} for pid, (g, s, _, _) in PEOPLE.items()][:3]}
         if args[0] == "search":
-            return {"patients": [{"id": 9004, "given": "Priya", "surname": "ZZTEST-PRISM", "dob": "1970-06-30", "last_rx": "2026-11-10"}], "more": False}
+            hits = [(pid, g, sn) for pid, (g, sn, _, _) in PEOPLE.items() if g.lower() in args[2].lower()] or [(9004, "Priya", "ZZTEST-PRISM")]
+            return {"patients": [{"id": pid, "given": g, "surname": sn, "dob": "1970-06-30", "last_rx": "2026-11-10"} for pid, g, sn in hits], "more": False}
         if args[0] == "rx":
             pid = int(args[2])
             g, s, eyes, comment = PEOPLE[pid]
@@ -327,7 +331,7 @@ def test_rimless_only_153_160_167(c):
 
 
 def test_heights_needed_for_digital_by_its_category(c):
-    pick(c, "Mia")
+    pick(c, "Lee")
     c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
     ch = {"tab": "af", "card": 1, "idx": "1.60", "opt": "clear"}
     r = c.post("/api/sheet/checks", json=body(choice=ch)).get_json()
@@ -404,3 +408,30 @@ def test_synchrony_sv_marks_and_job(c):
     c.post("/api/sheet/plan", json=body(choice={"tab": "syn", "card": 0, "idx": "1.50", "opt": "clear"}))
     cmd, req = c.sent[-1]
     assert cmd == "plan" and req["hub_pair_price"] == "140" and req["option"]["supplier"] == "Synchrony"
+
+
+
+# ---- SmartLife Digital add (Mark, 10 Nov 2026: +0.50 to +1.25 by 0.25 steps) -----------------------------
+DIGI = {"tab": "af", "card": 1, "idx": "1.60", "opt": "clear"}
+
+
+@pytest.mark.parametrize("who,ok", [("Lee", True), ("Ola", False), ("Ray", False), ("Mia", False), ("Alex", False)])
+def test_digital_needs_an_rx_add_of_050_to_125_same_both_eyes(c, who, ok):
+    pick(c, who)                       # Lee +1.00 / Ola +0.60 / Ray +0.75 and +1.00 / Mia no add / Alex +2.00
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    b = body(choice=DIGI, heights={"R": "20", "L": "20"})
+    r = c.post("/api/sheet/checks", json=b).get_json()
+    assert r["can_make"] is ok, r.get("why")
+    if not ok:
+        assert r["stop"] == sj.DIGITAL_STOP
+        for route in ("/api/sheet/plan", "/api/sheet/make"):
+            n = len(c.sent)
+            j = c.post(route, json=b).get_json()
+            assert j["ok"] is False and j["refusals"] == [sj.DIGITAL_STOP]
+            assert [x for x in c.sent[n:] if x[0] in ("plan", "make")] == []
+
+
+def test_digital_add_rule_leaves_the_patient_sheet_alone(c):
+    pick(c, "Ola")
+    af = c.get("/api/sheet/patient").get_json()["tabs"]["af"]
+    assert af["cards"][1]["1.60"]["state"] == "mto"

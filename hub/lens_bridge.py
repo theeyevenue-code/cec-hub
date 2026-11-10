@@ -612,6 +612,7 @@ def fixture_db(day: str) -> dict:
         # iPad sheet steps 2-3 (10 Nov 2026): high minus and high cyl, same people as the agent's FixtureSource
         9005: ("Jo", "ZZTEST-HIGH", "1985-03-14"),
         9006: ("Kim", "ZZTEST-CYL", "1992-08-08"),
+        9007: ("Lee", "ZZTEST-DIGITAL", "1990-05-05"),
     }
     rx = {
         9001: [["501", at("11:42"), day, "MJ", "0", "0", FOOTER % "", "",
@@ -632,6 +633,9 @@ def fixture_db(day: str) -> dict:
         9006: [["506", at("08:10"), day, "NK", "0", "0", FOOTER % "", "",
                 *_fx_eye("-0.50", "-3.50", "180", pd="32"),
                 *_fx_eye("-0.75", "-3.25", "10", pd="32")]],
+        9007: [["507", at("07:50"), day, "MJ", "0", "0", FOOTER % "", "",
+                *_fx_eye("-1.50", "-0.25", "180", "+1.00", pd="31"),
+                *_fx_eye("-1.75", "", "", "+1.00", pd="31")]],
     }
     return {"people": people, "rx": rx}
 

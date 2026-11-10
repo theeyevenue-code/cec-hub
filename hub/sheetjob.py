@@ -48,6 +48,9 @@ TAB_OF_LENS_TYPE = {"distance": "sv", "near": "sv", "intermediate": "sv", "multi
 TYPE_WORDS = {"distance": "Distance", "near": "Reading", "intermediate": "Computer", "multifocal": "Multifocal",
               "office": "Office", "bifocal": "Bifocal"}
 ASK_US = "Ask us about these lenses."
+# Mark, 10 Nov 2026: "digital is based on +0.50 to 1.25 by 0.25 steps". The add is copied from the Rx, never worked out.
+DIGITAL_ADDS = ("0.50", "0.75", "1.00", "1.25")
+DIGITAL_STOP = "Digital needs an add of +0.50 to +1.25 on the Rx (same both eyes) - check the Rx."
 NOT_MADE = "Not made in your prescription"
 
 _sessions: dict[str, dict] = {}
@@ -395,6 +398,18 @@ def frame_lookup(cfg: dict, token, barcode="", q="") -> dict:
     return {"frames": fs, "more": bool(data.get("more"))}
 
 
+def digital_add_ok(rx: dict) -> bool:
+    """The saved Rx add, as written, is +0.50, +0.75, +1.00 or +1.25 and the same on every eye being made."""
+    eyes = [rx.get("right")] if rx.get("right_only") else [rx.get("left")] if rx.get("left_only") else [rx.get("right"), rx.get("left")]
+    adds = set()
+    for e in eyes:
+        v = lensoptions.num((e or {}).get("add"))
+        if v is None:
+            return False
+        adds.add(f"{v:.2f}")
+    return len(adds) == 1 and adds.pop() in DIGITAL_ADDS
+
+
 def _clean_choice(ch) -> dict:
     ch = ch if isinstance(ch, dict) else {}
     out = {"tab": str(ch.get("tab") or "")[:8], "idx": str(ch.get("idx") or "")[:5], "opt": str(ch.get("opt") or "clear")[:8],
@@ -489,6 +504,8 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
     q, typ, kind = _question(rx, ch["tab"])
     if q.get("unavailable"):
         return {"stop": q["unavailable"], "can_make": False, "why": "This lens type doesn't apply to the Rx.", "rx": staff_rx(s)}
+    if ch["tab"] == "af" and not digital_add_ok(rx):
+        return {"stop": DIGITAL_STOP, "can_make": False, "why": DIGITAL_STOP, "rx": staff_rx(s), "fixes": [], "warnings": []}
     found = _found(rows, pricing, q)
     start = resolve(book, rx, found, ch)                       # what the patient chose, as the sheet prices it
     fix = data.get("fix") if isinstance(data.get("fix"), dict) else {}
