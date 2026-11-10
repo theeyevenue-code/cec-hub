@@ -330,6 +330,23 @@ main#page.tall { padding-top:26px; }
 #donenorx { margin-top:18px; }
 .oldrx { color:#B00020; font-weight:600; }
 .nomore .other { margin-top:12px; }
+
+/* confirmation screens, simplicity pass (Mark, 10 Nov 2026): the answer first, one table, working folded away */
+.vline { font-size:26px; font-weight:700; color:var(--ink); line-height:1.25; padding:12px 18px; background:var(--card); margin-top:4px; }
+.vline.ok { background:var(--greenbg); color:var(--green); }
+.vline.stop { background:#FDECEE; color:#B00020; }
+.red { color:#B00020; }
+.kv b small { display:block; font-size:15px; font-weight:400; color:var(--grey); }
+#s-frame .cols { margin-top:14px; }
+#actions { margin-top:14px; }
+#actions h4 { font-size:14px; font-weight:500; letter-spacing:1.4px; text-transform:uppercase; color:var(--grey); margin-bottom:6px; }
+#actions .hts { margin-top:10px; }
+details { margin-top:12px; }
+details summary { font-size:16px; font-weight:600; color:var(--btn); cursor:pointer; padding:6px 0; }
+.cpop .vline { font-size:22px; margin-top:10px; }
+.cpop .ctable { margin-top:12px; }
+.cpop .kv { font-size:18px; }
+#s-frame .make .mode { display:none; }
 </style>
 </head>
 <body>
@@ -389,14 +406,12 @@ main#page.tall { padding-top:26px; }
 </section>
 
 <section class="screen" id="s-frame">
-  <div class="stopbar">Frame and checks <span id="fpat"></span></div>
+  <div class="stopbar">Frame and job <span id="fpat"></span></div>
   <main>
-    <div class="eyebrow">Staff</div>
-    <h1>Scan the frame.</h1>
+    <div class="vline" id="vline">Scan the frame.</div>
     <div class="cols">
       <div>
-        <div class="box"><h4>Lens chosen</h4><div id="chosen"></div></div>
-        <div class="box" style="margin-top:16px">
+        <div class="box">
           <h4>Frame</h4>
           <div class="fbox">
             <div class="scan"><input id="bc" placeholder="Scan, or type brand, model, colour" autocomplete="off" spellcheck="false"></div>
@@ -404,10 +419,16 @@ main#page.tall { padding-top:26px; }
           </div>
           <div class="switches"><button class="sw2" id="own"><i></i>Own frame</button><button class="sw2" id="rimless"><i></i>Rimless</button></div>
           <div class="own" id="ownsize" style="display:none">Eye <input id="oa" inputmode="decimal"> Bridge <input id="odbl" inputmode="decimal"> ED <input id="oed" inputmode="decimal" placeholder="if known"></div>
-          <div id="framefacts" style="margin-top:6px"></div>
+          <div id="framefacts"></div>
         </div>
+        <div id="actions"></div>
       </div>
-      <div class="box checks" id="checkbox"></div>
+      <div class="box checks">
+        <h4>Check by eye</h4>
+        <div id="eyetable"></div>
+        <div id="flags"></div>
+        <details id="details"><summary>Details</summary><div id="detailbody"></div></details>
+      </div>
     </div>
     <div class="make">
       <button class="cta" id="make" disabled>Make job (dry run, nothing written)</button>
@@ -875,8 +896,8 @@ async function drawFrame() {
   fq = { frame:null, own:false, rimless:false, fix:null, told:false, noRxOk:false, h:{ R:"", L:"" } }; chk = null;
   $("bc").value = ""; $("framefacts").innerHTML = ""; ["oa","odbl","oed"].forEach(i => $(i).value = "");
   $("own").classList.remove("on"); $("rimless").classList.remove("on"); $("ownsize").style.display = "none";
-  $("checkbox").innerHTML = `<h4>Checks</h4><div class="note" style="margin-top:0">Reading the Rx ...</div>`;
-  $("chosen").innerHTML = "";
+  $("vline").className = "vline"; $("vline").textContent = "Scan the frame."; $("eyetable").innerHTML = "";
+  $("flags").innerHTML = ""; $("actions").innerHTML = ""; $("detailbody").innerHTML = "";
   if (!st.staff) { const r = await api("/api/sheet/staff"); if (!r) return; st.staff = r; }
   $("fpat").textContent = st.staff.name;
   const rf = st.resumeFrame; st.resumeFrame = null;          // the frame kept for this patient today
@@ -894,40 +915,62 @@ async function runChecks() {
   if (!r || seq !== checkSeq) return;
   chk = r; drawChecks();
 }
-function verdictHTML(v) {
-  if (!v) return "";
-  const cls = { green:"v-ok", amber:"v-bad", blue:"v-blue", none:"v-none" }[v.tone] || "v-none";
-  return `<div class="verdict ${cls}"><div class="vh">${esc(v.head)}</div><div class="vd">${esc(v.detail || "")}</div></div>`;
+// one line each, once each: the flags that must never disappear (NO RX, old Rx, Digital add, not checked) included
+function flagsOf(r, rx) {
+  const seen = new Set(), out = [];
+  [...(rx.warnings || []), ...(r.warnings || [])].forEach(w => {
+    if (r.no_rx && /^No (saved )?Rx/.test(w)) return;              // the NO RX flag is said once, in the Rx row
+    const k = w.slice(0, 40); if (!seen.has(k)) { seen.add(k); out.push(w); }
+  });
+  return out;
+}
+function frameWords() {
+  if (fq.own) return `Own frame ${$("oa").value || "?"} □ ${$("odbl").value || "?"}${$("oed").value ? " ED " + $("oed").value : ""}`;
+  const f = fq.frame; if (!f) return "";
+  return `${(f.brand ? f.brand + " " : "") + f.model} ${f.colour || ""} · ${f.a || "?"} □ ${f.dbl || "?"}`;
+}
+function readyLine(r) {
+  const c = r.choice || {}, f = fq.frame;
+  const lens = `${c.idx || ""} ${(r.made || "").toLowerCase().startsWith("stock") ? "stock" : "made to order"}${r.option && r.option !== "Clear" ? ", " + r.option : ""}`;
+  const fr = fq.own ? "own frame" : f ? `${f.brand ? f.brand + " " : ""}${f.model}` : "";
+  const price = r.price != null ? money(r.price) + (f && f.price != null ? " + " + money(f.price) : "") : "";
+  return `Ready: ${lens} · ${fr} · ${price}`;
 }
 function drawChecks() {
-  const r = chk, rx = r.rx || st.staff;
-  $("chosen").innerHTML = r.lens ? `<div class="kv"><span>Lens</span><b>${esc(r.lens)}</b></div>
-    <div class="kv"><span>Option</span><b>${esc(r.option || "Clear")}</b></div>
-    <div class="kv"><span>Made</span><b>${esc(r.made || "")}</b></div>
-    <div class="kv"><span>Price</span><b>${r.price != null ? money(r.price) + " a pair" : "-"}</b></div>` : "";
-  let h = `<h4>Checks</h4>`;
-  (rx.warnings || []).forEach(w => h += `<div class="warn">${esc(w)}</div>`);
-  (r.warnings || []).forEach(w => h += `<div class="warn">${esc(w)}</div>`);
-  h += `<div class="kv"><span>Rx as saved</span><b>R ${esc(rx.right)}<br>L ${esc(rx.left)}</b></div>
-        <div class="kv"><span>PD, from the Rx</span><b>${esc(rx.pd)}</b></div>`;
-  if (r.blank) h += `<div class="kv"><span>Blank needed (${esc(r.blank.label)})</span><b>${Object.entries(r.blank.per_eye).sort((x, y) => x[0] < y[0] ? 1 : -1).map(([s, v]) => `${s} ${v} mm`).join(" / ")}</b></div>
-        <div class="work">${r.blank.working.map(esc).join("<br>")}</div>`;
-  if (r.blank && r.blank.ed_note) h += `<div class="warn">${esc(r.blank.ed_note)}</div>`;
-  if (fq.frame && !fq.frame.ed && !fq.own) h += `<div class="hts">ED, if you know it <input id="edt" inputmode="decimal" placeholder="mm" value="${esc(fq.edTyped || "")}"><span class="req">optional</span></div>`;
-  h += verdictHTML(r.verdict);
+  const r = chk, rx = r.rx || st.staff, framed = !!(fq.frame || fq.own);
+  // 1 the answer first: ready, or the ONE thing in the way
+  const v = $("vline");
+  if (r.can_make) { v.className = "vline ok"; v.textContent = readyLine(r); }
+  else if (!framed) { v.className = "vline"; v.textContent = "Scan the frame."; }
+  else { v.className = "vline stop"; v.textContent = r.why || r.stop || "Not ready yet."; }
+  // 2 what staff check by eye: one table
+  const blank = r.verdict ? r.verdict.head : "";
+  const rows = [
+    ["Rx as saved", rx.no_rx ? `<b class="red">NO RX - confirm the Rx in Optomate before ordering</b>` : `R ${esc(rx.right)}<br>L ${esc(rx.left)}<small>PD ${esc(rx.pd)}</small>`],
+    ["Lens", `${esc(r.lens || "")}<small>${esc(r.option || "Clear")} · ${esc((r.made || "").replace(" - not checked, no Rx", ""))}</small>`],
+    ["Frame", framed ? esc(frameWords()) + (fq.frame && fq.frame.price == null ? `<small class="red">No sell price</small>` : "") : "-"],
+    ["Blank", framed && blank ? esc(blank) : "-"],
+    ["Price", r.price != null ? `${money(r.price)} lenses${fq.frame && fq.frame.price != null ? " + " + money(fq.frame.price) + " frame" : ""}<small>Before discounts and health fund</small>` : "-"],
+  ];
+  $("eyetable").innerHTML = rows.map(([k, val]) => `<div class="kv"><span>${k}</span><b>${val}</b></div>`).join("");
+  $("flags").innerHTML = flagsOf(r, rx).map(w => `<div class="warn">${esc(w)}</div>`).join("");
+  // 3 what staff do: fixes, heights, ticks (only when they apply)
+  let a = "";
   if (r.fixes && r.fixes.length) {
-    h += `<div class="fix">` + r.fixes.map((f, i) => `<button class="fixo ${f.on ? "on" : ""}" data-i="${i}"><div><div class="fn">${i + 1}. ${esc(f.title)}${f.best ? ` <span class="best">${esc(f.best)}</span>` : ""}</div>
-        <div class="fd">${esc(f.detail)}</div></div><div class="fp">${money(f.price)}<small>a pair</small></div></button>`).join("") + `</div>`;
+    a += `<h4>Pick a fix</h4><div class="fix">` + r.fixes.map((f, i) => `<button class="fixo ${f.on ? "on" : ""}" data-i="${i}"><div><div class="fn">${esc(f.title)}${f.best ? ` <span class="best">${esc(f.best)}</span>` : ""}</div></div><div class="fp">${money(f.price)}</div></button>`).join("") + `</div>`;
   }
-  if (r.stop) h += `<div class="stop">${esc(r.stop)}</div>`;
-  if (r.heights_needed && !r.stop) {
-    h += `<div style="margin-top:14px"><h4>Fitting heights</h4>
-      <div class="hts">R <input id="hR" inputmode="decimal" placeholder="mm" value="${esc(fq.h.R)}"> L <input id="hL" inputmode="decimal" placeholder="mm" value="${esc(fq.h.L)}">
-      <span class="req">Typed, 10 to 40 mm</span></div></div>`;
-  }
-  if (r.no_rx && !r.stop) h += `<label class="told norx"><input type="checkbox" id="norxok" ${fq.noRxOk ? "checked" : ""}> No Rx: make the job anyway. I'll confirm the Rx in Optomate before ordering.</label>`;
-  if (r.price_changed) h += `<label class="told"><input type="checkbox" id="told" ${fq.told ? "checked" : ""}> Told the patient: was ${money(r.start_price)}, now ${money(r.price)}</label>`;
-  $("checkbox").innerHTML = h;
+  if (r.heights_needed && !r.stop) a += `<div class="hts">Heights R <input id="hR" inputmode="decimal" placeholder="mm" value="${esc(fq.h.R)}"> L <input id="hL" inputmode="decimal" placeholder="mm" value="${esc(fq.h.L)}"></div>`;
+  if (r.no_rx && !r.stop) a += `<label class="told norx"><input type="checkbox" id="norxok" ${fq.noRxOk ? "checked" : ""}> No Rx: make it anyway</label>`;
+  if (r.price_changed) a += `<label class="told"><input type="checkbox" id="told" ${fq.told ? "checked" : ""}> Told the patient: was ${money(r.start_price)}, now ${money(r.price)}</label>`;
+  $("actions").innerHTML = a;
+  // 4 the working, folded away
+  let d = "";
+  if (r.verdict && r.verdict.detail) d += `<div class="work">${esc(r.verdict.detail)}</div>`;
+  if (r.blank) d += `<div class="work">Blank needed (${esc(r.blank.label)}): ${Object.entries(r.blank.per_eye).sort((x, y) => x[0] < y[0] ? 1 : -1).map(([s2, v2]) => `${s2} ${v2} mm`).join(" / ")}<br>${r.blank.working.map(esc).join("<br>")}</div>`;
+  if (r.blank && r.blank.ed_note) d += `<div class="work">${esc(r.blank.ed_note)}</div>`;
+  if (fq.frame && !fq.frame.ed && !fq.own) d += `<div class="hts">ED, if you know it <input id="edt" inputmode="decimal" placeholder="mm" value="${esc(fq.edTyped || "")}"></div>`;
+  if (r.fixes) r.fixes.forEach(f => { d += `<div class="work">${esc(f.title)}: ${esc(f.detail)}</div>`; });
+  $("detailbody").innerHTML = d || `<div class="work">Nothing more to show.</div>`;
   document.querySelectorAll(".fixo").forEach(b => b.onclick = () => {
     const f = r.fixes[+b.dataset.i]; fq.fix = f.on ? null : { kind:f.kind, idx:f.idx || "" }; fq.told = false; runChecks(); });
   ["hR","hL"].forEach(id => { const el = $(id); if (el) el.oninput = () => { fq.h[id.slice(1)] = el.value.trim(); clearTimeout(ddTimer); ddTimer = setTimeout(runChecks, 350); }; });
@@ -936,7 +979,6 @@ function drawChecks() {
   if ($("norxok")) $("norxok").onchange = () => { fq.noRxOk = $("norxok").checked; runChecks(); };
   $("make").textContent = (r.mode && r.mode.button) || "Make job (dry run, nothing written)";
   $("make").disabled = !r.can_make;
-  $("makewhy").textContent = r.can_make ? "" : r.why || "";
 }
 
 // one box: digits + Enter = a barcode; typing narrows a live list from Optomate (read only)
@@ -971,10 +1013,7 @@ async function scanBarcode(v) {
 }
 function frameChosen(f) {
   fq.frame = f; fq.own = false; fq.fix = null; fq.told = false; fq.edTyped = ""; $("own").classList.remove("on"); $("ownsize").style.display = "none";
-  $("framefacts").innerHTML = `<div class="kv"><span>Frame</span><b>${esc((f.brand ? f.brand + " " : "") + f.model)} · ${esc(f.colour || "")}</b></div>
-    <div class="kv"><span>Size</span><b>${f.a || "?"} &#9633; ${f.dbl || "?"}${f.ed ? " · ED " + f.ed : " · ED not on the record"}</b></div>
-    ${f.sunglass ? `<div class="kv"><span>Type</span><b>Sunglass frame</b></div>` : ""}
-    <div class="kv"><span>Price</span><b>${f.price != null ? money(f.price) : "No sell price"}</b></div>`;
+  $("framefacts").innerHTML = "";                         // the frame shows once, in the table
   runChecks();
 }
 $("bc").addEventListener("input", () => { ddSel = 0; clearTimeout(ddTimer); ddTimer = setTimeout(searchFrames, 250); });
@@ -987,7 +1026,7 @@ $("bc").addEventListener("keydown", (ev) => {
   else if (ev.key === "Enter") { const v = $("bc").value.trim(); if (/^[A-Za-z0-9._-]+$/.test(v) && !open) { closeDD(); scanBarcode(v); } else if (open) pickDD(ddSel); }
 });
 $("own").onclick = () => { fq.own = !fq.own; fq.frame = null; fq.fix = null; $("own").classList.toggle("on", fq.own); $("ownsize").style.display = fq.own ? "" : "none";
-  $("framefacts").innerHTML = fq.own ? `<div class="note">No frame on the job; the job comment says OWN FRAME. Tick Own Frame in Touch before invoicing.</div>` : ""; runChecks(); };
+  $("framefacts").innerHTML = ""; runChecks(); };
 $("rimless").onclick = () => { fq.rimless = !fq.rimless; $("rimless").classList.toggle("on", fq.rimless); runChecks(); };
 ["oa","odbl","oed"].forEach(i => $(i).oninput = () => { clearTimeout(ddTimer); ddTimer = setTimeout(runChecks, 400); });
 
@@ -999,25 +1038,26 @@ $("make").onclick = async () => {
   const r = await api("/api/sheet/plan", jobBody());
   $("make").disabled = !(chk && chk.can_make);
   if (!r) return;
-  const pv = r.preview || {}, pr = pv.price || {}, sh = r.sheet || {};
-  const fr = pv.frame || {};
-  $("cpop").innerHTML = `<div class="eyebrow">Staff · ${esc((pv.patient || {}).name || st.staff.name)}</div><h3>Check, then make the job.</h3>
-    ${r.no_rx ? `<div class="refuse">No Rx - confirm the Rx in Optomate before ordering.</div>` : ""}
-    ${(r.refusals || []).map(x => `<div class="refuse">${esc(x)}</div>`).join("")}${(r.warnings || []).map(x => `<div class="warn">${esc(x)}</div>`).join("")}
-    <div class="cg"><div>
-      <div class="kv"><span>Rx as saved</span><b>${pv.no_rx ? "NO RX on this job" : `R ${eyeRow((pv.rx || {}).right)}<br>L ${eyeRow((pv.rx || {}).left)}<small>Rx #${esc((pv.rx || {}).id || "")}, saved ${esc((pv.rx || {}).saved || "")}</small>`}</b></div>
-      <div class="kv"><span>Sheet choice</span><b>${esc(sh.lens || "")} · ${esc(sh.option || "Clear")}<small>${esc(sh.made || "")}</small></b></div>
-      <div class="kv"><span>Lens</span><b>${esc((pv.lens || {}).description || sh.lens || "")}<small>Optomate ${esc((pv.lens || {}).barcode || "-")} · ${esc((pv.lens || {}).use || "")}</small></b></div>
-      ${pv.tint ? `<div class="kv"><span>Tint</span><b>${esc(pv.tint.description)}<small>Optomate ${esc(pv.tint.barcode)}</small></b></div>` : ""}
-      <div class="kv"><span>Coat</span><b>${esc((pv.coat || {}).description || "-")}</b></div>
-      ${pv.pd_shift ? `<div class="kv"><span>PD</span><b>${esc(pv.pd_shift)}</b></div>` : ""}
-    </div><div>
-      <div class="kv"><span>Lenses, sheet</span><b>${sh.price != null ? money(sh.price) : "-"}</b></div>
-      <div class="kv"><span>Lenses, Optomate</span><b>${pr.lens_pair ? "$" + esc(pr.lens_pair) : "-"}${pr.tint_pair && pr.tint_pair !== "0.00" ? ` + tint $${esc(pr.tint_pair)}` : ""}<small>lens x 2 + coat x 2${pv.tint ? " + tint x 2" : ""}</small></b></div>
-      <div class="kv"><span>Frame</span><b>${fr.own ? "Own frame" : esc(`${fr.model || ""} ${fr.colour || ""}`)}${fr.sellinc ? ` · $${esc(fr.sellinc)}` : ""}<small>${esc(fr.size || "")}</small></b></div>
-      <div class="kv"><span>Heights</span><b>${Object.keys(pv.heights || {}).length ? Object.entries(pv.heights).map(([s, v]) => `${s} ${esc(v)}`).join(" / ") : "none"}</b></div>
-      <div class="kv"><span>Touch will charge</span><b>${pr.touch_total ? "$" + esc(pr.touch_total) : "-"}<small>Before discounts and health fund</small></b></div>
-    </div></div>
+  const pv = r.preview || {}, pr = pv.price || {}, sh = r.sheet || {}, fr = pv.frame || {};
+  const seen = new Set(), warns = (r.warnings || []).filter(w => !(r.no_rx && /^No Rx/.test(w)) && !seen.has(w) && seen.add(w));
+  const head = r.ok ? `<div class="vline ok">${esc(chk ? readyLine(chk) : "Ready")}</div>`
+                    : (r.refusals || []).map(x => `<div class="vline stop">${esc(x)}</div>`).join("");
+  const rows = [
+    ["Rx as saved", pv.no_rx ? `<b class="red">NO RX - confirm the Rx in Optomate before ordering</b>` : `R ${eyeRow((pv.rx || {}).right)}<br>L ${eyeRow((pv.rx || {}).left)}`],
+    ["Sheet choice", `${esc(sh.lens || "")}<small>${esc(sh.option || "Clear")} · ${esc(sh.made || "")}</small>`],
+    ["Optomate lens", esc((pv.lens || {}).description || "-")],
+    ["Frame", fr.own ? "Own frame" : esc(`${fr.model || ""} ${fr.colour || ""}`.trim() || "-")],
+    ["Price", `${sh.price != null ? money(sh.price) : "-"} lenses${pr.agree === false ? ` <b class="red">Optomate $${esc(pr.lens_pair)}</b>` : ""}${fr.sellinc ? " + $" + esc(fr.sellinc) + " frame" : ""}`],
+  ];
+  if (Object.keys(pv.heights || {}).length) rows.push(["Heights", Object.entries(pv.heights).map(([s2, v2]) => `${s2} ${esc(v2)}`).join(" / ")]);
+  const details = [`Lens ${esc((pv.lens || {}).barcode || "-")} · ${esc((pv.lens || {}).use || "")}`, `Coat: ${esc((pv.coat || {}).description || "-")}`,
+    pv.tint ? `Tint: ${esc(pv.tint.description)} (${esc(pv.tint.barcode)})` : "", pv.pd_shift ? esc(pv.pd_shift) : "",
+    pr.touch_total ? `Touch will charge $${esc(pr.touch_total)} (lens x 2 + coat x 2${pv.tint ? " + tint x 2" : ""} + frame)` : "",
+    fr.size ? `Frame ${esc(fr.size)}` : ""].filter(Boolean);
+  $("cpop").innerHTML = `<div class="eyebrow">Check, then make the job · ${esc((pv.patient || {}).name || st.staff.name)}</div>${head}
+    <div class="ctable">${rows.map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join("")}</div>
+    ${warns.map(x => `<div class="warn">${esc(x)}</div>`).join("")}
+    <details><summary>Details</summary>${details.map(x => `<div class="work">${x}</div>`).join("")}</details>
     <div class="popbtns"><button class="cta" id="confirm" ${r.ok ? "" : "disabled"}>${esc((r.mode_words || {}).button || "Make job (dry run, nothing written)")}</button><button class="ghost" id="cback">Back</button></div>`;
   $("scrim2").classList.add("on"); $("cpop").classList.add("on");
   $("cback").onclick = () => { $("scrim2").classList.remove("on"); $("cpop").classList.remove("on"); };
@@ -1032,7 +1072,7 @@ async function confirmMake() {
   $("doneh").textContent = made ? `Job ${made} made.` : r.ok ? "Dry run: nothing was made." : "Not made.";
   $("donetick").style.background = made ? "" : r.ok ? "var(--btn)" : "#B00020";
   $("donetick").innerHTML = made || r.ok ? "&#10003;" : "!";
-  $("donel").innerHTML = made ? (r.verified ? "" : esc(r.next || "")) : r.ok ? "This is the job it would send. Nothing was written to Optomate." : (r.refusals || []).map(esc).join("<br>");
+  $("donel").innerHTML = made ? (r.verified ? "" : esc(r.next || "")) : r.ok ? "" : (r.refusals || []).map(esc).join("<br>");
   $("donesteps").style.display = made || r.ok ? "" : "none";
   $("donemode").textContent = made ? "" : r.ok ? "When jobs are live, these are the steps in Touch." : "";
   $("donenorx").style.display = r.no_rx && (made || r.ok) ? "" : "none";
