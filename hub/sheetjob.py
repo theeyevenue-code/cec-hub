@@ -41,7 +41,8 @@ IDLE_S = 5 * 60                 # 5 minutes untouched: back to the sheet, everyt
 LIST_S = 2 * 60                 # one staff-code unlock = one look at the patient list
 RIMLESS = ("1.53", "1.60", "1.67")
 HEIGHT_CATEGORIES = {"progressive", "anti-fatigue", "occupational", "bifocal"}
-USE = {"sv": "D", "mf": "M", "af": "M", "office": "M", "bif": "B"}
+USE = {"sv": "D", "mf": "M", "af": "M", "office": "M", "bif": "B", "syn": "D"}
+SV_TABS = sheetprice.SV_TABS
 TAB_OF_LENS_TYPE = {"distance": "sv", "near": "sv", "intermediate": "sv", "multifocal": "mf",
                     "office": "office", "bifocal": "bif"}
 TYPE_WORDS = {"distance": "Distance", "near": "Reading", "intermediate": "Computer", "multifocal": "Multifocal",
@@ -220,7 +221,7 @@ def _question(rx: dict, tab: str) -> tuple[dict, str, str]:
     """(Lens Finder question, lens type key, catalogue kind) for one sheet tab."""
     lt = rx.get("lens_type") or {}
     written_as = lt.get("type") if lt.get("as_written") else ""
-    typ = {"sv": _sv_typ(rx), "mf": "multifocal", "af": "distance", "office": "office", "bif": "bifocal"}[tab]
+    typ = {"sv": _sv_typ(rx), "syn": _sv_typ(rx), "mf": "multifocal", "af": "distance", "office": "office", "bif": "bifocal"}[tab]
     q = lensoptions.mode_question(rx, typ, written_as)
     kind = "Anti-fatigue" if tab == "af" else q["kind"]
     q["kind"] = kind
@@ -256,16 +257,20 @@ def resolve(book: dict, rx: dict | None, found: dict, ch: dict) -> dict:
     tab = ch["tab"]
     prism = bool(rx) and lensoptions.rx_has_prism(rx)
     tries = [ch]
-    if tab == "sv":
+    if tab in SV_TABS:
         want = ch.get("made")
         tries = ([{**ch, "made": "mto"}] if (prism or want == "mto") else
                  [{**ch, "made": "stock"}, {**ch, "made": "mto"}])
     last = None
     for c in tries:
         q = sheetprice.quote(book, c)
-        last = (c, q)
         if not q.get("ok"):
+            if tab in SV_TABS and c.get("made") == "mto":
+                # no made-to-order version on the sheet (Synchrony 1.56): not made in this prescription
+                last = last or (c, q)
+                break
             return {"state": "off", "choice": c, "quote": q, "why": q.get("why", "")}
+        last = (c, q)
         if not q["map"].get("ok"):
             return {"state": "plain", "choice": c, "quote": q, "why": q["map"].get("why", "")}
         if prism and q["map"]["key"]["stockgrind"] == "stock":
@@ -572,7 +577,7 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
             ref = None
     res["ref"] = ref
     if ref:
-        res["lens_use"] = "N" if (ch["tab"] == "sv" and typ == "near") else USE[ch["tab"]]
+        res["lens_use"] = "N" if (ch["tab"] in SV_TABS and typ == "near") else USE[ch["tab"]]
         res["tint_barcode"] = qq["map"].get("tint_barcode") or ""
     res["price_changed"] = res["price"] is not None and res["start_price"] is not None and res["price"] != res["start_price"]
     res["can_make"], res["why"] = _can_make(res, data, s)
@@ -586,7 +591,7 @@ def _fixes(book, rx, rows, pricing, found, q, typ, cur, fit, nums, fix) -> list[
     ch, tab = cur["choice"], cur["choice"]["tab"]
     out = []
     # 1 the PD (single vision, stock, no prism, both monocular PDs as saved: Mark, 9 Nov 2026)
-    if tab == "sv" and not lensoptions.rx_has_prism(rx) and not fit["pd_note"]:
+    if tab in SV_TABS and not lensoptions.rx_has_prism(rx) and not fit["pd_note"]:
         powers = {}
         for side, k in (("R", "right"), ("L", "left")):
             e = q.get(k)
@@ -599,8 +604,8 @@ def _fixes(book, rx, rows, pricing, found, q, typ, cur, fit, nums, fix) -> list[
                             "detail": v["line"], "shift": {k: x for k, x in v["shift"].items() if x},
                             "blank": max(v["blank"].values()), "on": fix.get("kind") == "pd"})
     # 2 another stock lens that fits (other thicknesses on this tab, the patient's option kept)
-    if tab == "sv":
-        for j, c in enumerate(sheetprice.page(book, "sv")["cards"]):
+    if tab in SV_TABS:
+        for j, c in enumerate(sheetprice.page(book, tab)["cards"]):
             if c["idx"] == ch["idx"]:
                 continue
             alt = resolve(book, rx, found, {**ch, "card": j, "idx": c["idx"], "made": None})
@@ -615,7 +620,7 @@ def _fixes(book, rx, rows, pricing, found, q, typ, cur, fit, nums, fix) -> list[
                 if len([f for f in out if f["kind"] == "stock"]) >= 2:
                     break
     # 3 made to order, same lens and options
-    if tab == "sv":
+    if tab in SV_TABS:
         m = resolve(book, rx, found, {**ch, "made": "mto"})
         if m["state"] == "mto":
             out.append({"kind": "mto", "title": "Made to order", "detail": f"{sheetprice.card_title(book, m['choice'])}, cut to the frame",

@@ -1,5 +1,5 @@
 {
- "_readme": "The iPad price sheet's prices (Mark, 10 Nov 2026). ONE price file: price_sheet/build.py inlines it into static/price-sheet.html and the Hub server (hub/sheetprice.py) reads the same file to price a job. Copied verbatim from the printed patient sheets (second-brain price-lists/patient) and the staff scan sheets; never worked out. Change a price here, rebuild, and run the sheet audit (agent repo: python -m pricing.sheet_audit).",
+ "_readme": "The iPad price sheet's prices (Mark, 10 Nov 2026). ONE price file: price_sheet/build.py inlines it into static/price-sheet.html and the Hub server (hub/sheetprice.py) reads the same file to price a job. Copied verbatim from the printed patient sheets (second-brain price-lists/patient) and the staff scan sheets; never worked out. Change a price here, rebuild, and run the sheet audit (agent repo: python -m pricing.sheet_audit). The small 'Essential SV' tab (Synchrony single vision, Mark 10 Nov 2026): stock and made-to-order pair prices copied from the Hub price book (pricing/lens_link.csv hub_pair_price = Optomate lens x 2 where linked).",
  "date": "2026-11-10",
  "optionSets": {
   "SV_LOW": [
@@ -969,6 +969,104 @@
        "price": 300
       }
      ]
+    }
+   ]
+  },
+  {
+   "key": "syn",
+   "tab": "Essential SV",
+   "small": true,
+   "eyebrow": "Synchrony by ZEISS · single vision",
+   "h1": "Essential single vision lenses.",
+   "lead": "Synchrony by ZEISS single vision lenses, anti-reflective multicoated.",
+   "cols": 4,
+   "by": "index",
+   "foot": [
+    [
+     "Stock lens; made to order when the frame or script needs it.",
+     "Prices per pair."
+    ],
+    "Prices: price book and Optomate · November 2026"
+   ],
+   "cards": [
+    {
+     "idx": "1.50",
+     "name": "Standard",
+     "price": 140,
+     "mtoPrice": 200,
+     "product": "Synchrony FSV 1.50 HMC+",
+     "line": "Synchrony single vision · HMC+ multicoat",
+     "opts": [
+      {
+       "k": "clear",
+       "n": "Clear, multicoated",
+       "add": 0,
+       "d": "Anti-reflective multicoat."
+      }
+     ],
+     "moreList": [
+      "Made to order $200"
+     ],
+     "moreFrom": null
+    },
+    {
+     "idx": "1.56",
+     "name": "Thinner",
+     "price": 140,
+     "product": "Synchrony FSV 1.56 HMC+",
+     "line": "Synchrony single vision · HMC+ multicoat",
+     "opts": [
+      {
+       "k": "clear",
+       "n": "Clear, multicoated",
+       "add": 0,
+       "d": "Anti-reflective multicoat."
+      }
+     ],
+     "moreList": [
+      "Stock only"
+     ],
+     "moreFrom": null
+    },
+    {
+     "idx": "1.60",
+     "name": "Thin & light",
+     "price": 220,
+     "mtoPrice": 290,
+     "product": "Synchrony FSV 1.60 HMC+",
+     "line": "Synchrony single vision · HMC+ multicoat",
+     "opts": [
+      {
+       "k": "clear",
+       "n": "Clear, multicoated",
+       "add": 0,
+       "d": "Anti-reflective multicoat."
+      }
+     ],
+     "moreList": [
+      "Made to order $290"
+     ],
+     "moreFrom": null
+    },
+    {
+     "idx": "1.67",
+     "name": "Ultra thin",
+     "price": 250,
+     "mtoPrice": 420,
+     "product": "Synchrony FSV 1.67 HMC+",
+     "line": "Synchrony single vision · HMC+ multicoat",
+     "opts": [
+      {
+       "k": "clear",
+       "n": "Clear, multicoated",
+       "add": 0,
+       "d": "Anti-reflective multicoat."
+      }
+     ],
+     "moreList": [
+      "Made to order $420"
+     ],
+     "moreFrom": null
     }
    ]
   }

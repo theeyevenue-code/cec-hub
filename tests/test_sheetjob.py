@@ -30,6 +30,8 @@ LENS_CSV = (
     "ZEISS,ZEISS,ClearView Single Vision 1.50,Single vision,1.50,Clear BluePro,grind,,-10.00,+8.00,-4.00,,,32.00,DuraVision Plus Platinum UV\n"
     "ZEISS,ZEISS,ClearView Single Vision 1.60,Single vision,1.60,Clear,grind,,-12.00,+8.00,-4.00,,,35.00,DuraVision Plus Platinum UV\n"
     "ZEISS,ZEISS,SmartLife Digital 1.60,Anti-fatigue,1.60,Clear,grind,,-10.00,+8.00,-4.00,,,60.00,DuraVision Plus Platinum UV\n"
+    "Synchrony,Synchrony,FSV Clear 1.50,Single vision,1.50,Clear,stock,70,-4.00,+4.00,-2.00,,,9.00,HMC+\n"
+    "Synchrony,Synchrony,FSV Clear 1.56,Single vision,1.56,Clear,stock,65,+0.25,+4.00,-2.00,,,9.00,HMC+\n"
     "Synchrony,Synchrony,Progressive Ultra HDV 1.50,Progressive,1.50,Clear,grind,,-8.00,+6.00,-4.00,0.75,3.50,45.00,HMC+\n"
 )
 HEAD = ("supplier,lens,index,material,coating,stockgrind,blank_mm,category,pb_codes,orderable,lens_barcode,lens_description,"
@@ -44,6 +46,7 @@ LINK_CSV = HEAD + (
     "ZEISS,ClearView Single Vision 1.50,1.50,Clear BluePro,DuraVision Plus Platinum UV,grind,,Single vision,,yes,20001363,SV Grind Blue 1.50,175.00,20002018,0.00,addon,350.00,350.00,,yes,name,,unchecked,,\n"
     "ZEISS,ClearView Single Vision 1.60,1.60,Clear,DuraVision Plus Platinum UV,grind,,Single vision,,yes,20001352,SV Grind 1.60,175.00,20002018,0.00,addon,350.00,350.00,,yes,name,,unchecked,,\n"
     "ZEISS,SmartLife Digital 1.60,1.60,Clear,DuraVision Plus Platinum UV,grind,,Anti-fatigue,,yes,20001600,Digital 1.60,225.00,20002018,0.00,addon,450.00,450.00,,yes,name,,unchecked,,\n"
+    "Synchrony,FSV Clear 1.50,1.50,Clear,HMC+,stock,70,Single vision,,yes,20001311,Synchrony FSV 1.50,70.00,20001325,0.00,addon,140.00,140.00,,yes,name,,unchecked,,\n"
     "Synchrony,Progressive Ultra HDV 1.50,1.50,Clear,HMC+,grind,,Progressive,,yes,20001267,Ultra HDV 1.50,210.00,20001325,0.00,addon,420.00,420.00,,yes,code,,unchecked,,\n"
 )
 
@@ -370,3 +373,34 @@ def test_frame_name_search_is_a_select_with_safe_words_only(monkeypatch):
 
 def test_lens_options_pd_shift_stops_for_prism():
     assert lo._shift_ctx({"kind": "Single vision", "pd_exact": True, "prism": True}, {"frame": {"a": 52}}) is None
+
+
+# ---- the small Synchrony single vision tab (Mark, 10 Nov 2026: the sheet as a portal for any lens) ----
+def test_synchrony_sv_prices_are_copied_per_card_never_worked_out():
+    book = sp.load()
+    q = lambda **kw: sp.quote(book, {"tab": "syn", "opt": "clear", **kw})   # noqa: E731
+    assert q(card=0, idx="1.50")["total"] == 140 and q(card=0, idx="1.50", made="mto")["total"] == 200
+    assert q(card=2, idx="1.60", made="mto")["total"] == 290 and q(card=3, idx="1.67", made="mto")["total"] == 420
+    assert q(card=1, idx="1.56")["total"] == 140 and not q(card=1, idx="1.56", made="mto")["ok"]   # 1.56: stock only
+    k = q(card=0, idx="1.50", made="mto")["map"]["key"]
+    assert (k["supplier"], k["lens"], k["coating"], k["stockgrind"]) == ("Synchrony", "Single Vision Grind 1.50", "HMC+", "grind")
+    assert q(card=0, idx="1.50")["map"]["key"]["lens"] == "FSV Clear 1.50"
+
+
+def test_synchrony_sv_tab_is_small_and_last():
+    pages = sp.load()["data"]["pages"]
+    assert pages[-1]["key"] == "syn" and pages[-1]["small"] is True
+    assert [p["key"] for p in pages[:-1]] == ["sv", "mf", "af", "sun", "myo", "office", "bif"]
+
+
+def test_synchrony_sv_marks_and_job(c):
+    pick(c, "Mia")
+    syn = c.get("/api/sheet/patient").get_json()["tabs"]["syn"]
+    assert syn["cards"][0]["1.50"]["state"] == "stock" and syn["cards"][1]["1.56"]["state"] == "none"
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    r = c.post("/api/sheet/checks", json=body(choice={"tab": "syn", "card": 0, "idx": "1.50", "opt": "clear"})).get_json()
+    assert r["can_make"], r["why"]
+    assert r["price"] == 140 and r["ref"]["lens"] == "FSV Clear 1.50" and r["lens_use"] == "D"
+    c.post("/api/sheet/plan", json=body(choice={"tab": "syn", "card": 0, "idx": "1.50", "opt": "clear"}))
+    cmd, req = c.sent[-1]
+    assert cmd == "plan" and req["hub_pair_price"] == "140" and req["option"]["supplier"] == "Synchrony"

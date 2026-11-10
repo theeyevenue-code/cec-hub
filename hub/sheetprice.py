@@ -29,7 +29,8 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent / "price_sheet"
 PRICES = BASE / "prices.json"
 MAP = BASE / "sheet_map.json"
-JOB_TABS = ("sv", "mf", "af", "office", "bif")
+JOB_TABS = ("sv", "mf", "af", "office", "bif", "syn")
+SV_TABS = ("sv", "syn")       # single vision: a stock lens, or made to order (syn = the small Synchrony tab)
 
 _cache: dict = {}
 _lock = threading.Lock()
@@ -149,7 +150,14 @@ def price(book: dict, ch: dict) -> dict:
     pfx = str(ch.get("pfx") or "Grey")
     lens, tint = base, 0
     made = "mto"
-    if tab == "sv":
+    if tab == "syn":
+        # Synchrony single vision (Mark, 10 Nov 2026): each card carries its own made-to-order price, copied
+        made = "mto" if str(ch.get("made")) == "mto" else "stock"
+        if made == "mto":
+            if c.get("mtoPrice") is None:
+                return {"ok": False, "why": f"No made-to-order {idx} on the price sheet."}
+            lens = c["mtoPrice"]
+    elif tab == "sv":
         made = "mto" if (str(ch.get("made")) == "mto" or (o and o.get("mto")) or
                          (o and o.get("k") == "photo" and o.get("photoStock") and pfx != "Grey")) else "stock"
         if o and o["k"] == "tint":
@@ -201,7 +209,7 @@ def pricebook(book: dict, ch: dict, pr: dict | None = None) -> dict:
         return {"ok": False, "why": tm["price_only"]}
     idx, k = pr["idx"], pr["option"]
     out = {"ok": True, "why": "", "use": tm.get("use", "D"), "tint_barcode": "", "tint_kind": ""}
-    if tab == "sv":
+    if tm.get("stock"):                                  # single vision tabs: a stock row and a made-to-order row
         side = tm["mto" if pr["made"] == "mto" else "stock"]
         lens = _pick(side["lens"], k)
         if isinstance(lens, dict):
@@ -266,7 +274,7 @@ def every_choice(book: dict):
                 opts = options(book, c, idx) or [{"k": "clear"}]
                 for o in opts:
                     k = o["k"]
-                    mades = ["stock", "mto"] if tab == "sv" else [None]
+                    mades = ["stock", "mto"] if tab in SV_TABS else [None]
                     for made in mades:
                         base = {"tab": tab, "card": i, "idx": idx, "opt": k, "made": made}
                         if k == "tint":
