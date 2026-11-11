@@ -205,5 +205,32 @@
   "Black": "20002035",
   "Blue": "20002033",
   "Burgundy": "20002034"
+ },
+ "tint_coats": {
+  "_readme": "Coating on a TINTED ZEISS lens (one whose price-book coating is Platinum). Staff pick it on the Order Pad staff screen; Platinum is the default. Mark, 11 Nov 2026: back surface AR costs the same per lens as Platinum ('Same as Platinum'), so the sheet price does not change. Hard coat is held: no hard coat price exists in the data (Optomate would charge the same lens item with no add-on, i.e. the Platinum price). DuraVision Gold is not offered.",
+  "order": [
+   "platinum",
+   "bsar",
+   "hc"
+  ],
+  "platinum": {
+   "n": "Platinum",
+   "d": "Anti-reflective both sides",
+   "coating": "DuraVision Plus Platinum UV",
+   "addon": "20002018"
+  },
+  "bsar": {
+   "n": "Back surface AR",
+   "d": "Anti-reflective inside only. Same price as Platinum.",
+   "coating": "DuraVision Plus Sun UV",
+   "addon": "20002017"
+  },
+  "hc": {
+   "n": "Hard coat",
+   "d": "No anti-reflective.",
+   "coating": "DSHC hard coat",
+   "addon": "",
+   "hold": "Hard coat price not set yet. Pick Platinum or back surface AR, or make this one in Touch."
+  }
  }
 }

@@ -533,7 +533,8 @@ def test_the_choice_is_kept_for_the_patient_today_and_comes_back(c):
     c.post("/api/sheet/next")
     _search_pick(c, "zztest noa")                                            # reopened later the same day
     res = c.get("/api/sheet/patient").get_json()["resume"]
-    assert res["choice"] == {"tab": "sv", "card": 1, "idx": "1.60", "opt": "tint", "colour": "Brown", "depth": "g75", "pfx": "Grey"}
+    assert res["choice"] == {"tab": "sv", "card": 1, "idx": "1.60", "opt": "tint", "colour": "Brown", "depth": "g75", "pfx": "Grey",
+                             "tcoat": "platinum"}
     assert res["frame"]["barcode"] == "ZZFRAME5219" and res["rimless"] is True
     sj._kept.clear()
     c.post("/api/sheet/next")
@@ -714,3 +715,33 @@ def test_page_has_no_code_pad():
     for gone in ("padKey", "Staff code", "checkin/staff/unlock"):
         assert gone not in html
     assert "Staff iPad only" in html
+
+
+# ---- tint coatings (Mark, 11 Nov 2026) ---------------------------------------------------------------
+def test_tinted_zeiss_lens_offers_platinum_bsar_and_holds_hard_coat(c):
+    # "Same as Platinum": back surface AR keeps the sheet price; hard coat has no price yet, so it is held
+    pick(c, "Mia")
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    ch = {"tab": "sv", "card": 0, "idx": "1.50", "opt": "tint", "colour": "Brown", "depth": "g75"}
+    r = c.post("/api/sheet/checks", json=body(choice=ch)).get_json()
+    assert [t["k"] for t in r["tint_coats"]] == ["platinum", "bsar", "hc"] and r["tint_coats"][0]["on"]
+    assert r["tint_coat"]["addon"] == "20002018"
+    plat = r["price"]
+    b = c.post("/api/sheet/checks", json=body(choice={**ch, "tcoat": "bsar"})).get_json()
+    # no price-book row links back surface AR to Optomate yet: Make in Touch (tints are refused live anyway)
+    assert not b["can_make"] and "Not linked" in b["stop"]
+    assert b["price"] == plat and b["tint_coat"] == {"k": "bsar", "n": "Back surface AR", "addon": "20002017"}
+    h = c.post("/api/sheet/checks", json=body(choice={**ch, "tcoat": "hc"})).get_json()
+    assert not h["can_make"] and "Hard coat price not set" in h["stop"] and h["price"] == plat
+    assert "Gold" not in str(r["tint_coats"])
+
+
+def test_coat_pick_only_on_tinted_platinum_lenses():
+    book = sp.load()
+    clear = sp.quote(book, {"tab": "sv", "card": 0, "idx": "1.50", "opt": "clear", "tcoat": "bsar"})
+    assert "tint_coat" not in clear["map"] and clear["map"]["key"]["coating"] == "DuraVision Platinum UV"
+    t = sp.quote(book, {"tab": "sv", "card": 0, "idx": "1.50", "opt": "tint", "tcoat": "bsar"})
+    assert t["map"]["coat_key"]["coating"] == "DuraVision Plus Sun UV" and t["total"] == sp.quote(
+        book, {"tab": "sv", "card": 0, "idx": "1.50", "opt": "tint"})["total"]
+    syn = sp.quote(book, {"tab": "mf", "card": 0, "idx": "1.50", "opt": "tint", "tcoat": "bsar"})   # Synchrony: own HMC+ coat
+    assert syn["map"].get("ok") and "tint_coat" not in syn["map"]

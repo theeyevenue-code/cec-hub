@@ -873,15 +873,15 @@ $("changelens").onclick = () => { drawPage(); show("s-sheet"); };
 /* ---- 3 staff: frame, checks, heights, make job (screens 5-7) ----------------------------------
    Rule 1 of the director's doc: the page works nothing out. The blank, the verdict, the fixes and their
    prices, the PD change, the heights rule and whether Make may be pressed all come from /api/sheet/checks. */
-let chk = null, fq = { frame:null, own:false, rimless:false, fix:null, told:false, noRxOk:false, h:{ R:"", L:"" } }, ddHits = [], ddSel = 0, ddTimer = 0;
+let chk = null, fq = { frame:null, own:false, rimless:false, fix:null, told:false, noRxOk:false, tcoat:"platinum", h:{ R:"", L:"" } }, ddHits = [], ddSel = 0, ddTimer = 0;
 const choiceNow = () => ({ tab:st.tab, card:st.cardI, idx:curIdx(), opt:(priceNow().o || {}).k || "clear",
-  colour:{ Green:"Green" }[st.colour] || st.colour, depth:st.depth, pfx:st.pfx });
+  colour:{ Green:"Green" }[st.colour] || st.colour, depth:st.depth, pfx:st.pfx, tcoat:fq.tcoat || "platinum" });
 function frameReq() {
   if (fq.own) return { own:true, a:$("oa").value.trim(), dbl:$("odbl").value.trim(), ed:$("oed").value.trim() };
   return fq.frame ? { barcode:fq.frame.barcode, ed_typed:fq.edTyped || "" } : {};
 }
 async function drawFrame() {
-  fq = { frame:null, own:false, rimless:false, fix:null, told:false, noRxOk:false, h:{ R:"", L:"" } }; chk = null;
+  fq = { frame:null, own:false, rimless:false, fix:null, told:false, noRxOk:false, tcoat:"platinum", h:{ R:"", L:"" } }; chk = null;
   $("bc").value = ""; $("framefacts").innerHTML = ""; ["oa","odbl","oed"].forEach(i => $(i).value = "");
   $("own").classList.remove("on"); $("rimless").classList.remove("on"); $("ownsize").style.display = "none";
   $("vline").className = "vline"; $("vline").textContent = "Scan the frame."; $("eyetable").innerHTML = "";
@@ -936,7 +936,7 @@ function drawChecks() {
   const rows = [
     ["Rx as saved", rx.no_rx ? `<b class="red">NO RX - confirm the Rx in Optomate before ordering</b>` : `R ${esc(rx.right)}<br>L ${esc(rx.left)}<small>PD ${esc(rx.pd)}</small>`],
     ...(r.pd_job ? [["PD on the job", `<b class="flagtxt">R ${esc(r.pd_job.to.R)} / L ${esc(r.pd_job.to.L)} (widened from ${esc(r.pd_job.from.R)} / ${esc(r.pd_job.from.L)})</b>`]] : []),
-    ["Lens", `${esc(r.lens || "")}<small>${esc(r.option || "Clear")} · ${esc((r.made || "").replace(" - not checked, no Rx", ""))}</small>`],
+    ["Lens", `${esc(r.lens || "")}<small>${esc(r.option || "Clear")} · ${esc((r.made || "").replace(" - not checked, no Rx", ""))}${r.tint_coat ? " · " + esc(r.tint_coat.n) : ""}</small>`],
     ["Frame", framed ? esc(frameWords()) + (fq.frame && fq.frame.price == null ? `<small class="red">No sell price</small>` : "") : "-"],
     ["Blank", framed && blank ? esc(blank) : "-"],
     ["Price", r.price != null ? `${money(r.price)} lenses${fq.frame && fq.frame.price != null ? " + " + money(fq.frame.price) + " frame" : ""}<small>Before discounts and health fund</small>` : "-"],
@@ -945,6 +945,10 @@ function drawChecks() {
   $("flags").innerHTML = flagsOf(r, rx).map(w => `<div class="warn">${esc(w)}</div>`).join("");
   // 3 what staff do: fixes, heights, ticks (only when they apply)
   let a = "";
+  // Mark, 11 Nov 2026: a tinted ZEISS lens - staff pick the coat (same price; hard coat held until it has a price)
+  if (r.tint_coats && r.tint_coats.length) {
+    a += `<h4>Coating with the tint</h4><div class="fix">` + r.tint_coats.map(t => `<button class="fixo tcoat ${t.on ? "on" : ""}" data-k="${esc(t.k)}"><div><div class="fn">${esc(t.n)}${t.held ? ` <span class="best">Price not set</span>` : ""}</div><div class="fd">${esc(t.d)}</div></div></button>`).join("") + `</div>`;
+  }
   if (r.fixes && r.fixes.length) {
     a += `<h4>Pick a fix</h4><div class="fix">` + r.fixes.map((f, i) => `<button class="fixo ${f.on ? "on" : ""}" data-i="${i}"><div><div class="fn">${esc(f.title)}${f.best ? ` <span class="best">${esc(f.best)}</span>` : ""}</div></div><div class="fp">${money(f.price)}</div></button>`).join("") + `</div>`;
   }
@@ -960,7 +964,8 @@ function drawChecks() {
   if (fq.frame && !fq.frame.ed && !fq.own) d += `<div class="hts">ED, if you know it <input id="edt" inputmode="decimal" placeholder="mm" value="${esc(fq.edTyped || "")}"></div>`;
   if (r.fixes) r.fixes.forEach(f => { d += `<div class="work">${esc(f.title)}: ${esc(f.detail)}</div>`; });
   $("detailbody").innerHTML = d || `<div class="work">Nothing more to show.</div>`;
-  document.querySelectorAll(".fixo").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".tcoat").forEach(b => b.onclick = () => { fq.tcoat = b.dataset.k; runChecks(); });
+  document.querySelectorAll(".fixo:not(.tcoat)").forEach(b => b.onclick = () => {
     const f = r.fixes[+b.dataset.i]; fq.fix = f.on ? null : { kind:f.kind, idx:f.idx || "" }; fq.told = false; runChecks(); });
   ["hR","hL"].forEach(id => { const el = $(id); if (el) el.oninput = () => { fq.h[id.slice(1)] = el.value.trim(); clearTimeout(ddTimer); ddTimer = setTimeout(runChecks, 350); }; });
   if ($("told")) $("told").onchange = () => { fq.told = $("told").checked; runChecks(); };

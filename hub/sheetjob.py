@@ -451,7 +451,8 @@ def _clean_choice(ch) -> dict:
     ch = ch if isinstance(ch, dict) else {}
     out = {"tab": str(ch.get("tab") or "")[:8], "idx": str(ch.get("idx") or "")[:5], "opt": str(ch.get("opt") or "clear")[:8],
            "colour": str(ch.get("colour") or "Grey")[:12], "depth": str(ch.get("depth") or "s85")[:6],
-           "pfx": str(ch.get("pfx") or "Grey")[:12], "made": "mto" if ch.get("made") == "mto" else None}
+           "pfx": str(ch.get("pfx") or "Grey")[:12], "made": "mto" if ch.get("made") == "mto" else None,
+           "tcoat": ch.get("tcoat") if ch.get("tcoat") in ("platinum", "bsar", "hc") else "platinum"}
     try:
         out["card"] = int(ch.get("card"))
     except (TypeError, ValueError):
@@ -558,7 +559,7 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
     rx = s.get("rx")
     ch = _clean_choice(data.get("choice"))
     fr_in = data.get("frame") if isinstance(data.get("frame"), dict) else {}
-    _kept[(s["pid"], _today())] = {"choice": {k: ch[k] for k in ("tab", "card", "idx", "opt", "colour", "depth", "pfx")},
+    _kept[(s["pid"], _today())] = {"choice": {k: ch[k] for k in ("tab", "card", "idx", "opt", "colour", "depth", "pfx", "tcoat")},
                                    "frame": {k: fr_in.get(k) for k in ("own", "barcode", "a", "dbl", "ed")},
                                    "rimless": bool(data.get("rimless"))}
     if not rx:
@@ -600,6 +601,7 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
         res["stop"] = "Price only: make this job in Touch."
     elif cur["state"] == "none":
         res["stop"] = "Not made in this prescription. Change lens."
+    _tint_coat(book, cur, qq, res)
     link = None
     if not res["stop"]:
         key = qq["map"]["key"]
@@ -686,6 +688,7 @@ def _no_rx_checks(cfg: dict, s: dict, book: dict, ch: dict, data: dict) -> dict:
         res["stop"] = q.get("why") or "Not on the price sheet."
     elif not q["map"].get("ok"):
         res["stop"] = "Price only: make this job in Touch."
+    _tint_coat(book, None, q, res)
     fr_rec, nums, frame_problem = _frame_for(s, data.get("frame"))
     if fr_rec and not fr_rec.get("own"):
         res["frame"] = fr_rec
@@ -725,6 +728,20 @@ def _no_rx_checks(cfg: dict, s: dict, book: dict, ch: dict, data: dict) -> dict:
         res["can_make"], res["why"] = True, ""
     res["mode"] = mode_words(cfg, s)
     return res
+
+
+def _tint_coat(book: dict, cur: dict, qq: dict, res: dict) -> None:
+    """Mark, 11 Nov 2026: a tinted ZEISS lens - staff pick Platinum (default), back surface AR (same price) or hard
+    coat (held: no price yet). Shown on the staff screen only; the sheet price never changes."""
+    mp = qq.get("map") or {}
+    if not qq.get("ok") or not mp.get("ok") or not mp.get("tint_coat"):
+        return
+    res["tint_coats"] = [{"k": t["k"], "n": t["n"], "d": t["d"], "on": t["k"] == mp["tint_coat"], "held": bool(t["hold"])}
+                         for t in sheetprice.tint_coats(book, mp["key"])]
+    mp["key"] = mp["coat_key"]          # from here on (link, blank, the engine) the job's coating is the one picked
+    res["tint_coat"] = {"k": mp["tint_coat"], "n": mp["tint_coat_name"], "addon": mp["tint_coat_addon"]}
+    if mp.get("tint_coat_hold") and not res["stop"]:
+        res["stop"] = mp["tint_coat_hold"]
 
 
 def _heights_ok(data: dict) -> bool:
@@ -856,6 +873,6 @@ def job(cfg: dict, token, data: dict, rows: list, pricing: dict, user: str, comm
     if isinstance(pat, dict):
         pat.pop("dob", None)                         # screens 5-7: no DOB (director's section 2)
     eng["sheet"] = {"lens": res["lens"], "option": res["option"], "made": res["made"], "price": res["price"],
-                    "lens_pair": res["lens_pair"], "tint_pair": res["tint_pair"]}
+                    "lens_pair": res["lens_pair"], "tint_pair": res["tint_pair"], "tint_coat": res.get("tint_coat")}
     eng["mode_words"] = res["mode"]
     return eng
