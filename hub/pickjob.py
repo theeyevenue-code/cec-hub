@@ -282,14 +282,34 @@ def frame(cfg: dict, barcode) -> dict:
 # the engine (agent repo, orders/pickjob.py) as a subprocess
 # ---------------------------------------------------------------------------
 
+def engine_env(cfg: dict, cwd) -> tuple[dict | None, str]:
+    """Which settings file the Make job engine reads (Mark, 11 Nov 2026: "turn it on to make it real").
+    integrations.json "pick_lens_job": {"engine_config": "orders/pickjob_config.local.json"} (relative to the agent
+    folder, or absolute) -> the engine gets CEC_PICKJOB_CONFIG for that file only; the agent repo's shipped
+    pickjob_config.json stays dry. Not set -> unchanged (the engine's own file, or a test copy's env). Set but the file
+    is missing -> refuse: never fall back silently to some other mode."""
+    ec = str((cfg.get("pick_lens_job") or {}).get("engine_config") or "").strip()
+    if not ec:
+        return None, ""
+    p = Path(ec)
+    if not p.is_absolute():
+        p = Path(cwd or ".") / p
+    if not p.is_file():
+        return None, "The Make job settings file is missing on this computer. Nothing was made - tell Mark."
+    return {**os.environ, "CEC_PICKJOB_CONFIG": str(p)}, ""
+
+
 def run_engine(cfg: dict, command: str, request: dict | None = None) -> dict:
     """Never raises. One JSON object on the engine's last stdout line."""
     if not connected(cfg):
         return {"ok": False, "connected": False, "refusals": [NOT_CONNECTED]}
     python = (cfg.get("optomate_agent") or {}).get("python") or sys.executable
     cwd = checkin.agent_dir(cfg)
+    env, bad = engine_env(cfg, cwd)
+    if bad:
+        return {"ok": False, "refusals": [bad]}
     try:
-        proc = subprocess.run([python, "-m", "orders.pickjob", command, "--json"],
+        proc = subprocess.run([python, "-m", "orders.pickjob", command, "--json"], env=env,
                               input=json.dumps(request or {}, default=str), cwd=str(cwd) if cwd else None,
                               capture_output=True, text=True, encoding="utf-8", errors="replace",
                               timeout=TIMEOUTS.get(command, 60))

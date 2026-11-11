@@ -336,3 +336,19 @@ def test_page_ships_the_hidden_route_and_files_but_no_tile():
     pj = (root / "static" / "picklens.js").read_text(encoding="utf-8")
     for tier in ("Essential", "Everyday", "Signature"):
         assert tier not in pj                     # staff pages use product names, never tier names
+
+
+def test_engine_settings_file_from_hub_config_only_when_named(agent, monkeypatch):
+    # Mark, 11 Nov 2026 "turn it on to make it real": the live Hub names its own engine settings file; the agent
+    # repo's shipped pickjob_config.json stays dry; a named file that is missing refuses (no silent fallback)
+    seen = Seen({"ok": True})
+    monkeypatch.setattr(pk.subprocess, "run", seen)
+    pk.run_engine(agent, "status")
+    assert seen.calls[-1][1]["env"] is None                                   # not named: unchanged
+    cfg = {**agent, "pick_lens_job": {"show": True, "engine_config": "orders/pickjob_config.local.json"}}
+    out = pk.run_engine(cfg, "make", {})
+    assert not out["ok"] and "settings file is missing" in out["refusals"][0] and len(seen.calls) == 1
+    local = __import__("pathlib").Path(agent["optomate_agent"]["agent_dir"]) / "orders" / "pickjob_config.local.json"
+    local.write_text('{"DRY_RUN": false, "WRITE_LIVE": true, "ZZTEST_ONLY": true}', encoding="utf-8")
+    pk.run_engine(cfg, "status")
+    assert seen.calls[-1][1]["env"]["CEC_PICKJOB_CONFIG"] == str(local)
