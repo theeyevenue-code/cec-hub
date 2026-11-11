@@ -16,27 +16,47 @@ Write-Host ""
 Write-Host "  Restarting the CEC Hub..." -ForegroundColor Cyan
 Write-Host ""
 
+# 0. Note which process answers on the Hub's port now, and leave a "planned restart" note so
+#    the watchdog logs this as planned, not as a crash (11 Nov 2026: every deploy restart was
+#    being counted as a failure - "6 restarts in 7 days" with no crash at all).
+$oldPids = @(Get-NetTCPConnection -LocalPort $PORT -State Listen -ErrorAction SilentlyContinue |
+             Select-Object -ExpandProperty OwningProcess -Unique)
+(Get-Date -Format 'o') | Set-Content (Join-Path $PSScriptRoot 'PLANNED-RESTART.txt') -Encoding utf8
+
 # 1. Stop every running Hub process (only the Python app.py under cec-hub —
 #    matched narrowly so nothing else is touched). Handles the rare case of
-#    more than one copy running.
-$hub = Get-CimInstance Win32_Process | Where-Object {
-    $_.Name -match 'python' -and $_.CommandLine -like '*cec-hub\app.py*' }
-if ($hub) {
-    $hub | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
-    Write-Host "  Stopped the old Hub." -ForegroundColor Gray
-} else {
-    Write-Host "  The Hub was not running." -ForegroundColor Gray
+#    more than one copy running. Also the process that owns the Hub's port, whose command
+#    line may be unreadable from this account (11 Nov 2026: one started as administrator).
+$hub = @(Get-CimInstance Win32_Process | Where-Object {
+    $_.Name -match 'python' -and $_.CommandLine -like '*cec-hub\app.py*' } | Select-Object -ExpandProperty ProcessId)
+$targets = @($hub + $oldPids | Where-Object { $_ } | Select-Object -Unique)
+$denied = $false
+foreach ($id in $targets) {
+    try { Stop-Process -Id $id -Force -ErrorAction Stop } catch { $denied = $true }
 }
+if ($denied) {
+    Write-Host "  Couldn't stop the running Hub: it was started as administrator." -ForegroundColor Yellow
+    Write-Host "  Close this, then right-click RESTART-HUB.bat > Run as administrator." -ForegroundColor Yellow
+    Remove-Item (Join-Path $PSScriptRoot 'PLANNED-RESTART.txt') -Force -ErrorAction SilentlyContinue
+    Write-Host ""
+    exit 1
+}
+if ($targets.Count) { Write-Host "  Stopped the old Hub." -ForegroundColor Gray }
+else { Write-Host "  The Hub was not running." -ForegroundColor Gray }
 
 # 2. Ask the watchdog to bring a fresh one up now (don't wait for its 5-min tick).
 Start-ScheduledTask -TaskName 'CEC Hub Watchdog'
 Write-Host "  Starting a fresh copy..." -ForegroundColor Gray
 
-# 3. Wait until it answers.
+# 3. Wait until a NEW copy answers (11 Nov 2026: this used to say "back up" when the old copy,
+#    which it had failed to stop, was still answering - the new code never loaded).
 $ok = $false
 for ($i = 0; $i -lt 30; $i++) {
     try {
-        if ((Invoke-WebRequest -Uri $URL -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200) {
+        $now = @(Get-NetTCPConnection -LocalPort $PORT -State Listen -ErrorAction SilentlyContinue |
+                 Select-Object -ExpandProperty OwningProcess -Unique)
+        $fresh = $now.Count -gt 0 -and -not ($now | Where-Object { $oldPids -contains $_ })
+        if ($fresh -and (Invoke-WebRequest -Uri $URL -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200) {
             $ok = $true; break
         }
     } catch {}
