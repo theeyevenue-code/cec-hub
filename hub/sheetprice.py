@@ -98,17 +98,17 @@ def indices(c: dict) -> list[str]:
 
 def options(book: dict, c: dict, idx: str) -> list[dict]:
     """The option list the page shows for this card at this thickness (MF light-reactive off at 1.74 on Essential)."""
-    if c.get("opts"):
-        return list(c["opts"])
-    if c.get("mf"):
-        out = []
-        for o in book["data"]["optionSets"]["MF"]:
-            o = dict(o)
-            if o.get("offIdx"):
-                o["off"] = idx == o["offIdx"] and not c.get("photo174")
-            out.append(o)
-        return out
-    return []
+    src = c.get("opts") or (book["data"]["optionSets"]["MF"] if c.get("mf") else [])
+    out = []
+    for o in src:
+        o = dict(o)
+        if o.get("offIdx"):
+            o["off"] = idx == o["offIdx"] and not c.get("photo174")
+        if idx in (o.get("offAt") or []):
+            # 1.53 is clear only (ZEISS makes no BluePro, PhotoFusion or tint at 1.53; Mark 11 Nov 2026)
+            o["off"], o["offwhy"] = True, o.get("offAtWhy") or "Not made at this thickness."
+        out.append(o)
+    return out
 
 
 def _base(c: dict, idx: str):
