@@ -19,3 +19,5 @@ config/lenschat.json
 config/assistant.json
 config/*.bak
 config/sheet_devices.json
+
+PLANNED-RESTART.txt

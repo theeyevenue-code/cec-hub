@@ -111,7 +111,15 @@ if ($ok) {
     $now  = @(Get-HubProcesses)
     $note = ''
     if ($stale.Count -gt 0) { $note = " (cleared $($stale.Count) stale instance(s) first)" }
-    Write-Log "$LABEL was unhealthy - restarted OK, now $($now.Count) instance(s)$note."
+    # a restart someone asked for (RESTART-HUB leaves PLANNED-RESTART.txt) is logged as planned,
+    # so the daily check counts only real failures (11 Nov 2026)
+    $planned = Join-Path $here 'PLANNED-RESTART.txt'
+    if ((Test-Path $planned) -and ((Get-Item $planned).LastWriteTime -gt (Get-Date).AddMinutes(-15))) {
+        Write-Log "$LABEL planned restart done, now $($now.Count) instance(s)$note."
+    } else {
+        Write-Log "$LABEL was unhealthy - restarted OK, now $($now.Count) instance(s)$note."
+    }
+    Remove-Item $planned -Force -ErrorAction SilentlyContinue
     if (Test-Path $marker) { Remove-Item $marker -Force -ErrorAction SilentlyContinue }
 } else {
     Write-Log "$LABEL was unhealthy - RESTART DID NOT TAKE, still not answering on $PORT. NEEDS A HUMAN."
