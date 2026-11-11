@@ -53,6 +53,21 @@ function Get-HubProcesses {
     } catch { @() }
 }
 
+# A restart someone asked for (RESTART-HUB.ps1 leaves RESTART-REQUESTED.txt when it can't stop the
+# Hub itself - the Hub runs under this task's account, which a normal session can't stop). This task
+# owns the Hub, so it does the stop here; the start below then logs it as planned (11 Nov 2026).
+$request = Join-Path $here 'RESTART-REQUESTED.txt'
+$requested = (Test-Path $request) -and ((Get-Item $request).LastWriteTime -gt (Get-Date).AddMinutes(-15))
+if (Test-Path $request) { Remove-Item $request -Force -ErrorAction SilentlyContinue }
+if ($requested) {
+    (Get-Date -Format 'o') | Set-Content (Join-Path $here 'PLANNED-RESTART.txt') -Encoding utf8
+    $owners = @(Get-NetTCPConnection -LocalPort $PORT -State Listen -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty OwningProcess -Unique)
+    @(Get-HubProcesses) | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    $owners | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+    Start-Sleep -Seconds 2
+}
+
 if (Test-Healthy) {
     $procs = @(Get-HubProcesses)
     if ($procs.Count -gt 1) {

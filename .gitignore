@@ -21,3 +21,5 @@ config/*.bak
 config/sheet_devices.json
 
 PLANNED-RESTART.txt
+
+RESTART-REQUESTED.txt
