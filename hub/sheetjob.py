@@ -540,7 +540,21 @@ def _link(cfg: dict, key: dict) -> dict:
                 got = pickjob.link_for(rows, {**key, "blank_mm": r.get("blank_mm")})
                 if got.get("ready"):
                     return got
-    return pickjob.link_for(rows, {**key, "blank_mm": key.get("blank_mm") or ""})
+    got = pickjob.link_for(rows, {**key, "blank_mm": key.get("blank_mm") or ""})
+    if (not got.get("ready") and got.get("barcode") and _sheet_priced_coat(key)
+            and str(got.get("why") or "").startswith(("Prices don't agree", "No Optomate price"))):
+        # the hard-coat lens line for a tinted lens (Mark 11 Nov 2026) is priced by the Order Pad ($80 a pair less than
+        # Platinum), not by the Lens Finder's clear price stored on the row; the engine checks that sheet price
+        # against Optomate before any job is made, so the row's own comparison does not apply here
+        got = {**got, "ready": True, "words": "Ready for Optomate", "why": ""}
+    return got
+
+
+def _sheet_priced_coat(key: dict) -> bool:
+    """A price-book row that only the Order Pad's tint-coat choice uses (hard coat lines, sheet_map 'tint_coats')."""
+    tc = (sheetprice.load()["map"].get("tint_coats") or {})
+    return any(isinstance(v, dict) and v.get("only_lens") and key.get("coating") == v.get("coating")
+               and key.get("lens") in v["only_lens"] for v in tc.values())
 
 
 def _mm(v) -> str:

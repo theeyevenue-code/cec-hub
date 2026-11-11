@@ -822,3 +822,19 @@ def test_hard_coat_only_on_clearview_sv_made_to_order_150_160():
     assert sup["map"]["tint_coat"] == "bsar" and sup["total"] == sp.quote(book, {"tab": "mf", "card": 1, "idx": "1.60", **tint})["total"]
     # tints at 1.74 on multifocals left as they are (Server Desk is asking Mark separately)
     assert sp.quote(book, {"tab": "mf", "card": 1, "idx": "1.74", **tint})["ok"]
+
+
+def test_hard_coat_line_is_checked_on_the_sheet_price_not_the_row(monkeypatch):
+    # 11 Nov 2026: the SV hard coat lens lines (20002306 / 20002307) are priced $80 a pair under Platinum by the Order
+    # Pad; the row's Lens Finder clear price must not block them. Every other row keeps the row's own price check.
+    base = {"supplier": "ZEISS", "index": "1.50", "material": "Clear", "stockgrind": "grind", "blank_mm": "", "category": "Single vision",
+            "lens_description": "x", "status": "unchecked", "price_agree": "no", "optomate_pair": "220.00", "hub_pair_price": "300.00",
+            "coat_in": "none"}
+    rows = [{**base, "lens": "ClearView Single Vision 1.50", "coating": "DSHC hard coat", "lens_barcode": "20002306"},
+            {**base, "lens": "ClearView Single Vision 1.50", "coating": "DuraVision Plus Platinum UV", "lens_barcode": "20001357"},
+            {**base, "lens": "SmartLife Progressive Superb 1.50", "coating": "DSHC hard coat", "lens_barcode": "20001545"}]
+    monkeypatch.setattr(sj.pickjob, "links", lambda cfg: rows)
+    k = lambda lens, coat: {"supplier": "ZEISS", "lens": lens, "index": "1.50", "material": "Clear", "coating": coat, "stockgrind": "grind"}   # noqa: E731
+    assert sj._link({}, k("ClearView Single Vision 1.50", "DSHC hard coat"))["ready"]
+    assert not sj._link({}, k("ClearView Single Vision 1.50", "DuraVision Plus Platinum UV"))["ready"]
+    assert not sj._link({}, k("SmartLife Progressive Superb 1.50", "DSHC hard coat"))["ready"]     # not a sheet hard-coat line
