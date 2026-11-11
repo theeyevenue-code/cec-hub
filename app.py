@@ -19,10 +19,10 @@ import logging
 import os
 from pathlib import Path
 
-from flask import Flask, jsonify, make_response, request, send_from_directory
+from flask import Flask, Response, jsonify, make_response, redirect, request, send_from_directory
 
 from hub import checkin, integrations, jobscan, lenses, lensoptions, pricesheets, sendguide, sop_parser
-from hub import lenschat, pickjob, workqueue
+from hub import lenschat, pickjob, sheetdevice, sheetjob, workqueue
 from hub.assistant import core as assistant, registry as assistant_registry
 from hub.assistant.adapters import ReadContext
 
@@ -43,6 +43,7 @@ BASE_DIR = Path(__file__).parent
 IPAD_DIR = BASE_DIR / "ipad"                       # the iPad page's own files (no Hub links)
 EXAMPLE_CONFIG_DIR = BASE_DIR / "config"          # the committed *.example.json templates
 CONFIG_DIR = Path(os.getenv("CEC_HUB_CONFIG_DIR", str(EXAMPLE_CONFIG_DIR)))
+sheetdevice.PATH = Path(os.getenv("CEC_HUB_SHEET_DEVICES", str(CONFIG_DIR / "sheet_devices.json")))
 
 # Tests (and unusual machines) can repoint these with environment variables.
 SOPS_DIR = Path(os.getenv("CEC_HUB_SOPS_DIR", str(BASE_DIR / "sops")))
@@ -422,6 +423,10 @@ def _staff_refusal():
     if request.headers.get("X-Checkin-Key"):
         logger.warning("Check-in: staff route refused - request carried the iPad device key")
         return _no_store(jsonify({"error": "Not from the iPad.", "ipad": True})), 403
+    # iPad price sheet (10 Nov 2026): a browser tied to a patient on the sheet reaches no other staff page
+    if sheetjob.locked(request.cookies.get(sheetjob.COOKIE)):
+        return _no_store(jsonify({"error": "This iPad is on the price sheet. Press Next patient first.",
+                                  "sheet_locked": True})), 403
     if _from_this_computer():
         return None
     cfg = _integrations()
@@ -763,6 +768,193 @@ def picklens_make():
     if off:
         return off
     return _no_store(jsonify(pickjob.make(_integrations(), request.get_json(silent=True) or {}, _staff_name())))
+
+
+# --- iPad price sheet, staff side and Make job (hub/sheetjob.py) ---------------------
+# Mark, 10 Nov 2026 (steps 2-3). Hidden behind the same switch as Pick a lens. These routes do NOT use
+# the staff cookie: the iPad unlocks with the staff code each time the patient list opens, and the
+# sheet's own HttpOnly cookie then ties it to one patient (the server keeps who; the page never sends a
+# patient number). Answers are no-store; nothing about a patient is logged. The job is made by the
+# agent's engine, which honours DRY_RUN / WRITE_LIVE / ZZTEST_ONLY; the Hub never writes.
+
+def _sheet(fn, *a, cookie: str | None = None, clear: bool = False, guard: bool = True):
+    off = _picklens_off() or (_sheet_staff() if guard else None)
+    if off:
+        return off
+    try:
+        out = fn(*a)
+    except sheetjob.Refusal as r:
+        resp = _no_store(jsonify(r.body))
+        if r.body.get("expired"):
+            resp.delete_cookie(sheetjob.COOKIE, path="/")
+        return resp, r.status
+    resp = _keep_device(_no_store(jsonify(out)))
+    if cookie:
+        resp.set_cookie(sheetjob.COOKIE, cookie, max_age=sheetjob.IDLE_S + 60, httponly=True, samesite="Strict", path="/")
+    if clear:
+        resp.delete_cookie(sheetjob.COOKIE, path="/")
+    return resp
+
+
+def _sheet_token():
+    return request.cookies.get(sheetjob.COOKIE)
+
+
+def _sheet_rows():
+    catalog = _catalog()
+    if catalog.get("message"):
+        raise sheetjob.Refusal(503, {"error": catalog["message"]})
+    return [l for l in catalog["lenses"] if l.get("orderable", True)]
+
+
+def _sheet_staff():
+    """Who may see or act on a patient through the price sheet. Mark, 11 Nov 2026: "No codes the iPad is purely
+    for staff patients don't touch". Allowed: this computer; a staff iPad enrolled once from this computer
+    (hub/sheetdevice.py, HttpOnly device cookie); a front-desk computer already unlocked for staff pages. Never the
+    check-in iPad's device key. Everyone else gets "Staff iPad only" - no code pad, no patient data."""
+    if request.headers.get("X-Checkin-Key"):
+        return _no_store(jsonify({"error": "Staff iPad only.", "ipad_only": True})), 403
+    if _from_this_computer():
+        return None
+    if sheetdevice.ok(request.cookies.get(sheetdevice.COOKIE)):
+        return None
+    if checkin.staff_cookie_ok(_integrations(), request.cookies.get(checkin.STAFF_COOKIE)):
+        return None
+    return _no_store(jsonify({"error": "Staff iPad only.", "ipad_only": True})), 403
+
+
+def _keep_device(resp):
+    """Re-set an enrolled iPad's cookie on each use, so one in daily use never reaches the 400-day limit."""
+    tok = request.cookies.get(sheetdevice.COOKIE)
+    if tok and sheetdevice.ok(tok):
+        resp.set_cookie(sheetdevice.COOKIE, tok, max_age=sheetdevice.COOKIE_DAYS * 86400, httponly=True,
+                        samesite="Strict", path="/")
+    return resp
+
+
+def _lan_address() -> str:
+    """This server's address on the practice network, for the setup link (no packet is sent)."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
+_DEV_CSS = ("<style>body{font:17px/1.5 system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 16px;color:#111}"
+            "h1{font-size:28px}code{font-size:20px;background:#f3f3f3;padding:6px 10px;display:inline-block;word-break:break-all}"
+            "button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#1d6b47;color:#fff}"
+            "table{border-collapse:collapse;margin-top:10px}td,th{padding:6px 14px 6px 0;text-align:left;border-bottom:1px solid #ddd}"
+            ".rm{background:#a33;font-size:15px;padding:6px 12px}</style>")
+
+
+@app.route("/sheet-device", methods=["GET", "POST"])
+def sheet_device_admin():
+    """Server only: make a one-time setup link for the staff iPad, and list / remove enrolled iPads."""
+    if not _from_this_computer():
+        return _no_store(Response("Server only.", 403, mimetype="text/plain"))
+    if request.method == "POST":
+        sheetdevice.remove(request.form.get("remove", ""))
+        return redirect("/sheet-device", 303)
+    host = request.host.split(":")
+    port = host[1] if len(host) > 1 else "80"
+    link = f"http://{_lan_address()}:{port}/sheet-device/{sheetdevice.new_setup()}"
+    rows = "".join(f"<tr><td>{html.escape(d['name'])}</td><td>{html.escape(d['added'])}</td><td><form method=post>"
+                   f"<button class=rm name=remove value='{html.escape(d['id'])}'>Remove</button></form></td></tr>"
+                   for d in sheetdevice.devices()) or "<tr><td colspan=3>None yet.</td></tr>"
+    out = (f"<!doctype html><meta charset=utf-8><title>Staff iPad setup</title>{_DEV_CSS}"
+            f"<h1>Staff iPad setup</h1><p>Open this link in Safari on the staff iPad. One use, 10 minutes.</p>"
+            f"<p><code>{html.escape(link)}</code></p><p>Reload this page for a new link.</p>"
+            f"<h2>Staff iPads</h2><table><tr><th>Name</th><th>Added</th><th></th></tr>{rows}</table>")
+    return _no_store(Response(out, mimetype="text/html"))
+
+
+@app.route("/sheet-device/<token>", methods=["GET", "POST"])
+def sheet_device_enrol(token):
+    """Opened on the staff iPad. GET shows one button (so a link preview can't use up the link); POST enrols."""
+    page = f"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>Staff iPad</title>{_DEV_CSS}"
+    if request.method == "GET":
+        return _no_store(Response(page + "<h1>Staff iPad</h1><p>Make this the staff iPad for the price sheet?</p>"
+                                  "<form method=post><button>Make this the staff iPad</button></form>", mimetype="text/html"))
+    dev = sheetdevice.enrol(token)
+    if not dev:
+        return _no_store(Response(page + "<h1>Link used or expired</h1><p>Make a new one on the server: "
+                                  "/sheet-device</p>", 403, mimetype="text/html"))
+    logger.info("Price sheet: staff iPad enrolled from %s", request.remote_addr)
+    resp = redirect("/price-sheet.html", 303)
+    resp.set_cookie(sheetdevice.COOKIE, dev, max_age=sheetdevice.COOKIE_DAYS * 86400, httponly=True,
+                    samesite="Lax", path="/")
+    return _no_store(resp)
+
+
+@app.route("/api/sheet/start", methods=["POST"])
+def sheet_start():
+    off = _picklens_off() or _sheet_staff()
+    if off:
+        return off
+    sheetjob.end(_sheet_token())                       # a fresh look at the list, nothing carried over
+    return _sheet(lambda: {"ok": True}, cookie=sheetjob.start())
+
+
+@app.route("/api/sheet/patients")
+def sheet_patients():
+    return _sheet(sheetjob.patients, _integrations(), _sheet_token())
+
+
+@app.route("/api/sheet/search", methods=["POST"])
+def sheet_search():
+    return _sheet(sheetjob.search, _integrations(), _sheet_token(), (request.get_json(silent=True) or {}).get("q", ""))
+
+
+@app.route("/api/sheet/pick", methods=["POST"])
+def sheet_pick():
+    return _sheet(sheetjob.pick, _integrations(), _sheet_token(), (request.get_json(silent=True) or {}).get("h", ""))
+
+
+@app.route("/api/sheet/patient")
+def sheet_patient():
+    return _sheet(lambda: sheetjob.sheet(_integrations(), _sheet_token(), _sheet_rows(), _pricing()))
+
+
+@app.route("/api/sheet/staff")
+def sheet_staff():
+    return _sheet(lambda: sheetjob.staff_rx(sheetjob._need(_sheet_token())))
+
+
+@app.route("/api/sheet/frame", methods=["POST"])
+def sheet_frame():
+    data = request.get_json(silent=True) or {}
+    return _sheet(sheetjob.frame_lookup, _integrations(), _sheet_token(), data.get("barcode", ""), data.get("q", ""))
+
+
+@app.route("/api/sheet/checks", methods=["POST"])
+def sheet_checks():
+    data = request.get_json(silent=True) or {}
+    return _sheet(lambda: sheetjob.checks(_integrations(), _sheet_token(), data, _sheet_rows(), _pricing()))
+
+
+@app.route("/api/sheet/plan", methods=["POST"])
+def sheet_plan():
+    data = request.get_json(silent=True) or {}
+    return _sheet(lambda: sheetjob.job(_integrations(), _sheet_token(), data, _sheet_rows(), _pricing(),
+                                       _staff_name(), "plan"))
+
+
+@app.route("/api/sheet/make", methods=["POST"])
+def sheet_make():
+    data = request.get_json(silent=True) or {}
+    return _sheet(lambda: sheetjob.job(_integrations(), _sheet_token(), data, _sheet_rows(), _pricing(),
+                                       _staff_name(), "make"))
+
+
+@app.route("/api/sheet/next", methods=["POST"])
+def sheet_next():
+    sheetjob.end(_sheet_token())
+    return _sheet(lambda: {"ok": True}, clear=True, guard=False)
 
 
 # --- Compare (hub/compare.py) - no AI; the Lens Finder box's chat is below ------

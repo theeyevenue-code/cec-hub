@@ -184,6 +184,11 @@ def _eye_numbers(eye: dict | None) -> dict | None:
             "add": num(eye.get("add")), "intadd": num(eye.get("intadd"))}
 
 
+def rx_has_prism(rx: dict) -> bool:
+    """Any prescribed prism on the saved Rx (the bridge's per-eye "prism" words)."""
+    return any(str((rx.get(k) or {}).get("prism") or "").strip() for k in ("right", "left"))
+
+
 def rx_flags(rx: dict) -> list[str]:
     """Plain-words warnings for the bench. Never a clinical judgement."""
     flags = []
@@ -546,6 +551,8 @@ def _shift_ctx(q: dict, est: dict | None) -> dict | None:
     saved (not a halved binocular PD, not a distance PD standing in for a missing near PD)."""
     if not est or q.get("kind") != "Single vision" or not q.get("pd_exact") or not est.get("frame"):
         return None
+    if q.get("prism"):          # Mark, 10 Nov 2026: prism on the Rx = made to order only, no PD change
+        return None
     powers = {}
     for s, e in (("R", q.get("right")), ("L", q.get("left"))):
         if e:
@@ -684,6 +691,7 @@ def options_for_rx(rx: dict, rows: list, pricing: dict, sells: dict,
                 part["blank"] = est
                 q["pd_exact"] = not pd_note and typ in pdshift.SV_PARTS
                 q["axes"] = {s: num((rx.get(k) or {}).get("axis")) for s, k in (("R", "right"), ("L", "left"))}
+                q["prism"] = rx_has_prism(rx)
                 part["answer"] = run_mode(rows, pricing, sells, q, est)
             parts.append(part)
         tabs.append({"key": tab, "label": TAB_LABELS[tab], "written": tab in written,
