@@ -16,6 +16,7 @@ A "choice" (dict, from the page or built here):
     opt     option key: clear | blue | photo | tint | polar
     colour  tint colour (Black, Grey, Brown, Green)        depth  s85 s75 s60 s25 s12 g9040 g75 g25
     pfx     PhotoFusion X colour (Grey ... Burgundy)
+    tcoat   coating on a tinted ZEISS lens: platinum (default) | bsar | hc (sheet_map.json "tint_coats")
     made    "stock" or "mto" (single vision only: made to order asked for, e.g. a fix)
 No patient data ever enters this module.
 """
@@ -239,6 +240,12 @@ def pricebook(book: dict, ch: dict, pr: dict | None = None) -> dict:
                "coating": coat, "stockgrind": "grind"}
     out["key"] = key
     if k == "tint":
+        tc = tint_coats(book, key)
+        if tc:
+            pick = next((t for t in tc if t["k"] == str(ch.get("tcoat") or "platinum")), tc[0])
+            # the lens is found (and fitted) by its Platinum row; the job's coating is swapped in after (coat_key)
+            out.update(coat_key={**key, "coating": pick["coating"]}, tint_coat=pick["k"], tint_coat_name=pick["n"], tint_coat_addon=pick["addon"],
+                       tint_coat_hold=pick.get("hold", ""))
         bc = (book["map"].get("tints") or {}).get(f"{ch.get('colour') or 'Grey'}|{ch.get('depth') or 's85'}")
         if not bc:
             return {"ok": False, "why": "That tint colour and depth isn't mapped to an Optomate tint."}
@@ -248,6 +255,73 @@ def pricebook(book: dict, ch: dict, pr: dict | None = None) -> dict:
         # goes in the job comment. (10 Nov 2026: the $0 Photofusion colour tint items are not how jobs are keyed.)
         out["pfx_colour"] = str(ch.get("pfx") or "Grey")
     return out
+
+
+def tint_coats(book: dict, key: dict) -> list[dict]:
+    """The coats staff may pick for a tinted lens whose price-book coating is Platinum (ZEISS); [] otherwise
+    (Synchrony HMC+ tints keep their own coat). Labels and price-book coating names copied from the sheet map."""
+    tc = book["map"].get("tint_coats") or {}
+    if "platinum" not in str(key.get("coating") or "").lower():
+        return []
+    return [{"k": k, **{f: tc[k].get(f, "") for f in ("n", "d", "coating", "addon", "hold")}}
+            for k in tc.get("order") or [] if k in tc]
+
+
+def _sheet_by_index(book: dict, spec: str) -> dict:
+    """{index: pair price} copied from prices.json for 'tab' (each card one index) or 'tab:card' (one card's
+    thicknesses, the rimless other index included)."""
+    tab, _, ci = str(spec).partition(":")
+    pg = page(book, tab) or {}
+    cards = pg.get("cards") or []
+    if ci != "":
+        cards = [cards[int(ci)]] if int(ci) < len(cards) else []
+    out = {}
+    for c in cards:
+        for idx in indices(c):
+            p = _base(c, idx)
+            if p is not None and idx not in out:
+                out[idx] = p
+    return out
+
+
+def finder_prices(cfg: dict | None, book: dict | None = None) -> dict:
+    """config/cec_prices.json with every price the Order Pad sells taken from prices.json instead (sheet_map.json
+    'lens_finder'). One price source: Mark, 11 Nov 2026. The file's own figures stay only for lenses not on the
+    sheet. Nothing is worked out: each figure is copied from prices.json."""
+    book = book or load()
+    lf = book["map"].get("lens_finder") or {}
+    cfg = json.loads(json.dumps(cfg or {}))
+    tiers = list(cfg.get("tiers") or [])
+    for t in lf.get("tiers") or []:
+        by = _sheet_by_index(book, t["from"])
+        new = {"name": t["name"], "category": t["category"], "match": list(t["match"]), "by_index": by,
+               "source": "prices.json"}
+        i = next((i for i, x in enumerate(tiers) if x.get("name") == t["name"] and not x.get("materials")
+                  and not x.get("by_coating")), None)
+        if i is None:
+            tiers.append(new)
+        else:
+            # the sheet's figure wins at every index it sells; an index only the file prices (not on the sheet) is
+            # kept and named, so nothing is in two places and nothing silently vanishes
+            only = {k: v for k, v in (tiers[i].get("by_index") or {}).items() if k not in by}
+            tiers[i] = {**{k: v for k, v in tiers[i].items() if k not in ("by_index", "_note")}, **new,
+                        "by_index": {**only, **by}, "file_only": sorted(only)}
+    cfg["tiers"] = tiers
+    adds = dict(cfg.get("addons") or {})
+    sets = book["data"].get("optionSets") or {}
+    for k, spec in (lf.get("addons") or {}).items():
+        a, _, b = spec.partition(":")
+        if b == "grind":
+            c = (card(book, a, 0) or {})
+            val = c.get("grind")
+        else:
+            val = next((o.get("add") for o in sets.get(a) or [] if o.get("k") == b), None)
+        if val is not None:
+            for old in [x for x in adds if x.lower() == k.lower()]:
+                del adds[old]
+            adds[k] = val
+    cfg["addons"] = adds
+    return cfg
 
 
 def quote(book: dict, ch: dict) -> dict:

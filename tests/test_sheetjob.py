@@ -533,7 +533,8 @@ def test_the_choice_is_kept_for_the_patient_today_and_comes_back(c):
     c.post("/api/sheet/next")
     _search_pick(c, "zztest noa")                                            # reopened later the same day
     res = c.get("/api/sheet/patient").get_json()["resume"]
-    assert res["choice"] == {"tab": "sv", "card": 1, "idx": "1.60", "opt": "tint", "colour": "Brown", "depth": "g75", "pfx": "Grey"}
+    assert res["choice"] == {"tab": "sv", "card": 1, "idx": "1.60", "opt": "tint", "colour": "Brown", "depth": "g75", "pfx": "Grey",
+                             "tcoat": "platinum"}
     assert res["frame"]["barcode"] == "ZZFRAME5219" and res["rimless"] is True
     sj._kept.clear()
     c.post("/api/sheet/next")
@@ -714,3 +715,63 @@ def test_page_has_no_code_pad():
     for gone in ("padKey", "Staff code", "checkin/staff/unlock"):
         assert gone not in html
     assert "Staff iPad only" in html
+
+
+# ---- tint coatings (Mark, 11 Nov 2026) ---------------------------------------------------------------
+def test_tinted_zeiss_lens_offers_platinum_bsar_and_holds_hard_coat(c):
+    # "Same as Platinum": back surface AR keeps the sheet price; hard coat has no price yet, so it is held
+    pick(c, "Mia")
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    ch = {"tab": "sv", "card": 0, "idx": "1.50", "opt": "tint", "colour": "Brown", "depth": "g75"}
+    r = c.post("/api/sheet/checks", json=body(choice=ch)).get_json()
+    assert [t["k"] for t in r["tint_coats"]] == ["platinum", "bsar", "hc"] and r["tint_coats"][0]["on"]
+    assert r["tint_coat"]["addon"] == "20002018"
+    plat = r["price"]
+    b = c.post("/api/sheet/checks", json=body(choice={**ch, "tcoat": "bsar"})).get_json()
+    # no price-book row links back surface AR to Optomate yet: Make in Touch (tints are refused live anyway)
+    assert not b["can_make"] and "Not linked" in b["stop"]
+    assert b["price"] == plat and b["tint_coat"] == {"k": "bsar", "n": "Back surface AR", "addon": "20002017"}
+    h = c.post("/api/sheet/checks", json=body(choice={**ch, "tcoat": "hc"})).get_json()
+    assert not h["can_make"] and "Hard coat price not set" in h["stop"] and h["price"] == plat
+    assert "Gold" not in str(r["tint_coats"])
+
+
+def test_coat_pick_only_on_tinted_platinum_lenses():
+    book = sp.load()
+    clear = sp.quote(book, {"tab": "sv", "card": 0, "idx": "1.50", "opt": "clear", "tcoat": "bsar"})
+    assert "tint_coat" not in clear["map"] and clear["map"]["key"]["coating"] == "DuraVision Platinum UV"
+    t = sp.quote(book, {"tab": "sv", "card": 0, "idx": "1.50", "opt": "tint", "tcoat": "bsar"})
+    assert t["map"]["coat_key"]["coating"] == "DuraVision Plus Sun UV" and t["total"] == sp.quote(
+        book, {"tab": "sv", "card": 0, "idx": "1.50", "opt": "tint"})["total"]
+    syn = sp.quote(book, {"tab": "mf", "card": 0, "idx": "1.50", "opt": "tint", "tcoat": "bsar"})   # Synchrony: own HMC+ coat
+    assert syn["map"].get("ok") and "tint_coat" not in syn["map"]
+
+
+# ---- staff "All lenses" (Mark, 11 Nov 2026: Order Pad replaces Lens options for staff) ----------------
+def test_all_lenses_lists_every_lens_for_the_rx_with_sell_and_blank(c):
+    pick(c, "Mia")
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    r = c.post("/api/sheet/all-lenses", json={"frame": {"barcode": "ZZFRAME5219"}})
+    assert r.status_code == 200 and r.headers.get("Cache-Control", "").startswith("no-store")
+    d = r.get_json()
+    first = next(l for t in d["tabs"] for p in t["parts"] for l in p["lenses"])
+    assert set(first) == set(sj.LENS_FIELDS) and "cost" not in first
+    assert all(l["sell"] is None or isinstance(l["sell"], (int, float)) for t in d["tabs"] for p in t["parts"] for l in p["lenses"])
+
+
+def test_all_lenses_keeps_the_red_blank_warning(c):
+    # the clinical safety part staff rely on in Lens options: a stock lens too small for the frame is named in red
+    pick(c, "Mia")
+    big = {"own": True, "a": "62", "dbl": "14", "ed": "68"}
+    d = c.post("/api/sheet/all-lenses", json={"frame": big}).get_json()
+    warn = [p["blank_warning"] for t in d["tabs"] for p in t["parts"] if p["blank_warning"]]
+    assert warn and warn[0]["lenses"] and warn[0]["need"]
+    small = c.post("/api/sheet/all-lenses", json={"frame": {}}).get_json()
+    assert small["frame_note"] and not any(p["blank_warning"] for t in small["tabs"] for p in t["parts"])
+
+
+def test_all_lenses_staff_ipad_and_picked_patient_only(c):
+    assert c.post("/api/sheet/all-lenses", json={}).status_code == 403          # unknown device
+    unlock(c)
+    r = c.post("/api/sheet/all-lenses", json={})
+    assert r.status_code >= 400                                                  # no patient picked yet

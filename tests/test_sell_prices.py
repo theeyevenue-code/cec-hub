@@ -8,7 +8,9 @@ from pathlib import Path
 from hub import lenses, lensoptions
 
 ROOT = Path(__file__).resolve().parents[1]
-CFG = json.loads((ROOT / "config" / "cec_prices.example.json").read_text(encoding="utf-8"))
+# one price source (11 Nov 2026): the shipped file + the Order Pad's prices.json, as the Hub serves them
+from hub import sheetprice  # noqa: E402
+CFG = sheetprice.finder_prices(json.loads((ROOT / "config" / "cec_prices.example.json").read_text(encoding="utf-8")))
 
 HEAD = "supplier,brand,lens,category,index,material,type,blank_mm,sph_min,sph_max,cyl_max,add_min,add_max,price,coating\n"
 ROWS = HEAD + (
@@ -95,3 +97,21 @@ def test_lens_options_line_shows_the_material_price():
     rows, _, sells = _priced()
     o = dict(_row(rows, "SmartLife Progressive Superb 1.50", "PhotoFusionX"), price_now=144.75)
     assert lensoptions._lens_out(o, sells, None)["sell"] == 710
+
+
+def test_one_price_source_no_figure_in_two_places():
+    raw = json.loads((ROOT / "config" / "cec_prices.example.json").read_text(encoding="utf-8"))
+    book = sheetprice.load()
+    for spec in book["map"]["lens_finder"]["tiers"]:
+        t = next(x for x in raw["tiers"] if x["name"] == spec["name"] and not x.get("materials") and not x.get("by_coating"))
+        assert not set(t["by_index"]) & set(sheetprice._sheet_by_index(book, spec["from"])), spec["name"]
+    assert raw["addons"] == {}
+    # a stale per-machine file (the 15 Sep one) is overruled by the sheet
+    old = {"tiers": [{"name": "SV Premium", "category": "Single vision", "match": ["ClearView FSV"],
+                      "by_index": {"1.67": 300, "1.74": 460}}],
+           "addons": {"PhotoFusion|Photochromic|Transitions|Sensity": 130}}
+    new = sheetprice.finder_prices(old)
+    sv = next(x for x in new["tiers"] if x["name"] == "SV Premium")
+    assert sv["by_index"]["1.67"] == 350 and sv["by_index"]["1.74"] == 500
+    assert new["addons"]["PhotoFusion|Photochromic|Transitions|Sensity"] == 150
+    assert any(x["name"] == "Office" for x in new["tiers"])        # added from the sheet when the file lacks it

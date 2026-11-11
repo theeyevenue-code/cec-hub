@@ -205,5 +205,99 @@
   "Black": "20002035",
   "Blue": "20002033",
   "Burgundy": "20002034"
+ },
+ "tint_coats": {
+  "_readme": "Coating on a TINTED ZEISS lens (one whose price-book coating is Platinum). Staff pick it on the Order Pad staff screen; Platinum is the default. Mark, 11 Nov 2026: back surface AR costs the same per lens as Platinum ('Same as Platinum'), so the sheet price does not change. Hard coat is held: no hard coat price exists in the data (Optomate would charge the same lens item with no add-on, i.e. the Platinum price). DuraVision Gold is not offered.",
+  "order": [
+   "platinum",
+   "bsar",
+   "hc"
+  ],
+  "platinum": {
+   "n": "Platinum",
+   "d": "Anti-reflective both sides",
+   "coating": "DuraVision Plus Platinum UV",
+   "addon": "20002018"
+  },
+  "bsar": {
+   "n": "Back surface AR",
+   "d": "Anti-reflective inside only. Same price as Platinum.",
+   "coating": "DuraVision Plus Sun UV",
+   "addon": "20002017"
+  },
+  "hc": {
+   "n": "Hard coat",
+   "d": "No anti-reflective.",
+   "coating": "DSHC hard coat",
+   "addon": "",
+   "hold": "Hard coat price not set yet. Pick Platinum or back surface AR, or make this one in Touch."
+  }
+ },
+ "lens_finder": {
+  "_readme": "ONE price source (Mark, 11 Nov 2026). The Lens Finder, Lens options and the Hub assistant price these tiers from prices.json (the Order Pad's file), never from config/cec_prices.json: a tier below REPLACES the same-named tier there (one with no 'materials' and a by_index), or is added when the file lacks it. 'from' is tab or tab:card. Add-ons: 'SET:option' is that option's add in prices.json optionSets; 'tab:grind' is that tab's made-to-order surcharge. cec_prices.json keeps only lenses the Order Pad does not sell (polarised, Desk Pair, Synchrony sun lenses).",
+  "tiers": [
+   {
+    "name": "Signature",
+    "category": "Progressive",
+    "match": [
+     "SmartLife Progressive Individual 3"
+    ],
+    "from": "mf:2"
+   },
+   {
+    "name": "Everyday",
+    "category": "Progressive",
+    "match": [
+     "SmartLife Progressive Superb"
+    ],
+    "from": "mf:1"
+   },
+   {
+    "name": "Essential",
+    "category": "Progressive",
+    "match": [
+     "Ultra HDV"
+    ],
+    "from": "mf:0"
+   },
+   {
+    "name": "Screen Relief",
+    "category": "Anti-fatigue",
+    "match": [
+     "SmartLife Digital"
+    ],
+    "from": "af"
+   },
+   {
+    "name": "Office",
+    "category": "Occupational",
+    "match": [
+     "Office Lens Superb"
+    ],
+    "from": "office:1"
+   },
+   {
+    "name": "SV Premium",
+    "category": "Single vision",
+    "match": [
+     "ClearView FSV",
+     "ClearView Single Vision"
+    ],
+    "from": "sv"
+   },
+   {
+    "name": "SV Standard",
+    "category": "Single vision",
+    "match": [
+     "Synchrony FSV"
+    ],
+    "from": "syn"
+   }
+  ],
+  "addons": {
+   "BluePro|HMC Blue": "MF:blue",
+   "PhotoFusion|Photochromic|Transitions|Sensity": "MF:photo",
+   "grind": "sv:grind"
+  }
  }
 }

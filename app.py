@@ -72,6 +72,20 @@ def _config_json(filename: str, fallback):
     return _load_json(EXAMPLE_CONFIG_DIR / f"{stem}.example.{ext}", fallback)
 
 
+def _cec_prices() -> dict:
+    """The Lens Finder / Lens options / assistant sell prices: config/cec_prices.json, with every lens the Order Pad
+    sells priced from price_sheet/prices.json instead (hub/sheetprice.finder_prices). One price source, Mark 11 Nov 2026."""
+    from hub import sheetprice as _sp
+    cfg = _config_json("cec_prices.json", {})
+    try:
+        return _sp.finder_prices(cfg)
+    except (OSError, ValueError, KeyError) as exc:
+        logger.warning("Order Pad price file unreadable (%s); Lens Finder shows no prices for those lenses", exc)
+        sheet = {"Signature", "Everyday", "Essential", "Screen Relief", "Office", "SV Premium", "SV Standard"}
+        return {**cfg, "tiers": [t for t in cfg.get("tiers") or []
+                                 if t.get("materials") or t.get("by_coating") or t.get("name") not in sheet]}
+
+
 def merge_tiles(real, example):
     """This machine's tiles, plus any tile in the shipped template that this
     machine doesn't have yet (matched by id). So a new tile (e.g. the Lens
@@ -667,7 +681,7 @@ def pricesheets_asset(kind, filename):
 def _sells() -> dict:
     products = lenses.group_products(_catalog()["lenses"], pricing=_pricing())
     products = lenses.mark_preferred(products, _config_json("lens_filter.json", {}))
-    products = lenses.attach_cec_price(products, _config_json("cec_prices.json", {}))
+    products = lenses.attach_cec_price(products, _cec_prices())
     return lensoptions.sell_index(products)
 
 
@@ -937,6 +951,13 @@ def sheet_checks():
     return _sheet(lambda: sheetjob.checks(_integrations(), _sheet_token(), data, _sheet_rows(), _pricing()))
 
 
+@app.route("/api/sheet/all-lenses", methods=["POST"])
+def sheet_all_lenses():
+    """Staff 'All lenses' on the Order Pad (staff iPad / this computer only, the picked patient only)."""
+    data = request.get_json(silent=True) or {}
+    return _sheet(lambda: sheetjob.all_lenses(_integrations(), _sheet_token(), data, _sheet_rows(), _pricing(), _sells()))
+
+
 @app.route("/api/sheet/plan", methods=["POST"])
 def sheet_plan():
     data = request.get_json(silent=True) or {}
@@ -1067,7 +1088,7 @@ def assistant_ask():
         binding, given, surname = got["binding"], got.get("given", ""), got.get("surname", "")
     catalog = _catalog()
     ctx = ReadContext(rows=catalog.get("lenses") or [], pricing=_pricing(),
-                      cec_prices=_config_json("cec_prices.json", {}), engine=engine,
+                      cec_prices=_cec_prices(), engine=engine,
                       base_filters=base)
     chat_cfg, asst_cfg = _assistant_cfgs()
     names = lenschat.name_words(_integrations())
@@ -1391,7 +1412,7 @@ def lenses_catalog():
     pricing = _pricing()
     products = lenses.group_products(cat["lenses"], pricing=pricing)
     products = lenses.mark_preferred(products, _config_json("lens_filter.json", {}))
-    products = lenses.attach_cec_price(products, _config_json("cec_prices.json", {}))
+    products = lenses.attach_cec_price(products, _cec_prices())
     return jsonify({"products": products,
                     "files": cat["files"], "message": cat["message"],
                     "pricing": {"promo_until": pricing.get("promo_until", ""),
