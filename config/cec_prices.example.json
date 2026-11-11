@@ -1,5 +1,5 @@
 {
- "_readme": "ONE price source (Mark, 11 Nov 2026): every lens the Order Pad sells is priced from price_sheet/prices.json (hub/sheetprice.finder_prices, mapped in price_sheet/sheet_map.json 'lens_finder'), and so are the BluePro, PhotoFusion and made-to-order add-ons. This file keeps only what the Order Pad does not sell: polarised progressives, Desk Pair, the Synchrony sun / tintable / Photo Grey lenses, and thicknesses not on the sheet. A figure here for a lens the sheet prices is ignored. Earlier: Concord's SELLING prices per pair (GST incl., coating included) shown in the Lens Finder and Lens options beside the supplier cost. Copied from the QR price sheets in Google Drive 'Price sheets' (PRINT ALL, 2 Nov 2026: fronts October 2026, scan pages 22 Sep to 30 Oct 2026; Mark, 8 Nov 2026: 'use the qr price sheet on google drive as the reference'). Optomate holds each lens PER LENS; these are the PAIR prices the sheets print. 'tiers': the first tier whose 'match' snippet appears in supplier+brand+lens name gives the base price by index (category limits a tier to one lens kind; 'materials' limits it to those materials, exact match). 'addons' add to the base when the snippet appears in the lens name, material or coating: blue light (BluePro lens or Synchrony HMC Blue) +$50, light-reactive (PhotoFusion X / photochromic) +$150; the special 'grind' key adds the made-to-order surcharge (+$100) on single-vision GRIND rows only (multifocal tiers already include it). A tier's own 'addons' replace the global ones ({} = none) where the sheet price is already the whole price. 'by_coating' prices per coating instead of by_index (a coating not listed has no price). A null price means not on the sheet. 'blank_names' suppress a price when the snippet is in the name or the material, unless a tier names that material: AdaptiveSun and polarised are priced only where the sheet prints them (multifocal polarised, Synchrony sun lenses). Tints (+$50 solid, +$70 graduated, mirror +$50) are scanned separately and not modelled. Index keys are strings like \"1.60\". The old Hoya keys (design_prices / sv_tiers / surcharge) still work if you ever need them.",
+ "_readme": "11 Nov 2026 (Mark): Synchrony SV 1.60 / 1.67 / 1.74 and Desk Pair (Work & Office HD) removed - on no printed sheet; Digital 1.53 rimless and Synchrony 1.53 now priced from the Order Pad file. ONE price source (Mark, 11 Nov 2026): every lens the Order Pad sells is priced from price_sheet/prices.json (hub/sheetprice.finder_prices, mapped in price_sheet/sheet_map.json 'lens_finder'), and so are the BluePro, PhotoFusion and made-to-order add-ons. This file keeps only what the Order Pad does not sell: polarised progressives, Desk Pair, the Synchrony sun / tintable / Photo Grey lenses, and thicknesses not on the sheet. A figure here for a lens the sheet prices is ignored. Earlier: Concord's SELLING prices per pair (GST incl., coating included) shown in the Lens Finder and Lens options beside the supplier cost. Copied from the QR price sheets in Google Drive 'Price sheets' (PRINT ALL, 2 Nov 2026: fronts October 2026, scan pages 22 Sep to 30 Oct 2026; Mark, 8 Nov 2026: 'use the qr price sheet on google drive as the reference'). Optomate holds each lens PER LENS; these are the PAIR prices the sheets print. 'tiers': the first tier whose 'match' snippet appears in supplier+brand+lens name gives the base price by index (category limits a tier to one lens kind; 'materials' limits it to those materials, exact match). 'addons' add to the base when the snippet appears in the lens name, material or coating: blue light (BluePro lens or Synchrony HMC Blue) +$50, light-reactive (PhotoFusion X / photochromic) +$150; the special 'grind' key adds the made-to-order surcharge (+$100) on single-vision GRIND rows only (multifocal tiers already include it). A tier's own 'addons' replace the global ones ({} = none) where the sheet price is already the whole price. 'by_coating' prices per coating instead of by_index (a coating not listed has no price). A null price means not on the sheet. 'blank_names' suppress a price when the snippet is in the name or the material, unless a tier names that material: AdaptiveSun and polarised are priced only where the sheet prints them (multifocal polarised, Synchrony sun lenses). Tints (+$50 solid, +$70 graduated, mirror +$50) are scanned separately and not modelled. Index keys are strings like \"1.60\". The old Hoya keys (design_prices / sv_tiers / surcharge) still work if you ever need them.",
  "tiers": [
   {
    "name": "Signature",
@@ -82,9 +82,7 @@
    "match": [
     "SmartLife Digital"
    ],
-   "by_index": {
-    "1.53": 400
-   },
+   "by_index": {},
    "_note": "Prices come from price_sheet/prices.json (the Order Pad). by_index here holds only thicknesses the Order Pad does not sell."
   },
   {
@@ -95,19 +93,6 @@
    ],
    "by_index": {},
    "_note": "Prices come from price_sheet/prices.json (the Order Pad). by_index here holds only thicknesses the Order Pad does not sell."
-  },
-  {
-   "name": "Desk Pair",
-   "category": "Occupational",
-   "match": [
-    "Work & Office HD"
-   ],
-   "by_index": {
-    "1.50": 420,
-    "1.53": 480,
-    "1.60": 520,
-    "1.67": 630
-   }
   },
   {
    "name": "SV Premium",
@@ -196,12 +181,7 @@
    "match": [
     "Synchrony FSV"
    ],
-   "by_index": {
-    "1.53": 170,
-    "1.60": 220,
-    "1.67": 250,
-    "1.74": 460
-   },
+   "by_index": {},
    "_note": "Prices come from price_sheet/prices.json (the Order Pad). by_index here holds only thicknesses the Order Pad does not sell."
   }
  ],
