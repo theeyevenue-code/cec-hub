@@ -220,7 +220,7 @@
   "Burgundy": "20002034"
  },
  "tint_coats": {
-  "_readme": "Coating on a TINTED ZEISS lens (one whose price-book coating is Platinum). Staff pick it on the Order Pad staff screen; Platinum is the default. Mark, 11 Nov 2026: on a tinted lens the coat is $80 a pair ($40 a lens), whichever coat - back surface AR costs the same as Platinum, and hard coat is $80 a pair LESS than Platinum ('less_pair', his figure). The sheet's tint price already includes Platinum. DuraVision Gold is not offered.",
+  "_readme": "Coating on a TINTED ZEISS lens (one whose price-book coating is Platinum). Staff pick it on the Order Pad staff screen; Platinum is the default. Mark, 11 Nov 2026: on a tinted lens the coat is $80 a pair ($40 a lens), whichever coat - back surface AR costs the same as Platinum, and hard coat is $80 a pair LESS than Platinum ('less_pair', his figure). The sheet's tint price already includes Platinum. DuraVision Gold is not offered. Hard coat ONLY on ClearView SV made to order 1.50 and 1.60 ('only_lens'; Mark 11 Nov 2026: 'dont worry about multifocals, only time id not do platinum is if we do back surface multicoat'; ZEISS: 1.67 and up cannot be ordered hard coat, requires AR). Multifocals: Platinum or back surface AR only.",
   "order": [
    "platinum",
    "bsar",
@@ -243,7 +243,11 @@
    "d": "No anti-reflective. $80 less a pair.",
    "coating": "DSHC hard coat",
    "addon": "",
-   "less_pair": 80
+   "less_pair": 80,
+   "only_lens": [
+    "ClearView Single Vision 1.50",
+    "ClearView Single Vision 1.60"
+   ]
   }
  },
  "lens_finder": {
