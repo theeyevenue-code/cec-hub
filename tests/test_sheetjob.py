@@ -787,3 +787,19 @@ def test_all_lenses_staff_ipad_and_picked_patient_only(c):
     unlock(c)
     r = c.post("/api/sheet/all-lenses", json={})
     assert r.status_code >= 400                                                  # no patient picked yet
+
+
+def test_153_rimless_is_clear_only_everywhere():
+    # Mark 11 Nov 2026, verified against ZEISS's product guide, its codes and Optomate's 1.53 items: no BluePro,
+    # PhotoFusion X or tint at 1.53 - matches the printed "Not on 1.53 rimless"
+    book = sp.load()
+    for tab, cards in (("mf", (0, 1, 2)), ("office", (0, 1, 2)), ("af", (4,)), ("syn", (2,))):
+        for i in cards:
+            assert sp.quote(book, {"tab": tab, "card": i, "idx": "1.53", "opt": "clear"})["ok"], (tab, i)
+            for k in ("blue", "photo", "tint"):
+                q = sp.quote(book, {"tab": tab, "card": i, "idx": "1.53", "opt": k, "colour": "Grey", "depth": "s85"})
+                assert not q["ok"], (tab, i, k)
+    assert "1.53 rimless" in sp.quote(book, {"tab": "mf", "card": 1, "idx": "1.53", "opt": "blue"})["why"]
+    # other thicknesses untouched
+    assert sp.quote(book, {"tab": "mf", "card": 1, "idx": "1.60", "opt": "blue"})["total"] == 740
+    assert sp.quote(book, {"tab": "office", "card": 1, "idx": "1.60", "opt": "blue"})["total"] == 640

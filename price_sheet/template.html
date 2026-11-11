@@ -480,7 +480,9 @@ details summary { font-size:16px; font-weight:600; color:var(--btn); cursor:poin
 const DATA = {{PRICES}};
 const SETS = DATA.optionSets;
 // multifocal: light-reactive is off at 1.74 unless the card says photo174 (printed sheet: not at 1.74 on Essential)
-const MF_OPTS = (c, idx) => SETS.MF.map(o => o.offIdx ? { ...o, off: idx === o.offIdx && !c.photo174 } : o);
+// an option off at this thickness: MF light-reactive at 1.74 on Essential; blue / light-reactive / tint at 1.53 (Mark, 11 Nov 2026)
+const OFF_AT = (o, idx) => (o.offAt || []).includes(idx) ? { ...o, off:true, offwhy:o.offAtWhy } : o;
+const MF_OPTS = (c, idx) => SETS.MF.map(o => OFF_AT(o.offIdx ? { ...o, off: idx === o.offIdx && !c.photo174 } : o, idx));
 const TINT_COLOURS = DATA.tintColours, SOLID_DEPTHS = DATA.solidDepths, GRAD_DEPTHS = DATA.gradDepths, PFX_COLOURS = DATA.pfxColours;
 const depthName = (k) => ([...SOLID_DEPTHS, ...GRAD_DEPTHS].find(d => d[0] === k) || ["", ""])[1];
 const PAGES = DATA.pages.map(pg => ({ ...pg, cards: pg.cards.map(c => typeof c.opts === "string" ? { ...c, opts: SETS[c.opts] } : c) }));
@@ -729,7 +731,7 @@ function openSheet(i, pre = {}) {
 }
 function optList() {
   const c = st.card;
-  if (c.opts) return c.opts;
+  if (c.opts) return c.opts.map(o => OFF_AT(o, curIdx()));
   if (c.mf) return MF_OPTS(c, curIdx());
   return null;
 }
