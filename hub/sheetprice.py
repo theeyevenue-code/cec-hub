@@ -269,7 +269,9 @@ def tint_coats(book: dict, key: dict) -> list[dict]:
     if "platinum" not in str(key.get("coating") or "").lower():
         return []
     return [{"k": k, **{f: tc[k].get(f, "") for f in ("n", "d", "coating", "addon", "hold")},
-             "less_pair": int(tc[k].get("less_pair") or 0)} for k in tc.get("order") or [] if k in tc]
+             "less_pair": int(tc[k].get("less_pair") or 0)} for k in tc.get("order") or [] if k in tc
+            # a coat limited to some lenses (hard coat: ClearView SV made to order 1.50 / 1.60 only, Mark 11 Nov 2026)
+            and (not tc[k].get("only_lens") or key.get("lens") in tc[k]["only_lens"])]
 
 
 def _sheet_by_index(book: dict, spec: str) -> dict:
