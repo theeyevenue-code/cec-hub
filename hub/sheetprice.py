@@ -154,6 +154,8 @@ def price(book: dict, ch: dict) -> dict:
     if tab == "syn":
         # Synchrony single vision (Mark, 10 Nov 2026): each card carries its own made-to-order price, copied
         made = "mto" if str(ch.get("made")) == "mto" else "stock"
+        if o and o.get("price") is not None:
+            lens = o["price"]                            # Photo Grey: its own printed price (11 Nov 2026)
         if made == "mto":
             if c.get("mtoPrice") is None:
                 return {"ok": False, "why": f"No made-to-order {idx} on the price sheet."}
@@ -220,8 +222,11 @@ def pricebook(book: dict, ch: dict, pr: dict | None = None) -> dict:
         mat = (side.get("material") or {}).get(k)
         if not lens or not mat:
             return {"ok": False, "why": "No price-book lens for this choice."}
+        coat = _pick(side["coating"], k)
+        if isinstance(coat, dict):
+            coat = coat.get(idx)                         # Synchrony 1.53 Trivex is HMC, the others HMC+
         key = {"supplier": side["supplier"], "lens": lens.replace("{idx}", idx), "index": idx, "material": mat,
-               "coating": _pick(side["coating"], k), "stockgrind": "stock" if pr["made"] == "stock" else "grind"}
+               "coating": coat, "stockgrind": "stock" if pr["made"] == "stock" else "grind"}
     else:
         try:
             i = int(ch.get("card"))
@@ -244,7 +249,7 @@ def pricebook(book: dict, ch: dict, pr: dict | None = None) -> dict:
         if tc:
             pick = next((t for t in tc if t["k"] == str(ch.get("tcoat") or "platinum")), tc[0])
             # the lens is found (and fitted) by its Platinum row; the job's coating is swapped in after (coat_key)
-            out.update(coat_key={**key, "coating": pick["coating"]}, tint_coat=pick["k"], tint_coat_name=pick["n"], tint_coat_addon=pick["addon"],
+            out.update(coat_key={**key, "coating": pick["coating"]}, tint_coat=pick["k"], tint_coat_less=pick["less_pair"], tint_coat_name=pick["n"], tint_coat_addon=pick["addon"],
                        tint_coat_hold=pick.get("hold", ""))
         bc = (book["map"].get("tints") or {}).get(f"{ch.get('colour') or 'Grey'}|{ch.get('depth') or 's85'}")
         if not bc:
@@ -263,8 +268,8 @@ def tint_coats(book: dict, key: dict) -> list[dict]:
     tc = book["map"].get("tint_coats") or {}
     if "platinum" not in str(key.get("coating") or "").lower():
         return []
-    return [{"k": k, **{f: tc[k].get(f, "") for f in ("n", "d", "coating", "addon", "hold")}}
-            for k in tc.get("order") or [] if k in tc]
+    return [{"k": k, **{f: tc[k].get(f, "") for f in ("n", "d", "coating", "addon", "hold")},
+             "less_pair": int(tc[k].get("less_pair") or 0)} for k in tc.get("order") or [] if k in tc]
 
 
 def _sheet_by_index(book: dict, spec: str) -> dict:
@@ -328,6 +333,10 @@ def quote(book: dict, ch: dict) -> dict:
     """price + pricebook in one answer, for the Hub routes and the audit."""
     pr = price(book, ch)
     pb = pricebook(book, ch, pr)
+    less = pb.get("tint_coat_less") or 0 if pb.get("ok") else 0
+    if less and pr.get("ok"):
+        # Mark, 11 Nov 2026: hard coat on a tinted lens = the sheet price (Platinum included) less his $80 a pair
+        pr = {**pr, "total": pr["total"] - less, "lens_pair": pr["lens_pair"] - less, "coat_less": less}
     return {**pr, "map": pb, "version": book["version"]}
 
 

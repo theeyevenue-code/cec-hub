@@ -284,7 +284,7 @@ def test_next_patient_then_staff_needs_no_code(c):
 def test_sheet_answer_has_first_name_and_marks_only(c):
     pick(c, "Mia")
     d = c.get("/api/sheet/patient").get_json()
-    text = json.dumps(d)
+    text = json.dumps({k: v for k, v in d.items() if k != "version"})     # the price file's hash is hex, not patient data
     assert d["first"] == "Mia" and d["tab"] == "sv"
     for leak in ("ZZTEST", "-2.75", "-3.00", "1970", "MJ", "PD", "prism", "Check the Rx"):
         assert leak not in text
@@ -422,12 +422,23 @@ def test_lens_options_pd_shift_stops_for_prism():
 def test_synchrony_sv_prices_are_copied_per_card_never_worked_out():
     book = sp.load()
     q = lambda **kw: sp.quote(book, {"tab": "syn", "opt": "clear", **kw})   # noqa: E731
-    assert q(card=0, idx="1.50")["total"] == 140 and q(card=0, idx="1.50", made="mto")["total"] == 200
-    assert [c["idx"] for c in sp.page(book, "syn")["cards"]] == ["1.50", "1.56"]    # from 1.60: ZEISS (Mark, 10 Nov)
+    assert q(card=0, idx="1.50")["total"] == 140
+    # Mark 11 Nov 2026: Synchrony is stock only (printed SV back "no grind"); 1.53 rimless $170 and Photo Grey $240 added
+    assert not q(card=0, idx="1.50", made="mto")["ok"]
+    assert [c["idx"] for c in sp.page(book, "syn")["cards"]] == ["1.50", "1.56", "1.53"]    # from 1.60: ZEISS (Mark, 10 Nov)
     assert q(card=1, idx="1.56")["total"] == 140 and not q(card=1, idx="1.56", made="mto")["ok"]   # 1.56: stock only
-    k = q(card=0, idx="1.50", made="mto")["map"]["key"]
-    assert (k["supplier"], k["lens"], k["coating"], k["stockgrind"]) == ("Synchrony", "Single Vision Grind 1.50", "HMC+", "grind")
     assert q(card=0, idx="1.50")["map"]["key"]["lens"] == "FSV Clear 1.50"
+    t = q(card=2, idx="1.53")
+    assert t["total"] == 170 and (t["map"]["key"]["lens"], t["map"]["key"]["coating"]) == ("FSV Trivex 1.53", "HMC")
+    g = sp.quote(book, {"tab": "syn", "card": 0, "idx": "1.50", "opt": "pgrey"})
+    assert g["total"] == 240 and (g["map"]["key"]["lens"], g["map"]["key"]["material"]) == ("FSV Photo Grey 1.50", "Photochromic")
+
+
+def test_digital_153_rimless_is_on_the_order_pad_clear_only():
+    book = sp.load()
+    q = sp.quote(book, {"tab": "af", "card": 4, "idx": "1.53", "opt": "clear"})
+    assert q["total"] == 400 and q["map"]["key"]["lens"] == "SmartLife Digital 1.53"
+    assert not sp.quote(book, {"tab": "af", "card": 4, "idx": "1.53", "opt": "blue"})["ok"]     # printed: not on 1.53
 
 
 def test_synchrony_sv_tab_is_small_and_last():
@@ -719,7 +730,7 @@ def test_page_has_no_code_pad():
 
 # ---- tint coatings (Mark, 11 Nov 2026) ---------------------------------------------------------------
 def test_tinted_zeiss_lens_offers_platinum_bsar_and_holds_hard_coat(c):
-    # "Same as Platinum": back surface AR keeps the sheet price; hard coat has no price yet, so it is held
+    # Mark 11 Nov: the coat on a tinted lens is $80 a pair whichever coat; hard coat is $80 a pair less
     pick(c, "Mia")
     c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
     ch = {"tab": "sv", "card": 0, "idx": "1.50", "opt": "tint", "colour": "Brown", "depth": "g75"}
@@ -732,7 +743,8 @@ def test_tinted_zeiss_lens_offers_platinum_bsar_and_holds_hard_coat(c):
     assert not b["can_make"] and "Not linked" in b["stop"]
     assert b["price"] == plat and b["tint_coat"] == {"k": "bsar", "n": "Back surface AR", "addon": "20002017"}
     h = c.post("/api/sheet/checks", json=body(choice={**ch, "tcoat": "hc"})).get_json()
-    assert not h["can_make"] and "Hard coat price not set" in h["stop"] and h["price"] == plat
+    assert h["price"] == plat - 80 and not any(t["held"] for t in h["tint_coats"])     # Mark: $80 a pair less
+    assert h["price_changed"] and h["start_price"] == plat       # staff tick "Told the patient: was $X, now $X-80"
     assert "Gold" not in str(r["tint_coats"])
 
 

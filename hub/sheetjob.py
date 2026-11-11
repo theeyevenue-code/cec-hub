@@ -576,7 +576,9 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
     fix = data.get("fix") if isinstance(data.get("fix"), dict) else {}
     fr_rec, nums, frame_problem = _frame_for(s, data.get("frame"))
     rimless = bool(data.get("rimless"))
-    res = {"rx": staff_rx(s), "start_price": start["quote"].get("total"), "fixes": [], "warnings": [], "stop": "",
+    # the price the patient saw on the sheet: a coat change on a tint (hard coat, $80 less) is a price change to tell
+    shown = (start["quote"].get("total") or 0) + (start["quote"].get("coat_less") or 0) if start["quote"].get("total") is not None else None
+    res = {"rx": staff_rx(s), "start_price": shown, "fixes": [], "warnings": [], "stop": "",
            "heights_needed": False, "verdict": None, "blank": None, "pd_shift": None, "fix": ""}
     # the fixes always come from what the patient chose, so a fix that is picked can be seen and undone
     cur, applied, start_fit = start, None, None

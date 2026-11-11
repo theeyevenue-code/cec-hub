@@ -145,12 +145,25 @@
    "use": "D",
    "stock": {
     "supplier": "Synchrony",
-    "coating": "HMC+",
+    "coating": {
+     "clear": {
+      "1.50": "HMC+",
+      "1.56": "HMC+",
+      "1.53": "HMC"
+     },
+     "pgrey": "HMC+"
+    },
     "lens": {
-     "clear": "FSV Clear {idx}"
+     "clear": {
+      "1.50": "FSV Clear 1.50",
+      "1.56": "FSV Clear 1.56",
+      "1.53": "FSV Trivex 1.53"
+     },
+     "pgrey": "FSV Photo Grey {idx}"
     },
     "material": {
-     "clear": "Clear"
+     "clear": "Clear",
+     "pgrey": "Photochromic"
     }
    },
    "mto": {
@@ -207,7 +220,7 @@
   "Burgundy": "20002034"
  },
  "tint_coats": {
-  "_readme": "Coating on a TINTED ZEISS lens (one whose price-book coating is Platinum). Staff pick it on the Order Pad staff screen; Platinum is the default. Mark, 11 Nov 2026: back surface AR costs the same per lens as Platinum ('Same as Platinum'), so the sheet price does not change. Hard coat is held: no hard coat price exists in the data (Optomate would charge the same lens item with no add-on, i.e. the Platinum price). DuraVision Gold is not offered.",
+  "_readme": "Coating on a TINTED ZEISS lens (one whose price-book coating is Platinum). Staff pick it on the Order Pad staff screen; Platinum is the default. Mark, 11 Nov 2026: on a tinted lens the coat is $80 a pair ($40 a lens), whichever coat - back surface AR costs the same as Platinum, and hard coat is $80 a pair LESS than Platinum ('less_pair', his figure). The sheet's tint price already includes Platinum. DuraVision Gold is not offered.",
   "order": [
    "platinum",
    "bsar",
@@ -227,10 +240,10 @@
   },
   "hc": {
    "n": "Hard coat",
-   "d": "No anti-reflective.",
+   "d": "No anti-reflective. $80 less a pair.",
    "coating": "DSHC hard coat",
    "addon": "",
-   "hold": "Hard coat price not set yet. Pick Platinum or back surface AR, or make this one in Touch."
+   "less_pair": 80
   }
  },
  "lens_finder": {
