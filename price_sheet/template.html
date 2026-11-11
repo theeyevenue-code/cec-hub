@@ -336,6 +336,20 @@ main#page.tall { padding-top:26px; }
 .vline.ok { background:var(--greenbg); color:var(--green); }
 .vline.stop { background:#FDECEE; color:#B00020; }
 .red { color:#B00020; }
+/* staff All lenses (11 Nov 2026): one table per lens type; red = a stock blank too small for this frame */
+.alltabs { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 10px; }
+.alltabs button { font:inherit; font-size:17px; padding:8px 14px; border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:8px; }
+.alltabs button.on { border-color:var(--btn); color:var(--btn); font-weight:600; }
+.alltabs button small { font-size:14px; color:var(--grey); margin-left:6px; }
+.allpart h4 { font-size:18px; margin:14px 0 6px; }
+.allt { width:100%; border-collapse:collapse; font-size:17px; }
+.allt td, .allt th { padding:7px 8px 7px 0; border-top:1px solid var(--line); text-align:left; vertical-align:top; }
+.allt th { font-size:14px; color:var(--grey); font-weight:500; }
+.allt td.ix { font-weight:700; white-space:nowrap; }
+.allt td.pr { text-align:right; font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
+.allt td small { display:block; font-size:14px; color:var(--grey); }
+.allt tr.small td { color:#B00020; }
+.redbox { border-left:4px solid #B00020; background:#FCEBEE; color:#B00020; font-size:17px; padding:10px 12px; margin:6px 0 10px; line-height:1.4; }
 .kv b small { display:block; font-size:15px; font-weight:400; color:var(--grey); }
 #s-frame .cols { margin-top:14px; }
 #actions { margin-top:14px; }
@@ -429,10 +443,21 @@ details summary { font-size:16px; font-weight:600; color:var(--btn); cursor:poin
     <div class="make">
       <button class="cta" id="make" disabled>Make job (dry run, nothing written)</button>
       <div class="mode" id="makewhy"></div>
+      <button class="ghost" id="alllens">All lenses for this Rx</button>
     </div>
   </main>
   <div class="scrim" id="scrim2"></div>
   <div class="pop cpop" id="cpop"></div>
+</section>
+
+<section class="screen" id="s-all">
+  <div class="stopbar">All lenses <span>Staff only</span></div>
+  <main>
+    <div class="lead">Every lens that takes this Rx. Pair price, before discounts.</div>
+    <div class="alltabs" id="alltabs"></div>
+    <div id="allbody"></div>
+    <button class="ghost" id="allback">&larr; Back to the job</button>
+  </main>
 </section>
 
 <section class="screen" id="s-done">
@@ -865,6 +890,41 @@ function drawSum() {
     + (st.mirror && c.mirror ? `<div class="line"><span>Mirror</span><b>${plus(c.mirror)}</b></div>` : "");
   $("sum-total").textContent = money(pr.total);
 }
+/* ---- staff: All lenses for this Rx (Mark, 11 Nov 2026: covers Lens options, which is then hidden) ----------
+   Everything comes from /api/sheet/all-lenses: the same engine as Lens options, the server's own patient and
+   frame, pair sell prices from the one price file. The page works nothing out. */
+let allData = null, allTab = "";
+async function openAll() {
+  const r = await api("/api/sheet/all-lenses", { frame:frameReq() });
+  if (!r) return;
+  if (r.error) { alert(r.error); return; }
+  allData = r; allTab = (r.tabs || []).some(t => t.key === r.default_tab) ? r.default_tab : ((r.tabs || [])[0] || {}).key;
+  drawAll(); show("s-all");
+}
+function drawAll() {
+  const r = allData;
+  if (r.empty) { $("alltabs").innerHTML = ""; $("allbody").innerHTML = `<div class="warn">${esc(r.empty)}</div>`; return; }
+  const n = t => t.parts.reduce((k, p) => k + p.lenses.length, 0);
+  $("alltabs").innerHTML = r.tabs.map(t => `<button data-k="${esc(t.key)}" class="${t.key === allTab ? "on" : ""}">${esc(t.label)}<small>${n(t) || "-"}</small></button>`).join("");
+  const tab = r.tabs.find(t => t.key === allTab) || r.tabs[0];
+  let h = (r.flags || []).map(w => `<div class="warn">${esc(w)}</div>`).join("") + (r.frame_note ? `<div class="warn">${esc(r.frame_note)}</div>` : "");
+  tab.parts.forEach(p => {
+    h += `<div class="allpart">${tab.parts.length > 1 ? `<h4>${esc(p.title)}</h4>` : ""}`;
+    if (p.unavailable) { h += `<div class="work">${esc(p.unavailable)}</div></div>`; return; }
+    const w = p.blank_warning;
+    if (w) h += `<div class="redbox"><b>${w.none_fit ? "No stock lens fits this frame" : "Some stock lenses are too small for this frame"}</b> (needs ${esc(w.need)}): `
+      + w.lenses.map(x => `${esc(x.supplier)} ${esc(x.index)} comes ${esc(x.largest)}`).join("; ") + ". Grind, or a smaller frame.</div>";
+    if (!p.lenses.length) { h += `<div class="work">No lens we order takes this Rx.</div></div>`; return; }
+    h += `<table class="allt"><tr><th>Index</th><th>Lens</th><th>Stock or grind</th><th>Blank</th><th style="text-align:right">Pair</th></tr>`
+      + p.lenses.map(l => `<tr class="${l.fits === false ? "small" : ""}"><td class="ix">${esc(l.index)}</td><td>${esc(l.supplier)} ${esc(l.name)}<small>${esc(l.material)}${l.coating ? " · " + esc(l.coating) : ""}${l.thicker ? " · thicker than suggested" : ""}</small></td><td>${esc(l.type)}</td><td>${esc(l.blank_line || "")}</td><td class="pr">${l.sell != null ? money(l.sell) : "Not on the sheet"}</td></tr>`).join("")
+      + `</table>`;
+    h += (p.blank_note ? `<div class="work">${esc(p.blank_note)}</div>` : "") + `</div>`;
+  });
+  $("allbody").innerHTML = h;
+  document.querySelectorAll("#alltabs button").forEach(b => b.onclick = () => { allTab = b.dataset.k; drawAll(); });
+}
+$("alllens").onclick = openAll;
+$("allback").onclick = () => show("s-frame");
 $("toframe").onclick = () => { drawFrame(); show("s-frame"); setTimeout(() => $("bc").focus(), 50); };
 $("backsheets").onclick = () => { st.chosen = null; drawPage(); show("s-sheet"); };   // st.lastChoice stays for Staff
 $("changelens").onclick = () => { drawPage(); show("s-sheet"); };

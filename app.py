@@ -951,6 +951,13 @@ def sheet_checks():
     return _sheet(lambda: sheetjob.checks(_integrations(), _sheet_token(), data, _sheet_rows(), _pricing()))
 
 
+@app.route("/api/sheet/all-lenses", methods=["POST"])
+def sheet_all_lenses():
+    """Staff 'All lenses' on the Order Pad (staff iPad / this computer only, the picked patient only)."""
+    data = request.get_json(silent=True) or {}
+    return _sheet(lambda: sheetjob.all_lenses(_integrations(), _sheet_token(), data, _sheet_rows(), _pricing(), _sells()))
+
+
 @app.route("/api/sheet/plan", methods=["POST"])
 def sheet_plan():
     data = request.get_json(silent=True) or {}

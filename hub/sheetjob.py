@@ -730,6 +730,35 @@ def _no_rx_checks(cfg: dict, s: dict, book: dict, ch: dict, data: dict) -> dict:
     return res
 
 
+LENS_FIELDS = ("index", "name", "supplier", "material", "type", "coating", "sell", "fits", "blank_line", "thicker")
+
+
+def all_lenses(cfg: dict, token, data: dict, rows: list, pricing: dict, sells: dict) -> dict:
+    """Staff "All lenses" (Mark, 11 Nov 2026: Order Pad covers what Lens options gives staff, so Lens options can be
+    hidden). Every lens that takes the picked patient's saved Rx, each tab, from the SAME engine as Lens options
+    (lensoptions.options_for_rx), with the frame on this screen for the red blank warning. Pair sell prices only (the
+    one price source); no supplier cost, no DOB. Staff screens only."""
+    s = _need(token)
+    rx = s.get("rx")
+    if not rx:
+        return {"empty": "No saved Rx, so no lens can be checked against it. Check the Rx in Optomate first."}
+    data = data if isinstance(data, dict) else {}
+    _, nums, _ = _frame_for(s, data.get("frame"))
+    out = lensoptions.options_for_rx(rx, rows, pricing, sells, nums)
+    tabs = []
+    for t in out["tabs"]:
+        parts = []
+        for p in t["parts"]:
+            a = p.get("answer") or {}
+            parts.append({"title": p["title"], "unavailable": p["unavailable"] or "",
+                          "lenses": [{k: x.get(k) for k in LENS_FIELDS} for x in a.get("options") or []],
+                          "blank_warning": a.get("blank_warning"), "blank_note": a.get("blank_note") or "",
+                          "need": (p.get("blank") or {}).get("value")})
+        tabs.append({"key": t["key"], "label": t["label"], "written": bool(t["written"]), "parts": parts})
+    return {"tabs": tabs, "default_tab": out["default_tab"], "flags": out["flags"],
+            "frame_note": "" if nums else out["blank_note"]}
+
+
 def _tint_coat(book: dict, cur: dict, qq: dict, res: dict) -> None:
     """Mark, 11 Nov 2026: a tinted ZEISS lens - staff pick Platinum (default), back surface AR (same price) or hard
     coat (held: no price yet). Shown on the staff screen only; the sheet price never changes."""

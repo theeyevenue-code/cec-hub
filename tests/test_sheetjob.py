@@ -745,3 +745,33 @@ def test_coat_pick_only_on_tinted_platinum_lenses():
         book, {"tab": "sv", "card": 0, "idx": "1.50", "opt": "tint"})["total"]
     syn = sp.quote(book, {"tab": "mf", "card": 0, "idx": "1.50", "opt": "tint", "tcoat": "bsar"})   # Synchrony: own HMC+ coat
     assert syn["map"].get("ok") and "tint_coat" not in syn["map"]
+
+
+# ---- staff "All lenses" (Mark, 11 Nov 2026: Order Pad replaces Lens options for staff) ----------------
+def test_all_lenses_lists_every_lens_for_the_rx_with_sell_and_blank(c):
+    pick(c, "Mia")
+    c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
+    r = c.post("/api/sheet/all-lenses", json={"frame": {"barcode": "ZZFRAME5219"}})
+    assert r.status_code == 200 and r.headers.get("Cache-Control", "").startswith("no-store")
+    d = r.get_json()
+    first = next(l for t in d["tabs"] for p in t["parts"] for l in p["lenses"])
+    assert set(first) == set(sj.LENS_FIELDS) and "cost" not in first
+    assert all(l["sell"] is None or isinstance(l["sell"], (int, float)) for t in d["tabs"] for p in t["parts"] for l in p["lenses"])
+
+
+def test_all_lenses_keeps_the_red_blank_warning(c):
+    # the clinical safety part staff rely on in Lens options: a stock lens too small for the frame is named in red
+    pick(c, "Mia")
+    big = {"own": True, "a": "62", "dbl": "14", "ed": "68"}
+    d = c.post("/api/sheet/all-lenses", json={"frame": big}).get_json()
+    warn = [p["blank_warning"] for t in d["tabs"] for p in t["parts"] if p["blank_warning"]]
+    assert warn and warn[0]["lenses"] and warn[0]["need"]
+    small = c.post("/api/sheet/all-lenses", json={"frame": {}}).get_json()
+    assert small["frame_note"] and not any(p["blank_warning"] for t in small["tabs"] for p in t["parts"])
+
+
+def test_all_lenses_staff_ipad_and_picked_patient_only(c):
+    assert c.post("/api/sheet/all-lenses", json={}).status_code == 403          # unknown device
+    unlock(c)
+    r = c.post("/api/sheet/all-lenses", json={})
+    assert r.status_code >= 400                                                  # no patient picked yet
