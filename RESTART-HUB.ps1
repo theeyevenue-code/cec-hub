@@ -35,13 +35,11 @@ foreach ($id in $targets) {
     try { Stop-Process -Id $id -Force -ErrorAction Stop } catch { $denied = $true }
 }
 if ($denied) {
-    Write-Host "  Couldn't stop the running Hub: it was started as administrator." -ForegroundColor Yellow
-    Write-Host "  Close this, then right-click RESTART-HUB.bat > Run as administrator." -ForegroundColor Yellow
-    Remove-Item (Join-Path $PSScriptRoot 'PLANNED-RESTART.txt') -Force -ErrorAction SilentlyContinue
-    Write-Host ""
-    exit 1
-}
-if ($targets.Count) { Write-Host "  Stopped the old Hub." -ForegroundColor Gray }
+    # The Hub runs under the watchdog task's account, which this session can't stop. Ask the watchdog to
+    # do it: it owns the Hub (11 Nov 2026 - before this, every update needed Mark as administrator).
+    (Get-Date -Format 'o') | Set-Content (Join-Path $PSScriptRoot 'RESTART-REQUESTED.txt') -Encoding utf8
+    Write-Host "  Asked the watchdog to restart the Hub." -ForegroundColor Gray
+} elseif ($targets.Count) { Write-Host "  Stopped the old Hub." -ForegroundColor Gray }
 else { Write-Host "  The Hub was not running." -ForegroundColor Gray }
 
 # 2. Ask the watchdog to bring a fresh one up now (don't wait for its 5-min tick).
