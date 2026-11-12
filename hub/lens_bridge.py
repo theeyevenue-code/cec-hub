@@ -763,10 +763,14 @@ FIXTURE_FRAME_RECORDS = {
 }
 
 
+RIMLESS_CONSTRUCTION = "~RIM"      # FRAMECONSTRUCTION: ~FUL full rim, ~SEM semi rimless, ~NYL nylon, ~RIM rimless
+
+
 def frame_by_barcode_query(barcode: str) -> str:
     return (f"SELECT {_txt('f.BARCODE')}, {_txt('f.MODEL')}, {_txt('f.COLOUR_DESCRIPTION')}, {_txt('f.SIZE')}, "
             "ISNULL(f.BRIDGE,0), ISNULL(f.DIAG,0), ISNULL(f.SUPPLIER_IDENTIFIER,''), ISNULL(f.STOCK_TYPE,0), "
-            f"ISNULL(CAST(b.SELLINC AS varchar(20)),''), ISNULL(b.QOH,0), {_txt('f.BRAND_IDENTIFIER')} "
+            f"ISNULL(CAST(b.SELLINC AS varchar(20)),''), ISNULL(b.QOH,0), {_txt('f.BRAND_IDENTIFIER')}, "
+            f"{_txt('f.CONSTRUCTION_IDENTIFIER')} "
             "FROM SPECFRAME f WITH (NOLOCK) LEFT JOIN SPECFRAME_BRANCH b WITH (NOLOCK) "
             "ON b.SPECFRAMEID = f.ID AND b.BRANCH_IDENTIFIER = 'MJ' "
             f"WHERE f.BARCODE = N'{_sql_str(barcode)}'")
@@ -789,7 +793,9 @@ def build_frame_record(row: list[str] | None) -> dict | None:
         qoh = 0
     return {"barcode": row[0], "model": row[1], "colour": row[2], "a": a, "dbl": dbl, "ed": ed,
             "sunglass": row[7].strip() == str(SUNGLASS_STOCK_TYPE), "price": price, "qoh": qoh,
-            "brand": row[10].strip() if len(row) > 10 else ""}
+            "brand": row[10].strip() if len(row) > 10 else "",
+            # Optomate's frame construction: ~RIM = Rimless (drilled), so the rimless fitting applies (12 Nov 2026)
+            "rimless": len(row) > 11 and row[11].strip().upper() == RIMLESS_CONSTRUCTION}
 
 
 FRAME_WORD_RE = re.compile(r"^[A-Za-z0-9.\-/]{1,30}$")
@@ -814,7 +820,7 @@ def frames_search_query(words: list[str], top: int = FRAME_TOP) -> str:
     return (f"SELECT TOP {int(top) + 1} {_txt('f.BARCODE')}, {_txt('f.MODEL')}, {_txt('f.COLOUR_DESCRIPTION')}, "
             f"{_txt('f.SIZE')}, ISNULL(f.BRIDGE,0), ISNULL(f.DIAG,0), ISNULL(f.SUPPLIER_IDENTIFIER,''), "
             "ISNULL(f.STOCK_TYPE,0), ISNULL(CAST(b.SELLINC AS varchar(20)),''), ISNULL(b.QOH,0), "
-            f"{_txt('f.BRAND_IDENTIFIER')} "
+            f"{_txt('f.BRAND_IDENTIFIER')}, {_txt('f.CONSTRUCTION_IDENTIFIER')} "
             "FROM SPECFRAME f WITH (NOLOCK) LEFT JOIN SPECFRAME_BRANCH b WITH (NOLOCK) "
             "ON b.SPECFRAMEID = f.ID AND b.BRANCH_IDENTIFIER = 'MJ' "
             f"WHERE {where} ORDER BY CASE WHEN ISNULL(b.QOH,0) > 0 THEN 0 ELSE 1 END, f.BRAND_IDENTIFIER, f.MODEL")

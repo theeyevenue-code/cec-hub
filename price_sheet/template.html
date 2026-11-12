@@ -481,7 +481,8 @@ const DATA = {{PRICES}};
 const SETS = DATA.optionSets;
 // multifocal: light-reactive is off at 1.74 unless the card says photo174 (printed sheet: not at 1.74 on Essential)
 // an option off at this thickness: MF light-reactive at 1.74 on Essential; blue / light-reactive / tint at 1.53 (Mark, 11 Nov 2026)
-const OFF_AT = (o, idx) => (o.offAt || []).includes(idx) ? { ...o, off:true, offwhy:o.offAtWhy } : o;
+const OFF_AT = (o, idx) => (o.offAt || []).includes(idx)
+  ? { ...o, off:true, offwhy:(o.offAtWhy && typeof o.offAtWhy === "object" ? o.offAtWhy[idx] : o.offAtWhy) || "Not made at this thickness." } : o;
 const MF_OPTS = (c, idx) => SETS.MF.map(o => OFF_AT(o.offIdx ? { ...o, off: idx === o.offIdx && !c.photo174 } : o, idx));
 const TINT_COLOURS = DATA.tintColours, SOLID_DEPTHS = DATA.solidDepths, GRAD_DEPTHS = DATA.gradDepths, PFX_COLOURS = DATA.pfxColours;
 const depthName = (k) => ([...SOLID_DEPTHS, ...GRAD_DEPTHS].find(d => d[0] === k) || ["", ""])[1];
@@ -1069,6 +1070,7 @@ async function scanBarcode(v) {
 }
 function frameChosen(f) {
   fq.frame = f; fq.own = false; fq.fix = null; fq.told = false; fq.edTyped = ""; $("own").classList.remove("on"); $("ownsize").style.display = "none";
+  if (f && f.rimless) { fq.rimless = true; $("rimless").classList.add("on"); }   // the frame record says Rimless (12 Nov 2026)
   $("framefacts").innerHTML = "";                         // the frame shows once, in the table
   runChecks();
 }
@@ -1106,10 +1108,11 @@ $("make").onclick = async () => {
     ["Frame", fr.own ? "Own frame" : esc(`${fr.model || ""} ${fr.colour || ""}`.trim() || "-")],
     ["Price", `${sh.price != null ? money(sh.price) : "-"} lenses${pr.agree === false ? ` <b class="red">Optomate $${esc(pr.lens_pair)}</b>` : ""}${fr.sellinc ? " + $" + esc(fr.sellinc) + " frame" : ""}`],
   ];
+  (pv.fees || []).forEach(f => rows.push([esc(f.words), `$${esc(f.total)} <small>${esc(f.qty)} x $${esc(f.each)} a lens</small>`]));
   if (Object.keys(pv.heights || {}).length) rows.push(["Heights", Object.entries(pv.heights).map(([s2, v2]) => `${s2} ${esc(v2)}`).join(" / ")]);
   const details = [`Lens ${esc((pv.lens || {}).barcode || "-")} · ${esc((pv.lens || {}).use || "")}`, `Coat: ${esc((pv.coat || {}).description || "-")}`,
     pv.tint ? `Tint: ${esc(pv.tint.description)} (${esc(pv.tint.barcode)})` : "",
-    pr.touch_total ? `Touch will charge $${esc(pr.touch_total)} (lens x 2 + coat x 2${pv.tint ? " + tint x 2" : ""} + frame)` : "",
+    pr.touch_total ? `Touch will charge $${esc(pr.touch_total)} (lens x 2 + coat x 2${pv.tint ? " + tint x 2" : ""}${(pv.fees || []).length ? " + fees" : ""} + frame)` : "",
     fr.size ? `Frame ${esc(fr.size)}` : ""].filter(Boolean);
   $("cpop").innerHTML = `<div class="eyebrow">Check, then make the job · ${esc((pv.patient || {}).name || st.staff.name)}</div>${head}
     <div class="ctable">${rows.map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join("")}</div>

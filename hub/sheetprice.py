@@ -106,7 +106,9 @@ def options(book: dict, c: dict, idx: str) -> list[dict]:
             o["off"] = idx == o["offIdx"] and not c.get("photo174")
         if idx in (o.get("offAt") or []):
             # 1.53 is clear only (ZEISS makes no BluePro, PhotoFusion or tint at 1.53; Mark 11 Nov 2026)
-            o["off"], o["offwhy"] = True, o.get("offAtWhy") or "Not made at this thickness."
+            why = o.get("offAtWhy")
+            why = why.get(idx) if isinstance(why, dict) else why      # one reason, or one per thickness (12 Nov 2026)
+            o["off"], o["offwhy"] = True, why or "Not made at this thickness."
         out.append(o)
     return out
 
