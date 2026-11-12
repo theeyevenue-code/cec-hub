@@ -191,8 +191,11 @@ def test_frame_by_barcode_row_is_read_and_sized():
     row = ["827", "Ray-Ban RB5154", "Black", "5121.0", "0", "0", "LUX", "2", "299.0000", "2"]
     f = lb.build_frame_record(row)
     assert f == {"barcode": "827", "model": "Ray-Ban RB5154", "colour": "Black", "a": 51.0, "dbl": 21.0, "ed": None,
-                 "sunglass": False, "price": 299.0, "qoh": 2, "brand": ""}
+                 "sunglass": False, "price": 299.0, "qoh": 2, "brand": "", "rimless": False}
     assert lb.build_frame_record(row + ["RAYBAN"])["brand"] == "RAYBAN"     # iPad sheet: brand for the live list
+    assert lb.build_frame_record(row + ["RAYBAN", "~RIM"])["rimless"] is True   # Optomate construction: Rimless
+    assert lb.build_frame_record(row + ["RAYBAN", "~SEM"])["rimless"] is False  # semi rimless (supra) = no fee
+    assert "CONSTRUCTION_IDENTIFIER" in lb.frame_by_barcode_query("827") and "CONSTRUCTION_IDENTIFIER" in lb.frames_search_query(["ray"])
     assert lb.build_frame_record(["x", "", "", "0", "0", "0", "", "3", "", "0"])["sunglass"] is True
     assert lb.build_frame_record(None) is None
 

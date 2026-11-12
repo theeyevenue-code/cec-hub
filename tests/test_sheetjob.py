@@ -369,6 +369,17 @@ def test_rimless_only_153_160_167(c):
     assert ok["can_make"], ok["why"]
 
 
+def test_a_frame_recorded_as_rimless_makes_a_rimless_job_without_the_switch(c, monkeypatch):
+    # 12 Nov 2026: Optomate's frame construction ~RIM = Rimless, so the rimless rules and the fitting fee apply
+    real = sj._frame_out
+    monkeypatch.setattr(sj, "_frame_out", lambda f: {**real(f), "rimless": True})
+    pick(c, "Mia")
+    f = c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"}).get_json()["frame"]
+    assert f["rimless"] is True                                               # the page turns the switch on
+    r = c.post("/api/sheet/checks", json=body(rimless=False)).get_json()      # 1.50 with the switch off
+    assert not r["can_make"] and "Rimless frame: 1.53, 1.60 or 1.67 only" in r["stop"]
+
+
 def test_heights_needed_for_digital_by_its_category(c):
     pick(c, "Lee")
     c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
@@ -813,15 +824,20 @@ def test_hard_coat_only_on_clearview_sv_made_to_order_150_160():
     for tab, card, idx in (("sv", 0, "1.50"), ("sv", 1, "1.60")):
         q = sp.quote(book, {"tab": tab, "card": card, "idx": idx, **tint, "tcoat": "hc"})
         assert q["map"]["tint_coat"] == "hc" and q.get("coat_less") == 80, idx
-    for tab, card, idx in (("sv", 2, "1.67"), ("mf", 0, "1.50"), ("mf", 1, "1.50"), ("mf", 1, "1.74"), ("mf", 2, "1.60")):
+    for tab, card, idx in (("sv", 2, "1.67"), ("mf", 0, "1.50"), ("mf", 1, "1.50"), ("mf", 2, "1.60")):
         q = sp.quote(book, {"tab": tab, "card": card, "idx": idx, **tint, "tcoat": "hc"})
         coats = [t["k"] for t in sp.tint_coats(book, q["map"]["key"])]
         assert "hc" not in coats and q["map"].get("tint_coat") in (None, "platinum") and not q.get("coat_less"), (tab, idx)
     # multifocals still offer back surface AR at the Platinum price
     sup = sp.quote(book, {"tab": "mf", "card": 1, "idx": "1.60", **tint, "tcoat": "bsar"})
     assert sup["map"]["tint_coat"] == "bsar" and sup["total"] == sp.quote(book, {"tab": "mf", "card": 1, "idx": "1.60", **tint})["total"]
-    # tints at 1.74 on multifocals left as they are (Server Desk is asking Mark separately)
-    assert sp.quote(book, {"tab": "mf", "card": 1, "idx": "1.74", **tint})["ok"]
+    # 12 Nov 2026 (Mark): ZEISS can't tint 1.74 multifocals - every multifocal card refuses a tint at 1.74, nothing else moves
+    for card in (0, 1, 2):
+        q = sp.quote(book, {"tab": "mf", "card": card, "idx": "1.74", **tint})
+        assert not q["ok"] and q["why"] == "No tint at 1.74", card
+        assert sp.quote(book, {"tab": "mf", "card": card, "idx": "1.67", **tint})["ok"], card
+        assert sp.quote(book, {"tab": "mf", "card": card, "idx": "1.74", "opt": "clear"})["ok"], card
+    assert sp.quote(book, {"tab": "mf", "card": 1, "idx": "1.53", **tint})["why"] == "Not on 1.53 rimless"
 
 
 def test_hard_coat_line_is_checked_on_the_sheet_price_not_the_row(monkeypatch):

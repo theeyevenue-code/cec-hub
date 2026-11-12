@@ -412,7 +412,7 @@ def staff_rx(s: dict) -> dict:
 def _frame_out(f: dict) -> dict:
     return {"barcode": f.get("barcode"), "brand": f.get("brand") or "", "model": f.get("model"), "colour": f.get("colour"),
             "a": f.get("a"), "dbl": f.get("dbl"), "ed": f.get("ed"), "price": f.get("price"), "qoh": f.get("qoh"),
-            "sunglass": bool(f.get("sunglass"))}
+            "sunglass": bool(f.get("sunglass")), "rimless": bool(f.get("rimless"))}
 
 
 def frame_lookup(cfg: dict, token, barcode="", q="") -> dict:
@@ -573,6 +573,8 @@ def checks(cfg: dict, token, data: dict, rows: list, pricing: dict) -> dict:
     rx = s.get("rx")
     ch = _clean_choice(data.get("choice"))
     fr_in = data.get("frame") if isinstance(data.get("frame"), dict) else {}
+    if not fr_in.get("own") and ((s.get("frame_cache") or {}).get(str(fr_in.get("barcode") or "").strip()) or {}).get("rimless"):
+        data["rimless"] = True        # 12 Nov 2026: the frame record says Rimless, so the fitting fee goes on the job
     _kept[(s["pid"], _today())] = {"choice": {k: ch[k] for k in ("tab", "card", "idx", "opt", "colour", "depth", "pfx", "tcoat")},
                                    "frame": {k: fr_in.get(k) for k in ("own", "barcode", "a", "dbl", "ed")},
                                    "rimless": bool(data.get("rimless"))}
