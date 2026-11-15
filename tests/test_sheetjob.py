@@ -380,6 +380,19 @@ def test_a_frame_recorded_as_rimless_makes_a_rimless_job_without_the_switch(c, m
     assert not r["can_make"] and "Rimless frame: 1.53, 1.60 or 1.67 only" in r["stop"]
 
 
+def test_page_clears_a_rimless_switch_the_last_frame_turned_on():
+    # 15 Nov 2026 review: a rimless frame turns the switch on; the next frame (or Own frame) that isn't recorded as
+    # rimless turns it off again, unless staff pressed the switch themselves - so no fitting fee rides over.
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    for p in (root / "price_sheet" / "template.html", root / "static" / "price-sheet.html"):
+        s = p.read_text(encoding="utf-8")
+        assert "if (f && f.rimless) { fq.rimless = true; fq.rimlessAuto = true;" in s, p
+        assert "else if (fq.rimlessAuto) { fq.rimless = false; fq.rimlessAuto = false;" in s, p
+        assert s.count("if (fq.rimlessAuto) { fq.rimless = false;") == 2, p          # next frame + Own frame
+        assert "fq.rimless = !fq.rimless; fq.rimlessAuto = false;" in s, p          # staff's own press sticks
+
+
 def test_heights_needed_for_digital_by_its_category(c):
     pick(c, "Lee")
     c.post("/api/sheet/frame", json={"barcode": "ZZFRAME5219"})
