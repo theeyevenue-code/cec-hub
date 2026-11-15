@@ -936,7 +936,7 @@ $("changelens").onclick = () => { drawPage(); show("s-sheet"); };
 /* ---- 3 staff: frame, checks, heights, make job (screens 5-7) ----------------------------------
    Rule 1 of the director's doc: the page works nothing out. The blank, the verdict, the fixes and their
    prices, the PD change, the heights rule and whether Make may be pressed all come from /api/sheet/checks. */
-let chk = null, fq = { frame:null, own:false, rimless:false, fix:null, told:false, noRxOk:false, tcoat:"platinum", h:{ R:"", L:"" } }, ddHits = [], ddSel = 0, ddTimer = 0;
+let chk = null, fq = { frame:null, own:false, rimless:false, rimlessAuto:false, fix:null, told:false, noRxOk:false, tcoat:"platinum", h:{ R:"", L:"" } }, ddHits = [], ddSel = 0, ddTimer = 0;
 const choiceNow = () => ({ tab:st.tab, card:st.cardI, idx:curIdx(), opt:(priceNow().o || {}).k || "clear",
   colour:{ Green:"Green" }[st.colour] || st.colour, depth:st.depth, pfx:st.pfx, tcoat:fq.tcoat || "platinum" });
 function frameReq() {
@@ -944,7 +944,7 @@ function frameReq() {
   return fq.frame ? { barcode:fq.frame.barcode, ed_typed:fq.edTyped || "" } : {};
 }
 async function drawFrame() {
-  fq = { frame:null, own:false, rimless:false, fix:null, told:false, noRxOk:false, tcoat:"platinum", h:{ R:"", L:"" } }; chk = null;
+  fq = { frame:null, own:false, rimless:false, rimlessAuto:false, fix:null, told:false, noRxOk:false, tcoat:"platinum", h:{ R:"", L:"" } }; chk = null;
   $("bc").value = ""; $("framefacts").innerHTML = ""; ["oa","odbl","oed"].forEach(i => $(i).value = "");
   $("own").classList.remove("on"); $("rimless").classList.remove("on"); $("ownsize").style.display = "none";
   $("vline").className = "vline"; $("vline").textContent = "Scan the frame."; $("eyetable").innerHTML = "";
@@ -1070,7 +1070,10 @@ async function scanBarcode(v) {
 }
 function frameChosen(f) {
   fq.frame = f; fq.own = false; fq.fix = null; fq.told = false; fq.edTyped = ""; $("own").classList.remove("on"); $("ownsize").style.display = "none";
-  if (f && f.rimless) { fq.rimless = true; $("rimless").classList.add("on"); }   // the frame record says Rimless (12 Nov 2026)
+  // the frame record says Rimless (12 Nov 2026): switch on. A switch the last frame turned on goes off again for a
+  // frame that isn't recorded as rimless (15 Nov 2026), so a fitting fee never rides over to the next frame.
+  if (f && f.rimless) { fq.rimless = true; fq.rimlessAuto = true; $("rimless").classList.add("on"); }
+  else if (fq.rimlessAuto) { fq.rimless = false; fq.rimlessAuto = false; $("rimless").classList.remove("on"); }
   $("framefacts").innerHTML = "";                         // the frame shows once, in the table
   runChecks();
 }
@@ -1084,8 +1087,9 @@ $("bc").addEventListener("keydown", (ev) => {
   else if (ev.key === "Enter") { const v = $("bc").value.trim(); if (/^[A-Za-z0-9._-]+$/.test(v) && !open) { closeDD(); scanBarcode(v); } else if (open) pickDD(ddSel); }
 });
 $("own").onclick = () => { fq.own = !fq.own; fq.frame = null; fq.fix = null; $("own").classList.toggle("on", fq.own); $("ownsize").style.display = fq.own ? "" : "none";
+  if (fq.rimlessAuto) { fq.rimless = false; fq.rimlessAuto = false; $("rimless").classList.remove("on"); }   // it came from the old frame
   $("framefacts").innerHTML = ""; runChecks(); };
-$("rimless").onclick = () => { fq.rimless = !fq.rimless; $("rimless").classList.toggle("on", fq.rimless); runChecks(); };
+$("rimless").onclick = () => { fq.rimless = !fq.rimless; fq.rimlessAuto = false; $("rimless").classList.toggle("on", fq.rimless); runChecks(); };
 ["oa","odbl","oed"].forEach(i => $(i).oninput = () => { clearTimeout(ddTimer); ddTimer = setTimeout(runChecks, 400); });
 
 /* ---- screen 6: check, then make the job (the engine's plan: exactly what will be written) ---- */
