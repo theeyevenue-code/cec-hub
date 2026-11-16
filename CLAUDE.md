@@ -22,6 +22,30 @@ Chain of command: **Mark -> two generals** (Front Desk = home PC, Server Desk = 
 7. **Stop at Mark's lines.** Server: merges, turning on a live write or patient send, money and anything staff notice need his words, said in that session; a switch he has already turned on runs as approved until he says otherwise. Home: red actions need the S24 preflight and his go; a tick on his phone list is his word. Privacy guardrails beat everything here.
 <!-- /standing-orders -->
 
+## Mark's preferences: read them at session start (one source, never copied here)
+Mark, 16 Nov 2026: "my preferences and my stuff that I like from the front desk might still somehow, if it's
+relevant ... be linked to the referral generator and sidetrack and everything". The Hub is one node of the
+practice, not an entity in itself. Claude Code keeps memory per folder, so a session opened here does NOT see what
+Mark taught other sessions unless it reads it. Before any page, staff-facing or reply work:
+1. Server Desk's index `C:/Users/ConcordeyecareServer/.claude/projects/C--CEC-CEC-Optomate-Agent/memory/MEMORY.md`;
+   open every file it links that touches the work (they sit beside it).
+2. Front Desk's index `C:/CEC/brain-readonly/shared-memory/MEMORY.md` (read-only clone: `git -C C:/CEC/brain-readonly
+   pull --ff-only` first); open the ones that apply here (design, wording, privacy).
+3. Mark's decisions: "Decided here" in `C:/CEC/CEC-Optomate-Agent/docs/reports/server-ledger.md`, and the agent
+   `logs/CHANGELOG.md` decision / LIVE / merge headings that name the Hub.
+
+Likely to apply here (file names in the Server Desk memory folder; read the file, this list is only a pointer):
+`readability-standard.md`, `simplicity-rule-kats-rule.md`, `staff-lens-names-not-tier-names.md`,
+`live-dropdown-search.md`, `patient-search-accepts-full-name.md`, `nobody-checks-the-hub.md`,
+`staff-change-one-at-a-time.md`, `staff-updates-weekly-email.md`, `no-window-flash-on-server.md`,
+`privacy-filters-not-overcautious.md`, `no-paid-api-testing-without-ok.md`, `mark-hub-design-preferences.md`.
+The agent CLAUDE.md beats a preference. If a Server and a Front preference disagree, the Server
+one applies here and the clash goes to Front Desk as a ledger flag.
+
+A new preference Mark gives in a session here is saved once, in the Server Desk memory folder above (file + its
+MEMORY.md line), never in this repo or a per-folder memory. Front Desk's files are read-only from here: to change
+one, flag it (`python -m system.ledger add flag --for Front`, run in the agent repo).
+
 ## Hub specifics
 
 | Rule | Why |
