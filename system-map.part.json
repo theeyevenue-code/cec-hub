@@ -1,0 +1,21 @@
+{
+  "_about": "This repo's part of the practice map (Mark, 16 Nov 2026: \"a part of the node and it's not an entity in itself\"). Server Desk's map (C:/CEC/CEC-Optomate-Agent, python -m system.map) reads this file from origin/main and adds it to the jobs.json app 'hub'; rule RN greps origin/main for effects nothing declares. NAMES OF THINGS ONLY: no patient data, no switch values, no keys. Ids must exist in the agent's system/resources.json or be declared under 'resources' here. Change it in the same commit as the code that changes an effect (standing order 5). What the Hub does through the agent's engine (texts, Optomate writes) stays declared in the agent's jobs.json 'hub' entry.",
+  "meta": {"repo": "cec-hub", "app": "hub", "owner_desk": "Server", "updated": "2026-11-16",
+           "source": "local-reports/review-hub-and-command-2026-11-16.html (finding 6) and a grep of origin/main"},
+  "resources": [
+    {"id": "file.hub.sendguide_history", "label": "Hub send-guide record: which guide went to which patient email, and the outcome",
+     "path": "C:/CEC/runtime/hub-send-guide/send-history.sqlite3", "sensitivity": "patient-admin", "single_writer": true, "ledger": true}
+  ],
+  "adds": {
+    "reads": ["optomate.database", "file.hub.sendguide_history"],
+    "writes": ["mail.info.send", "file.hub.sendguide_history"],
+    "egress": [
+      {"to": "ext.anthropic_api", "what": "Lens Finder assistant: staff's lens question + lens attributes (names, dates and ID-like numbers blocked before sending; no Rx, no money)", "sensitivity": "business"}
+    ],
+    "costs_money": "Claude API per Lens Finder assistant question (Mark's device only, monthly cap in config/lenschat.json)"
+  },
+  "launchers": [
+    {"file": "RUN-HUB-HIDDEN.bat", "how": "Startup-folder 'CEC Hub.vbs' at logon (INSTALL-AUTOSTART.bat) -> RUN-HUB-HIDDEN.bat -> pythonw app.py; RESTART-HUB.bat / .ps1 by hand"},
+    {"file": "HUB-WATCHDOG.vbs", "how": "task CEC Hub Watchdog -> HUB-WATCHDOG.ps1 -> pythonw app.py when unhealthy (INSTALL-WATCHDOG.bat registers the task)"}
+  ]
+}
