@@ -34,10 +34,12 @@ Mark taught other sessions unless it reads it. Before any page, staff-facing or 
 3. Mark's decisions: "Decided here" in `C:/CEC/CEC-Optomate-Agent/docs/reports/server-ledger.md`, and the agent
    `logs/CHANGELOG.md` decision / LIVE / merge headings that name the Hub.
 
-Likely to apply here: readability and the 3-second skim, the simplicity rule (Kat's rule), staff product names,
-live dropdown search, full-name patient search, nobody checks the Hub (act-on items go by email), one staff change
-at a time, staff updates in the weekly email, no window flash, privacy (names fine, clinical detail never), quote
-before spending. The agent CLAUDE.md beats a preference. If a Server and a Front preference disagree, the Server
+Likely to apply here (file names in the Server Desk memory folder; read the file, this list is only a pointer):
+`readability-standard.md`, `simplicity-rule-kats-rule.md`, `staff-lens-names-not-tier-names.md`,
+`live-dropdown-search.md`, `patient-search-accepts-full-name.md`, `nobody-checks-the-hub.md`,
+`staff-change-one-at-a-time.md`, `staff-updates-weekly-email.md`, `no-window-flash-on-server.md`,
+`privacy-filters-not-overcautious.md`, `no-paid-api-testing-without-ok.md`, `mark-hub-design-preferences.md`.
+The agent CLAUDE.md beats a preference. If a Server and a Front preference disagree, the Server
 one applies here and the clash goes to Front Desk as a ledger flag.
 
 A new preference Mark gives in a session here is saved once, in the Server Desk memory folder above (file + its

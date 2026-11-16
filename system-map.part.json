@@ -12,7 +12,7 @@
     "egress": [
       {"to": "ext.anthropic_api", "what": "Lens Finder assistant: staff's lens question + lens attributes (names, dates and ID-like numbers blocked before sending; no Rx, no money)", "sensitivity": "business"}
     ],
-    "costs_money": "Claude API per Lens Finder assistant question (Mark's device only, monthly cap in config/lenschat.json)"
+    "costs_money": "Claude API per Lens Finder assistant question (Mark's device only; spend cap cap_aud in config/lenschat.json, code default A$10 in total with a 7-day trial unless that file sets monthly)"
   },
   "launchers": [
     {"file": "RUN-HUB-HIDDEN.bat", "how": "Startup-folder 'CEC Hub.vbs' at logon (INSTALL-AUTOSTART.bat) -> RUN-HUB-HIDDEN.bat -> pythonw app.py; RESTART-HUB.bat / .ps1 by hand"},
