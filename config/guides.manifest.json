@@ -87,6 +87,18 @@
       "active": true
     },
     {
+      "id": "myopia-control-options",
+      "title": "Myopia Control - Options",
+      "version": "Nov 2026 (interim, no prices; Fable rev 4 to replace)",
+      "stage": "DECIDING",
+      "language": "en",
+      "path": "CEC-Myopia-Control-Options-Guide-A4.pdf",
+      "sha256": "160486bbb39f762f58196f6a032d5c6ea86e075e9fcab3b878f0325e4a21be31",
+      "approval_ref": "Mark 18 Nov 2026 via Front Desk: \"Can you save it into the Google Drive ... and put this into the send guide function\" and \"No prices\" (second-brain wiki/log.md 18 Nov receipt, master d4679e08). Drive: Patient guides - Deciding/PATIENT GUIDE - Myopia Control - Options (Nov 2026).pdf (hash checked against the Drive copy).",
+      "classification": "decision",
+      "active": true
+    },
+    {
       "id": "adult-myopia",
       "title": "Adult Myopia Guide",
       "version": "Nov 2026 (12 Nov rev)",
