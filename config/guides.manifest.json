@@ -101,12 +101,12 @@
     {
       "id": "adult-myopia",
       "title": "Adult Myopia Guide",
-      "version": "Nov 2026 (12 Nov rev)",
+      "version": "version C, Nov 2026 (19 Nov)",
       "stage": "GENERAL",
       "language": "en",
-      "path": "CEC-Adult-Myopia-Guide-A4-v2-design.pdf",
-      "sha256": "749f02e317081ce7c3b53e8c15006a1c25de168a0c34217ffe42f50edbd095b1",
-      "approval_ref": "Mark 12 Nov 2026 via Front Desk Q2: yes to the rule-only touch-ups (we-voice, two headings renamed, free 30-minute assessment as on the site) (second-brain wiki/log.md 12 Nov decision; export commit 02d91e3c). Republished to Drive 12 Nov: Patient guides - General/PATIENT GUIDE - Adult Myopia (Nov 2026).pdf (hash checked).",
+      "path": "CEC-Adult-Myopia-Guide-A4-vC.pdf",
+      "sha256": "3fba000b94129450e3d95f83586364bd6a44f1c9201bc9de23df890863b7c2dd",
+      "approval_ref": "Mark 19 Nov 2026 via Front Desk: \"version C looks good\". Drive: Patient guides - General/PATIENT GUIDE - Adult Myopia (Nov 2026).pdf (old copy moved to _Superseded; hash checked against the Drive copy 19 Nov). Previous: 12 Nov rev, CEC-Adult-Myopia-Guide-A4-v2-design.pdf (kept in the guides folder).",
       "classification": "care",
       "active": true
     },
