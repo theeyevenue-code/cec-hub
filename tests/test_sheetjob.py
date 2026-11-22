@@ -31,6 +31,7 @@ LENS_CSV = (
     "ZEISS,ZEISS,ClearView Single Vision 1.50,Single vision,1.50,Clear BluePro,grind,,-10.00,+8.00,-4.00,,,32.00,DuraVision Plus Platinum UV\n"
     "ZEISS,ZEISS,ClearView Single Vision 1.60,Single vision,1.60,Clear,grind,,-12.00,+8.00,-4.00,,,35.00,DuraVision Plus Platinum UV\n"
     "ZEISS,ZEISS,SmartLife Digital 1.60,Anti-fatigue,1.60,Clear,grind,,-10.00,+8.00,-4.00,,,60.00,DuraVision Plus Platinum UV\n"
+    "ZEISS,ZEISS,SmartLife Digital 1.60,Anti-fatigue,1.60,Clear BluePro,grind,,-10.00,+8.00,-4.00,,,62.50,DuraVision Plus Platinum UV\n"  # blue included, 23 Nov 2026
     "Synchrony,Synchrony,FSV Clear 1.50,Single vision,1.50,Clear,stock,70,-4.00,+4.00,-2.00,,,9.00,HMC+\n"
     "Synchrony,Synchrony,FSV Clear 1.56,Single vision,1.56,Clear,stock,65,+0.25,+4.00,-2.00,,,9.00,HMC+\n"
     "Synchrony,Synchrony,Progressive Ultra HDV 1.50,Progressive,1.50,Clear,grind,,-8.00,+6.00,-4.00,0.75,3.50,45.00,HMC+\n"
@@ -47,6 +48,7 @@ LINK_CSV = HEAD + (
     "ZEISS,ClearView Single Vision 1.50,1.50,Clear BluePro,DuraVision Plus Platinum UV,grind,,Single vision,,yes,20001363,SV Grind Blue 1.50,175.00,20002018,0.00,addon,350.00,350.00,,yes,name,,unchecked,,\n"
     "ZEISS,ClearView Single Vision 1.60,1.60,Clear,DuraVision Plus Platinum UV,grind,,Single vision,,yes,20001352,SV Grind 1.60,175.00,20002018,0.00,addon,350.00,350.00,,yes,name,,unchecked,,\n"
     "ZEISS,SmartLife Digital 1.60,1.60,Clear,DuraVision Plus Platinum UV,grind,,Anti-fatigue,,yes,20001600,Digital 1.60,225.00,20002018,0.00,addon,450.00,450.00,,yes,name,,unchecked,,\n"
+    "ZEISS,SmartLife Digital 1.60,1.60,Clear BluePro,DuraVision Plus Platinum UV,grind,,Anti-fatigue,,yes,20001602,Digital Blue 1.60,225.00,20002018,0.00,addon,450.00,450.00,,yes,name,,unchecked,,\n"
     "Synchrony,FSV Clear 1.50,1.50,Clear,HMC+,stock,70,Single vision,,yes,20001311,Synchrony FSV 1.50,70.00,20001325,0.00,addon,140.00,140.00,,yes,name,,unchecked,,\n"
     "Synchrony,Progressive Ultra HDV 1.50,1.50,Clear,HMC+,grind,,Progressive,,yes,20001267,Ultra HDV 1.50,210.00,20001325,0.00,addon,420.00,420.00,,yes,code,,unchecked,,\n"
 )

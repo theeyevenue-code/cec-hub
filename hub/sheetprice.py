@@ -238,6 +238,8 @@ def pricebook(book: dict, ch: dict, pr: dict | None = None) -> dict:
         if not cm:
             return {"ok": False, "why": "No price-book lens for this card."}
         mat = (cm.get("material") or {}).get(k)
+        if isinstance(mat, dict):
+            mat = mat.get(idx)                           # SmartLife Digital: BluePro included except 1.53 (23 Nov 2026)
         coat = _pick(cm.get("coating"), k)
         if not mat or not coat:
             return {"ok": False, "why": "No price-book lens for this option."}
@@ -305,6 +307,9 @@ def finder_prices(cfg: dict | None, book: dict | None = None) -> dict:
         by = _sheet_by_index(book, t["from"])
         new = {"name": t["name"], "category": t["category"], "match": list(t["match"]), "by_index": by,
                "source": "prices.json"}
+        if t.get("addons"):
+            # a tier's own add-ons replace the global ones (SmartLife Digital: blue light included, 23 Nov 2026)
+            new["addons"] = _addons(book, t["addons"], {})
         i = next((i for i, x in enumerate(tiers) if x.get("name") == t["name"] and not x.get("materials")
                   and not x.get("by_coating")), None)
         if i is None:
@@ -316,9 +321,14 @@ def finder_prices(cfg: dict | None, book: dict | None = None) -> dict:
             tiers[i] = {**{k: v for k, v in tiers[i].items() if k not in ("by_index", "_note")}, **new,
                         "by_index": {**only, **by}, "file_only": sorted(only)}
     cfg["tiers"] = tiers
-    adds = dict(cfg.get("addons") or {})
+    cfg["addons"] = _addons(book, lf.get("addons") or {}, dict(cfg.get("addons") or {}))
+    return cfg
+
+
+def _addons(book: dict, specs: dict, adds: dict) -> dict:
+    """{snippet: 'optionSet:option' | 'tab:grind'} -> {snippet: add-on $}, copied from prices.json onto `adds`."""
     sets = book["data"].get("optionSets") or {}
-    for k, spec in (lf.get("addons") or {}).items():
+    for k, spec in specs.items():
         a, _, b = spec.partition(":")
         if b == "grind":
             c = (card(book, a, 0) or {})
@@ -329,8 +339,7 @@ def finder_prices(cfg: dict | None, book: dict | None = None) -> dict:
             for old in [x for x in adds if x.lower() == k.lower()]:
                 del adds[old]
             adds[k] = val
-    cfg["addons"] = adds
-    return cfg
+    return adds
 
 
 def quote(book: dict, ch: dict) -> dict:

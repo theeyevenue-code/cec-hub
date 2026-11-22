@@ -115,3 +115,19 @@ def test_one_price_source_no_figure_in_two_places():
     assert sv["by_index"]["1.67"] == 350 and sv["by_index"]["1.74"] == 500
     assert new["addons"]["PhotoFusion|Photochromic|Transitions|Sensity"] == 150
     assert any(x["name"] == "Office" for x in new["tiers"])        # added from the sheet when the file lacks it
+
+
+def test_digital_blue_included_at_the_clear_price():
+    """Mark, 23 Nov 2026 ("Yes, at $350"): SmartLife Digital 1.50-1.74 carries the blue-light filter at the clear
+    price; the job links to the BluePro lens; 1.53 rimless stays plain clear; PhotoFusion X still +$150."""
+    from hub import sheetprice
+    book = sheetprice.load()
+    for card, idx, total in ((0, "1.50", 350), (1, "1.60", 450), (2, "1.67", 560), (3, "1.74", 740)):
+        q = sheetprice.quote(book, {"tab": "af", "card": card, "idx": idx, "opt": "clear"})
+        assert q["total"] == total and q["map"]["key"]["material"] == "Clear BluePro"
+        assert not any(o["k"] == "blue" for o in sheetprice.options(book, sheetprice.card(book, "af", card), idx))
+        assert sheetprice.quote(book, {"tab": "af", "card": card, "idx": idx, "opt": "photo"})["total"] == total + 150
+    q = sheetprice.quote(book, {"tab": "af", "card": 4, "idx": "1.53", "opt": "clear"})
+    assert q["total"] == 400 and q["map"]["key"]["material"] == "Clear"
+    tier = next(t for t in sheetprice.finder_prices({}, book)["tiers"] if t["name"] == "Screen Relief")
+    assert tier["addons"]["BluePro"] == 0 and tier["addons"]["PhotoFusion|Photochromic|Transitions|Sensity"] == 150
