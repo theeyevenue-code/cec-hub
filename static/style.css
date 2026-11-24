@@ -2263,3 +2263,13 @@ tr.ja-flash td { animation: ja-flash 1.2s ease-out; }
 .ja-key .ja-amber { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber-ink); }
 .ja-callword { color: var(--amber-ink); }
 @media (max-width: 700px) { .ja-table th:nth-child(4), .ja-table td:nth-child(4) { display: none; } }
+
+/* Jobs arrived status column (Mark 24 Nov 2026): status, then the frame question, then the text */
+.ja-q { font-size: 16px; font-weight: 600; margin-top: 10px; }
+.ja-ans-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.ja-ans { font: inherit; font-size: 16px; padding: 6px 14px; border-radius: 10px; border: 1px solid #b5b5b5; background: #fff; color: #2b2b2b; cursor: pointer; }
+.ja-ans-on { background: #e3f3ea; border-color: var(--green); color: var(--green-dark); font-weight: 600; }
+.ja-link { font: inherit; font-size: 15px; background: none; border: 0; padding: 0; margin-top: 8px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+.ja-sms { margin-top: 10px; }
+.ja-sms-to { font-weight: 600; }
+.ja-q-open { color: var(--amber-ink); background: var(--amber-bg); border: 1px solid var(--amber-line); border-radius: 8px; padding: 4px 10px; display: inline-block; }

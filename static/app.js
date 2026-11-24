@@ -4825,18 +4825,19 @@ async function renderStocktake(sid) {
    patient kept the frame - that job gets the "bring in your glasses" text. Optomate's own-frame tick
    is only a hint ("Own frame in Optomate"): it is also ticked when the frame was left with us. */
 
-const ja = { lines: new Map(), own: new Set(), gates: null, words: "", busy: false, seq: 0,
+const ja = { lines: new Map(), own: new Set(), framed: new Set(), gates: null, words: "", busy: false, seq: 0,
              texts: new Map(), pvSeq: 0, pvTimer: null, pvFor: "" };
 const JA_STATE = {
-    ok: ["Ready to mark", "ja-ok"], received: ["Already in", "ja-grey"], looking: ["Checking…", "ja-wait"],
-    cancelled: ["Cancelled", "ja-red"], notfound: ["Not found", "ja-red"], bad: ["Not a job number", "ja-red"],
-    error: ["Couldn't check", "ja-red"], pick: ["Glasses or contacts?", "ja-wait"],
+    ok: ["✓ Marks received on Confirm", "ja-ok"], received: ["Already received - skipped", "ja-grey"],
+    looking: ["Checking…", "ja-wait"], cancelled: ["Cancelled - skipped", "ja-red"],
+    notfound: ["Not found - skipped", "ja-red"], bad: ["Not a job number - skipped", "ja-red"],
+    error: ["Couldn't check - skipped", "ja-red"], pick: ["Glasses or contacts?", "ja-wait"],
 };
 const JA_TYPE = { glasses: ["GLASSES", "ja-type-g"], contacts: ["CONTACTS", "ja-type-c"] };
 
 function renderJobsArrived() {
     reloadIfHubChanged();      // empty list: nothing to lose
-    ja.lines = new Map(); ja.own = new Set(); ja.busy = false; ja.seq += 1;
+    ja.lines = new Map(); ja.own = new Set(); ja.framed = new Set(); ja.busy = false; ja.seq += 1;
     ja.texts = new Map(); ja.pvFor = ""; clearTimeout(ja.pvTimer);
     view.innerHTML = `<div class="ja-page">
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
@@ -4933,6 +4934,11 @@ function jaFlash(key) {
     row.classList.remove("ja-flash"); void row.offsetWidth; row.classList.add("ja-flash");
 }
 
+/* a flagged own-frame glasses job nobody has answered yet: Confirm waits for it */
+function jaNeedsFrame(l) {
+    return l.state === "ok" && l.type === "glasses" && l.own_frame && !ja.framed.has(l.key);
+}
+
 function jaReady() { return [...ja.lines.values()].filter((l) => l.state === "ok" && /^[GC]\d+$/.test(l.key)); }
 
 function jaTypeCell(type) {
@@ -4960,11 +4966,19 @@ function jaRow(l) {
     if (l.call) extra.push(`<span class="ja-chip ja-call">${esc(l.call)}</span>`);
     if (l.trial) extra.push(`<span class="ja-chip ja-plain">Trial</span>`);
     if (l.state === "ok" && l.type === "glasses") {
+        // Mark 24 Nov 2026: one plain question instead of a "Replacement lenses" switch + hint. Optomate's own-frame
+        // tick is only a hint (also ticked when the frame was left with us), so it asks; other jobs get a quiet link.
         const on = ja.own.has(l.key);
-        extra.push(`<button type="button" class="ja-own${on ? " ja-own-on" : ""}" data-ja-own="${esc(l.key)}" aria-pressed="${on}">${on ? "✓ " : ""}Replacement lenses</button>`);
-        if (l.own_frame && !on) extra.push(`<div class="ja-why">Own frame in Optomate - does the patient have it? Press Replacement lenses.</div>`);
+        const answered = ja.framed.has(l.key);
+        const btn = (v, label, sel) => `<button type="button" class="ja-ans${sel ? " ja-ans-on" : ""}" data-ja-frame="${esc(l.key)}" data-v="${v}" aria-pressed="${sel}">${sel ? "✓ " : ""}${label}</button>`;
+        if (l.own_frame || on) {
+            extra.push(`<div class="ja-q${answered ? "" : " ja-q-open"}">Where is the frame?${answered ? "" : " Pick one"}</div>
+                <div class="ja-ans-row">${btn("here", "Frame is here", answered && !on)}${btn("patient", "Patient has the frame", answered && on)}</div>`);
+        } else {
+            extra.push(`<div><button type="button" class="ja-link" data-ja-frame="${esc(l.key)}" data-v="patient">Change: patient has the frame</button></div>`);
+        }
     }
-    if (l.state === "ok") extra.push(jaTextPreview(l.key));
+    if (l.state === "ok") extra.push(jaNeedsFrame(l) ? `<div class="ja-sms ja-sms-wait">Text: pick where the frame is first</div>` : jaTextPreview(l.key));
     const why = [l.state !== "bad" && l.reason ? l.reason : "", l.note || ""].filter(Boolean);
     const others = (l.others || []).map((o) => o.old
         ? `<div class="ja-other ja-other-old">Old open job - check: ${esc(o.what)}, job ${esc(o.job)} (ordered ${esc(o.ordered || "?")})</div>`
@@ -4975,7 +4989,7 @@ function jaRow(l) {
         <td class="ja-name">${esc(l.name || "")}</td>
         <td>${esc(l.lens || "")}</td>
         <td class="ja-num">${esc(l.ordered || "")}</td>
-        <td><span class="ja-chip">${esc(word)}</span> ${extra.join(" ")}${why.map((w) => `<div class="ja-why">${esc(w)}</div>`).join("")}</td>
+        <td><span class="ja-chip">${esc(word)}</span>${extra.join("")}${why.map((w) => `<div class="ja-why">${esc(w)}</div>`).join("")}</td>
         <td><button class="btn btn-quiet ja-x" type="button" data-ja-remove="${esc(l.key)}" aria-label="Remove job ${esc(l.id)}">Remove</button></td>
     </tr>${others ? `<tr class="${cls} ja-others-row"><td></td><td colspan="6">${others}</td></tr>` : ""}`;
 }
@@ -4984,7 +4998,10 @@ function jaRow(l) {
 function jaTextPreview(key) {
     const t = ja.texts.get(key);
     if (!t) return `<div class="ja-sms ja-sms-wait">Text: checking…</div>`;
-    if (t.message) return `<div class="ja-sms">${esc(t.text.replace(/^Would text/, "Texts"))}:<br>“${esc(t.message)}”</div>`;
+    if (t.message) {
+        const to = /mobile ending (\d+)/.exec(t.text || "");
+        return `<div class="ja-sms"><span class="ja-sms-to">Text to ${to ? "…" + esc(to[1]) : "the patient"}:</span><br>“${esc(t.message)}”</div>`;
+    }
     return `<div class="ja-why">${esc(t.text || "No text")}</div>`;
 }
 
@@ -5018,15 +5035,15 @@ function jaDraw() {
     const rows = [...ja.lines.values()];
     list.innerHTML = rows.length ? `<table class="ja-table">
         <thead><tr><th>Type</th><th>Job</th><th>Patient</th><th>Lens</th><th>Ordered</th><th>Status</th><th></th></tr></thead>
-        <tbody>${rows.map(jaRow).join("")}</tbody></table>
-        <div class="ja-key"><span class="ja-chip ja-ok">Ready to mark</span> <span class="ja-chip ja-grey">Already in - skipped</span> <span class="ja-chip ja-red">Problem - skipped</span> <span class="ja-chip ja-amber">Pick glasses or contacts</span></div>`
+        <tbody>${rows.map(jaRow).join("")}</tbody></table>`
         : `<div class="ja-empty">No jobs scanned yet.</div>`;
     list.querySelectorAll("[data-ja-remove]").forEach((b) => b.addEventListener("click", () => {
         ja.lines.delete(b.dataset.jaRemove); jaDraw(); document.getElementById("ja-in").focus();
     }));
-    list.querySelectorAll("[data-ja-own]").forEach((b) => b.addEventListener("click", () => {
-        const k = b.dataset.jaOwn;
-        if (ja.own.has(k)) ja.own.delete(k); else ja.own.add(k);
+    list.querySelectorAll("[data-ja-frame]").forEach((b) => b.addEventListener("click", () => {
+        const k = b.dataset.jaFrame;
+        if (b.dataset.v === "patient") ja.own.add(k); else ja.own.delete(k);
+        ja.framed.add(k);
         jaDraw(); document.getElementById("ja-in").focus();
     }));
     list.querySelectorAll("[data-ja-pick]").forEach((b) => b.addEventListener("click", () => {
@@ -5041,10 +5058,11 @@ function jaDraw() {
     const nc = ready.filter((l) => l.type === "contacts").length;
     const waiting = rows.some((l) => l.state === "looking");
     const picks = rows.filter((l) => l.state === "pick").length;
+    const frames = rows.filter(jaNeedsFrame).length;
     const what = nc && nc < n ? `${n - nc} glasses + ${nc} contacts` : `${n} ${nc ? "contacts order" : "job"}${n === 1 ? "" : "s"}`;
     foot.innerHTML = `${picks ? `<div class="ja-banner ja-banner-test">${picks} line${picks === 1 ? "" : "s"} need${picks === 1 ? "s" : ""} Glasses or Contacts picked first - ${picks === 1 ? "it is" : "they are"} left out until then.</div>` : ""}
-        <button id="ja-go" class="btn ja-go" type="button" ${n && !waiting && !ja.busy ? "" : "disabled"}>
-        Confirm ${what}</button><div id="ja-msg"></div>`;
+        <button id="ja-go" class="btn ja-go" type="button" ${n && !waiting && !ja.busy && !frames ? "" : "disabled"}>
+        ${frames ? `Answer ${frames} frame question${frames === 1 ? "" : "s"} first` : `Confirm ${what}`}</button><div id="ja-msg"></div>`;
     document.getElementById("ja-go").addEventListener("click", jaConfirm);
 }
 
@@ -5076,6 +5094,7 @@ function jaDialogText(ready) {
 async function jaConfirm() {
     const ready = jaReady();
     if (ja.busy || !ready.length) return;
+    if ([...ja.lines.values()].some(jaNeedsFrame)) return;     // a frame question is still open
     const asked = Date.now();
     if (!window.confirm(jaDialogText(ready))) {
         // a "No" faster than anyone can read = the browser blocked the box, not staff
@@ -5122,7 +5141,7 @@ function jaResults(d) {
                     <td class="ja-name">${esc(x.name)}${(x.others || []).map((o) => `<div class="ja-other${o.old ? " ja-other-old" : ""}">${o.old ? "Old open job - check" : "Still open"}: ${esc(o.what)}, job ${esc(o.job)}</div>`).join("")}</td>
                     <td><span class="ja-chip">${esc(word)}</span></td>
                     <td>${esc(x.write)}</td>
-                    <td>${x.own ? `<span class="ja-chip ja-plain">Replacement lenses</span> ` : ""}${x.call ? `<span class="ja-chip ja-call">${esc(x.text)}</span>` : esc(x.text)}${x.message ? `<div class="ja-sms">“${esc(x.message)}”</div>` : ""}${x.job_note ? `<div class="ja-why">${esc(x.job_note)}</div>` : ""}</td>
+                    <td>${x.own ? `<span class="ja-chip ja-plain">Patient has the frame</span> ` : ""}${x.call ? `<span class="ja-chip ja-call">${esc(x.text)}</span>` : esc(x.text)}${x.message ? `<div class="ja-sms">“${esc(x.message)}”</div>` : ""}${x.job_note ? `<div class="ja-why">${esc(x.job_note)}</div>` : ""}</td>
                 </tr>`; }).join("")}</tbody></table>
         <button class="btn ja-go" type="button" id="ja-again">Scan more jobs</button>
     </div>`;
