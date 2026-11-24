@@ -1,5 +1,5 @@
 {
- "_readme": "The iPad price sheet's prices (Mark, 10 Nov 2026). ONE price file: price_sheet/build.py inlines it into static/price-sheet.html and the Hub server (hub/sheetprice.py) reads the same file to price a job. Copied verbatim from the printed patient sheets (second-brain price-lists/patient) and the staff scan sheets; never worked out. Change a price here, rebuild, and run the sheet audit (agent repo: python -m pricing.sheet_audit). The small 'Essential SV' tab (1.50 and 1.56 only; from 1.60 ZEISS: Mark, 10 Nov 2026) (Synchrony single vision, Mark 10 Nov 2026): stock and made-to-order pair prices copied from the Hub price book (pricing/lens_link.csv hub_pair_price = Optomate lens x 2 where linked). 11 Nov 2026 (Mark): Synchrony single vision is stock only (made to order removed); Synchrony 1.53 rimless $170 and Photo Grey $240 added, and SmartLife Digital 1.53 rimless $400, all copied from the printed Nov 2026 sheets (fronts and scan backs). 11 Nov 2026 (Mark, verified against ZEISS's Oct 2026 product guide, its May 2026 codes and Optomate's 46 ZEISS 1.53 items): 1.53 is clear (or polarised) only - blue-light, light-reactive and tints are off at 1.53 ('offAt'), as the printed sheets say. 12 Nov 2026 (Mark): ZEISS can't tint 1.74 multifocals, so the multifocal Sun tint is off at 1.74 as well ('offAtWhy' may name a reason per thickness). 23 Nov 2026 (Mark: \"Yes, at $350\"): blue-light filter included as standard on SmartLife Digital 1.50-1.74 at the clear price (the 'clear' option of optionSets AF is the BluePro lens; sheet_map af material by index); 1.53 rimless stays clear only.",
+ "_readme": "The iPad price sheet's prices (Mark, 10 Nov 2026). ONE price file: price_sheet/build.py inlines it into static/price-sheet.html and the Hub server (hub/sheetprice.py) reads the same file to price a job. Copied verbatim from the printed patient sheets (second-brain price-lists/patient) and the staff scan sheets; never worked out. Change a price here, rebuild, and run the sheet audit (agent repo: python -m pricing.sheet_audit). The small 'Essential SV' tab (1.50 and 1.56 only; from 1.60 ZEISS: Mark, 10 Nov 2026) (Synchrony single vision, Mark 10 Nov 2026): stock and made-to-order pair prices copied from the Hub price book (pricing/lens_link.csv hub_pair_price = Optomate lens x 2 where linked). 11 Nov 2026 (Mark): Synchrony single vision is stock only (made to order removed); Synchrony 1.53 rimless $170 and Photo Grey $240 added, and SmartLife Digital 1.53 rimless $400, all copied from the printed Nov 2026 sheets (fronts and scan backs). 11 Nov 2026 (Mark, verified against ZEISS's Oct 2026 product guide, its May 2026 codes and Optomate's 46 ZEISS 1.53 items): 1.53 is clear (or polarised) only - blue-light, light-reactive and tints are off at 1.53 ('offAt'), as the printed sheets say. 12 Nov 2026 (Mark): ZEISS can't tint 1.74 multifocals, so the multifocal Sun tint is off at 1.74 as well ('offAtWhy' may name a reason per thickness). 23 Nov 2026 (Mark: \"Yes, at $350\"): blue-light filter included as standard on SmartLife Digital 1.50-1.74 at the clear price (the 'clear' option of optionSets AF is the BluePro lens; sheet_map af material by index); 1.53 rimless stays clear only. 23 Nov 2026 (Mark: 'don't highlight the Our pick one, just make it all the same'): the three multifocal tiers carry no tag and no highlight, so none is pre-selected for the patient.",
  "date": "2026-11-10",
  "optionSets": {
   "SV_LOW": [
@@ -369,7 +369,7 @@
    ],
    "cards": [
     {
-     "tag": "Best value",
+     "tag": "",
      "tier": "Essential",
      "line": "Synchrony Ultra HDV",
      "product": "Synchrony Ultra HDV",
@@ -413,8 +413,7 @@
      ]
     },
     {
-     "tag": "Most popular",
-     "hi": true,
+     "tag": "",
      "tier": "Everyday",
      "line": "ZEISS SmartLife Superb",
      "product": "ZEISS SmartLife Superb",
@@ -459,7 +458,7 @@
      ]
     },
     {
-     "tag": "Most advanced",
+     "tag": "",
      "tier": "Signature",
      "line": "ZEISS SmartLife Individual 3",
      "product": "ZEISS SmartLife Individual 3",

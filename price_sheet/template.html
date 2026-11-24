@@ -624,7 +624,7 @@ const optState = (i, idx, k) => { const c = cardState(i, idx); return c ? (c.opt
 function headHTML(pg, c) {
   if (pg.by === "index") return `<div class="head"><div class="idx">${c.idx}</div><div class="name">${c.name}</div></div>`;
   if (pg.by === "dist") return `<div class="head"><div class="tag ${c.hi ? "hi" : ""}">${esc(c.tag)}</div><div class="dist">${esc(c.dist)}<small>${esc(c.use)}</small></div></div>`;
-  return `<div class="head"><div class="tag ${c.hi ? "hi" : ""}">${esc(c.tag)}</div><div class="tier">${c.tier}</div>${c.line ? `<div class="lens">${esc(c.line)}</div>` : ""}</div>`;
+  return `<div class="head">${c.tag ? `<div class="tag ${c.hi ? "hi" : ""}">${esc(c.tag)}</div>` : ""}<div class="tier">${c.tier}</div>${c.line ? `<div class="lens">${esc(c.line)}</div>` : ""}</div>`;
 }
 function priceHTML(pg, c, i, thick) {
   // one block (the cards share a six-row grid): the price, then the Rx notes under it
