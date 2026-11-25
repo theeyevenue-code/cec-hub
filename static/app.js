@@ -4825,8 +4825,16 @@ async function renderStocktake(sid) {
    patient kept the frame - that job gets the "bring in your glasses" text. Optomate's own-frame tick
    is only a hint ("Own frame in Optomate"): it is also ticked when the frame was left with us. */
 
+/* DON'T TEXT + NOT TEXTED YET (Karen via Mark, 25 Nov 2026: "build all 3"). Each ready line has a
+   "Don't text" tick; ticking it asks for ONE reason from the agent's fixed list (status gives it) and
+   Confirm waits until it is picked. The job is still marked received; the summary says
+   "Marked received - not texted: <reason>". Below the scan list, "Not texted yet" lists every order
+   received in the last 30 days that is not collected and has no delivered ready text, newest first,
+   with the reason. "Text now" previews the exact text, then sends it through the agent's resend (same
+   gates, dedupe and checks as Confirm); "Called them - remove" takes the row off (logged with who/when). */
 const ja = { lines: new Map(), own: new Set(), framed: new Set(), gates: null, words: "", busy: false, seq: 0,
-             texts: new Map(), pvSeq: 0, pvTimer: null, pvFor: "" };
+             texts: new Map(), pvSeq: 0, pvTimer: null, pvFor: "", hold: new Map(), holdReasons: [],
+             nt: null, ntBusy: "", ntOpen: new Map() };
 const JA_STATE = {
     ok: ["✓ Marks received on Confirm", "ja-ok"], received: ["Already received - skipped", "ja-grey"],
     looking: ["Checking…", "ja-wait"], cancelled: ["Cancelled - skipped", "ja-red"],
@@ -4839,6 +4847,7 @@ function renderJobsArrived() {
     reloadIfHubChanged();      // empty list: nothing to lose
     ja.lines = new Map(); ja.own = new Set(); ja.framed = new Set(); ja.busy = false; ja.seq += 1;
     ja.texts = new Map(); ja.pvFor = ""; clearTimeout(ja.pvTimer);
+    ja.hold = new Map(); ja.nt = null; ja.ntBusy = ""; ja.ntOpen = new Map();
     view.innerHTML = `<div class="ja-page">
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Jobs arrived</h1>
@@ -4851,6 +4860,7 @@ function renderJobsArrived() {
         </form>
         <div id="ja-list"></div>
         <div id="ja-foot"></div>
+        <section id="ja-nt" class="ja-nt-wrap" aria-label="Not texted yet"></section>
     </div>`;
     const input = document.getElementById("ja-in");
     document.getElementById("ja-scan").addEventListener("submit", (ev) => {
@@ -4862,11 +4872,12 @@ function renderJobsArrived() {
     });
     // keep the scanner's box focused: a tap anywhere that isn't a button goes back to it
     document.querySelector(".ja-page").addEventListener("click", (ev) => {
-        if (!ev.target.closest("button, a, input")) input.focus();
+        if (!ev.target.closest("button, a, input, select, label, #ja-nt")) input.focus();
     });
     input.focus();
     jaDraw();
     jaLoadMode();
+    jaLoadNotTexted();
 }
 
 async function jaLoadMode() {
@@ -4878,6 +4889,8 @@ async function jaLoadMode() {
     const box = document.getElementById("ja-mode");
     if (!d.ok) { box.innerHTML = `<div class="ja-banner ja-banner-red">${esc(d.error || "Not connected.")}</div>`; return; }
     ja.gates = d.gates; ja.words = d.mode_words || "";
+    ja.holdReasons = Array.isArray(d.hold_reasons) ? d.hold_reasons : [];
+    jaDraw();
     box.innerHTML = d.gates.dry_run
         ? `<div class="ja-banner ja-banner-test"><strong>TEST MODE</strong> - nothing will be changed or texted${d.fixture ? " (fake ZZTEST jobs)" : ""}</div>`
         : `<div class="ja-banner">${esc(ja.words)}</div>`;
@@ -4936,7 +4949,21 @@ function jaFlash(key) {
 
 /* a flagged own-frame glasses job nobody has answered yet: Confirm waits for it */
 function jaNeedsFrame(l) {
-    return l.state === "ok" && l.type === "glasses" && l.own_frame && !ja.framed.has(l.key);
+    return l.state === "ok" && l.type === "glasses" && l.own_frame && !ja.framed.has(l.key) && !ja.hold.has(l.key);
+}
+
+/* a "Don't text" tick without a reason yet: Confirm waits for it */
+function jaNeedsReason(l) { return l.state === "ok" && ja.hold.has(l.key) && !ja.hold.get(l.key); }
+
+function jaHoldLabel(code) { const r = ja.holdReasons.find((x) => x.code === code); return r ? r.label : ""; }
+
+function jaHoldBox(l) {
+    if (!ja.holdReasons.length || !/^[GC]\d+$/.test(l.key)) return "";     // older agent: no hold
+    const on = ja.hold.has(l.key);
+    const code = ja.hold.get(l.key) || "";
+    const pick = on ? `<select class="ja-hold-why${code ? "" : " ja-hold-need"}" data-ja-holdwhy="${esc(l.key)}" aria-label="Why not text job ${esc(l.id)}">
+            <option value="">Pick a reason…</option>${ja.holdReasons.map((r) => `<option value="${esc(r.code)}"${r.code === code ? " selected" : ""}>${esc(r.label)}</option>`).join("")}</select>` : "";
+    return `<div class="ja-hold"><label class="ja-hold-tick"><input type="checkbox" data-ja-hold="${esc(l.key)}"${on ? " checked" : ""}> Don't text</label>${pick}</div>`;
 }
 
 function jaReady() { return [...ja.lines.values()].filter((l) => l.state === "ok" && /^[GC]\d+$/.test(l.key)); }
@@ -4978,7 +5005,16 @@ function jaRow(l) {
             extra.push(`<div><button type="button" class="ja-link" data-ja-frame="${esc(l.key)}" data-v="patient">Change: patient has the frame</button></div>`);
         }
     }
-    if (l.state === "ok") extra.push(jaNeedsFrame(l) ? `<div class="ja-sms ja-sms-wait">Text: pick where the frame is first</div>` : jaTextPreview(l.key));
+    if (l.state === "ok") {
+        extra.push(jaHoldBox(l));
+        if (ja.hold.has(l.key)) {
+            const code = ja.hold.get(l.key);
+            extra.push(code ? `<div class="ja-sms ja-sms-held">Marked received - not texted: ${esc(jaHoldLabel(code))}</div>`
+                            : `<div class="ja-sms ja-sms-wait">Pick why this one isn't texted</div>`);
+        } else {
+            extra.push(jaNeedsFrame(l) ? `<div class="ja-sms ja-sms-wait">Text: pick where the frame is first</div>` : jaTextPreview(l.key));
+        }
+    }
     const why = [l.state !== "bad" && l.reason ? l.reason : "", l.note || ""].filter(Boolean);
     const others = (l.others || []).map((o) => o.old
         ? `<div class="ja-other ja-other-old">Old open job - check: ${esc(o.what)}, job ${esc(o.job)} (ordered ${esc(o.ordered || "?")})</div>`
@@ -5005,12 +5041,16 @@ function jaTextPreview(key) {
     return `<div class="ja-why">${esc(t.text || "No text")}</div>`;
 }
 
+/* "G35144:knows" for every ready job ticked Don't text WITH a reason (no reason = Confirm waits) */
+function jaHoldList(ids) { return ids.filter((k) => ja.hold.get(k)).map((k) => `${k}:${ja.hold.get(k)}`); }
+
 /* re-ask the agent whenever the ready list or the switches change (debounced) */
 function jaPreviewSoon() {
     const ready = jaReady();
     const ids = ready.map((l) => l.key);
     const own = ids.filter((k) => ja.own.has(k));
-    const sig = ids.join(",") + "|" + own.join(",");
+    const hold = jaHoldList(ids);
+    const sig = ids.join(",") + "|" + own.join(",") + "|" + hold.join(",");
     if (sig === ja.pvFor) return;
     ja.pvFor = sig;
     ja.texts = new Map();
@@ -5019,7 +5059,7 @@ function jaPreviewSoon() {
     const seq = ++ja.pvSeq;
     ja.pvTimer = setTimeout(async () => {
         let r;
-        try { r = await ciCall("/api/jobscan/preview", { ids, own }); } catch (e) { r = { status: 0, data: {} }; }
+        try { r = await ciCall("/api/jobscan/preview", { ids, own, hold }); } catch (e) { r = { status: 0, data: {} }; }
         if (seq !== ja.pvSeq) return;
         const d = r.data || {};
         ja.texts = new Map((d.ok ? d.texts || [] : []).map((t) => [t.key, t]));
@@ -5038,7 +5078,17 @@ function jaDraw() {
         <tbody>${rows.map(jaRow).join("")}</tbody></table>`
         : `<div class="ja-empty">No jobs scanned yet.</div>`;
     list.querySelectorAll("[data-ja-remove]").forEach((b) => b.addEventListener("click", () => {
-        ja.lines.delete(b.dataset.jaRemove); jaDraw(); document.getElementById("ja-in").focus();
+        ja.lines.delete(b.dataset.jaRemove); ja.hold.delete(b.dataset.jaRemove); jaDraw(); document.getElementById("ja-in").focus();
+    }));
+    list.querySelectorAll("[data-ja-hold]").forEach((b) => b.addEventListener("change", () => {
+        const k = b.dataset.jaHold;
+        if (b.checked) ja.hold.set(k, ja.hold.get(k) || ""); else ja.hold.delete(k);
+        jaDraw();
+        const sel = document.querySelector(`[data-ja-holdwhy="${CSS.escape(k)}"]`);
+        if (sel) sel.focus();
+    }));
+    list.querySelectorAll("[data-ja-holdwhy]").forEach((s) => s.addEventListener("change", () => {
+        ja.hold.set(s.dataset.jaHoldwhy, s.value || ""); jaDraw(); document.getElementById("ja-in").focus();
     }));
     list.querySelectorAll("[data-ja-frame]").forEach((b) => b.addEventListener("click", () => {
         const k = b.dataset.jaFrame;
@@ -5059,10 +5109,13 @@ function jaDraw() {
     const waiting = rows.some((l) => l.state === "looking");
     const picks = rows.filter((l) => l.state === "pick").length;
     const frames = rows.filter(jaNeedsFrame).length;
+    const reasons = rows.filter(jaNeedsReason).length;
     const what = nc && nc < n ? `${n - nc} glasses + ${nc} contacts` : `${n} ${nc ? "contacts order" : "job"}${n === 1 ? "" : "s"}`;
+    const label = reasons ? `Pick a reason for ${reasons} "Don't text" job${reasons === 1 ? "" : "s"} first`
+        : frames ? `Answer ${frames} frame question${frames === 1 ? "" : "s"} first` : `Confirm ${what}`;
     foot.innerHTML = `${picks ? `<div class="ja-banner ja-banner-test">${picks} line${picks === 1 ? "" : "s"} need${picks === 1 ? "s" : ""} Glasses or Contacts picked first - ${picks === 1 ? "it is" : "they are"} left out until then.</div>` : ""}
-        <button id="ja-go" class="btn ja-go" type="button" ${n && !waiting && !ja.busy && !frames ? "" : "disabled"}>
-        ${frames ? `Answer ${frames} frame question${frames === 1 ? "" : "s"} first` : `Confirm ${what}`}</button><div id="ja-msg"></div>`;
+        <button id="ja-go" class="btn ja-go" type="button" ${n && !waiting && !ja.busy && !frames && !reasons ? "" : "disabled"}>
+        ${label}</button><div id="ja-msg"></div>`;
     document.getElementById("ja-go").addEventListener("click", jaConfirm);
 }
 
@@ -5084,8 +5137,13 @@ function jaDialogText(ready) {
         if (nc && g.cl_sms !== "live") parts.push(`Contacts orders are left out of texts (contacts texts are switched off).`);
     } else if (g.sms === "test") parts.push(`Texts go to the test phone only, not to patients.`);
     else parts.push(`No texts will be sent (texts are switched off).`);
-    const nown = ready.filter((l) => ja.own.has(l.key)).length;
+    const nown = ready.filter((l) => ja.own.has(l.key) && !ja.hold.has(l.key)).length;
     if (nown) parts.push(`${nown} replacement-lens job${nown === 1 ? " gets" : "s get"} the "bring in your glasses" text.`);
+    const held = ready.filter((l) => ja.hold.get(l.key));
+    if (held.length) parts.push(`DON'T TEXT: ${held.length} order${held.length === 1 ? " is" : "s are"} marked received with NO text:\n` +
+        held.map((l) => `  ${l.id} ${l.name || ""} - ${jaHoldLabel(ja.hold.get(l.key))}`).join("\n"));
+    const sibs = ready.filter((l) => !ja.hold.has(l.key) && (ja.texts.get(l.key) || {}).code === "other_held");
+    if (sibs.length) parts.push(`ALSO NOT TEXTED: ${sibs.map((l) => l.id).join(", ")} - same patient as a "Don't text" job. Text it later from Not texted yet.`);
     if (ncall) parts.push(`${ncall} ortho-K / scleral order${ncall === 1 ? " gets" : "s get"} NO text - call ${ncall === 1 ? "that patient" : "those patients"}.`);
     if (g.write_live || g.sms === "live") parts.push(`This can't be undone.`);
     return parts.join("\n\n");
@@ -5095,6 +5153,7 @@ async function jaConfirm() {
     const ready = jaReady();
     if (ja.busy || !ready.length) return;
     if ([...ja.lines.values()].some(jaNeedsFrame)) return;     // a frame question is still open
+    if ([...ja.lines.values()].some(jaNeedsReason)) return;    // a Don't text tick has no reason yet
     const asked = Date.now();
     if (!window.confirm(jaDialogText(ready))) {
         // a "No" faster than anyone can read = the browser blocked the box, not staff
@@ -5109,7 +5168,8 @@ async function jaConfirm() {
     const ids = ready.map((l) => l.key);           // typed: G35144 / C5100 - never a bare number
     let r;
     const own = ids.filter((k) => ja.own.has(k));
-    try { r = await ciCall("/api/jobscan/confirm", { ids, expected: ids.length, own }); }
+    const hold = jaHoldList(ids);
+    try { r = await ciCall("/api/jobscan/confirm", { ids, expected: ids.length, own, hold }); }
     catch (e) { r = { status: 0, data: { error: "The Hub didn't answer. Scan the cards again: finished jobs show grey." } }; }
     ja.busy = false;
     if (ciLocked(r)) { ciUnlockPanel(r.data, renderJobsArrived, "Jobs arrived"); return; }
@@ -5126,7 +5186,7 @@ function jaResults(d) {
     const head = d.nothing_changed
         ? `<div class="ja-banner ja-banner-test"><strong>TEST MODE - nothing was changed</strong></div>
            <div class="ja-answer">${c.would || 0} would be marked received</div>`
-        : `<div class="ja-answer">${c.done || 0} marked received · ${d.texted || 0} texted${c.failed ? ` · <span class="ja-bad">${c.failed} failed</span>` : ""}${calls ? ` · <span class="ja-callword">${calls} to call</span>` : ""}</div>`;
+        : `<div class="ja-answer">${c.done || 0} marked received · ${d.texted || 0} texted${d.held ? ` · ${d.held} not texted (Don't text)` : ""}${c.failed ? ` · <span class="ja-bad">${c.failed} failed</span>` : ""}${calls ? ` · <span class="ja-callword">${calls} to call</span>` : ""}</div>`;
     view.innerHTML = `<div class="ja-page">
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Jobs arrived</h1>
@@ -5141,11 +5201,154 @@ function jaResults(d) {
                     <td class="ja-name">${esc(x.name)}${(x.others || []).map((o) => `<div class="ja-other${o.old ? " ja-other-old" : ""}">${o.old ? "Old open job - check" : "Still open"}: ${esc(o.what)}, job ${esc(o.job)}</div>`).join("")}</td>
                     <td><span class="ja-chip">${esc(word)}</span></td>
                     <td>${esc(x.write)}</td>
-                    <td>${x.own ? `<span class="ja-chip ja-plain">Patient has the frame</span> ` : ""}${x.call ? `<span class="ja-chip ja-call">${esc(x.text)}</span>` : esc(x.text)}${x.message ? `<div class="ja-sms">“${esc(x.message)}”</div>` : ""}${x.job_note ? `<div class="ja-why">${esc(x.job_note)}</div>` : ""}</td>
+                    <td>${x.summary ? `<div class="ja-summary">${esc(x.summary)}</div>` : x.own ? `<span class="ja-chip ja-plain">Patient has the frame</span> ` : ""}${x.summary ? "" : x.call ? `<span class="ja-chip ja-call">${esc(x.text)}</span>` : esc(x.text)}${x.message ? `<div class="ja-sms">“${esc(x.message)}”</div>` : ""}${x.job_note ? `<div class="ja-why">${esc(x.job_note)}</div>` : ""}</td>
                 </tr>`; }).join("")}</tbody></table>
         <button class="btn ja-go" type="button" id="ja-again">Scan more jobs</button>
+        <section id="ja-nt" class="ja-nt-wrap" aria-label="Not texted yet"></section>
     </div>`;
+    jaLoadNotTexted();
     document.getElementById("ja-again").addEventListener("click", renderJobsArrived);
+}
+
+/* --- Not texted yet (25 Nov 2026) -------------------------------------------------------- */
+const JA_NT_RED = new Set(["undelivered", "failed", "uncertain", "never_confirmed"]);
+const JA_NT_GREY = new Set(["held", "not_on_page", "other_held"]);
+
+function jaNtTone(code) { return JA_NT_RED.has(code) ? "ja-nt-red" : JA_NT_GREY.has(code) ? "ja-nt-grey" : "ja-nt-amber"; }
+
+async function jaLoadNotTexted(msg) {
+    const box = document.getElementById("ja-nt");
+    if (!box) return;
+    const seq = ja.seq;
+    if (!ja.nt) box.innerHTML = `<h2 class="ja-nt-title">Not texted yet</h2><div class="ci-muted">Checking…</div>`;
+    let r;
+    try { r = await ciCall("/api/jobscan/nottexted"); } catch (e) { r = { status: 0, data: {} }; }
+    if (seq !== ja.seq || !document.getElementById("ja-nt")) return;
+    if (ciLocked(r)) return;            // the scan panel above already asks to unlock
+    const d = r.data || {};
+    if (!d.ok) {
+        // an agent without the list (not merged yet) or Optomate down: say so, never break the scan page
+        document.getElementById("ja-nt").innerHTML = `<h2 class="ja-nt-title">Not texted yet</h2><div class="ja-why">${esc(d.error || "The list isn't available.")}</div>`;
+        return;
+    }
+    ja.nt = d;
+    jaDrawNotTexted(msg);
+}
+
+function jaDrawNotTexted(msg) {
+    const box = document.getElementById("ja-nt");
+    const d = ja.nt;
+    if (!box || !d) return;
+    const rows = d.rows || [];
+    const test = d.gates && d.gates.dry_run;
+    const row = (x) => {
+        const open = ja.ntOpen.get(x.key);
+        const busy = ja.ntBusy === x.key;
+        let panel = "";
+        if (open && open.state === "loading") panel = `<div class="ja-sms ja-sms-wait">Getting the text…</div>`;
+        else if (open && open.state === "preview") {
+            panel = open.message
+                ? `${jaNtCovers(x.key, open)}<div class="ja-sms"><span class="ja-sms-to">Text to ${open.tail ? "…" + esc(open.tail) : "the patient"}:</span><br>“${esc(open.message)}”</div>
+                   <div class="ja-nt-acts"><button type="button" class="btn ja-nt-send" data-nt-send="${esc(x.key)}"${busy ? " disabled" : ""}>${busy ? "Sending…" : "Send this text"}</button>
+                   <button type="button" class="btn btn-quiet" data-nt-cancel="${esc(x.key)}">Cancel</button></div>`
+                : `${jaNtCovers(x.key, open)}<div class="ja-why">${esc(open.text || "No text")}</div><div class="ja-nt-acts"><button type="button" class="btn btn-quiet" data-nt-cancel="${esc(x.key)}">Close</button></div>`;
+        }
+        return `<tr class="${jaNtTone(x.code)}" data-nt-row="${esc(x.key)}">
+            <td class="ja-num ja-nt-date">${esc(x.received)}</td>
+            <td class="ja-job">${esc(x.job)}<div>${jaTypeCell(x.type)}</div></td>
+            <td class="ja-name">${esc(x.name)}</td>
+            <td>${esc(x.what)}</td>
+            <td><span class="ja-nt-reason">${esc(x.reason)}</span>${panel}</td>
+            <td class="ja-nt-btns">${x.can_text && !open ? `<button type="button" class="btn btn-quiet" data-nt-text="${esc(x.key)}">Text now</button>` : ""}
+                <button type="button" class="btn btn-quiet" data-nt-remove="${esc(x.key)}">Called them - remove</button></td>
+        </tr>`;
+    };
+    box.innerHTML = `<h2 class="ja-nt-title">Not texted yet <span class="ja-nt-n">${d.total || 0}</span></h2>
+        <p class="ja-how">Received in the last ${esc(d.days || 30)} days, not collected, no text delivered. Check after the arrivals.${test ? " TEST MODE - nothing is sent or saved." : ""}</p>
+        ${msg ? `<div class="ja-nt-msg">${esc(msg)}</div>` : ""}
+        ${rows.length ? `<div class="ja-nt-key"><span class="ja-nt-red">Text didn't reach them</span><span class="ja-nt-amber">Call or check</span><span class="ja-nt-grey">Staff chose / done in Optomate</span></div>
+        <table class="ja-table ja-nt">
+            <thead><tr><th>Received</th><th>Job</th><th>Patient</th><th>What</th><th>Reason</th><th></th></tr></thead>
+            <tbody>${rows.map(row).join("")}</tbody></table>
+        ${d.more ? `<div class="ja-why">${d.more} more not shown - the oldest. Clear the ones above first.</div>` : ""}`
+        : `<div class="ja-empty">Everyone received in the last ${esc(d.days || 30)} days has had their text.</div>`}`;
+    box.querySelectorAll("[data-nt-text]").forEach((b) => b.addEventListener("click", () => jaNtPreview(b.dataset.ntText)));
+    box.querySelectorAll("[data-nt-cancel]").forEach((b) => b.addEventListener("click", () => { ja.ntOpen.delete(b.dataset.ntCancel); jaDrawNotTexted(); }));
+    box.querySelectorAll("[data-nt-send]").forEach((b) => b.addEventListener("click", () => jaNtSend(b.dataset.ntSend)));
+    box.querySelectorAll("[data-nt-remove]").forEach((b) => b.addEventListener("click", () => jaNtRemove(b.dataset.ntRemove)));
+    box.querySelectorAll("[data-nt-own]").forEach((b) => b.addEventListener("click", () => {
+        const p = ja.ntOpen.get(b.dataset.ntOwn);
+        if (!p) return;
+        const own = new Set(p.own || []);
+        if (own.has(b.dataset.ntJob)) own.delete(b.dataset.ntJob); else own.add(b.dataset.ntJob);
+        jaNtPreview(b.dataset.ntOwn, own);                  // re-preview: the text changes with the answer
+    }));
+}
+
+function jaNtRow(key) { return ((ja.nt && ja.nt.rows) || []).find((x) => x.key === key); }
+
+/* Text now, step 1: the exact text (agent dry run - nothing sent). The agent's ONE text covers every job
+   of that patient still on this list ("covers"); each glasses job shows whether the patient has the frame
+   (the answer saved at Confirm), and staff can change it here before sending (review, 25 Nov 2026). */
+async function jaNtPreview(key, own) {
+    const prev = ja.ntOpen.get(key);
+    ja.ntOpen.set(key, { ...(prev || {}), state: "loading" }); jaDrawNotTexted();
+    let r;
+    const body = own ? { key, own: [...own] } : { key };
+    try { r = await ciCall("/api/jobscan/textnow", body); } catch (e) { r = { status: 0, data: {} }; }
+    const d = r.data || {};
+    const all = d.ok ? (d.results || []) : [];
+    const res = all.find((x) => x.message) || all[0];
+    const tail = res && /mobile ending (\d+)/.exec(res.text || "");
+    const covers = d.covers || [];
+    ja.ntOpen.set(key, res ? { state: "preview", message: res.message || "", text: res.text || res.write || "",
+                               tail: tail ? tail[1] : "", covers, own: new Set(covers.filter((c) => c.own).map((c) => c.key)) }
+                           : { state: "preview", message: "", text: d.error || "Couldn't get the text - try again.", covers: [], own: new Set() });
+    jaDrawNotTexted();
+}
+
+function jaNtCovers(key, p) {
+    if (!p.covers || !p.covers.length) return "";
+    const many = p.covers.length > 1;
+    return `<div class="ja-nt-covers">${many ? `<strong>One text for ${p.covers.length} jobs:</strong>` : ""}${p.covers.map((c) =>
+        `<div class="ja-nt-cover">Job ${esc(c.job)} · ${esc(c.what)}${c.type === "glasses"
+            ? ` <button type="button" class="ja-ans${p.own.has(c.key) ? " ja-ans-on" : ""}" data-nt-own="${esc(key)}" data-nt-job="${esc(c.key)}" aria-pressed="${p.own.has(c.key)}">${p.own.has(c.key) ? "✓ " : ""}Patient has the frame</button>` : ""}</div>`).join("")}</div>`;
+}
+
+/* Text now, step 2: send it - the confirm box shows the exact text and says it can't be undone */
+async function jaNtSend(key) {
+    const p = ja.ntOpen.get(key);
+    const x = jaNtRow(key);
+    if (!p || !p.message || ja.ntBusy) return;
+    const test = ja.nt && ja.nt.gates && ja.nt.gates.dry_run;
+    const jobs = (p.covers || []).map((c) => c.job).join(", ") || (x ? x.job : key);
+    const ask = test ? `TEST MODE: show what would happen for job ${jobs}.\n\nNothing will be sent.`
+        : `Send this ONE text to the mobile ending ${p.tail || "?"} (job ${jobs})?\n\n“${p.message}”\n\nThis can't be undone.`;
+    if (!window.confirm(ask)) return;
+    ja.ntBusy = key; jaDrawNotTexted();
+    let r;
+    try { r = await ciCall("/api/jobscan/textnow", { key, send: true, own: [...(p.own || [])] }); }
+    catch (e) { r = { status: 0, data: {} }; }
+    ja.ntBusy = "";
+    const d = r.data || {};
+    const res = d.ok && ((d.results || []).find((y) => y.key === key) || (d.results || [])[0]);
+    ja.ntOpen.delete(key);
+    const said = res ? `Job ${jobs}: ${res.text || res.write || "done"}${res.job_note ? " · " + res.job_note : ""}`
+                     : (d.error || "That didn't go through - refresh the list before trying again.");
+    jaLoadNotTexted(said);
+}
+
+async function jaNtRemove(key) {
+    const x = jaNtRow(key);
+    if (!window.confirm(`Take job ${x ? x.job : key}${x && x.name ? " (" + x.name + ")" : ""} off Not texted yet?\n\nOnly once you've called them or dealt with it. Your name and the time are kept.`)) return;
+    let r;
+    try { r = await ciCall("/api/jobscan/remove", { key }); } catch (e) { r = { status: 0, data: {} }; }
+    const d = r.data || {};
+    if (d.ok && ja.nt) {
+        ja.nt.rows = (ja.nt.rows || []).filter((y) => y.key !== key);       // gone straight away (test mode too)
+        ja.nt.total = Math.max(0, (ja.nt.total || 1) - 1);
+    }
+    jaDrawNotTexted(d.ok ? `Job ${x ? x.job : key} taken off the list${d.saved === false ? " (TEST MODE - not saved)" : ""}.` : (d.error || "Couldn't remove it - try again."));
 }
 
 /* --- Go ---------------------------------------------------------------------------- */

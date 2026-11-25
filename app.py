@@ -1123,7 +1123,7 @@ def jobscan_lookup():
 @staff_only
 def jobscan_preview():
     data = request.get_json(silent=True) or {}
-    out = jobscan.preview(_integrations(), data.get("ids"), data.get("own"))
+    out = jobscan.preview(_integrations(), data.get("ids"), data.get("own"), data.get("hold"))
     return _no_store(jsonify(out)), (200 if out.get("ok") else 400)
 
 
@@ -1131,16 +1131,50 @@ def jobscan_preview():
 @staff_only
 def jobscan_confirm():
     data = request.get_json(silent=True) or {}
-    out = jobscan.confirm(_integrations(), data.get("ids"), data.get("expected"), data.get("own"))
+    out = jobscan.confirm(_integrations(), data.get("ids"), data.get("expected"), data.get("own"),
+                          data.get("hold"))
     if out.get("ok"):
         c = out.get("counts") or {}
-        logger.info("Jobs arrived: confirm %s - done %d, would %d, skipped %d, failed %d, texted %d",
+        logger.info("Jobs arrived: confirm %s - done %d, would %d, skipped %d, failed %d, texted %d, held %d",
                     "TEST MODE" if out.get("nothing_changed") else "live",
                     c.get("done", 0), c.get("would", 0), c.get("skipped", 0), c.get("failed", 0),
-                    int(out.get("texted") or 0))
+                    int(out.get("texted") or 0), int(out.get("held") or 0))
     else:
         logger.info("Jobs arrived: confirm not done (%s)",
                     "timeout" if out.get("timeout") else "refused")
+    return _no_store(jsonify(out)), (200 if out.get("ok") else 400)
+
+
+# Not texted yet (25 Nov 2026, Mark: "build all 3"): the list, Text now (preview, then send through the
+# agent's resend - same gates and dedupe as Confirm), Called them - remove. Counts / job numbers only in hub.log.
+
+@app.route("/api/jobscan/nottexted")
+@staff_only
+def jobscan_nottexted():
+    out = jobscan.not_texted(_integrations())
+    return _no_store(jsonify(out)), (200 if out.get("ok") else 400)
+
+
+@app.route("/api/jobscan/textnow", methods=["POST"])
+@staff_only
+def jobscan_textnow():
+    data = request.get_json(silent=True) or {}
+    send = data.get("send") is True
+    out = jobscan.text_now(_integrations(), data.get("key"), send=send, own_raw=data.get("own"))
+    if send:
+        logger.info("Jobs arrived: Text now by %s - %s, texted %d", _staff_name(),
+                    "ok" if out.get("ok") else ("timeout" if out.get("timeout") else "refused"),
+                    int(out.get("texted") or 0))
+    return _no_store(jsonify(out)), (200 if out.get("ok") else 400)
+
+
+@app.route("/api/jobscan/remove", methods=["POST"])
+@staff_only
+def jobscan_remove():
+    data = request.get_json(silent=True) or {}
+    out = jobscan.remove(_integrations(), data.get("key"), _staff_name())
+    if out.get("ok"):
+        logger.info("Jobs arrived: Not texted yet row %s removed by %s", out.get("key", ""), _staff_name())
     return _no_store(jsonify(out)), (200 if out.get("ok") else 400)
 
 
