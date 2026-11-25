@@ -214,13 +214,21 @@ def _one_typed(raw) -> str | None:
     return good[0] if (good and not bad and TYPED_RE.match(good[0])) else None
 
 
-def text_now(cfg: dict, raw_key, send: bool = False) -> dict:
+def text_now(cfg: dict, raw_key, send: bool = False, own_raw=None) -> dict:
     """send=False -> the exact text (agent resend --dry, nothing sent). send=True -> the agent's
-    resend: the same approved text, gates, dedupe and checks as Confirm. One typed job only."""
+    resend: the same approved text, gates, dedupe and checks as Confirm. One typed job is clicked; the
+    agent's ONE text covers all of that patient's jobs on the list ('covers').
+    own_raw = None: the agent uses the "Patient has the frame" answer saved at Confirm; a list (maybe
+    empty): staff's answer on the preview, glasses jobs only."""
     key = _one_typed(raw_key)
     if not key:
         return {"ok": False, "error": "Text now takes one job from the list."}
-    return run(cfg, "resend", [key], extra=[] if send else ["--dry"])
+    extra = [] if send else ["--dry"]
+    if own_raw is not None:
+        own, _ = clean_ids(own_raw if isinstance(own_raw, list) else [own_raw])
+        own = [i for i in own if i.startswith("G")]
+        extra += ["--own", ",".join(own) if own else "none"]
+    return run(cfg, "resend", [key], extra=extra)
 
 
 def remove(cfg: dict, raw_key, who: str) -> dict:

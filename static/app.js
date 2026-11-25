@@ -5248,10 +5248,10 @@ function jaDrawNotTexted(msg) {
         if (open && open.state === "loading") panel = `<div class="ja-sms ja-sms-wait">Getting the text…</div>`;
         else if (open && open.state === "preview") {
             panel = open.message
-                ? `<div class="ja-sms"><span class="ja-sms-to">Text to ${open.tail ? "…" + esc(open.tail) : "the patient"}:</span><br>“${esc(open.message)}”</div>
+                ? `${jaNtCovers(x.key, open)}<div class="ja-sms"><span class="ja-sms-to">Text to ${open.tail ? "…" + esc(open.tail) : "the patient"}:</span><br>“${esc(open.message)}”</div>
                    <div class="ja-nt-acts"><button type="button" class="btn ja-nt-send" data-nt-send="${esc(x.key)}"${busy ? " disabled" : ""}>${busy ? "Sending…" : "Send this text"}</button>
                    <button type="button" class="btn btn-quiet" data-nt-cancel="${esc(x.key)}">Cancel</button></div>`
-                : `<div class="ja-why">${esc(open.text || "No text")}</div><div class="ja-nt-acts"><button type="button" class="btn btn-quiet" data-nt-cancel="${esc(x.key)}">Close</button></div>`;
+                : `${jaNtCovers(x.key, open)}<div class="ja-why">${esc(open.text || "No text")}</div><div class="ja-nt-acts"><button type="button" class="btn btn-quiet" data-nt-cancel="${esc(x.key)}">Close</button></div>`;
         }
         return `<tr class="${jaNtTone(x.code)}" data-nt-row="${esc(x.key)}">
             <td class="ja-num ja-nt-date">${esc(x.received)}</td>
@@ -5276,21 +5276,43 @@ function jaDrawNotTexted(msg) {
     box.querySelectorAll("[data-nt-cancel]").forEach((b) => b.addEventListener("click", () => { ja.ntOpen.delete(b.dataset.ntCancel); jaDrawNotTexted(); }));
     box.querySelectorAll("[data-nt-send]").forEach((b) => b.addEventListener("click", () => jaNtSend(b.dataset.ntSend)));
     box.querySelectorAll("[data-nt-remove]").forEach((b) => b.addEventListener("click", () => jaNtRemove(b.dataset.ntRemove)));
+    box.querySelectorAll("[data-nt-own]").forEach((b) => b.addEventListener("click", () => {
+        const p = ja.ntOpen.get(b.dataset.ntOwn);
+        if (!p) return;
+        const own = new Set(p.own || []);
+        if (own.has(b.dataset.ntJob)) own.delete(b.dataset.ntJob); else own.add(b.dataset.ntJob);
+        jaNtPreview(b.dataset.ntOwn, own);                  // re-preview: the text changes with the answer
+    }));
 }
 
 function jaNtRow(key) { return ((ja.nt && ja.nt.rows) || []).find((x) => x.key === key); }
 
-/* Text now, step 1: the exact text (agent dry run - nothing sent) */
-async function jaNtPreview(key) {
-    ja.ntOpen.set(key, { state: "loading" }); jaDrawNotTexted();
+/* Text now, step 1: the exact text (agent dry run - nothing sent). The agent's ONE text covers every job
+   of that patient still on this list ("covers"); each glasses job shows whether the patient has the frame
+   (the answer saved at Confirm), and staff can change it here before sending (review, 25 Nov 2026). */
+async function jaNtPreview(key, own) {
+    const prev = ja.ntOpen.get(key);
+    ja.ntOpen.set(key, { ...(prev || {}), state: "loading" }); jaDrawNotTexted();
     let r;
-    try { r = await ciCall("/api/jobscan/textnow", { key }); } catch (e) { r = { status: 0, data: {} }; }
+    const body = own ? { key, own: [...own] } : { key };
+    try { r = await ciCall("/api/jobscan/textnow", body); } catch (e) { r = { status: 0, data: {} }; }
     const d = r.data || {};
-    const res = d.ok && (d.results || [])[0];
+    const all = d.ok ? (d.results || []) : [];
+    const res = all.find((x) => x.message) || all[0];
     const tail = res && /mobile ending (\d+)/.exec(res.text || "");
-    ja.ntOpen.set(key, res ? { state: "preview", message: res.message || "", text: res.text || res.write || "", tail: tail ? tail[1] : "" }
-                           : { state: "preview", message: "", text: d.error || "Couldn't get the text - try again." });
+    const covers = d.covers || [];
+    ja.ntOpen.set(key, res ? { state: "preview", message: res.message || "", text: res.text || res.write || "",
+                               tail: tail ? tail[1] : "", covers, own: new Set(covers.filter((c) => c.own).map((c) => c.key)) }
+                           : { state: "preview", message: "", text: d.error || "Couldn't get the text - try again.", covers: [], own: new Set() });
     jaDrawNotTexted();
+}
+
+function jaNtCovers(key, p) {
+    if (!p.covers || !p.covers.length) return "";
+    const many = p.covers.length > 1;
+    return `<div class="ja-nt-covers">${many ? `<strong>One text for ${p.covers.length} jobs:</strong>` : ""}${p.covers.map((c) =>
+        `<div class="ja-nt-cover">Job ${esc(c.job)} · ${esc(c.what)}${c.type === "glasses"
+            ? ` <button type="button" class="ja-ans${p.own.has(c.key) ? " ja-ans-on" : ""}" data-nt-own="${esc(key)}" data-nt-job="${esc(c.key)}" aria-pressed="${p.own.has(c.key)}">${p.own.has(c.key) ? "✓ " : ""}Patient has the frame</button>` : ""}</div>`).join("")}</div>`;
 }
 
 /* Text now, step 2: send it - the confirm box shows the exact text and says it can't be undone */
@@ -5299,17 +5321,19 @@ async function jaNtSend(key) {
     const x = jaNtRow(key);
     if (!p || !p.message || ja.ntBusy) return;
     const test = ja.nt && ja.nt.gates && ja.nt.gates.dry_run;
-    const ask = test ? `TEST MODE: show what would happen for job ${x ? x.job : key}.\n\nNothing will be sent.`
-        : `Send this text to the mobile ending ${p.tail || "?"} (job ${x ? x.job : key})?\n\n“${p.message}”\n\nThis can't be undone.`;
+    const jobs = (p.covers || []).map((c) => c.job).join(", ") || (x ? x.job : key);
+    const ask = test ? `TEST MODE: show what would happen for job ${jobs}.\n\nNothing will be sent.`
+        : `Send this ONE text to the mobile ending ${p.tail || "?"} (job ${jobs})?\n\n“${p.message}”\n\nThis can't be undone.`;
     if (!window.confirm(ask)) return;
     ja.ntBusy = key; jaDrawNotTexted();
     let r;
-    try { r = await ciCall("/api/jobscan/textnow", { key, send: true }); } catch (e) { r = { status: 0, data: {} }; }
+    try { r = await ciCall("/api/jobscan/textnow", { key, send: true, own: [...(p.own || [])] }); }
+    catch (e) { r = { status: 0, data: {} }; }
     ja.ntBusy = "";
     const d = r.data || {};
-    const res = d.ok && (d.results || [])[0];
+    const res = d.ok && ((d.results || []).find((y) => y.key === key) || (d.results || [])[0]);
     ja.ntOpen.delete(key);
-    const said = res ? `Job ${res.id}: ${res.text || res.write || "done"}${res.job_note ? " · " + res.job_note : ""}`
+    const said = res ? `Job ${jobs}: ${res.text || res.write || "done"}${res.job_note ? " · " + res.job_note : ""}`
                      : (d.error || "That didn't go through - refresh the list before trying again.");
     jaLoadNotTexted(said);
 }

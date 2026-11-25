@@ -294,3 +294,13 @@ def test_page_wires_dont_text_and_not_texted():
     assert "/api/jobscan/nottexted" in js and "/api/jobscan/textnow" in js and "/api/jobscan/remove" in js
     assert "{ ids, expected: ids.length, own, hold }" in js and "Don't text" in js
     assert "This can't be undone." in js and "send: true" in js
+
+
+def test_text_now_passes_the_frame_answer_from_the_preview(agent, calls):
+    calls.reply = {"ok": True, "results": [], "covers": []}
+    jobscan.text_now(agent, "G1")                                   # no answer: the agent uses what Confirm saved
+    jobscan.text_now(agent, "G1", own_raw=["G1", "C2", "x"])
+    jobscan.text_now(agent, "G1", send=True, own_raw=[])            # "Frame is here" on every job
+    assert "--own" not in calls[0][0]
+    assert calls[1][0][-2:] == ["--own", "G1"] and calls[1][0][-3] == "--dry"
+    assert calls[2][0][-2:] == ["--own", "none"] and "--dry" not in calls[2][0]

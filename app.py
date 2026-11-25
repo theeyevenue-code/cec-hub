@@ -1160,7 +1160,7 @@ def jobscan_nottexted():
 def jobscan_textnow():
     data = request.get_json(silent=True) or {}
     send = data.get("send") is True
-    out = jobscan.text_now(_integrations(), data.get("key"), send=send)
+    out = jobscan.text_now(_integrations(), data.get("key"), send=send, own_raw=data.get("own"))
     if send:
         logger.info("Jobs arrived: Text now by %s - %s, texted %d", _staff_name(),
                     "ok" if out.get("ok") else ("timeout" if out.get("timeout") else "refused"),

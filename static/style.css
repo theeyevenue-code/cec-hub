@@ -2298,6 +2298,8 @@ tr.ja-flash td { animation: ja-flash 1.2s ease-out; }
 .ja-nt-date { white-space: nowrap; font-weight: 700; }
 .ja-nt-btns { white-space: nowrap; text-align: right; }
 .ja-nt-btns .btn { font-size: 15px; padding: 6px 12px; margin: 2px 0 2px 4px; }
+.ja-nt-covers { margin-top: 8px; font-size: 16px; }
+.ja-nt-cover { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
 .ja-nt-acts { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 @media (max-width: 900px) { .ja-nt-btns { white-space: normal; } .ja-nt-btns .btn { display: block; width: 100%; margin: 4px 0; } }
 /* iPad width: the scan table ran ~170px past the screen (the status chip never wrapped) - 25 Nov 2026 */
