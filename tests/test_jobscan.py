@@ -205,3 +205,92 @@ def test_preview_runs_the_agent_dry(agent, calls):
 
 def test_preview_of_nothing_never_runs_the_engine(agent, calls):
     assert jobscan.preview(agent, [], []) == {"ok": True, "texts": []} and calls == []
+
+
+# --- 25 Nov 2026 (Mark: "build all 3"): Don't text, Not texted yet, Text now --------------------
+
+def test_engine_runs_without_a_console_window(agent, calls):
+    jobscan.status(agent)
+    assert calls[0][1]["creationflags"] == getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def test_confirm_passes_dont_text_holds_for_confirmed_jobs_only(agent, calls):
+    calls.reply = {"ok": True, "counts": {}, "results": []}
+    jobscan.confirm(agent, ["G1", "C2"], 2, None, ["G1:knows", "G9:rest", "c2:REST"])
+    assert calls[0][0][3:] == ["confirm", "--json", "--ids", "G1,C2", "--hold", "G1:knows,C2:rest"]
+
+
+def test_confirm_with_a_hold_but_no_reason_changes_nothing(agent, calls):
+    out = jobscan.confirm(agent, ["G1"], 1, None, ["G1:"])
+    assert out["ok"] is False and "reason" in out["error"] and calls == []
+    out = jobscan.confirm(agent, ["G1"], 1, None, ["G1:knows;rm"])
+    assert out["ok"] is False and calls == []
+
+
+def test_preview_passes_holds(agent, calls):
+    calls.reply = {"ok": True, "texts": []}
+    jobscan.preview(agent, ["G1"], [], {"G1": "check"})
+    assert calls[0][0][-2:] == ["--hold", "G1:check"]
+
+
+def test_not_texted_runs_the_engine_list(agent, calls):
+    calls.reply = {"ok": True, "rows": [], "more": 0}
+    jobscan.not_texted(agent)
+    assert calls[0][0][3:] == ["nottexted", "--json"] and calls[0][1]["timeout"] == jobscan.TIMEOUTS["nottexted"]
+
+
+def test_text_now_previews_dry_then_sends(agent, calls):
+    calls.reply = {"ok": True, "results": [{"message": "Hi"}]}
+    jobscan.text_now(agent, "G35144")
+    jobscan.text_now(agent, "C5100", send=True)
+    assert calls[0][0][3:] == ["resend", "--json", "--ids", "G35144", "--dry"]
+    assert calls[1][0][3:] == ["resend", "--json", "--ids", "C5100"]
+
+
+@pytest.mark.parametrize("key", ["35144", "G1,G2", "x", "", None, "G35144;rm"])
+def test_text_now_and_remove_take_one_typed_job_only(agent, calls, key):
+    assert jobscan.text_now(agent, key, send=True)["ok"] is False
+    assert jobscan.remove(agent, key, "Karen")["ok"] is False
+    assert calls == []
+
+
+def test_remove_passes_a_clean_staff_name(agent, calls):
+    calls.reply = {"ok": True, "key": "G1", "saved": True}
+    jobscan.remove(agent, "G1", "Karen <script>")
+    assert calls[0][0][3:] == ["remove", "--json", "--ids", "G1", "--who", "Karen script"]
+    jobscan.remove(agent, "G1", "")
+    assert calls[1][0][-1] == "someone (no name picked)"
+
+
+@pytest.mark.parametrize("method,url", [("get", "/api/jobscan/nottexted"),
+                                        ("post", "/api/jobscan/textnow"),
+                                        ("post", "/api/jobscan/remove")])
+def test_not_texted_routes_are_staff_only(client, method, url):
+    r = getattr(client, method)(url, json={"key": "G1", "send": True},
+                                environ_base={"REMOTE_ADDR": "192.168.1.50"})
+    assert r.status_code == 403 and client.fake == []
+
+
+def test_textnow_route_sends_only_on_send_true(client, caplog):
+    client.fake.reply = {"ok": True, "texted": 1, "results": [{"id": 1, "name": "ZZTEST, Alex", "message": "Hi Alex"}]}
+    client.post("/api/jobscan/textnow", json={"key": "G1", "send": "yes"})
+    assert client.fake[-1][0][-1] == "--dry"                    # anything but true = preview only
+    with caplog.at_level(logging.INFO):
+        r = client.post("/api/jobscan/textnow", json={"key": "G1", "send": True})
+    assert r.status_code == 200 and "--dry" not in client.fake[-1][0]
+    assert "Text now by" in caplog.text and "Alex" not in caplog.text and "ZZTEST" not in caplog.text
+
+
+def test_remove_route_uses_the_staff_cookie(client):
+    client.fake.reply = {"ok": True, "key": "G1", "saved": True}
+    client.set_cookie("hub_staff", "Karen")
+    r = client.post("/api/jobscan/remove", json={"key": "G1"})
+    assert r.status_code == 200 and client.fake[-1][0][-2:] == ["--who", "Karen"]
+
+
+def test_page_wires_dont_text_and_not_texted():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parent.parent / "static" / "app.js").read_text(encoding="utf-8")
+    assert "/api/jobscan/nottexted" in js and "/api/jobscan/textnow" in js and "/api/jobscan/remove" in js
+    assert "{ ids, expected: ids.length, own, hold }" in js and "Don't text" in js
+    assert "This can't be undone." in js and "send: true" in js

@@ -2273,3 +2273,35 @@ tr.ja-flash td { animation: ja-flash 1.2s ease-out; }
 .ja-sms { margin-top: 10px; }
 .ja-sms-to { font-weight: 600; }
 .ja-q-open { color: var(--amber-ink); background: var(--amber-bg); border: 1px solid var(--amber-line); border-radius: 8px; padding: 4px 10px; display: inline-block; }
+/* Don't text + Not texted yet (25 Nov 2026). Colour = what staff do: red = the text didn't reach them,
+   amber = call or check, grey = staff chose / done in Optomate. */
+.ja-hold { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.ja-hold-tick { font-size: 16px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.ja-hold-tick input { width: 20px; height: 20px; }
+.ja-hold-why { font: inherit; font-size: 16px; padding: 5px 8px; border-radius: 8px; border: 1px solid #b5b5b5; background: #fff; width: 100%; max-width: 15em; min-width: 0; }
+.ja-hold-why.ja-hold-need { border: 2px solid var(--amber-line); background: var(--amber-bg); }
+.ja-sms-held, .ja-summary { font-weight: 600; color: #4a4a4a; }
+.ja-summary { font-size: 17px; }
+.ja-nt-wrap { margin-top: 36px; }
+.ja-nt-title { font-size: 24px; font-weight: 700; margin: 0 0 4px; }
+.ja-nt-n { display: inline-block; min-width: 1.6em; text-align: center; font-size: 18px; padding: 1px 8px; border-radius: 999px; background: #e6e6e6; vertical-align: middle; }
+.ja-nt-msg { font-size: 17px; font-weight: 600; padding: 8px 12px; border-radius: 8px; color: var(--info-ink); background: #f3f6f9; margin: 8px 0; }
+.ja-nt-key { display: flex; flex-wrap: wrap; gap: 14px; font-size: 15px; color: var(--muted); margin: 6px 0 8px; }
+.ja-nt-key span::before, .ja-nt-reason::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.ja-nt-key .ja-nt-red::before, .ja-nt tr.ja-nt-red .ja-nt-reason::before { background: var(--danger-ink); }
+.ja-nt-key .ja-nt-amber::before, .ja-nt tr.ja-nt-amber .ja-nt-reason::before { background: var(--amber-line); }
+.ja-nt-key .ja-nt-grey::before, .ja-nt tr.ja-nt-grey .ja-nt-reason::before { background: #b5b5b5; }
+.ja-nt-reason { font-size: 17px; font-weight: 600; }
+.ja-nt tr.ja-nt-red .ja-nt-reason { color: var(--danger-ink); }
+.ja-nt tr.ja-nt-amber .ja-nt-reason { color: var(--amber-ink); }
+.ja-nt tr.ja-nt-grey .ja-nt-reason { color: #4a4a4a; }
+.ja-nt-date { white-space: nowrap; font-weight: 700; }
+.ja-nt-btns { white-space: nowrap; text-align: right; }
+.ja-nt-btns .btn { font-size: 15px; padding: 6px 12px; margin: 2px 0 2px 4px; }
+.ja-nt-acts { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+@media (max-width: 900px) { .ja-nt-btns { white-space: normal; } .ja-nt-btns .btn { display: block; width: 100%; margin: 4px 0; } }
+/* iPad width: the scan table ran ~170px past the screen (the status chip never wrapped) - 25 Nov 2026 */
+@media (max-width: 900px) {
+    #ja-list .ja-table th:nth-child(5), #ja-list .ja-table tr:not(.ja-others-row) td:nth-child(5) { display: none; }
+    #ja-list .ja-table td { padding: 8px 6px; }
+}
