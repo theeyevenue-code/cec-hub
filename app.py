@@ -1417,6 +1417,44 @@ def stocktake_refresh():
                         "loaded": cat.get("loaded"), "error": cat.get("error")}))
 
 
+# --- Jen's frames (hub/jenframes.py) -------------------------------------------------
+# Mark, 26 Nov 2026 ("Jen scans would be helpful" / "Front desk scanner"): Jennifer Chea scans
+# each frame she takes upstairs; it goes on her monthly list at our cost incl. GST from Optomate.
+# Lines can carry a patient name, so the staff guard applies; hub.log gets counts only.
+# Nothing here changes Optomate.
+
+@app.route("/api/jenframes")
+@staff_only
+def jenframes_month():
+    from hub import jenframes
+    try:
+        return _json((200, jenframes.month_view(request.args.get("month") or None)))
+    except ValueError:
+        return _json((400, {"ok": False, "error": "Pick a month from the list."}))
+
+
+@app.route("/api/jenframes/<action>", methods=["POST"])
+@staff_only
+def jenframes_action(action):
+    from hub import jenframes
+    data = request.get_json(silent=True) or {}
+    by = request.cookies.get("hub_staff")
+    if action == "scan":
+        out = jenframes.add(data.get("barcode"), by, _st_cat)
+        if out.get("ok"):
+            logger.info("Jen's frames: 1 frame added (%s)",
+                        "priced" if out["line"].get("cost_inc") is not None else "no price")
+    elif action == "for":
+        out = jenframes.set_for(data.get("id"), data.get("text"), by)
+    elif action == "remove":
+        out = jenframes.remove(data.get("id"), by)
+        if out.get("ok"):
+            logger.info("Jen's frames: 1 line removed by %s", _staff_name())
+    else:
+        return _json((404, {"ok": False, "error": "Unknown action."}))
+    return _json((200 if out.get("ok") else 400, out))
+
+
 # --- Scanner card (read live from the Second Brain clone) -------------------
 
 @app.route("/api/scanner-card")

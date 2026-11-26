@@ -122,6 +122,13 @@
       "link": "#/jobs-arrived"
     },
     {
+      "id": "jenframes",
+      "icon": "👓",
+      "name": "Jen's frames",
+      "description": "Jen scans each frame she takes upstairs: her list for the month",
+      "link": "#/jen-frames"
+    },
+    {
       "id": "recalls",
       "icon": "📱",
       "name": "Recalls",

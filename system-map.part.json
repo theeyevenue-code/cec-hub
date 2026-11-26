@@ -4,11 +4,13 @@
            "source": "local-reports/review-hub-and-command-2026-11-16.html (finding 6) and a grep of origin/main"},
   "resources": [
     {"id": "file.hub.sendguide_history", "label": "Hub send-guide record: which guide went to which patient email, and the outcome",
-     "path": "C:/CEC/runtime/hub-send-guide/send-history.sqlite3", "sensitivity": "patient-admin", "single_writer": true, "ledger": true}
+     "path": "C:/CEC/runtime/hub-send-guide/send-history.sqlite3", "sensitivity": "patient-admin", "single_writer": true, "ledger": true},
+    {"id": "file.hub.jen_frames", "label": "Jen's frames: frames Jennifer Chea takes from our shelf, per month, at our cost (optional patient name)",
+     "path": "C:/Users/ConcordeyecareServer/Claude/cec-hub/data/jen-frames", "sensitivity": "patient-admin", "single_writer": true}
   ],
   "adds": {
-    "reads": ["optomate.database", "file.hub.sendguide_history"],
-    "writes": ["mail.info.send", "file.hub.sendguide_history"],
+    "reads": ["optomate.database", "file.hub.sendguide_history", "file.hub.jen_frames"],
+    "writes": ["mail.info.send", "file.hub.sendguide_history", "file.hub.jen_frames"],
     "egress": [
       {"to": "ext.anthropic_api", "what": "Lens Finder assistant: staff's lens question + lens attributes (names, dates and ID-like numbers blocked before sending; no Rx, no money)", "sensitivity": "business"}
     ],

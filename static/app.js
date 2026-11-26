@@ -83,6 +83,7 @@ const routes = [
     { re: /^#\/stocktake$/, fn: renderStocktakeList },
     { re: /^#\/stocktake\/(\d{8}-\d{4}-[0-9a-f]{4})$/, fn: (m) => renderStocktake(m[1]) },
     { re: /^#\/jobs-arrived$/, fn: renderJobsArrived },
+    { re: /^#\/jen-frames$/, fn: renderJenFrames },
     { re: /^#\/scanner$/, fn: renderScanner },
     { re: /^#\/scanner-settings$/, fn: renderScanner },   // old link, same page
     { re: /^#\/scanner-help$/, fn: renderScannerHelp },
@@ -4809,6 +4810,100 @@ async function renderStocktake(sid) {
     stFocus();
 }
 
+/* --- Jen's frames (#/jen-frames) ---------------------------------------------------
+   Mark, 26 Nov 2026: Jennifer Chea (upstairs) scans each frame she takes from our shelf with the
+   front desk scanner. Each scan goes straight onto her list for the month at our cost incl. GST,
+   copied from Optomate. "For" is optional (a patient's name or Staff). Today's scans can be
+   removed; nothing on this page changes Optomate. Names never go in a URL. */
+
+const JF = { month: null, busy: false };
+
+function renderJenFrames() {
+    JF.month = null;
+    view.innerHTML = `<div class="ja-page">
+        <a class="btn btn-quiet btn-back" href="#/">← Home</a>
+        <h1 class="page-title">Jen's frames</h1>
+        <p class="ja-how">Jen: scan every frame you take upstairs. It goes on your list for the month.</p>
+        <form id="jf-scan" class="ja-scan" autocomplete="off">
+            <input id="jf-in" type="text" autocomplete="off" spellcheck="false"
+                   placeholder="Scan a frame" aria-label="Frame barcode">
+            <button class="btn btn-quiet" type="submit">Add</button>
+        </form>
+        <div id="jf-last" class="st-last"><span class="st-hint">Same frame twice = 2 frames.</span></div>
+        <div id="jf-list"></div>
+    </div>`;
+    const input = document.getElementById("jf-in");
+    document.getElementById("jf-scan").addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        const v = input.value.trim();
+        input.value = "";
+        if (v) jfScan(v);
+        input.focus();
+    });
+    document.querySelector(".ja-page").addEventListener("click", (ev) => {
+        if (!ev.target.closest("button, a, input, select, label")) input.focus();
+    });
+    input.focus();
+    jfLoad();
+}
+
+async function jfLoad(month) {
+    const r = await ciCall("/api/jenframes" + (month ? "?month=" + encodeURIComponent(month) : ""));
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderJenFrames, "Jen's frames"); return; }
+    const box = document.getElementById("jf-list");
+    if (!box) return;
+    const d = r.data || {};
+    if (!d.ok) { box.innerHTML = `<div class="ja-banner ja-banner-red">${esc(d.error || "Couldn't load the list.")}</div>`; return; }
+    JF.month = d.month;
+    const label = (m) => { const [y, mo] = m.split("-"); return new Date(+y, +mo - 1, 1).toLocaleString("en-AU", { month: "long", year: "numeric" }); };
+    const rows = d.lines.map((ln) => `<tr data-id="${esc(ln.id)}">
+        <td>${esc(stWhen(ln.at))}</td>
+        <td>${ln.found ? esc(ln.description) : `<span class="chip chip-amber">Not in Optomate</span> ${esc(ln.barcode)}`}</td>
+        <td>${esc(ln.supplier)}</td>
+        <td class="st-num">${ln.cost_inc == null ? `<span class="chip chip-amber">No price</span>` : esc(stMoney(ln.cost_inc))}</td>
+        <td><input class="st-input jf-for" maxlength="60" value="${esc(ln.for || "")}" placeholder="Patient or Staff" aria-label="Who it is for"></td>
+        <td>${ln.can_remove ? `<button class="btn btn-quiet jf-rm">Remove</button>` : ""}</td></tr>`).join("");
+    const opts = d.months.map((m) => `<option value="${esc(m)}"${m === d.month ? " selected" : ""}>${esc(label(m))}</option>`).join("");
+    box.innerHTML = `<div class="card">
+        <div class="jf-head">
+            <span class="st-totalbox jf-total"><span>${esc(stMoney(d.total))}</span><small>${d.count} frame${d.count === 1 ? "" : "s"}, our cost incl. GST${d.unpriced ? ` · ${d.unpriced} with no price` : ""}</small></span>
+            <select id="jf-month" class="st-input" aria-label="Month">${opts}</select>
+        </div>
+        ${rows ? `<div class="table-scroll"><table class="st-table">
+            <thead><tr><th>Scanned</th><th>Frame</th><th>Supplier</th><th class="st-num">Cost</th><th>For</th><th></th></tr></thead>
+            <tbody>${rows}</tbody></table></div>` : `<p class="st-hint">No frames this month.</p>`}
+    </div>`;
+    document.getElementById("jf-month").addEventListener("change", (ev) => jfLoad(ev.target.value));
+    box.querySelectorAll(".jf-for").forEach((inp) => inp.addEventListener("change", async () => {
+        const id = inp.closest("tr").dataset.id;
+        const res = await ciCall("/api/jenframes/for", { id, text: inp.value });
+        inp.classList.toggle("jf-saved", !!(res.data && res.data.ok));
+    }));
+    box.querySelectorAll(".jf-rm").forEach((b) => b.addEventListener("click", async () => {
+        const tr = b.closest("tr");
+        if (!confirm("Remove this frame from Jen's list?")) return;
+        const res = await ciCall("/api/jenframes/remove", { id: tr.dataset.id });
+        if (!(res.data && res.data.ok)) { alert((res.data && res.data.error) || "Couldn't remove it."); }
+        jfLoad(JF.month);
+    }));
+}
+
+async function jfScan(raw) {
+    const last = document.getElementById("jf-last");
+    last.className = "st-last"; last.textContent = "Checking…";
+    let r;
+    try { r = await ciCall("/api/jenframes/scan", { barcode: raw }); } catch (e) { r = { status: 0, data: {} }; }
+    if (ciLocked(r)) { ciUnlockPanel(r.data, renderJenFrames, "Jen's frames"); return; }
+    const d = r.data || {};
+    if (!d.ok) { last.className = "st-last st-last-err"; last.textContent = d.error || "Not saved - scan it again."; return; }
+    const ln = d.line;
+    const price = ln.cost_inc == null ? "no price - Mark will check" : stMoney(ln.cost_inc);
+    last.className = "st-last " + (ln.found ? "st-last-ok" : "st-last-unknown");
+    last.innerHTML = `<span class="st-last-count">✓</span><span><strong>${esc(ln.found ? ln.description : "Not in Optomate: " + ln.barcode)}</strong>
+        · ${esc(price)}${d.same_before ? ` · this frame is already on the list ${d.same_before === 1 ? "once" : d.same_before + " times"} this month` : ""}</span>`;
+    jfLoad();    // back to this month, where the scan went
+}
+
 /* --- Jobs arrived (scan job cards, confirm once) ------------------------------------ */
 /* Mark, 3 Nov 2026. The NETUM scanner types the job number + Enter into the box; each scan
    adds a line (type, job, patient, lens, ordered). Same card twice = one line. Grey = already
@@ -4852,7 +4947,7 @@ function renderJobsArrived() {
         <a class="btn btn-quiet btn-back" href="#/">← Home</a>
         <h1 class="page-title">Jobs arrived</h1>
         <div id="ja-mode"></div>
-        <p class="ja-how">Scan each job card - glasses or contacts. Then press Confirm once.</p>
+        <p class="ja-how">Scan each job card - glasses or contacts. Then press Confirm once. <a href="#/jen-frames">Jen taking a frame upstairs? Scan it here</a></p>
         <form id="ja-scan" class="ja-scan" autocomplete="off">
             <input id="ja-in" type="text" inputmode="numeric" autocomplete="off" spellcheck="false"
                    placeholder="Scan a job card" aria-label="Job number">

@@ -2307,3 +2307,10 @@ tr.ja-flash td { animation: ja-flash 1.2s ease-out; }
     #ja-list .ja-table th:nth-child(5), #ja-list .ja-table tr:not(.ja-others-row) td:nth-child(5) { display: none; }
     #ja-list .ja-table td { padding: 8px 6px; }
 }
+
+/* Jen's frames (#/jen-frames) */
+.jf-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.jf-head select { width: auto; }
+.jf-total { text-align: left; }
+.jf-for { font-size: 17px; padding: 6px 10px; min-width: 160px; }
+.jf-for.jf-saved { border-color: var(--green); }
