@@ -113,12 +113,12 @@
     {
       "id": "scleral-program",
       "title": "Scleral Lens Program Guide",
-      "version": "Nov 2026 (rev 3)",
+      "version": "Nov 2026 (rev 4)",
       "stage": "DECIDING",
       "language": "en",
-      "path": "CEC-Scleral-Program-Guide-A4.pdf",
-      "sha256": "411187768d3159f644823b3df5c7e6fff073da961c75cd56106b4ea97fff3761",
-      "approval_ref": "Mark approved rev 3 30 Oct 2026 (second-brain commits d9a51b02, ecd1e9f7: kit solution Soleko; approval recorded wiki/log.md 12 Nov). Published to Drive 12 Nov 2026: Patient guides - Deciding/PATIENT GUIDE - Scleral Lenses - Program (Nov 2026).pdf (hash checked against the export).",
+      "path": "CEC-Scleral-Program-Guide-A4-rev4.pdf",
+      "sha256": "67ec8f8e8ab8ef6e1f2a2c23535b33b21faa48e791fefcb6025da8fbc4e07a7f",
+      "approval_ref": "Mark approved rev 3 30 Oct 2026; kit line changed by Mark 27 Nov 2026 at Server Desk: \"disinfecting solution is Peroxide cleaning solution (eg. AO sept, Menisept, Soleko)\" (second-brain 3a755f80). Drive republished in place 27 Nov 2026 by Front Desk: Patient guides - Deciding/PATIENT GUIDE - Scleral Lenses - Program (Nov 2026).pdf, sha256 matches the export.",
       "classification": "decision",
       "active": true
     },
