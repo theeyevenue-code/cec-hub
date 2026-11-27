@@ -111,6 +111,18 @@
       "active": true
     },
     {
+      "id": "scleral-collecting",
+      "title": "Scleral Lens Collection Guide",
+      "version": "Nov 2026",
+      "stage": "COLLECTING",
+      "language": "en",
+      "path": "CEC-Scleral-Collection-Guide-A4.pdf",
+      "sha256": "ef9861f7b1cfa053d7bbd5326b2c62394c7f13e30926ec5f3c5ad477c1e51197",
+      "approval_ref": "Mark approved the rebuilt collection guide 30 Oct 2026 (insertion steps as they are, removal at 4 o'clock, peroxide only); kit solution wording Mark 27 Nov 2026 at Server Desk: \"disinfecting solution is Peroxide cleaning solution (eg. AO sept, Menisept, Soleko)\"; Hydra-PEG settled from Tangible's own sources (second-brain 4b3d62d4). Published to Drive 27 Nov 2026 on Mark's go via Front Desk: Patient guides - Collecting/PATIENT GUIDE - Scleral Lenses - Collection (Nov 2026).pdf (sha256 matches the export).",
+      "classification": "care",
+      "active": true
+    },
+    {
       "id": "scleral-program",
       "title": "Scleral Lens Program Guide",
       "version": "Nov 2026 (rev 4)",
